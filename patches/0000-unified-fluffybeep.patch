@@ -852,6 +852,199 @@ index 0000000..ebeb7b2
 +    return getLocalizedDisplayname(localizations);
 +  }
 +}
+diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
+new file mode 100644
+index 0000000..c685695
+--- /dev/null
++++ b/lib/widgets/cache_refresh_overlay.dart
+@@ -0,0 +1,187 @@
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
++import 'package:fluffychat/l10n/l10n.dart';
++
++class CacheRefreshOverlay extends StatefulWidget {
++  final Client client;
++  final SharedPreferences store;
++  final Widget child;
++
++  const CacheRefreshOverlay({
++    required this.client,
++    required this.store,
++    required this.child,
++    super.key,
++  });
++
++  @override
++  State<CacheRefreshOverlay> createState() => _CacheRefreshOverlayState();
++}
++
++class _CacheRefreshOverlayState extends State<CacheRefreshOverlay> {
++  bool _isSyncingInitial = true;
++  int _processedRooms = 0;
++  int _totalRooms = 0;
++  String _currentRoomName = '';
++  bool _completed = false;
++
++  @override
++  void initState() {
++    super.initState();
++    _startPrewarming();
++  }
++
++  Future<void> _startPrewarming() async {
++    // 1. Wait for initial sync to complete (so rooms list is loaded)
++    if (widget.client.prevBatch == null) {
++      await widget.client.onSync.stream
++          .firstWhere((syncUpdate) => widget.client.prevBatch != null);
++    }
++
++    if (!mounted) return;
++    setState(() {
++      _isSyncingInitial = false;
++      _totalRooms = widget.client.rooms.length;
++    });
++
++    final rooms = List<Room>.from(widget.client.rooms);
++    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
++
++    for (final room in rooms) {
++      if (!mounted) return;
++      
++      final l10n = L10n.of(context);
++      final roomName = room.getBeeperDisplayname(MatrixLocals(l10n));
++
++      setState(() {
++        _currentRoomName = roomName;
++      });
++
++      // 2. Pre-cache avatar
++      final avatarUri = BeeperBridgeUtils.isFakeDM(room)
++          ? (room.avatar ?? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl)
++          : room.avatar;
++
++      if (avatarUri != null) {
++        try {
++          await widget.client.downloadMxcCached(
++            avatarUri,
++            width: 48 * devicePixelRatio,
++            height: 48 * devicePixelRatio,
++            thumbnailMethod: ThumbnailMethod.scale,
++            isThumbnail: true,
++          );
++        } catch (_) {
++          // Ignore download errors to continue warming up remaining rooms
++        }
++      }
++
++      // 3. Pre-cache timeline history (fetch latest 30 messages)
++      try {
++        final timeline = await room.getTimeline();
++        await timeline.requestHistory(historyCount: 30);
++        timeline.cancelSubscriptions();
++      } catch (_) {
++        // Ignore timeline errors to continue warming up remaining rooms
++      }
++
++      if (!mounted) return;
++      setState(() {
++        _processedRooms++;
++      });
++    }
++
++    // 4. Mark cache refresh as completed
++    await widget.store.setBool('beeper_needs_cache_refresh', false);
++    if (!mounted) return;
++    setState(() {
++      _completed = true;
++    });
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    if (_completed) {
++      return widget.child;
++    }
++
++    final theme = Theme.of(context);
++    final progress = _totalRooms > 0 ? _processedRooms / _totalRooms : 0.0;
++
++    return Scaffold(
++      backgroundColor: theme.colorScheme.scrim.withOpacity(0.9),
++      body: Center(
++        child: Container(
++          width: 320,
++          padding: const EdgeInsets.all(24),
++          decoration: BoxDecoration(
++            color: theme.colorScheme.surface,
++            borderRadius: BorderRadius.circular(28),
++            boxShadow: [
++              BoxShadow(
++                color: Colors.black.withOpacity(0.2),
++                blurRadius: 16,
++                offset: const Offset(0, 8),
++              ),
++            ],
++          ),
++          child: Column(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              const SizedBox(height: 8),
++              Text(
++                "Calentando Cach├⌐...",
++                style: theme.textTheme.titleMedium?.copyWith(
++                  fontWeight: FontWeight.bold,
++                ),
++              ),
++              const SizedBox(height: 12),
++              Text(
++                "Estamos descargando tus avatares e historial de mensajes recientes para que tu scroll sea inmediato y offline.",
++                textAlign: TextAlign.center,
++                style: theme.textTheme.bodyMedium?.copyWith(
++                  color: theme.colorScheme.onSurfaceVariant,
++                ),
++              ),
++              const SizedBox(height: 24),
++              if (_isSyncingInitial) ...[
++                const CircularProgressIndicator.adaptive(),
++                const SizedBox(height: 16),
++                Text(
++                  "Sincronizando con el servidor...",
++                  style: theme.textTheme.bodySmall,
++                ),
++              ] else ...[
++                LinearProgressIndicator(
++                  value: progress,
++                  borderRadius: BorderRadius.circular(8),
++                  minHeight: 8,
++                ),
++                const SizedBox(height: 16),
++                Text(
++                  "Procesando ${_processedRooms} de ${_totalRooms} chats",
++                  style: theme.textTheme.bodyMedium?.copyWith(
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++                const SizedBox(height: 8),
++                Text(
++                  _currentRoomName,
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: theme.textTheme.bodySmall?.copyWith(
++                    color: theme.colorScheme.primary,
++                  ),
++                ),
++              ],
++              const SizedBox(height: 8),
++            ],
++          ),
++        ),
++      ),
++    );
++  }
++}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
 index 934de68..330bcca 100644
 --- a/lib/widgets/matrix.dart
