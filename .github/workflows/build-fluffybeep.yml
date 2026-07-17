@@ -12,10 +12,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🛎️ Checkout repository
+      - name: 🛎️ Checkout Fluffychat (Official Repo)
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Importante para Fluffychat
+          repository: 'krille-chan/fluffychat'
+          submodules: recursive
+          path: 'fluffychat'
+
+      - name: 🛎️ Checkout Patches (stickyfran/fluffybeep)
+        uses: actions/checkout@v4
+        with:
+          path: 'patches-repo'
 
       - name: ⚙️ Setup Java 17
         uses: actions/setup-java@v3
@@ -27,22 +34,30 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true # Activa la caché para acelerar builds futuros
-
-      - name: 📦 Install dependencies
-        run: flutter pub get
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
       - name: 🩹 Apply Fluffybeep Patches
         run: |
+          # Copia la carpeta de parches al directorio de fluffychat
+          cp -r patches-repo/patches fluffychat/patches
+          cd fluffychat
           chmod +x ./patches/patch-manager.sh
           ./patches/patch-manager.sh patch-only
 
+      - name: 📦 Install dependencies
+        run: |
+          cd fluffychat
+          flutter pub get
+
       - name: 🏗️ Build APK
-        run: flutter build apk --release
+        run: |
+          cd fluffychat
+          flutter build apk --release
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: fluffybeep-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: fluffychat/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
