@@ -1,9 +1,9 @@
 ﻿diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..e4a62de
+index 0000000..d1a5af2
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,84 @@
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +
@@ -18,7 +18,7 @@ index 0000000..e4a62de
 +  Future<void> reinitCache(BuildContext context) async {
 +    try {
 +      // 1. Stop the current sync process
-+      client.stopSync();
++      await client.stop();
 +
 +      // 2. Clear the database cache while keeping keys and session
 +      // Fluffychat's matrix client allows clearing cache without losing e2ee keys.
@@ -33,7 +33,10 @@ index 0000000..e4a62de
 +      }
 +
 +      // 4. Restart sync
-+      client.startSync();
++      await client.init(
++        waitForFirstSync: false,
++        waitUntilLoadCompletedLoaded: false,
++      );
 +
 +    } catch (e) {
 +      debugPrint('Error during Beeper cache reinitialization: $e');
