@@ -1,12 +1,14 @@
 ﻿diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..e68de34
+index 0000000..708d3bb
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,131 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++
++import 'package:fluffychat/widgets/matrix.dart';
 +
 +class BeeperReinitController {
 +  final Client client;
@@ -16,10 +18,14 @@ index 0000000..e68de34
 +  /// Purges local cache (SQLite tables for messages and avatars)
 +  Future<void> reinitCache(BuildContext context) async {
 +    try {
-+      // 1. Pause sync loop
++      // 1. Set the flag in SharedPreferences to trigger warming on next startup
++      final store = Matrix.of(context).store;
++      await store.setBool('beeper_needs_cache_refresh', true);
++
++      // 2. Pause sync loop
 +      client.backgroundSync = false;
 +
-+      // 2. Clear the database cache while keeping keys and session
++      // 3. Clear the database cache while keeping keys and session
 +      await client.database?.clearCache();
 +    } catch (e) {
 +      debugPrint('Error during Beeper cache reinitialization: $e');
@@ -212,6 +218,52 @@ index 6ceba8b..63c7306 100644
  
    bool isSearchMode = false;
    Future<QueryPublicRoomsResponse>? publicRoomsResponse;
+diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
+index 8610b92..8627f5f 100644
+--- a/lib/pages/chat_list/chat_list_body.dart
++++ b/lib/pages/chat_list/chat_list_body.dart
+@@ -16,6 +16,7 @@ import 'package:fluffychat/widgets/avatar.dart';
+ import 'package:flutter/cupertino.dart';
+ import 'package:flutter/material.dart';
+ import 'package:matrix/matrix.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ 
+ import '../../config/themes.dart';
+ import '../../widgets/adaptive_dialogs/user_dialog.dart';
+@@ -33,7 +34,8 @@ class ChatListViewBody extends StatelessWidget {
+ 
+     final client = Matrix.of(context).client;
+     final activeSpace = controller.activeSpaceId;
+-    if (activeSpace != null) {
++    final isVirtualSpace = activeSpace?.startsWith('virtual_space_') ?? false;
++    if (activeSpace != null && !isVirtualSpace) {
+       return SpaceView(
+         key: ValueKey(activeSpace),
+         spaceId: activeSpace,
+@@ -67,7 +69,7 @@ class ChatListViewBody extends StatelessWidget {
+           .where((s) => s.hasRoomUpdate)
+           .rateLimit(const Duration(seconds: 1)),
+       builder: (context, _) {
+-        final rooms = controller.filteredRooms
++        var rooms = controller.filteredRooms
+             .where(
+               (room) =>
+                   !AppSettings.hideRoomsInSpaces.value ||
+@@ -75,6 +77,14 @@ class ChatListViewBody extends StatelessWidget {
+             )
+             .toList();
+ 
++        if (isVirtualSpace) {
++          final virtualNetKey = activeSpace!.replaceFirst('virtual_space_', '');
++          rooms = rooms.where((room) {
++            final net = BeeperBridgeUtils.getRoomNetwork(room);
++            return net?.key == virtualNetKey;
++          }).toList();
++        }
++
+         return CustomScrollView(
+           controller: controller.scrollController,
+           slivers: [
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
 index 55d1d7e..9332c52 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
@@ -265,6 +317,338 @@ index 55d1d7e..9332c52 100644
                              size: space != null
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
+diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
+index a649171..62fb962 100644
+--- a/lib/pages/chat_list/navigation_rail.dart
++++ b/lib/pages/chat_list/navigation_rail.dart
+@@ -16,7 +16,9 @@ import 'package:flutter/material.dart';
+ import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+-class SpacesNavigationRail extends StatelessWidget {
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++
++class SpacesNavigationRail extends StatefulWidget {
+   final String? activeSpaceId;
+   final void Function() onGoToChats;
+   final void Function(String) onGoToSpaceId;
+@@ -28,9 +30,133 @@ class SpacesNavigationRail extends StatelessWidget {
+     super.key,
+   });
+ 
++  @override
++  State<SpacesNavigationRail> createState() => _SpacesNavigationRailState();
++}
++
++class _SpacesNavigationRailState extends State<SpacesNavigationRail> {
++  void _showNetworkMenu(
++    BuildContext context,
++    BeeperNetwork net,
++    List<BeeperNetwork> allNets,
++    dynamic store,
++  ) {
++    showModalBottomSheet(
++      context: context,
++      builder: (context) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.visibility_off_outlined),
++              title: Text('Ocultar ${net.name}'),
++              onTap: () async {
++                final hidden = List<String>.from(store.getStringList('beeper_hidden_networks') ?? []);
++                if (!hidden.contains(net.key)) {
++                  hidden.add(net.key);
++                  await store.setStringList('beeper_hidden_networks', hidden);
++                }
++                if (mounted) Navigator.of(context).pop();
++                setState(() {});
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.arrow_upward_outlined),
++              title: const Text('Mover hacia arriba'),
++              onTap: () async {
++                final order = List<String>.from(store.getStringList('beeper_networks_order') ?? allNets.map((n) => n.key).toList());
++                final idx = order.indexOf(net.key);
++                if (idx > 0) {
++                  final temp = order[idx];
++                  order[idx] = order[idx - 1];
++                  order[idx - 1] = temp;
++                  await store.setStringList('beeper_networks_order', order);
++                }
++                if (mounted) Navigator.of(context).pop();
++                setState(() {});
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.arrow_downward_outlined),
++              title: const Text('Mover hacia abajo'),
++              onTap: () async {
++                final order = List<String>.from(store.getStringList('beeper_networks_order') ?? allNets.map((n) => n.key).toList());
++                final idx = order.indexOf(net.key);
++                if (idx != -1 && idx < order.length - 1) {
++                  final temp = order[idx];
++                  order[idx] = order[idx + 1];
++                  order[idx + 1] = temp;
++                  await store.setStringList('beeper_networks_order', order);
++                }
++                if (mounted) Navigator.of(context).pop();
++                setState(() {});
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.restore_outlined),
++              title: const Text('Gestionar redes ocultas'),
++              onTap: () {
++                Navigator.of(context).pop();
++                _showManageHiddenNetworksDialog(context, store);
++              },
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
++  void _showManageHiddenNetworksDialog(BuildContext context, dynamic store) {
++    showDialog(
++      context: context,
++      builder: (context) {
++        final hidden = List<String>.from(store.getStringList('beeper_hidden_networks') ?? []);
++        if (hidden.isEmpty) {
++          return AlertDialog(
++            title: const Text('Redes ocultas'),
++            content: const Text('No tienes ninguna red oculta actualmente.'),
++            actions: [
++              TextButton(
++                onPressed: () => Navigator.of(context).pop(),
++                child: const Text('Aceptar'),
++              ),
++            ],
++          );
++        }
++        return AlertDialog(
++          title: const Text('Restaurar redes ocultas'),
++          content: SizedBox(
++            width: double.maxFinite,
++            child: ListView.builder(
++              shrinkWrap: true,
++              itemCount: hidden.length,
++              itemBuilder: (context, i) {
++                final netKey = hidden[i];
++                final displayName = BeeperBridgeUtils.networkMap[netKey]?.name ?? netKey;
++                return ListTile(
++                  title: Text(displayName),
++                  trailing: IconButton(
++                    icon: const Icon(Icons.add_circle_outline),
++                    onPressed: () async {
++                      hidden.remove(netKey);
++                      await store.setStringList('beeper_hidden_networks', hidden);
++                      if (mounted) Navigator.of(context).pop();
++                      setState(() {});
++                    },
++                  ),
++                );
++              },
++            ),
++          ),
++        );
++      },
++    );
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     final client = Matrix.of(context).client;
++    final store = Matrix.of(context).store;
+     final coloredMode = !FluffyThemes.isColumnMode(context);
+     final theme = Theme.of(context);
+     return Material(
+@@ -46,6 +172,37 @@ class SpacesNavigationRail extends StatelessWidget {
+                 .where((room) => room.isSpace)
+                 .toList();
+ 
++            // Extract unique Beeper networks from client rooms
++            final beeperNetworks = <String, BeeperNetwork>{};
++            for (final r in client.rooms) {
++              final net = BeeperBridgeUtils.getRoomNetwork(r);
++              if (net != null) {
++                beeperNetworks[net.key] = net;
++              }
++            }
++
++            final networksList = beeperNetworks.values.toList();
++            final hiddenNets = store.getStringList('beeper_hidden_networks') ?? [];
++            final visibleNetworks = networksList.where((n) => !hiddenNets.contains(n.key)).toList();
++
++            final order = store.getStringList('beeper_networks_order') ?? [];
++            visibleNetworks.sort((a, b) {
++              final idxA = order.indexOf(a.key);
++              final idxB = order.indexOf(b.key);
++              if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
++              if (idxA != -1) return -1;
++              if (idxB != -1) return 1;
++              return a.name.compareTo(b.name);
++            });
++
++            final combinedItems = <_CombinedRailItem>[];
++            for (final space in allSpaces) {
++              combinedItems.add(_CombinedRailItem.space(space));
++            }
++            for (final net in visibleNetworks) {
++              combinedItems.add(_CombinedRailItem.network(net));
++            }
++
+             return SizedBox(
+               width: FluffyThemes.isColumnMode(context)
+                   ? FluffyThemes.navRailWidth
+@@ -54,14 +211,14 @@ class SpacesNavigationRail extends StatelessWidget {
+                 children: [
+                   Expanded(
+                     child: ListView.builder(
+-                      padding: EdgeInsets.symmetric(vertical: 4),
++                      padding: const EdgeInsets.symmetric(vertical: 4),
+                       scrollDirection: Axis.vertical,
+-                      itemCount: allSpaces.length + 2,
++                      itemCount: combinedItems.length + 2,
+                       itemBuilder: (context, i) {
+                         if (i == 0) {
+                           return NaviRailItem(
+-                            isSelected: activeSpaceId == null,
+-                            onTap: onGoToChats,
++                            isSelected: widget.activeSpaceId == null,
++                            onTap: widget.onGoToChats,
+                             icon: const Padding(
+                               padding: EdgeInsets.all(12.0),
+                               child: Icon(Icons.forum_outlined),
+@@ -75,7 +232,7 @@ class SpacesNavigationRail extends StatelessWidget {
+                           );
+                         }
+                         i--;
+-                        if (i == allSpaces.length) {
++                        if (i == combinedItems.length) {
+                           return NaviRailItem(
+                             isSelected: false,
+                             onTap: () => context.go('/rooms/newspace'),
+@@ -86,38 +243,72 @@ class SpacesNavigationRail extends StatelessWidget {
+                             toolTip: L10n.of(context).createNewSpace,
+                           );
+                         }
+-                        final space = allSpaces[i];
+-                        final displayname = allSpaces[i]
+-                            .getLocalizedDisplayname(
+-                              MatrixLocals(L10n.of(context)),
+-                            );
+-                        final spaceChildrenIds = space.spaceChildren
+-                            .map((c) => c.roomId)
+-                            .toSet();
+-                        return NaviRailItem(
+-                          toolTip: displayname,
+-                          isSelected: activeSpaceId == space.id,
+-                          onTap: () => onGoToSpaceId(allSpaces[i].id),
+-                          unreadBadgeFilter: (room) =>
+-                              spaceChildrenIds.contains(room.id),
+-                          icon: Avatar(
+-                            mxContent: allSpaces[i].avatar,
+-                            name: displayname,
+-                            //size: 36,
+-                            shapeBorder: RoundedSuperellipseBorder(
+-                              side: BorderSide(
+-                                width: 1,
+-                                color: Theme.of(context).dividerColor,
++                        final item = combinedItems[i];
++                        if (item.isSpace) {
++                          final space = item.space!;
++                          final displayname = space.getLocalizedDisplayname(
++                            MatrixLocals(L10n.of(context)),
++                          );
++                          final spaceChildrenIds = space.spaceChildren
++                              .map((c) => c.roomId)
++                              .toSet();
++                          return NaviRailItem(
++                            toolTip: displayname,
++                            isSelected: widget.activeSpaceId == space.id,
++                            onTap: () => widget.onGoToSpaceId(space.id),
++                            unreadBadgeFilter: (room) =>
++                                spaceChildrenIds.contains(room.id),
++                            icon: Avatar(
++                              mxContent: space.avatar,
++                              name: displayname,
++                              shapeBorder: RoundedSuperellipseBorder(
++                                side: BorderSide(
++                                  width: 1,
++                                  color: Theme.of(context).dividerColor,
++                                ),
++                                borderRadius: BorderRadius.circular(
++                                  AppConfig.spaceBorderRadius,
++                                ),
+                               ),
+                               borderRadius: BorderRadius.circular(
+                                 AppConfig.spaceBorderRadius,
+                               ),
+                             ),
+-                            borderRadius: BorderRadius.circular(
+-                              AppConfig.spaceBorderRadius,
++                          );
++                        } else {
++                          final net = item.network!;
++                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
++                          return Material(
++                            color: Colors.transparent,
++                            child: InkWell(
++                              onLongPress: () => _showNetworkMenu(context, net, networksList, store),
++                              child: NaviRailItem(
++                                toolTip: net.name,
++                                isSelected: isSelected,
++                                onTap: () => widget.onGoToSpaceId('virtual_space_${net.key}'),
++                                unreadBadgeFilter: (room) =>
++                                    BeeperBridgeUtils.getRoomNetwork(room)?.key == net.key,
++                                icon: Avatar(
++                                  name: net.name.substring(0, 1),
++                                  backgroundColor: Color(net.colorHex),
++                                  textColor: Colors.white,
++                                  shapeBorder: RoundedSuperellipseBorder(
++                                    side: BorderSide(
++                                      width: 1,
++                                      color: Theme.of(context).dividerColor,
++                                    ),
++                                    borderRadius: BorderRadius.circular(
++                                      AppConfig.spaceBorderRadius,
++                                    ),
++                                  ),
++                                  borderRadius: BorderRadius.circular(
++                                    AppConfig.spaceBorderRadius,
++                                  ),
++                                ),
++                              ),
+                             ),
+-                          ),
+-                        );
++                          );
++                        }
+                       },
+                     ),
+                   ),
+@@ -135,3 +326,17 @@ class SpacesNavigationRail extends StatelessWidget {
+     );
+   }
+ }
++
++class _CombinedRailItem {
++  final Room? space;
++  final BeeperNetwork? network;
++  final bool isSpace;
++
++  _CombinedRailItem.space(this.space)
++      : network = null,
++        isSpace = true;
++
++  _CombinedRailItem.network(this.network)
++      : space = null,
++        isSpace = false;
++}
 diff --git a/lib/pages/settings/settings_view.dart b/lib/pages/settings/settings_view.dart
 index 029e7bc..8a6c4b2 100644
 --- a/lib/pages/settings/settings_view.dart
@@ -326,10 +710,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..d4fa4f4
+index 0000000..ebeb7b2
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,135 @@
 +import 'package:matrix/matrix.dart';
 +
 +class BeeperBridgeUtils {
@@ -390,6 +774,68 @@ index 0000000..d4fa4f4
 +    
 +    return null;
 +  }
++
++  static const Map<String, _BeeperNetSpec> networkMap = {
++    'whatsapp': _BeeperNetSpec('WhatsApp', 0xFF25D366),
++    'whatsappgo': _BeeperNetSpec('WhatsApp', 0xFF25D366),
++    'instagram': _BeeperNetSpec('Instagram', 0xFFE1306C),
++    'instagramgo': _BeeperNetSpec('Instagram', 0xFFE1306C),
++    'telegram': _BeeperNetSpec('Telegram', 0xFF2AABEE),
++    'telegramgo': _BeeperNetSpec('Telegram', 0xFF2AABEE),
++    'signal': _BeeperNetSpec('Signal', 0xFF3A76F0),
++    'signalgo': _BeeperNetSpec('Signal', 0xFF3A76F0),
++    'discord': _BeeperNetSpec('Discord', 0xFF5865F2),
++    'discordgo': _BeeperNetSpec('Discord', 0xFF5865F2),
++    'facebook': _BeeperNetSpec('Messenger', 0xFF00B2FF),
++    'facebookgo': _BeeperNetSpec('Messenger', 0xFF00B2FF),
++    'slack': _BeeperNetSpec('Slack', 0xFF4A154B),
++    'slackgo': _BeeperNetSpec('Slack', 0xFF4A154B),
++    'googlechat': _BeeperNetSpec('Google Chat', 0xFF34A853),
++    'googlechatgo': _BeeperNetSpec('Google Chat', 0xFF34A853),
++  };
++
++  /// Returns the detected Beeper network for a given room, or null if none is found.
++  static BeeperNetwork? getRoomNetwork(Room room) {
++    final participants = room.getParticipants();
++    for (final p in participants) {
++      if (p.id == room.client.userID) continue;
++      final localpart = p.id.split(':').first;
++      if (localpart.startsWith('@')) {
++        final rawPrefix = localpart.substring(1);
++        for (final entry in networkMap.entries) {
++          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
++            return BeeperNetwork(entry.value.name, entry.value.colorHex, entry.key);
++          }
++        }
++      }
++    }
++    final directId = room.directChatMatrixID;
++    if (directId != null) {
++      final localpart = directId.split(':').first;
++      if (localpart.startsWith('@')) {
++        final rawPrefix = localpart.substring(1);
++        for (final entry in networkMap.entries) {
++          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
++            return BeeperNetwork(entry.value.name, entry.value.colorHex, entry.key);
++          }
++        }
++      }
++    }
++    return null;
++  }
++}
++
++class BeeperNetwork {
++  final String name;
++  final int colorHex;
++  final String key;
++  const BeeperNetwork(this.name, this.colorHex, this.key);
++}
++
++class _BeeperNetSpec {
++  final String name;
++  final int colorHex;
++  const _BeeperNetSpec(this.name, this.colorHex);
 +}
 +
 +extension RoomBeeperExtension on Room {
@@ -403,3 +849,32 @@ index 0000000..d4fa4f4
 +    return getLocalizedDisplayname(localizations);
 +  }
 +}
+diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
+index 934de68..330bcca 100644
+--- a/lib/widgets/matrix.dart
++++ b/lib/widgets/matrix.dart
+@@ -35,6 +35,7 @@ import '../pages/key_verification/key_verification_dialog.dart';
+ import '../utils/account_bundles.dart';
+ import '../utils/background_push.dart';
+ import 'local_notifications_extension.dart';
++import 'cache_refresh_overlay.dart';
+ 
+ class Matrix extends StatefulWidget {
+   final Widget? child;
+@@ -409,7 +410,15 @@ class MatrixState extends State<Matrix> {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    return Provider(create: (_) => this, child: widget.child);
++    Widget current = widget.child ?? const SizedBox.shrink();
++    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
++      current = CacheRefreshOverlay(
++        client: client,
++        store: widget.store,
++        child: current,
++      );
++    }
++    return Provider(create: (_) => this, child: current);
+   }
+ 
+   Future<void> dehydrateAction(BuildContext context) async {
