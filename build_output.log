@@ -221,8 +221,9 @@ Caught exception: Already watching path: /home/runner/work/fluffybeep/fluffybeep
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':app:validateSigningRelease'.
-> Keystore file '/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/app/dummy.keystore' not found for signing config 'release'.
+Execution failed for task ':app:packageRelease'.
+> A failure occurred while executing com.android.build.gradle.tasks.PackageAndroidArtifact$IncrementalSplitterRunnable
+   > com.android.ide.common.signing.KeytoolException: Failed to read key dummyAlias from store "/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/app/dummy.keystore": Get Key failed: Given final block not properly padded. Such issues can arise if a bad key is used during decryption.
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -230,6 +231,6 @@ Execution failed for task ':app:validateSigningRelease'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 12m 44s
-Running Gradle task 'assembleRelease'...                          765.8s
+BUILD FAILED in 15m 9s
+Running Gradle task 'assembleRelease'...                          909.6s
 Gradle task assembleRelease failed with exit code 1
