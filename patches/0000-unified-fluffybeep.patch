@@ -220,18 +220,35 @@ index 6ceba8b..63c7306 100644
    bool isSearchMode = false;
    Future<QueryPublicRoomsResponse>? publicRoomsResponse;
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..8627f5f 100644
+index 8610b92..5175412 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -16,6 +16,7 @@ import 'package:fluffychat/widgets/avatar.dart';
- import 'package:flutter/cupertino.dart';
- import 'package:flutter/material.dart';
- import 'package:matrix/matrix.dart';
+@@ -3,6 +3,10 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
++import 'package:flutter/cupertino.dart';
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++
+ import 'package:fluffychat/config/setting_keys.dart';
+ import 'package:fluffychat/l10n/l10n.dart';
+ import 'package:fluffychat/pages/chat_list/chat_list.dart';
+@@ -10,12 +14,10 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+ import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
+ import 'package:fluffychat/pages/chat_list/search_title.dart';
+ import 'package:fluffychat/pages/chat_list/space_view.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:fluffychat/utils/stream_extension.dart';
+ import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
+-import 'package:flutter/cupertino.dart';
+-import 'package:flutter/material.dart';
+-import 'package:matrix/matrix.dart';
  
  import '../../config/themes.dart';
  import '../../widgets/adaptive_dialogs/user_dialog.dart';
-@@ -33,7 +34,8 @@ class ChatListViewBody extends StatelessWidget {
+@@ -33,7 +35,8 @@ class ChatListViewBody extends StatelessWidget {
  
      final client = Matrix.of(context).client;
      final activeSpace = controller.activeSpaceId;
@@ -241,7 +258,7 @@ index 8610b92..8627f5f 100644
        return SpaceView(
          key: ValueKey(activeSpace),
          spaceId: activeSpace,
-@@ -67,7 +69,7 @@ class ChatListViewBody extends StatelessWidget {
+@@ -67,7 +70,7 @@ class ChatListViewBody extends StatelessWidget {
            .where((s) => s.hasRoomUpdate)
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
@@ -250,7 +267,7 @@ index 8610b92..8627f5f 100644
              .where(
                (room) =>
                    !AppSettings.hideRoomsInSpaces.value ||
-@@ -75,6 +77,14 @@ class ChatListViewBody extends StatelessWidget {
+@@ -75,6 +78,14 @@ class ChatListViewBody extends StatelessWidget {
              )
              .toList();
  
@@ -319,23 +336,39 @@ index 55d1d7e..9332c52 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..3511855 100644
+index a649171..0b5d99f 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -15,8 +15,11 @@ import 'package:fluffychat/widgets/matrix.dart';
- import 'package:flutter/material.dart';
- import 'package:go_router/go_router.dart';
- import 'package:matrix/matrix.dart';
+@@ -1,22 +1,20 @@
+-// SPDX-FileCopyrightText: 2019-Present Christian Ku├ƒowski
+-// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+-//
+-// SPDX-License-Identifier: AGPL-3.0-or-later
++import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
++import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
  
--class SpacesNavigationRail extends StatelessWidget {
+ import 'package:fluffychat/config/app_config.dart';
+ import 'package:fluffychat/config/themes.dart';
+ import 'package:fluffychat/l10n/l10n.dart';
+ import 'package:fluffychat/pages/chat_list/navi_rail_item.dart';
+ import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
-+
+ import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+ import 'package:fluffychat/utils/stream_extension.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+-import 'package:flutter/material.dart';
+-import 'package:go_router/go_router.dart';
+-import 'package:matrix/matrix.dart';
+ 
+-class SpacesNavigationRail extends StatelessWidget {
 +class SpacesNavigationRail extends StatefulWidget {
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +31,133 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +26,133 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -469,7 +502,7 @@ index a649171..3511855 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -46,6 +173,37 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -46,6 +168,37 @@ class SpacesNavigationRail extends StatelessWidget {
                  .where((room) => room.isSpace)
                  .toList();
  
@@ -507,7 +540,7 @@ index a649171..3511855 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +212,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +207,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -526,7 +559,7 @@ index a649171..3511855 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +233,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +228,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -535,7 +568,7 @@ index a649171..3511855 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +244,72 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +239,72 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -634,7 +667,7 @@ index a649171..3511855 100644
                        },
                      ),
                    ),
-@@ -135,3 +327,17 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +322,17 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -1047,17 +1080,17 @@ index 0000000..28d2b38
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..330bcca 100644
+index 934de68..5bf25ab 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -35,6 +35,7 @@ import '../pages/key_verification/key_verification_dialog.dart';
+@@ -34,6 +34,7 @@ import '../config/setting_keys.dart';
+ import '../pages/key_verification/key_verification_dialog.dart';
  import '../utils/account_bundles.dart';
  import '../utils/background_push.dart';
- import 'local_notifications_extension.dart';
 +import 'cache_refresh_overlay.dart';
+ import 'local_notifications_extension.dart';
  
  class Matrix extends StatefulWidget {
-   final Widget? child;
 @@ -409,7 +410,15 @@ class MatrixState extends State<Matrix> {
  
    @override
