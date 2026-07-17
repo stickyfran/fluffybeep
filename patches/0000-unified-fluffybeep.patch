@@ -336,19 +336,18 @@ index 55d1d7e..9332c52 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..647bb63 100644
+index a649171..c2ebad1 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -1,22 +1,20 @@
--// SPDX-FileCopyrightText: 2019-Present Christian Ku├ƒowski
--// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
--//
--// SPDX-License-Identifier: AGPL-3.0-or-later
+@@ -3,20 +3,23 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
 +import 'package:flutter/material.dart';
 +import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
- 
++
  import 'package:fluffychat/config/app_config.dart';
  import 'package:fluffychat/config/themes.dart';
  import 'package:fluffychat/l10n/l10n.dart';
@@ -368,7 +367,7 @@ index a649171..647bb63 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +26,137 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +31,137 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -506,7 +505,7 @@ index a649171..647bb63 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -46,6 +172,37 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -46,6 +177,37 @@ class SpacesNavigationRail extends StatelessWidget {
                  .where((room) => room.isSpace)
                  .toList();
  
@@ -544,7 +543,7 @@ index a649171..647bb63 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +211,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +216,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -563,7 +562,7 @@ index a649171..647bb63 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +232,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +237,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -572,7 +571,7 @@ index a649171..647bb63 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +243,72 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +248,72 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -671,7 +670,7 @@ index a649171..647bb63 100644
                        },
                      ),
                    ),
-@@ -135,3 +326,17 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +331,17 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -891,16 +890,18 @@ index 0000000..cfb34a9
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..28d2b38
+index 0000000..b6f6887
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,190 @@
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
-+import 'package:fluffychat/utils/beeper_bridge_utils.dart';
-+import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
++
 +import 'package:fluffychat/l10n/l10n.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/client_download_content_extension.dart';
++import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 +
 +class CacheRefreshOverlay extends StatefulWidget {
 +  final Client client;
