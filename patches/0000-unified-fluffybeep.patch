@@ -1,12 +1,13 @@
 ﻿diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..708d3bb
+index 0000000..fc5cb33
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,132 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
 +
 +import 'package:fluffychat/widgets/matrix.dart';
 +
