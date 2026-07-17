@@ -854,10 +854,10 @@ index 0000000..cfb34a9
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..c685695
+index 0000000..28d2b38
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,187 @@
+@@ -0,0 +1,188 @@
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
@@ -895,6 +895,9 @@ index 0000000..c685695
 +  }
 +
 +  Future<void> _startPrewarming() async {
++    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
++    final l10n = L10n.of(context);
++
 +    // 1. Wait for initial sync to complete (so rooms list is loaded)
 +    if (widget.client.prevBatch == null) {
 +      await widget.client.onSync.stream
@@ -908,12 +911,10 @@ index 0000000..c685695
 +    });
 +
 +    final rooms = List<Room>.from(widget.client.rooms);
-+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
 +
 +    for (final room in rooms) {
 +      if (!mounted) return;
 +      
-+      final l10n = L10n.of(context);
 +      final roomName = room.getBeeperDisplayname(MatrixLocals(l10n));
 +
 +      setState(() {
