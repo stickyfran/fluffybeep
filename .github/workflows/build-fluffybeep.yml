@@ -7,6 +7,9 @@ on:
       - master
   workflow_dispatch: # Permite ejecución manual
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -73,3 +76,20 @@ jobs:
           name: fluffybeep-release-apk
           path: fluffychat/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
+      - name: 🚀 Release APK on GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Fluffybeep v1.0.${{ github.run_number }} - Beeper Patches"
+          body: |
+            ### Initial Release & Beeper Enhancements
+            This release contains the custom compiled APK for Fluffychat with native Beeper bridge support.
+            
+            **Changes included:**
+            - **Room Name Correction**: Fixes bridged direct messages (WhatsApp, Telegram, etc.) showing as "Grupo con [Nombre]" to display only the contact name.
+            - **Beeper Re-sync**: Added a cache-clearing button in Settings to purge room metadata, profiles, and avatares safely.
+            - **Reproducible Signatures**: Signed with a permanent keystore key to allow updating the app without reinstalling.
+          files: fluffychat/build/app/outputs/flutter-apk/app-release.apk
+          draft: false
+          prerelease: false
