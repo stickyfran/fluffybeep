@@ -336,7 +336,7 @@ index 55d1d7e..9332c52 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..0b5d99f 100644
+index a649171..647bb63 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -1,22 +1,20 @@
@@ -368,7 +368,7 @@ index a649171..0b5d99f 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +26,133 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +26,137 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -393,12 +393,13 @@ index a649171..0b5d99f 100644
 +              leading: const Icon(Icons.visibility_off_outlined),
 +              title: Text('Ocultar ${net.name}'),
 +              onTap: () async {
++                final navigator = Navigator.of(context);
 +                final hidden = List<String>.from(store.getStringList('beeper_hidden_networks') ?? []);
 +                if (!hidden.contains(net.key)) {
 +                  hidden.add(net.key);
 +                  await store.setStringList('beeper_hidden_networks', hidden);
 +                }
-+                if (mounted) Navigator.of(context).pop();
++                navigator.pop();
 +                setState(() {});
 +              },
 +            ),
@@ -406,6 +407,7 @@ index a649171..0b5d99f 100644
 +              leading: const Icon(Icons.arrow_upward_outlined),
 +              title: const Text('Mover hacia arriba'),
 +              onTap: () async {
++                final navigator = Navigator.of(context);
 +                final order = List<String>.from(store.getStringList('beeper_networks_order') ?? allNets.map((n) => n.key).toList());
 +                final idx = order.indexOf(net.key);
 +                if (idx > 0) {
@@ -414,7 +416,7 @@ index a649171..0b5d99f 100644
 +                  order[idx - 1] = temp;
 +                  await store.setStringList('beeper_networks_order', order);
 +                }
-+                if (mounted) Navigator.of(context).pop();
++                navigator.pop();
 +                setState(() {});
 +              },
 +            ),
@@ -422,6 +424,7 @@ index a649171..0b5d99f 100644
 +              leading: const Icon(Icons.arrow_downward_outlined),
 +              title: const Text('Mover hacia abajo'),
 +              onTap: () async {
++                final navigator = Navigator.of(context);
 +                final order = List<String>.from(store.getStringList('beeper_networks_order') ?? allNets.map((n) => n.key).toList());
 +                final idx = order.indexOf(net.key);
 +                if (idx != -1 && idx < order.length - 1) {
@@ -430,7 +433,7 @@ index a649171..0b5d99f 100644
 +                  order[idx + 1] = temp;
 +                  await store.setStringList('beeper_networks_order', order);
 +                }
-+                if (mounted) Navigator.of(context).pop();
++                navigator.pop();
 +                setState(() {});
 +              },
 +            ),
@@ -480,9 +483,10 @@ index a649171..0b5d99f 100644
 +                  trailing: IconButton(
 +                    icon: const Icon(Icons.add_circle_outline),
 +                    onPressed: () async {
++                      final navigator = Navigator.of(context);
 +                      hidden.remove(netKey);
 +                      await store.setStringList('beeper_hidden_networks', hidden);
-+                      if (mounted) Navigator.of(context).pop();
++                      navigator.pop();
 +                      setState(() {});
 +                    },
 +                  ),
@@ -502,7 +506,7 @@ index a649171..0b5d99f 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -46,6 +168,37 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -46,6 +172,37 @@ class SpacesNavigationRail extends StatelessWidget {
                  .where((room) => room.isSpace)
                  .toList();
  
@@ -540,7 +544,7 @@ index a649171..0b5d99f 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +207,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +211,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -559,7 +563,7 @@ index a649171..0b5d99f 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +228,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +232,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -568,7 +572,7 @@ index a649171..0b5d99f 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +239,72 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +243,72 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -667,7 +671,7 @@ index a649171..0b5d99f 100644
                        },
                      ),
                    ),
-@@ -135,3 +322,17 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +326,17 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
