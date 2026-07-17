@@ -50,18 +50,9 @@ jobs:
           cd fluffychat
           flutter pub get
 
-      - name: 🔑 Generate Dummy Keystore
+      - name: 🔑 Copy Release Keystore
         run: |
-          keytool -genkey -v \
-            -keystore fluffychat/android/app/dummy.keystore \
-            -alias dummyAlias \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storetype JKS \
-            -storepass dummyStorePassword \
-            -keypass dummyPassword \
-            -dname "CN=Fluffybeep, O=Fluffybeep, C=US"
+          cp patches-repo/patches/release.keystore fluffychat/android/app/dummy.keystore
 
       - name: 🏗️ Build APK
         run: |
