@@ -180,8 +180,40 @@ index 4cda41c..7354407 100644
            MatrixLocals(L10n.of(context)),
          );
          return Scaffold(
+diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
+index 6ceba8b..63c7306 100644
+--- a/lib/pages/chat_list/chat_list.dart
++++ b/lib/pages/chat_list/chat_list.dart
+@@ -149,9 +149,24 @@ class ChatListController extends State<ChatList>
+     }
+   }
+ 
+-  List<Room> get filteredRooms => Matrix.of(
+-    context,
+-  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
++  List<Room> get filteredRooms {
++    final rooms = Matrix.of(context)
++        .client
++        .rooms
++        .where(getRoomFilterByActiveFilter(activeFilter))
++        .toList();
++    rooms.sort((a, b) {
++      if (a.isFavourite && !b.isFavourite) return -1;
++      if (!a.isFavourite && b.isFavourite) return 1;
++      if (a.isLowPriority && !b.isLowPriority) return 1;
++      if (!a.isLowPriority && b.isLowPriority) return -1;
++
++      final aTime = a.lastEvent?.originServerTs ?? a.latestEventReceivedTime;
++      final bTime = b.lastEvent?.originServerTs ?? b.latestEventReceivedTime;
++      return bTime.compareTo(aTime);
++    });
++    return rooms;
++  }
+ 
+   bool isSearchMode = false;
+   Future<QueryPublicRoomsResponse>? publicRoomsResponse;
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..9d456e0 100644
+index 55d1d7e..9332c52 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -192,7 +224,18 @@ index 55d1d7e..9d456e0 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -52,7 +53,7 @@ class ChatListItem extends StatelessWidget {
+@@ -46,13 +47,16 @@ class ChatListItem extends StatelessWidget {
+     final typingText = room.getLocalizedTypingText(context);
+     final lastEvent = room.lastEvent;
+     final ownMessage = lastEvent?.senderId == room.client.userID;
+-    final directChatMatrixId = room.directChatMatrixID;
+-    final isDirectChat = directChatMatrixId != null;
++    final isBeeperFakeDM = BeeperBridgeUtils.isFakeDM(room);
++    final directChatMatrixId = isBeeperFakeDM 
++        ? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.id 
++        : room.directChatMatrixID;
++    final isDirectChat = directChatMatrixId != null || isBeeperFakeDM;
+     final hasNotifications = room.notificationCount > 0;
      final backgroundColor = activeChat
          ? theme.colorScheme.secondaryContainer
          : null;
@@ -201,6 +244,27 @@ index 55d1d7e..9d456e0 100644
        MatrixLocals(L10n.of(context)),
      );
      final filter = this.filter;
+@@ -63,7 +67,10 @@ class ChatListItem extends StatelessWidget {
+     final needLastEventSender =
+         lastEvent != null &&
+         room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
+-    final space = this.space;
++    final space = isBeeperFakeDM ? null : this.space;
++    final mxContent = isBeeperFakeDM 
++        ? (room.avatar ?? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl) 
++        : room.avatar;
+ 
+     return Padding(
+       padding: const EdgeInsets.symmetric(horizontal: 8),
+@@ -145,7 +152,7 @@ class ChatListItem extends StatelessWidget {
+                                     AppConfig.spaceBorderRadius,
+                                   )
+                                 : null,
+-                            mxContent: room.avatar,
++                            mxContent: mxContent,
+                             size: space != null
+                                 ? Avatar.defaultSize * 0.75
+                                 : Avatar.defaultSize,
 diff --git a/lib/pages/settings/settings_view.dart b/lib/pages/settings/settings_view.dart
 index 029e7bc..8a6c4b2 100644
 --- a/lib/pages/settings/settings_view.dart
