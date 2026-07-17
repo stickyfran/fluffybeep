@@ -713,7 +713,7 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..ebeb7b2
+index 0000000..cfb34a9
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
 @@ -0,0 +1,135 @@
@@ -778,23 +778,23 @@ index 0000000..ebeb7b2
 +    return null;
 +  }
 +
-+  static const Map<String, _BeeperNetSpec> networkMap = {
-+    'whatsapp': _BeeperNetSpec('WhatsApp', 0xFF25D366),
-+    'whatsappgo': _BeeperNetSpec('WhatsApp', 0xFF25D366),
-+    'instagram': _BeeperNetSpec('Instagram', 0xFFE1306C),
-+    'instagramgo': _BeeperNetSpec('Instagram', 0xFFE1306C),
-+    'telegram': _BeeperNetSpec('Telegram', 0xFF2AABEE),
-+    'telegramgo': _BeeperNetSpec('Telegram', 0xFF2AABEE),
-+    'signal': _BeeperNetSpec('Signal', 0xFF3A76F0),
-+    'signalgo': _BeeperNetSpec('Signal', 0xFF3A76F0),
-+    'discord': _BeeperNetSpec('Discord', 0xFF5865F2),
-+    'discordgo': _BeeperNetSpec('Discord', 0xFF5865F2),
-+    'facebook': _BeeperNetSpec('Messenger', 0xFF00B2FF),
-+    'facebookgo': _BeeperNetSpec('Messenger', 0xFF00B2FF),
-+    'slack': _BeeperNetSpec('Slack', 0xFF4A154B),
-+    'slackgo': _BeeperNetSpec('Slack', 0xFF4A154B),
-+    'googlechat': _BeeperNetSpec('Google Chat', 0xFF34A853),
-+    'googlechatgo': _BeeperNetSpec('Google Chat', 0xFF34A853),
++  static const Map<String, BeeperNetSpec> networkMap = {
++    'whatsapp': BeeperNetSpec('WhatsApp', 0xFF25D366),
++    'whatsappgo': BeeperNetSpec('WhatsApp', 0xFF25D366),
++    'instagram': BeeperNetSpec('Instagram', 0xFFE1306C),
++    'instagramgo': BeeperNetSpec('Instagram', 0xFFE1306C),
++    'telegram': BeeperNetSpec('Telegram', 0xFF2AABEE),
++    'telegramgo': BeeperNetSpec('Telegram', 0xFF2AABEE),
++    'signal': BeeperNetSpec('Signal', 0xFF3A76F0),
++    'signalgo': BeeperNetSpec('Signal', 0xFF3A76F0),
++    'discord': BeeperNetSpec('Discord', 0xFF5865F2),
++    'discordgo': BeeperNetSpec('Discord', 0xFF5865F2),
++    'facebook': BeeperNetSpec('Messenger', 0xFF00B2FF),
++    'facebookgo': BeeperNetSpec('Messenger', 0xFF00B2FF),
++    'slack': BeeperNetSpec('Slack', 0xFF4A154B),
++    'slackgo': BeeperNetSpec('Slack', 0xFF4A154B),
++    'googlechat': BeeperNetSpec('Google Chat', 0xFF34A853),
++    'googlechatgo': BeeperNetSpec('Google Chat', 0xFF34A853),
 +  };
 +
 +  /// Returns the detected Beeper network for a given room, or null if none is found.
@@ -835,10 +835,10 @@ index 0000000..ebeb7b2
 +  const BeeperNetwork(this.name, this.colorHex, this.key);
 +}
 +
-+class _BeeperNetSpec {
++class BeeperNetSpec {
 +  final String name;
 +  final int colorHex;
-+  const _BeeperNetSpec(this.name, this.colorHex);
++  const BeeperNetSpec(this.name, this.colorHex);
 +}
 +
 +extension RoomBeeperExtension on Room {
