@@ -318,12 +318,14 @@ index 55d1d7e..9332c52 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..62fb962 100644
+index a649171..3511855 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -16,7 +16,9 @@ import 'package:flutter/material.dart';
+@@ -15,8 +15,11 @@ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:flutter/material.dart';
  import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
  
 -class SpacesNavigationRail extends StatelessWidget {
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
@@ -332,7 +334,7 @@ index a649171..62fb962 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +30,133 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +31,133 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -345,7 +347,7 @@ index a649171..62fb962 100644
 +    BuildContext context,
 +    BeeperNetwork net,
 +    List<BeeperNetwork> allNets,
-+    dynamic store,
++    SharedPreferences store,
 +  ) {
 +    showModalBottomSheet(
 +      context: context,
@@ -412,7 +414,7 @@ index a649171..62fb962 100644
 +    );
 +  }
 +
-+  void _showManageHiddenNetworksDialog(BuildContext context, dynamic store) {
++  void _showManageHiddenNetworksDialog(BuildContext context, SharedPreferences store) {
 +    showDialog(
 +      context: context,
 +      builder: (context) {
@@ -466,7 +468,7 @@ index a649171..62fb962 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -46,6 +172,37 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -46,6 +173,37 @@ class SpacesNavigationRail extends StatelessWidget {
                  .where((room) => room.isSpace)
                  .toList();
  
@@ -504,7 +506,7 @@ index a649171..62fb962 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +211,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +212,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -523,7 +525,7 @@ index a649171..62fb962 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +232,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +233,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -532,7 +534,7 @@ index a649171..62fb962 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +243,72 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +244,72 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -631,7 +633,7 @@ index a649171..62fb962 100644
                        },
                      ),
                    ),
-@@ -135,3 +326,17 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +327,17 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
