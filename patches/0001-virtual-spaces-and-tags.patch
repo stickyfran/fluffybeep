@@ -881,7 +881,7 @@ index a649171..5a22bfe 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..1fe76eb
+index 0000000..593f127
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
 @@ -0,0 +1,170 @@
@@ -890,12 +890,12 @@ index 0000000..1fe76eb
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
-+import 'package:flutter/material.dart';
-+import 'package:matrix/matrix.dart';
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/controllers/beeper_reinit_controller.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
 +
 +class SettingsPatches extends StatefulWidget {
 +  const SettingsPatches({super.key});
