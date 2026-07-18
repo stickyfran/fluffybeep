@@ -1,3 +1,16 @@
+diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
+index 0aa18d9..7953214 100644
+--- a/android/app/build.gradle.kts
++++ b/android/app/build.gradle.kts
+@@ -50,7 +50,7 @@ android {
+ 
+     signingConfigs {
+        create("release") {
+-            keyAlias = "dummyAlias"
++            keyAlias = "dummyalias"
+             keyPassword = "dummyPassword"
+             storeFile = file("dummy.keystore")
+             storePassword = "dummyStorePassword"
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
 index c1b5b91..4d95180 100644
 --- a/lib/config/routes.dart
