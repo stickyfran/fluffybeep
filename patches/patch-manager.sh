@@ -39,7 +39,8 @@ apply_patches() {
             
             # Remove Windows CR line endings and apply
             cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
-                log_warn "Patch already applied or failed. Try running with 'clean' first."
+                log_error "Failed to apply patch $patch_file"
+                exit 1
             }
         fi
     done
