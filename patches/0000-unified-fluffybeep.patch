@@ -304,10 +304,18 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..27bc1d3 100644
+index 6ceba8b..dbb4683 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -83,7 +83,9 @@ class ChatListController extends State<ChatList>
+@@ -32,6 +32,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+ 
+ import '../../../utils/account_bundles.dart';
+ import '../../config/setting_keys.dart';
++import '../../utils/beeper_bridge_utils.dart';
+ import '../../utils/url_launcher.dart';
+ import '../../widgets/matrix.dart';
+ 
+@@ -83,7 +84,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -318,7 +326,7 @@ index 6ceba8b..27bc1d3 100644
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +141,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +142,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -330,7 +338,7 @@ index 6ceba8b..27bc1d3 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,9 +151,58 @@ class ChatListController extends State<ChatList>
+@@ -149,9 +152,58 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -392,7 +400,7 @@ index 6ceba8b..27bc1d3 100644
  
    bool isSearchMode = false;
    Future<QueryPublicRoomsResponse>? publicRoomsResponse;
-@@ -643,19 +694,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +695,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -424,7 +432,7 @@ index 6ceba8b..27bc1d3 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +850,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +851,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
