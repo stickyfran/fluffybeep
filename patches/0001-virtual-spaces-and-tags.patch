@@ -194,6 +194,71 @@ index 6305f45..ad95ef2 100644
                    maxLines: 1,
                    overflow: TextOverflow.ellipsis,
                    style: const TextStyle(fontSize: 16),
+diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
+index ae1b35f..da3fff6 100644
+--- a/lib/pages/chat/chat_view.dart
++++ b/lib/pages/chat/chat_view.dart
+@@ -21,6 +21,7 @@ import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
+ import 'package:fluffychat/widgets/future_loading_dialog.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:fluffychat/widgets/mxc_image.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:flutter/material.dart';
+ import 'package:matrix/matrix.dart';
+ 
+@@ -180,6 +181,22 @@ class ChatView extends StatelessWidget {
+                                 ],
+                               ),
+                             ),
++                          if (controller.selectedEvents.single.type == 'm.sticker')
++                            PopupMenuItem(
++                              onTap: () => BeeperBridgeUtils.addStickerToWhatsappPack(
++                                context,
++                                controller.selectedEvents.single,
++                              ),
++                              value: null,
++                              child: Row(
++                                mainAxisSize: .min,
++                                children: [
++                                  const Icon(Icons.add_photo_alternate_outlined),
++                                  const SizedBox(width: 12),
++                                  const Text('Agregar a stickers de WhatsApp'),
++                                ],
++                              ),
++                            ),
+                           if (controller.canSaveSelectedEvent)
+                             PopupMenuItem(
+                               onTap: () =>
+diff --git a/lib/pages/chat/event_info_dialog.dart b/lib/pages/chat/event_info_dialog.dart
+index 731cc94..9d6c03c 100644
+--- a/lib/pages/chat/event_info_dialog.dart
++++ b/lib/pages/chat/event_info_dialog.dart
+@@ -10,6 +10,7 @@ import 'package:fluffychat/l10n/l10n.dart';
+ import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
+ import 'package:fluffychat/utils/date_time_extension.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:flutter/material.dart';
+ import 'package:matrix/matrix.dart';
+ 
+@@ -46,6 +47,17 @@ class EventInfoDialog extends StatelessWidget {
+       ),
+       body: ListView(
+         children: [
++          if (event.type == 'm.sticker') ...[
++            ListTile(
++              leading: const Icon(Icons.add_photo_alternate_outlined),
++              title: const Text('Agregar a stickers de WhatsApp'),
++              onTap: () async {
++                Navigator.of(context, rootNavigator: false).pop();
++                await BeeperBridgeUtils.addStickerToWhatsappPack(context, event);
++              },
++            ),
++            Divider(color: theme.dividerColor),
++          ],
+           ListTile(
+             leading: Avatar(
+               mxContent: event.senderFromMemoryOrFallback.avatarUrl,
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..7354407 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
@@ -1050,11 +1115,14 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..cfb34a9
+index 0000000..6caf9d9
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,227 @@
++import 'dart:typed_data';
++import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +
 +class BeeperBridgeUtils {
 +  /// Regular expression to detect Beeper bridge bots.
@@ -1162,6 +1230,95 @@ index 0000000..cfb34a9
 +      }
 +    }
 +    return null;
++  }
++
++  static Future<void> addStickerToWhatsappPack(BuildContext context, Event event) async {
++    final client = event.room.client;
++    final messenger = ScaffoldMessenger.of(context);
++
++    final result = await showFutureLoadingDialog<Uri?>(
++      context: context,
++      future: () async {
++        final bytes = await event.downloadAndDecryptAttachment();
++        final String filename = event.content['body'] ?? 'sticker';
++        final String mimetype = event.content['info']?['mimetype'] ?? 'image/png';
++        final uri = await client.uploadContent(
++          bytes,
++          filename: filename,
++          contentType: mimetype,
++        );
++        return uri;
++      },
++    );
++
++    final mxcUri = result.result;
++    if (mxcUri == null) {
++      messenger.showSnackBar(
++        const SnackBar(content: Text('Error al subir el sticker a la cuenta')),
++      );
++      return;
++    }
++
++    try {
++      final accountDataEvent = client.accountData['im.ponies.user_emotes'];
++      Map<String, dynamic> packData;
++      if (accountDataEvent != null) {
++        packData = Map<String, dynamic>.from(accountDataEvent.content);
++      } else {
++        packData = {
++          'images': <String, dynamic>{},
++          'pack': {
++            'display_name': 'WhatsApp',
++            'usage': ['sticker'],
++          },
++        };
++      }
++
++      final images = Map<String, dynamic>.from(packData['images'] ?? <String, dynamic>{});
++      
++      final info = <String, dynamic>{};
++      if (event.content['info'] != null) {
++        info.addAll(Map<String, dynamic>.from(event.content['info']));
++      }
++      
++      if (info['w'] is int && info['h'] is int) {
++        final int w = info['w'];
++        final int h = info['h'];
++        final ratio = w / h;
++        if (w > h) {
++          info['w'] = 256;
++          info['h'] = (256.0 / ratio).round();
++        } else {
++          info['h'] = 256;
++          info['w'] = (ratio * 256.0).round();
++        }
++      }
++
++      final stickerContent = <String, dynamic>{
++        'url': mxcUri.toString(),
++        'info': info,
++        'body': event.content['body'] ?? 'sticker',
++        'usage': ['sticker'],
++      };
++
++      final String code = 'sticker_${DateTime.now().millisecondsSinceEpoch}';
++      images[code] = stickerContent;
++      packData['images'] = images;
++
++      await client.setAccountData(
++        client.userID!,
++        'im.ponies.user_emotes',
++        packData,
++      );
++
++      messenger.showSnackBar(
++        const SnackBar(content: Text('Sticker agregado al paquete WhatsApp')),
++      );
++    } catch (e) {
++      messenger.showSnackBar(
++        SnackBar(content: Text('Error al guardar el sticker: $e')),
++      );
++    }
 +  }
 +}
 +
