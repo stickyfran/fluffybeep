@@ -294,7 +294,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..65b1a95 100644
+index 6ceba8b..144f594 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -83,7 +83,9 @@ class ChatListController extends State<ChatList>
@@ -319,8 +319,8 @@ index 6ceba8b..65b1a95 100644
 +    final event = room.lastEvent;
 +    if (event != null) {
 +      final type = event.type;
-+      if (type == EventTypes.RoomMessage ||
-+          type == EventTypes.RoomEncrypted ||
++      if (type == 'm.room.message' ||
++          type == 'm.room.encrypted' ||
 +          type == 'm.sticker') {
 +        return event.originServerTs;
 +      }
@@ -1141,10 +1141,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..9bbb76c
+index 0000000..717fdb3
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,271 @@
+@@ -0,0 +1,273 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1298,8 +1298,9 @@ index 0000000..9bbb76c
 +      context: context,
 +      future: () async {
 +        final MatrixFile matrixFile = await event.downloadAndDecryptAttachment();
-+        final String filename = event.content['body'] ?? 'sticker';
-+        final String mimetype = event.content['info']?['mimetype'] ?? 'image/png';
++        final String filename = event.content['body']?.toString() ?? 'sticker';
++        final rawInfo = event.content['info'];
++        final String mimetype = (rawInfo is Map) ? (rawInfo['mimetype']?.toString() ?? 'image/png') : 'image/png';
 +        final uri = await client.uploadContent(
 +          matrixFile.bytes,
 +          filename: filename,
@@ -1335,8 +1336,9 @@ index 0000000..9bbb76c
 +      final images = Map<String, dynamic>.from(packData['images'] ?? <String, dynamic>{});
 +      
 +      final info = <String, dynamic>{};
-+      if (event.content['info'] != null) {
-+        info.addAll(Map<String, dynamic>.from(event.content['info']));
++      final rawInfo = event.content['info'];
++      if (rawInfo is Map) {
++        info.addAll(Map<String, dynamic>.from(rawInfo));
 +      }
 +      
 +      if (info['w'] is int && info['h'] is int) {
@@ -1418,7 +1420,7 @@ index 0000000..9bbb76c
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..2b53845
+index 0000000..9c91173
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
 @@ -0,0 +1,322 @@
@@ -1468,8 +1470,8 @@ index 0000000..2b53845
 +    final event = room.lastEvent;
 +    if (event != null) {
 +      final type = event.type;
-+      if (type == EventTypes.RoomMessage ||
-+          type == EventTypes.RoomEncrypted ||
++      if (type == 'm.room.message' ||
++          type == 'm.room.encrypted' ||
 +          type == 'm.sticker') {
 +        return event.originServerTs;
 +      }
@@ -1504,15 +1506,15 @@ index 0000000..2b53845
 +    // 2. Start Foreground Service on Android to prevent system kill
 +    if (PlatformInfos.isAndroid) {
 +      try {
-+        await FlutterForegroundTask.init(
-+          androidNotificationOptions: const AndroidNotificationOptions(
++        FlutterForegroundTask.init(
++          androidNotificationOptions: AndroidNotificationOptions(
 +            channelId: 'beeper_reinit_channel_id',
 +            channelName: 'Beeper Re-sync',
 +            channelDescription: 'Sincronizando chats de Beeper en segundo plano',
 +            onlyAlertOnce: true,
 +          ),
 +          iosNotificationOptions: const IOSNotificationOptions(),
-+          foregroundTaskOptions: const ForegroundTaskOptions(
++          foregroundTaskOptions: ForegroundTaskOptions(
 +            eventAction: ForegroundTaskEventAction.nothing(),
 +          ),
 +        );
