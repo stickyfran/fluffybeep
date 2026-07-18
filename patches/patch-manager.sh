@@ -80,6 +80,7 @@ reverse_patches() {
         }
     else
         log_warn "Unified patch file not found at $patch_file"
+    fi
     log_info "Patches reversed."
 }
 
