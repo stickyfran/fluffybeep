@@ -1373,10 +1373,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..b63ac5e
+index 0000000..d037b5f
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,519 @@
+@@ -0,0 +1,518 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1854,20 +1854,19 @@ index 0000000..b63ac5e
 +  /// Returns the last real message event in a room, skipping state events
 +  /// and other technical events (e.g. m.room.member, m.room.topic, etc.).
 +  /// Only returns events of type m.room.message, m.room.encrypted, or m.sticker.
++  ///
++  /// Note: matrix SDK 8.x removed the `Room.timeline` getter. The SDK now
++  /// exposes only `room.lastEvent` (the most recent event stored in the DB).
++  /// We check its type and return it if it qualifies as a "real" message.
 +  static Event? getLastRealMessage(Room room) {
 +    const realMessageTypes = {
 +      EventTypes.Message,      // m.room.message
 +      EventTypes.Encrypted,    // m.room.encrypted
 +      EventTypes.Sticker,      // m.sticker
 +    };
-+    final events = room.timeline?.events;
-+    if (events == null || events.isEmpty) return null;
-+    for (int i = events.length - 1; i >= 0; i--) {
-+      final event = events[i];
-+      if (realMessageTypes.contains(event.type)) {
-+        return event;
-+      }
-+    }
++    final lastEvent = room.lastEvent;
++    if (lastEvent == null) return null;
++    if (realMessageTypes.contains(lastEvent.type)) return lastEvent;
 +    return null;
 +  }
 +}
