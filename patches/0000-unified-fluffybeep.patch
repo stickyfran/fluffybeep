@@ -208,7 +208,7 @@ index 6305f45..ad95ef2 100644
                    overflow: TextOverflow.ellipsis,
                    style: const TextStyle(fontSize: 16),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35f..81b958d 100644
+index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,6 +16,7 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -235,7 +235,7 @@ index ae1b35f..81b958d 100644
 +                                children: [
 +                                  const Icon(Icons.add_photo_alternate_outlined),
 +                                  const SizedBox(width: 12),
-+                                  const Text('Agregar a stickers de WhatsApp'),
++                                  const Text('Agregar a Mis stickers'),
 +                                ],
 +                              ),
 +                            ),
@@ -243,7 +243,7 @@ index ae1b35f..81b958d 100644
                              PopupMenuItem(
                                onTap: () =>
 diff --git a/lib/pages/chat/event_info_dialog.dart b/lib/pages/chat/event_info_dialog.dart
-index 731cc94..d266116 100644
+index 731cc94..7c330e1 100644
 --- a/lib/pages/chat/event_info_dialog.dart
 +++ b/lib/pages/chat/event_info_dialog.dart
 @@ -8,6 +8,7 @@ import 'dart:convert';
@@ -261,7 +261,7 @@ index 731cc94..d266116 100644
 +          if (event.type == 'm.sticker') ...[
 +            ListTile(
 +              leading: const Icon(Icons.add_photo_alternate_outlined),
-+              title: const Text('Agregar a stickers de WhatsApp'),
++              title: const Text('Agregar a Mis stickers'),
 +              onTap: () async {
 +                Navigator.of(context, rootNavigator: false).pop();
 +                await BeeperBridgeUtils.addStickerToWhatsappPack(context, event);
@@ -294,7 +294,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..51245fa 100644
+index 6ceba8b..65b1a95 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -83,7 +83,9 @@ class ChatListController extends State<ChatList>
@@ -308,13 +308,26 @@ index 6ceba8b..51245fa 100644
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -149,9 +151,24 @@ class ChatListController extends State<ChatList>
+@@ -149,9 +151,37 @@ class ChatListController extends State<ChatList>
      }
    }
  
 -  List<Room> get filteredRooms => Matrix.of(
 -    context,
 -  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
++  DateTime _getMessageTimestamp(Room room) {
++    final event = room.lastEvent;
++    if (event != null) {
++      final type = event.type;
++      if (type == EventTypes.RoomMessage ||
++          type == EventTypes.RoomEncrypted ||
++          type == 'm.sticker') {
++        return event.originServerTs;
++      }
++    }
++    return room.latestEventReceivedTime;
++  }
++
 +  List<Room> get filteredRooms {
 +    final rooms = Matrix.of(context)
 +        .client
@@ -327,8 +340,8 @@ index 6ceba8b..51245fa 100644
 +      if (a.isLowPriority && !b.isLowPriority) return 1;
 +      if (!a.isLowPriority && b.isLowPriority) return -1;
 +
-+      final aTime = a.lastEvent?.originServerTs ?? a.latestEventReceivedTime;
-+      final bTime = b.lastEvent?.originServerTs ?? b.latestEventReceivedTime;
++      final aTime = _getMessageTimestamp(a);
++      final bTime = _getMessageTimestamp(b);
 +      return bTime.compareTo(aTime);
 +    });
 +    return rooms;
@@ -1128,10 +1141,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..1554f0a
+index 0000000..9bbb76c
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,271 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1142,6 +1155,15 @@ index 0000000..1554f0a
 +  /// Regular expression to detect Beeper bridge bots.
 +  /// Matches pattern like: @whatsappbot:beeper.local
 +  static final RegExp beeperBotRegex = RegExp(r'^@.*bot.*:beeper\..*$');
++
++  /// Caches for performance optimization
++  static final Map<String, BeeperNetwork?> _networkCache = {};
++  static final Map<String, bool> _fakeDMCache = {};
++
++  static void clearCaches() {
++    _networkCache.clear();
++    _fakeDMCache.clear();
++  }
 +
 +  /// Checks if a given matrix user ID belongs to a Beeper bridge bot.
 +  static bool isBeeperBot(String userId) {
@@ -1154,30 +1176,32 @@ index 0000000..1554f0a
 +  /// 2. The real contact
 +  /// 3. The Beeper bridge bot
 +  static bool isFakeDM(Room room) {
-+    final members = room.getParticipants();
-+    
-+    // A Fake DM must have exactly 3 participants (including the local user)
-+    if (members.length != 3) {
-+      return false;
-+    }
-+
-+    bool hasLocalUser = false;
-+    bool hasBot = false;
-+    bool hasRealContact = false;
-+
-+    final clientUserId = room.client.userID;
-+
-+    for (var member in members) {
-+      if (member.id == clientUserId) {
-+        hasLocalUser = true;
-+      } else if (isBeeperBot(member.id)) {
-+        hasBot = true;
-+      } else {
-+        hasRealContact = true;
++    return _fakeDMCache.putIfAbsent(room.id, () {
++      final members = room.getParticipants();
++      
++      // A Fake DM must have exactly 3 participants (including the local user)
++      if (members.length != 3) {
++        return false;
 +      }
-+    }
 +
-+    return hasLocalUser && hasBot && hasRealContact;
++      bool hasLocalUser = false;
++      bool hasBot = false;
++      bool hasRealContact = false;
++
++      final clientUserId = room.client.userID;
++
++      for (var member in members) {
++        if (member.id == clientUserId) {
++          hasLocalUser = true;
++        } else if (isBeeperBot(member.id)) {
++          hasBot = true;
++        } else {
++          hasRealContact = true;
++        }
++      }
++
++      return hasLocalUser && hasBot && hasRealContact;
++    });
 +  }
 +
 +  /// Extracts the real contact from a Fake DM room.
@@ -1216,8 +1240,24 @@ index 0000000..1554f0a
 +    'googlechatgo': BeeperNetSpec('Google Chat', 0xFF34A853),
 +  };
 +
++  static String getBaseNetworkKey(String key) {
++    if (key.endsWith('go')) {
++      return key.substring(0, key.length - 2);
++    }
++    return key;
++  }
++
 +  /// Returns the detected Beeper network for a given room, or null if none is found.
 +  static BeeperNetwork? getRoomNetwork(Room room) {
++    if (_networkCache.containsKey(room.id)) {
++      return _networkCache[room.id];
++    }
++    final net = _detectRoomNetwork(room);
++    _networkCache[room.id] = net;
++    return net;
++  }
++
++  static BeeperNetwork? _detectRoomNetwork(Room room) {
 +    final participants = room.getParticipants();
 +    for (final p in participants) {
 +      if (p.id == room.client.userID) continue;
@@ -1226,7 +1266,9 @@ index 0000000..1554f0a
 +        final rawPrefix = localpart.substring(1);
 +        for (final entry in networkMap.entries) {
 +          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
-+            return BeeperNetwork(entry.value.name, entry.value.colorHex, entry.key);
++            final baseKey = getBaseNetworkKey(entry.key);
++            final spec = networkMap[baseKey] ?? entry.value;
++            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
 +          }
 +        }
 +      }
@@ -1238,7 +1280,9 @@ index 0000000..1554f0a
 +        final rawPrefix = localpart.substring(1);
 +        for (final entry in networkMap.entries) {
 +          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
-+            return BeeperNetwork(entry.value.name, entry.value.colorHex, entry.key);
++            final baseKey = getBaseNetworkKey(entry.key);
++            final spec = networkMap[baseKey] ?? entry.value;
++            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
 +          }
 +        }
 +      }
@@ -1253,11 +1297,11 @@ index 0000000..1554f0a
 +    final result = await showFutureLoadingDialog<Uri?>(
 +      context: context,
 +      future: () async {
-+        final bytes = await event.downloadAndDecryptAttachment();
++        final MatrixFile matrixFile = await event.downloadAndDecryptAttachment();
 +        final String filename = event.content['body'] ?? 'sticker';
 +        final String mimetype = event.content['info']?['mimetype'] ?? 'image/png';
 +        final uri = await client.uploadContent(
-+          bytes,
++          matrixFile.bytes,
 +          filename: filename,
 +          contentType: mimetype,
 +        );
@@ -1282,7 +1326,7 @@ index 0000000..1554f0a
 +        packData = {
 +          'images': <String, dynamic>{},
 +          'pack': {
-+            'display_name': 'WhatsApp',
++            'display_name': 'Mis stickers',
 +            'usage': ['sticker'],
 +          },
 +        };
@@ -1315,19 +1359,31 @@ index 0000000..1554f0a
 +        'usage': ['sticker'],
 +      };
 +
-+      final String code = 'sticker_${DateTime.now().millisecondsSinceEpoch}';
-+      images[code] = stickerContent;
-+      packData['images'] = images;
++      // De-duplication check: if a sticker with the same URL already exists, don't add it again.
++      bool isDuplicate = false;
++      if (images.values.any((val) => val is Map && val['url'] == mxcUri.toString())) {
++        isDuplicate = true;
++      }
 +
-+      await client.setAccountData(
-+        client.userID!,
-+        'im.ponies.user_emotes',
-+        packData,
-+      );
++      if (!isDuplicate) {
++        final String code = 'sticker_${DateTime.now().millisecondsSinceEpoch}';
++        images[code] = stickerContent;
++        packData['images'] = images;
 +
-+      messenger.showSnackBar(
-+        const SnackBar(content: Text('Sticker agregado al paquete WhatsApp')),
-+      );
++        await client.setAccountData(
++          client.userID!,
++          'im.ponies.user_emotes',
++          packData,
++        );
++
++        messenger.showSnackBar(
++          const SnackBar(content: Text('Sticker agregado al paquete Mis stickers')),
++        );
++      } else {
++        messenger.showSnackBar(
++          const SnackBar(content: Text('Este sticker ya está en tu paquete')),
++        );
++      }
 +    } catch (e) {
 +      messenger.showSnackBar(
 +        SnackBar(content: Text('Error al guardar el sticker: $e')),
@@ -1362,18 +1418,20 @@ index 0000000..1554f0a
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..b6f6887
+index 0000000..2b53845
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,322 @@
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
++import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 +
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
++import 'package:fluffychat/utils/platform_infos.dart';
 +
 +class CacheRefreshOverlay extends StatefulWidget {
 +  final Client client;
@@ -1393,6 +1451,8 @@ index 0000000..b6f6887
 +
 +class _CacheRefreshOverlayState extends State<CacheRefreshOverlay> {
 +  bool _isSyncingInitial = true;
++  bool _initialCompleted = false;
++  bool _minimized = false;
 +  int _processedRooms = 0;
 +  int _totalRooms = 0;
 +  String _currentRoomName = '';
@@ -1402,6 +1462,19 @@ index 0000000..b6f6887
 +  void initState() {
 +    super.initState();
 +    _startPrewarming();
++  }
++
++  DateTime _getMessageTimestamp(Room room) {
++    final event = room.lastEvent;
++    if (event != null) {
++      final type = event.type;
++      if (type == EventTypes.RoomMessage ||
++          type == EventTypes.RoomEncrypted ||
++          type == 'm.sticker') {
++        return event.originServerTs;
++      }
++    }
++    return room.latestEventReceivedTime;
 +  }
 +
 +  Future<void> _startPrewarming() async {
@@ -1421,9 +1494,40 @@ index 0000000..b6f6887
 +    });
 +
 +    final rooms = List<Room>.from(widget.client.rooms);
++    // Sort rooms by actual messages recency (newest first)
++    rooms.sort((a, b) {
++      final aTime = _getMessageTimestamp(a);
++      final bTime = _getMessageTimestamp(b);
++      return bTime.compareTo(aTime);
++    });
 +
++    // 2. Start Foreground Service on Android to prevent system kill
++    if (PlatformInfos.isAndroid) {
++      try {
++        await FlutterForegroundTask.init(
++          androidNotificationOptions: const AndroidNotificationOptions(
++            channelId: 'beeper_reinit_channel_id',
++            channelName: 'Beeper Re-sync',
++            channelDescription: 'Sincronizando chats de Beeper en segundo plano',
++            onlyAlertOnce: true,
++          ),
++          iosNotificationOptions: const IOSNotificationOptions(),
++          foregroundTaskOptions: const ForegroundTaskOptions(
++            eventAction: ForegroundTaskEventAction.nothing(),
++          ),
++        );
++        await FlutterForegroundTask.startService(
++          notificationTitle: 'Re-sincronizando chats (Beeper)',
++          notificationText: 'Descargando mensajes recientes...',
++        );
++      } catch (e) {
++        debugPrint('Failed to start Foreground Service: $e');
++      }
++    }
++
++    int count = 0;
 +    for (final room in rooms) {
-+      if (!mounted) return;
++      if (!mounted) break;
 +      
 +      final roomName = room.getBeeperDisplayname(MatrixLocals(l10n));
 +
@@ -1431,7 +1535,14 @@ index 0000000..b6f6887
 +        _currentRoomName = roomName;
 +      });
 +
-+      // 2. Pre-cache avatar
++      if (PlatformInfos.isAndroid) {
++        FlutterForegroundTask.updateService(
++          notificationTitle: 'Re-sincronizando chats: $count de $_totalRooms',
++          notificationText: roomName,
++        );
++      }
++
++      // Pre-cache avatar
 +      final avatarUri = BeeperBridgeUtils.isFakeDM(room)
 +          ? (room.avatar ?? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl)
 +          : room.avatar;
@@ -1445,32 +1556,47 @@ index 0000000..b6f6887
 +            thumbnailMethod: ThumbnailMethod.scale,
 +            isThumbnail: true,
 +          );
-+        } catch (_) {
-+          // Ignore download errors to continue warming up remaining rooms
-+        }
++        } catch (_) {}
 +      }
 +
-+      // 3. Pre-cache timeline history (fetch latest 30 messages)
++      // Pre-cache timeline history (fetch latest 30 messages)
 +      try {
 +        final timeline = await room.getTimeline();
 +        await timeline.requestHistory(historyCount: 30);
 +        timeline.cancelSubscriptions();
-+      } catch (_) {
-+        // Ignore timeline errors to continue warming up remaining rooms
-+      }
++      } catch (_) {}
 +
-+      if (!mounted) return;
++      count++;
++      if (!mounted) break;
 +      setState(() {
-+        _processedRooms++;
++        _processedRooms = count;
 +      });
++
++      // 3. Once the first 100 most recent chats are warmed up, dismiss full-screen blocking overlay
++      if (count == 100 && !_initialCompleted) {
++        setState(() {
++          _initialCompleted = true;
++        });
++      }
 +    }
 +
 +    // 4. Mark cache refresh as completed
 +    await widget.store.setBool('beeper_needs_cache_refresh', false);
++    
++    if (PlatformInfos.isAndroid) {
++      try {
++        await FlutterForegroundTask.stopService();
++      } catch (_) {}
++    }
++
 +    if (!mounted) return;
 +    setState(() {
 +      _completed = true;
 +    });
++
++    ScaffoldMessenger.of(context).showSnackBar(
++      const SnackBar(content: Text('Re-sincronización de Beeper completada.')),
++    );
 +  }
 +
 +  @override
@@ -1479,11 +1605,73 @@ index 0000000..b6f6887
 +      return widget.child;
 +    }
 +
++    if (_initialCompleted) {
++      // Background Phase: Render the main app, with a floating minimized progress banner.
++      return Stack(
++        children: [
++          widget.child,
++          if (!_minimized)
++            Positioned(
++              bottom: 16,
++              left: 16,
++              right: 16,
++              child: SafeArea(
++                child: Material(
++                  elevation: 8,
++                  borderRadius: BorderRadius.circular(16),
++                  color: Theme.of(context).cardColor,
++                  child: Container(
++                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
++                    child: Row(
++                      children: [
++                        const SizedBox(
++                          width: 20,
++                          height: 20,
++                          child: CircularProgressIndicator(strokeWidth: 2.5),
++                        ),
++                        const SizedBox(width: 16),
++                        Expanded(
++                          child: Column(
++                            mainAxisSize: MainAxisSize.min,
++                            crossAxisAlignment: CrossAxisAlignment.start,
++                            children: [
++                              const Text(
++                                'Sincronizando de fondo...',
++                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
++                              ),
++                              const SizedBox(height: 2),
++                              Text(
++                                '$_processedRooms de $_totalRooms - $_currentRoomName',
++                                style: const TextStyle(fontSize: 11, color: Colors.grey),
++                                maxLines: 1,
++                                overflow: TextOverflow.ellipsis,
++                              ),
++                            ],
++                          ),
++                        ),
++                        IconButton(
++                          icon: const Icon(Icons.close, size: 20),
++                          onPressed: () {
++                            setState(() {
++                              _minimized = true;
++                            });
++                          },
++                        ),
++                      ],
++                    ),
++                  ),
++                ),
++              ),
++            ),
++        ],
++      );
++    }
++
 +    final theme = Theme.of(context);
 +    final progress = _totalRooms > 0 ? _processedRooms / _totalRooms : 0.0;
 +
 +    return Scaffold(
-+      backgroundColor: theme.colorScheme.scrim.withOpacity(0.9),
++      backgroundColor: theme.colorScheme.scrim.withOpacity(0.85),
 +      body: Center(
 +        child: Container(
 +          width: 320,
@@ -1511,7 +1699,7 @@ index 0000000..b6f6887
 +              ),
 +              const SizedBox(height: 12),
 +              Text(
-+                "Estamos descargando tus avatares e historial de mensajes recientes para que tu scroll sea inmediato y offline.",
++                "Estamos cargando tus 100 chats más recientes para que puedas empezar a usar la app de inmediato, luego seguiremos en segundo plano.",
 +                textAlign: TextAlign.center,
 +                style: theme.textTheme.bodyMedium?.copyWith(
 +                  color: theme.colorScheme.onSurfaceVariant,
