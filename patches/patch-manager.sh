@@ -32,25 +32,27 @@ log_error() {
 apply_patches() {
     log_info "Applying patches..."
     
-    # 1. Clean Windows line endings and apply unified patches
-    for patch_file in "$PATCHES_DIR"/*.patch; do
-        if [ -f "$patch_file" ]; then
-            log_info "Processing $patch_file"
-            
-            # Try git apply first as it is more robust with line endings and binary files
-            if [ "$FLUFFYCHAT_DIR" = "." ]; then
-                git apply "$patch_file"
-            else
-                git apply --directory="$FLUFFYCHAT_DIR" "$patch_file"
-            fi || {
-                log_warn "git apply failed or not available, falling back to patch utility..."
-                cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
-                    log_error "Failed to apply patch $patch_file"
-                    exit 1
-                }
+    # 1. Clean Windows line endings and apply the unified patch
+    local patch_file="$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    if [ -f "$patch_file" ]; then
+        log_info "Processing $patch_file"
+        
+        # Try git apply first as it is more robust with line endings and binary files
+        if [ "$FLUFFYCHAT_DIR" = "." ]; then
+            git apply "$patch_file"
+        else
+            git apply --directory="$FLUFFYCHAT_DIR" "$patch_file"
+        fi || {
+            log_warn "git apply failed or not available, falling back to patch utility..."
+            cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
+                log_error "Failed to apply patch $patch_file"
+                exit 1
             }
-        fi
-    done
+        }
+    else
+        log_error "Unified patch file not found at $patch_file"
+        exit 1
+    fi
 
     # 2. Copy new files
     if [ -d "$NEW_FILES_DIR" ]; then
@@ -66,19 +68,18 @@ apply_patches() {
 reverse_patches() {
     log_info "Reversing patches..."
     
-    for patch_file in "$PATCHES_DIR"/*.patch; do
-        if [ -f "$patch_file" ]; then
-            log_info "Reversing $patch_file"
-            if [ "$FLUFFYCHAT_DIR" = "." ]; then
-                git apply -R "$patch_file"
-            else
-                git apply -R --directory="$FLUFFYCHAT_DIR" "$patch_file"
-            fi || {
-                cat "$patch_file" | tr -d '\r' | patch -p1 -R -d "$FLUFFYCHAT_DIR" || true
-            }
-        fi
-    done
-    
+    local patch_file="$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    if [ -f "$patch_file" ]; then
+        log_info "Reversing $patch_file"
+        if [ "$FLUFFYCHAT_DIR" = "." ]; then
+            git apply -R "$patch_file"
+        else
+            git apply -R --directory="$FLUFFYCHAT_DIR" "$patch_file"
+        fi || {
+            cat "$patch_file" | tr -d '\r' | patch -p1 -R -d "$FLUFFYCHAT_DIR" || true
+        }
+    else
+        log_warn "Unified patch file not found at $patch_file"
     log_info "Patches reversed."
 }
 
