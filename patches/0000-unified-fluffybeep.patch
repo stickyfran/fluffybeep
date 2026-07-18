@@ -304,7 +304,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..dbb4683 100644
+index 6ceba8b..fcb5a8a 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -32,6 +32,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -338,7 +338,7 @@ index 6ceba8b..dbb4683 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,9 +152,58 @@ class ChatListController extends State<ChatList>
+@@ -149,9 +152,68 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -346,30 +346,40 @@ index 6ceba8b..dbb4683 100644
 -    context,
 -  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +  DateTime _getMessageTimestamp(Room room) {
++    final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
++    if (cached != null) return cached;
++
 +    final event = room.lastEvent;
 +    if (event != null) {
 +      final type = event.type;
 +      if (type == 'm.room.message' ||
 +          type == 'm.room.encrypted' ||
 +          type == 'm.sticker') {
++        BeeperBridgeUtils.setLastMessageTime(room.id, event.originServerTs);
 +        return event.originServerTs;
 +      }
 +    }
-+    
-+    final events = room.timeline?.events;
-+    if (events != null && events.isNotEmpty) {
-+      for (var i = events.length - 1; i >= 0; i--) {
-+        final ev = events[i];
++
++    _fetchLastMessageTimeAsync(room);
++    return room.latestEventReceivedTime;
++  }
++
++  void _fetchLastMessageTimeAsync(Room room) async {
++    try {
++      final events = await room.client.database.getEventList(room, limit: 30);
++      for (final ev in events) {
 +        final t = ev.type;
 +        if (t == 'm.room.message' ||
 +            t == 'm.room.encrypted' ||
 +            t == 'm.sticker') {
-+          return ev.originServerTs;
++          BeeperBridgeUtils.setLastMessageTime(room.id, ev.originServerTs);
++          if (mounted) {
++            setState(() {});
++          }
++          break;
 +        }
 +      }
-+    }
-+
-+    return room.latestEventReceivedTime;
++    } catch (_) {}
 +  }
 +
 +  List<Room> get filteredRooms {
@@ -400,7 +410,7 @@ index 6ceba8b..dbb4683 100644
  
    bool isSearchMode = false;
    Future<QueryPublicRoomsResponse>? publicRoomsResponse;
-@@ -643,19 +695,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +705,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -432,7 +442,7 @@ index 6ceba8b..dbb4683 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +851,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +861,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -1264,10 +1274,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..2f5a647
+index 0000000..6bf4c58
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,480 @@
+@@ -0,0 +1,488 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1722,6 +1732,14 @@ index 0000000..2f5a647
 +
 +    await setBeeperLabels(client, labels);
 +  }
++
++  static final Map<String, DateTime> _lastMessageTimeCache = {};
++
++  static DateTime? getLastMessageTime(String roomId) => _lastMessageTimeCache[roomId];
++
++  static void setLastMessageTime(String roomId, DateTime time) {
++    _lastMessageTimeCache[roomId] = time;
++  }
 +}
 +
 +class BeeperNetwork {
@@ -1750,10 +1768,10 @@ index 0000000..2f5a647
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..234696c
+index 0000000..69d11a0
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,336 @@
+@@ -0,0 +1,341 @@
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
@@ -1796,33 +1814,6 @@ index 0000000..234696c
 +    _startPrewarming();
 +  }
 +
-+  DateTime _getMessageTimestamp(Room room) {
-+    final event = room.lastEvent;
-+    if (event != null) {
-+      final type = event.type;
-+      if (type == 'm.room.message' ||
-+          type == 'm.room.encrypted' ||
-+          type == 'm.sticker') {
-+        return event.originServerTs;
-+      }
-+    }
-+    
-+    final events = room.timeline?.events;
-+    if (events != null && events.isNotEmpty) {
-+      for (var i = events.length - 1; i >= 0; i--) {
-+        final ev = events[i];
-+        final t = ev.type;
-+        if (t == 'm.room.message' ||
-+            t == 'm.room.encrypted' ||
-+            t == 'm.sticker') {
-+          return ev.originServerTs;
-+        }
-+      }
-+    }
-+
-+    return room.latestEventReceivedTime;
-+  }
-+
 +  Future<void> _startPrewarming() async {
 +    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
 +    final l10n = L10n.of(context);
@@ -1840,10 +1831,42 @@ index 0000000..234696c
 +    });
 +
 +    final rooms = List<Room>.from(widget.client.rooms);
++    
++    // Fetch last message timestamps asynchronously from database/cache
++    final timestamps = <String, DateTime>{};
++    for (final room in rooms) {
++      final event = room.lastEvent;
++      if (event != null) {
++        final type = event.type;
++        if (type == 'm.room.message' ||
++            type == 'm.room.encrypted' ||
++            type == 'm.sticker') {
++          timestamps[room.id] = event.originServerTs;
++          continue;
++        }
++      }
++      try {
++        final events = await room.client.database.getEventList(room, limit: 30);
++        DateTime? foundTime;
++        for (final ev in events) {
++          final t = ev.type;
++          if (t == 'm.room.message' ||
++              t == 'm.room.encrypted' ||
++              t == 'm.sticker') {
++            foundTime = ev.originServerTs;
++            break;
++          }
++        }
++        timestamps[room.id] = foundTime ?? room.latestEventReceivedTime;
++      } catch (_) {
++        timestamps[room.id] = room.latestEventReceivedTime;
++      }
++    }
++
 +    // Sort rooms by actual messages recency (newest first)
 +    rooms.sort((a, b) {
-+      final aTime = _getMessageTimestamp(a);
-+      final bTime = _getMessageTimestamp(b);
++      final aTime = timestamps[a.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
++      final bTime = timestamps[b.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
 +      return bTime.compareTo(aTime);
 +    });
 +
