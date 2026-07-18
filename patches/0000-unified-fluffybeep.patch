@@ -1,4 +1,45 @@
-﻿diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
+diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
+index 0aa18d9..7953214 100644
+--- a/android/app/build.gradle.kts
++++ b/android/app/build.gradle.kts
+@@ -50,7 +50,7 @@ android {
+ 
+     signingConfigs {
+        create("release") {
+-            keyAlias = "dummyAlias"
++            keyAlias = "dummyalias"
+             keyPassword = "dummyPassword"
+             storeFile = file("dummy.keystore")
+             storePassword = "dummyStorePassword"
+diff --git a/lib/config/routes.dart b/lib/config/routes.dart
+index c1b5b91..4d95180 100644
+--- a/lib/config/routes.dart
++++ b/lib/config/routes.dart
+@@ -22,6 +22,7 @@ import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart'
+ import 'package:fluffychat/pages/login/login.dart';
+ import 'package:fluffychat/pages/new_group/new_group.dart';
+ import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
++import 'package:fluffychat/pages/settings/patches_settings.dart';
+ import 'package:fluffychat/pages/settings/settings.dart';
+ import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
+ import 'package:fluffychat/pages/settings_chat/settings_chat.dart';
+@@ -236,6 +237,15 @@ abstract class AppRoutes {
+                       ),
+                       redirect: loggedOutRedirect,
+                     ),
++                    GoRoute(
++                      path: 'patches',
++                      pageBuilder: (context, state) => defaultPageBuilder(
++                        context,
++                        state,
++                        const SettingsPatches(),
++                      ),
++                      redirect: loggedOutRedirect,
++                    ),
+                     GoRoute(
+                       path: 'style',
+                       pageBuilder: (context, state) => defaultPageBuilder(
+diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
 index 0000000..fc5cb33
 --- /dev/null
@@ -41,7 +82,7 @@ index 0000000..fc5cb33
 +      context: context,
 +      builder: (context) => AlertDialog(
 +        title: const Text('Re-sincronizar chats (Beeper)'),
-+        content: const Text('Se limpiar├í la cach├⌐ de chats y perfiles. Para completar el proceso, la aplicaci├│n se cerrar├í y deber├ís volver a abrirla. ┬┐Deseas continuar?'),
++        content: const Text('Se limpiará la caché de chats y perfiles. Para completar el proceso, la aplicación se cerrará y deberás volver a abrirla. ¿Deseas continuar?'),
 +        actions: [
 +          TextButton(
 +            onPressed: () => Navigator.of(context).pop(false),
@@ -78,7 +119,7 @@ index 0000000..fc5cb33
 +                  CircularProgressIndicator(),
 +                  SizedBox(height: 16),
 +                  Text(
-+                    'Limpiando cach├⌐...',
++                    'Limpiando caché...',
 +                    style: TextStyle(fontSize: 16, decoration: TextDecoration.none),
 +                  ),
 +                ],
@@ -104,8 +145,8 @@ index 0000000..fc5cb33
 +          context: context,
 +          barrierDismissible: false,
 +          builder: (context) => AlertDialog(
-+            title: const Text('Cach├⌐ limpiada'),
-+            content: const Text('La cach├⌐ se ha limpiado correctamente. La aplicaci├│n se cerrar├í ahora para aplicar los cambios. Por favor, ├íbrela nuevamente.'),
++            title: const Text('Caché limpiada'),
++            content: const Text('La caché se ha limpiado correctamente. La aplicación se cerrará ahora para aplicar los cambios. Por favor, ábrela nuevamente.'),
 +            actions: [
 +              TextButton(
 +                onPressed: () => exit(0),
@@ -123,7 +164,7 @@ index 0000000..fc5cb33
 +          context: context,
 +          builder: (context) => AlertDialog(
 +            title: const Text('Error'),
-+            content: Text('Ocurri├│ un error al limpiar la cach├⌐: $e'),
++            content: Text('Ocurrió un error al limpiar la caché: $e'),
 +            actions: [
 +              TextButton(
 +                onPressed: () => Navigator.of(context).pop(),
@@ -166,6 +207,71 @@ index 6305f45..ad95ef2 100644
                    maxLines: 1,
                    overflow: TextOverflow.ellipsis,
                    style: const TextStyle(fontSize: 16),
+diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
+index ae1b35f..81b958d 100644
+--- a/lib/pages/chat/chat_view.dart
++++ b/lib/pages/chat/chat_view.dart
+@@ -16,6 +16,7 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
+ import 'package:fluffychat/pages/chat/pinned_events.dart';
+ import 'package:fluffychat/pages/chat/reply_display.dart';
+ import 'package:fluffychat/utils/account_config.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:fluffychat/utils/localized_exception_extension.dart';
+ import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
+ import 'package:fluffychat/widgets/future_loading_dialog.dart';
+@@ -180,6 +181,22 @@ class ChatView extends StatelessWidget {
+                                 ],
+                               ),
+                             ),
++                          if (controller.selectedEvents.single.type == 'm.sticker')
++                            PopupMenuItem(
++                              onTap: () => BeeperBridgeUtils.addStickerToWhatsappPack(
++                                context,
++                                controller.selectedEvents.single,
++                              ),
++                              value: null,
++                              child: Row(
++                                mainAxisSize: .min,
++                                children: [
++                                  const Icon(Icons.add_photo_alternate_outlined),
++                                  const SizedBox(width: 12),
++                                  const Text('Agregar a stickers de WhatsApp'),
++                                ],
++                              ),
++                            ),
+                           if (controller.canSaveSelectedEvent)
+                             PopupMenuItem(
+                               onTap: () =>
+diff --git a/lib/pages/chat/event_info_dialog.dart b/lib/pages/chat/event_info_dialog.dart
+index 731cc94..d266116 100644
+--- a/lib/pages/chat/event_info_dialog.dart
++++ b/lib/pages/chat/event_info_dialog.dart
+@@ -8,6 +8,7 @@ import 'dart:convert';
+ import 'package:fluffychat/config/app_config.dart';
+ import 'package:fluffychat/l10n/l10n.dart';
+ import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:fluffychat/utils/date_time_extension.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
+ import 'package:flutter/material.dart';
+@@ -46,6 +47,17 @@ class EventInfoDialog extends StatelessWidget {
+       ),
+       body: ListView(
+         children: [
++          if (event.type == 'm.sticker') ...[
++            ListTile(
++              leading: const Icon(Icons.add_photo_alternate_outlined),
++              title: const Text('Agregar a stickers de WhatsApp'),
++              onTap: () async {
++                Navigator.of(context, rootNavigator: false).pop();
++                await BeeperBridgeUtils.addStickerToWhatsappPack(context, event);
++              },
++            ),
++            Divider(color: theme.dividerColor),
++          ],
+           ListTile(
+             leading: Avatar(
+               mxContent: event.senderFromMemoryOrFallback.avatarUrl,
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..7354407 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
@@ -188,10 +294,21 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..63c7306 100644
+index 6ceba8b..51245fa 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -149,9 +149,24 @@ class ChatListController extends State<ChatList>
+@@ -83,7 +83,9 @@ class ChatListController extends State<ChatList>
+   String? get activeSpaceId => _activeSpaceId;
+ 
+   Future<void> setActiveSpace(String spaceId) async {
+-    await Matrix.of(context).client.getRoomById(spaceId)!.postLoad();
++    if (!spaceId.startsWith('virtual_space_') && !spaceId.startsWith('virtual_tag_')) {
++      await Matrix.of(context).client.getRoomById(spaceId)?.postLoad();
++    }
+ 
+     setState(() {
+       _activeSpaceId = spaceId;
+@@ -149,9 +151,24 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -220,7 +337,7 @@ index 6ceba8b..63c7306 100644
    bool isSearchMode = false;
    Future<QueryPublicRoomsResponse>? publicRoomsResponse;
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..5175412 100644
+index 8610b92..a98fe6c 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -248,17 +365,18 @@ index 8610b92..5175412 100644
  
  import '../../config/themes.dart';
  import '../../widgets/adaptive_dialogs/user_dialog.dart';
-@@ -33,7 +35,8 @@ class ChatListViewBody extends StatelessWidget {
+@@ -33,7 +35,9 @@ class ChatListViewBody extends StatelessWidget {
  
      final client = Matrix.of(context).client;
      final activeSpace = controller.activeSpaceId;
 -    if (activeSpace != null) {
 +    final isVirtualSpace = activeSpace?.startsWith('virtual_space_') ?? false;
-+    if (activeSpace != null && !isVirtualSpace) {
++    final isVirtualTag = activeSpace?.startsWith('virtual_tag_') ?? false;
++    if (activeSpace != null && !isVirtualSpace && !isVirtualTag) {
        return SpaceView(
          key: ValueKey(activeSpace),
          spaceId: activeSpace,
-@@ -67,7 +70,7 @@ class ChatListViewBody extends StatelessWidget {
+@@ -67,14 +71,34 @@ class ChatListViewBody extends StatelessWidget {
            .where((s) => s.hasRoomUpdate)
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
@@ -267,8 +385,17 @@ index 8610b92..5175412 100644
              .where(
                (room) =>
                    !AppSettings.hideRoomsInSpaces.value ||
-@@ -75,6 +78,14 @@ class ChatListViewBody extends StatelessWidget {
+                   spaceDelegateCandidates[room.id] == null,
              )
++            .where((room) {
++              if (isVirtualSpace) return true;
++              final net = BeeperBridgeUtils.getRoomNetwork(room);
++              if (net != null) {
++                final contained = Matrix.of(context).store.getStringList('beeper_contained_networks') ?? [];
++                if (contained.contains(net.key)) return false;
++              }
++              return true;
++            })
              .toList();
  
 +        if (isVirtualSpace) {
@@ -277,6 +404,9 @@ index 8610b92..5175412 100644
 +            final net = BeeperBridgeUtils.getRoomNetwork(room);
 +            return net?.key == virtualNetKey;
 +          }).toList();
++        } else if (isVirtualTag) {
++          final tagKey = activeSpace!.replaceFirst('virtual_tag_', '');
++          rooms = rooms.where((room) => room.tags.containsKey(tagKey)).toList();
 +        }
 +
          return CustomScrollView(
@@ -336,7 +466,7 @@ index 55d1d7e..9332c52 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..c2ebad1 100644
+index a649171..5a22bfe 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,23 @@
@@ -367,7 +497,7 @@ index a649171..c2ebad1 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +31,137 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +31,161 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -390,7 +520,7 @@ index a649171..c2ebad1 100644
 +          children: [
 +            ListTile(
 +              leading: const Icon(Icons.visibility_off_outlined),
-+              title: Text('Ocultar ${net.name}'),
++              title: Text('Ocultar ${net.name} del menú'),
 +              onTap: () async {
 +                final navigator = Navigator.of(context);
 +                final hidden = List<String>.from(store.getStringList('beeper_hidden_networks') ?? []);
@@ -398,6 +528,30 @@ index a649171..c2ebad1 100644
 +                  hidden.add(net.key);
 +                  await store.setStringList('beeper_hidden_networks', hidden);
 +                }
++                navigator.pop();
++                setState(() {});
++              },
++            ),
++            ListTile(
++              leading: Icon(
++                (store.getStringList('beeper_contained_networks') ?? []).contains(net.key)
++                    ? Icons.inbox_outlined
++                    : Icons.inbox,
++              ),
++              title: Text(
++                (store.getStringList('beeper_contained_networks') ?? []).contains(net.key)
++                    ? 'Mostrar en listado principal'
++                    : 'Contener chats solo aquí',
++              ),
++              onTap: () async {
++                final navigator = Navigator.of(context);
++                final contained = List<String>.from(store.getStringList('beeper_contained_networks') ?? []);
++                if (contained.contains(net.key)) {
++                  contained.remove(net.key);
++                } else {
++                  contained.add(net.key);
++                }
++                await store.setStringList('beeper_contained_networks', contained);
 +                navigator.pop();
 +                setState(() {});
 +              },
@@ -505,22 +659,27 @@ index a649171..c2ebad1 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -46,6 +177,37 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -46,6 +201,45 @@ class SpacesNavigationRail extends StatelessWidget {
                  .where((room) => room.isSpace)
                  .toList();
  
-+            // Extract unique Beeper networks from client rooms
++            // Extract unique Beeper networks and custom tags from client rooms
 +            final beeperNetworks = <String, BeeperNetwork>{};
++            final customTags = <String>{};
 +            for (final r in client.rooms) {
 +              final net = BeeperBridgeUtils.getRoomNetwork(r);
 +              if (net != null) {
 +                beeperNetworks[net.key] = net;
++              }
++              for (final tag in r.tags.keys) {
++                if (tag.startsWith('u.')) customTags.add(tag);
 +              }
 +            }
 +
 +            final networksList = beeperNetworks.values.toList();
 +            final hiddenNets = store.getStringList('beeper_hidden_networks') ?? [];
 +            final visibleNetworks = networksList.where((n) => !hiddenNets.contains(n.key)).toList();
++            final tagsList = customTags.toList()..sort();
 +
 +            final order = store.getStringList('beeper_networks_order') ?? [];
 +            visibleNetworks.sort((a, b) {
@@ -539,11 +698,14 @@ index a649171..c2ebad1 100644
 +            for (final net in visibleNetworks) {
 +              combinedItems.add(_CombinedRailItem.network(net));
 +            }
++            for (final tag in tagsList) {
++              combinedItems.add(_CombinedRailItem.tag(tag));
++            }
 +
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +216,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +248,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -562,7 +724,7 @@ index a649171..c2ebad1 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +237,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +269,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -571,7 +733,7 @@ index a649171..c2ebad1 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +248,72 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +280,102 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -631,7 +793,7 @@ index a649171..c2ebad1 100644
 -                            borderRadius: BorderRadius.circular(
 -                              AppConfig.spaceBorderRadius,
 +                          );
-+                        } else {
++                        } else if (item.isNetwork) {
 +                          final net = item.network!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
 +                          return Material(
@@ -662,6 +824,36 @@ index a649171..c2ebad1 100644
 +                                  ),
 +                                ),
 +                              ),
++                            ),
++                          );
++                        } else {
++                          final tag = item.tag!;
++                          final isSelected = widget.activeSpaceId == 'virtual_tag_$tag';
++                          final displayName = tag.replaceFirst('u.', '');
++                          return Material(
++                            color: Colors.transparent,
++                            child: NaviRailItem(
++                              toolTip: displayName,
++                              isSelected: isSelected,
++                              onTap: () => widget.onGoToSpaceId('virtual_tag_$tag'),
++                              unreadBadgeFilter: (room) => room.tags.containsKey(tag),
++                              icon: Avatar(
++                                name: displayName,
++                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
++                                textColor: Theme.of(context).colorScheme.onPrimaryContainer,
++                                shapeBorder: RoundedSuperellipseBorder(
++                                  side: BorderSide(
++                                    width: 1,
++                                    color: Theme.of(context).dividerColor,
++                                  ),
++                                  borderRadius: BorderRadius.circular(
++                                    AppConfig.spaceBorderRadius,
++                                  ),
++                                ),
++                                borderRadius: BorderRadius.circular(
++                                  AppConfig.spaceBorderRadius,
++                                ),
++                              ),
                              ),
 -                          ),
 -                        );
@@ -670,7 +862,7 @@ index a649171..c2ebad1 100644
                        },
                      ),
                    ),
-@@ -135,3 +331,17 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +393,29 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -678,41 +870,228 @@ index a649171..c2ebad1 100644
 +class _CombinedRailItem {
 +  final Room? space;
 +  final BeeperNetwork? network;
++  final String? tag;
 +  final bool isSpace;
++  final bool isNetwork;
 +
 +  _CombinedRailItem.space(this.space)
 +      : network = null,
-+        isSpace = true;
++        tag = null,
++        isSpace = true,
++        isNetwork = false;
 +
 +  _CombinedRailItem.network(this.network)
 +      : space = null,
-+        isSpace = false;
++        tag = null,
++        isSpace = false,
++        isNetwork = true;
++
++  _CombinedRailItem.tag(this.tag)
++      : space = null,
++        network = null,
++        isSpace = false,
++        isNetwork = false;
++}
+diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
+new file mode 100644
+index 0000000..593f127
+--- /dev/null
++++ b/lib/pages/settings/patches_settings.dart
+@@ -0,0 +1,170 @@
++// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
++// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:fluffychat/config/themes.dart';
++import 'package:fluffychat/controllers/beeper_reinit_controller.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/widgets/matrix.dart';
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++
++class SettingsPatches extends StatefulWidget {
++  const SettingsPatches({super.key});
++
++  @override
++  State<SettingsPatches> createState() => _SettingsPatchesState();
++}
++
++class _SettingsPatchesState extends State<SettingsPatches> {
++  @override
++  Widget build(BuildContext context) {
++    final client = Matrix.of(context).client;
++    final store = Matrix.of(context).store;
++    final theme = Theme.of(context);
++
++    // Extract unique Beeper networks from client rooms
++    final beeperNetworks = <String, BeeperNetwork>{};
++    final customTags = <String>{};
++    for (final r in client.rooms) {
++      final net = BeeperBridgeUtils.getRoomNetwork(r);
++      if (net != null) {
++        beeperNetworks[net.key] = net;
++      }
++      for (final tag in r.tags.keys) {
++        if (tag.startsWith('u.')) {
++          customTags.add(tag);
++        }
++      }
++    }
++
++    final networksList = beeperNetworks.values.toList()
++      ..sort((a, b) => a.name.compareTo(b.name));
++    final tagsList = customTags.toList()..sort();
++
++    final contained = store.getStringList('beeper_contained_networks') ?? [];
++    final hiddenNets = store.getStringList('beeper_hidden_networks') ?? [];
++
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Parches de Beeper'),
++      ),
++      body: ListView(
++        children: [
++          Padding(
++            padding: const EdgeInsets.all(16.0),
++            child: Text(
++              'Acciones rápidas',
++              style: TextStyle(
++                color: theme.colorScheme.primary,
++                fontWeight: FontWeight.bold,
++              ),
++            ),
++          ),
++          ListTile(
++            leading: const Icon(Icons.sync_outlined),
++            title: const Text('Re-sincronizar chats (Beeper)'),
++            subtitle: const Text('Limpia la caché de perfiles, avatares y nombres e inicia una sincronización completa.'),
++            onTap: () => BeeperReinitController.showReinitOverlay(
++              context,
++              client,
++            ),
++          ),
++          const Divider(),
++          Padding(
++            padding: const EdgeInsets.all(16.0),
++            child: Text(
++              'Contener Bridges (Ocultar de la lista principal)',
++              style: TextStyle(
++                color: theme.colorScheme.primary,
++                fontWeight: FontWeight.bold,
++              ),
++            ),
++          ),
++          if (networksList.isEmpty)
++            const Padding(
++              padding: EdgeInsets.symmetric(horizontal: 16.0),
++              child: Text('No se detectaron puentes de Beeper activos.'),
++            )
++          else
++            ...networksList.map((net) {
++              final isContained = contained.contains(net.key);
++              final isHidden = hiddenNets.contains(net.key);
++              return Column(
++                children: [
++                  SwitchListTile.adaptive(
++                    value: isContained,
++                    title: Text('Contener ${net.name}'),
++                    subtitle: Text('Muestra los chats de ${net.name} solo dentro de su sala virtual en el menú lateral.'),
++                    onChanged: (val) async {
++                      final newContained = List<String>.from(contained);
++                      if (val) {
++                        newContained.add(net.key);
++                      } else {
++                        newContained.remove(net.key);
++                      }
++                      await store.setStringList('beeper_contained_networks', newContained);
++                      setState(() {});
++                    },
++                  ),
++                  SwitchListTile.adaptive(
++                    value: isHidden,
++                    title: Text('Ocultar ${net.name} de la barra lateral'),
++                    subtitle: Text('Oculta el ícono de acceso directo de ${net.name} de la izquierda.'),
++                    onChanged: (val) async {
++                      final newHidden = List<String>.from(hiddenNets);
++                      if (val) {
++                        newHidden.add(net.key);
++                      } else {
++                        newHidden.remove(net.key);
++                      }
++                      await store.setStringList('beeper_hidden_networks', newHidden);
++                      setState(() {});
++                    },
++                  ),
++                  const Divider(indent: 16, endIndent: 16),
++                ],
++              );
++            }),
++          const Divider(),
++          Padding(
++            padding: const EdgeInsets.all(16.0),
++            child: Text(
++              'Contener Etiquetas personalizadas (Labels)',
++              style: TextStyle(
++                color: theme.colorScheme.primary,
++                fontWeight: FontWeight.bold,
++              ),
++            ),
++          ),
++          if (tagsList.isEmpty)
++            const Padding(
++              padding: EdgeInsets.symmetric(horizontal: 16.0),
++              child: Text('No tienes etiquetas (u.xxx) creadas todavía.'),
++            )
++          else
++            ...tagsList.map((tag) {
++              final displayName = tag.replaceFirst('u.', '');
++              final isContained = contained.contains(tag);
++              return SwitchListTile.adaptive(
++                value: isContained,
++                title: Text('Contener etiqueta: $displayName'),
++                subtitle: const Text('Muestra estos chats solo dentro de la etiqueta en el menú lateral.'),
++                onChanged: (val) async {
++                  final newContained = List<String>.from(contained);
++                  if (val) {
++                    newContained.add(tag);
++                  } else {
++                    newContained.remove(tag);
++                  }
++                  await store.setStringList('beeper_contained_networks', newContained);
++                  setState(() {});
++                },
++              );
++            }),
++        ],
++      ),
++    );
++  }
 +}
 diff --git a/lib/pages/settings/settings_view.dart b/lib/pages/settings/settings_view.dart
-index 029e7bc..8a6c4b2 100644
+index 029e7bc..4830f61 100644
 --- a/lib/pages/settings/settings_view.dart
 +++ b/lib/pages/settings/settings_view.dart
-@@ -15,7 +15,7 @@ import 'package:go_router/go_router.dart';
+@@ -15,7 +15,6 @@ import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart' hide Result;
  import 'package:url_launcher/url_launcher.dart';
  import 'package:url_launcher/url_launcher_string.dart';
 -
-+import 'package:fluffychat/controllers/beeper_reinit_controller.dart';
  import '../../widgets/mxc_image_viewer.dart';
  import 'settings.dart';
  
-@@ -152,6 +152,16 @@ class SettingsView extends StatelessWidget {
+@@ -152,6 +151,16 @@ class SettingsView extends StatelessWidget {
                onChanged: controller.firstRunBootstrapAction,
              ),
              Divider(color: theme.dividerColor),
 +            ListTile(
-+              leading: const Icon(Icons.sync_outlined),
-+              title: const Text('Re-sincronizar chats (Beeper)'),
-+              subtitle: const Text('Limpia la cach├⌐ de perfiles y nombres.'),
-+              onTap: () => BeeperReinitController.showReinitOverlay(
-+                context,
-+                Matrix.of(context).client,
-+              ),
++              leading: const Icon(Icons.build_outlined),
++              title: const Text('Parches de Beeper'),
++              subtitle: const Text('Configurar re-sincronización, containment de salas y visibilidad.'),
++              tileColor: activeRoute.startsWith('/rooms/settings/patches')
++                  ? theme.colorScheme.surfaceContainerHigh
++                  : null,
++              onTap: () => context.go('/rooms/settings/patches'),
 +            ),
 +            Divider(color: theme.dividerColor),
              ListTile(
@@ -749,10 +1128,14 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..cfb34a9
+index 0000000..1554f0a
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,228 @@
++import 'dart:typed_data';
++
++import 'package:fluffychat/widgets/future_loading_dialog.dart';
++import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +
 +class BeeperBridgeUtils {
@@ -861,6 +1244,95 @@ index 0000000..cfb34a9
 +      }
 +    }
 +    return null;
++  }
++
++  static Future<void> addStickerToWhatsappPack(BuildContext context, Event event) async {
++    final client = event.room.client;
++    final messenger = ScaffoldMessenger.of(context);
++
++    final result = await showFutureLoadingDialog<Uri?>(
++      context: context,
++      future: () async {
++        final bytes = await event.downloadAndDecryptAttachment();
++        final String filename = event.content['body'] ?? 'sticker';
++        final String mimetype = event.content['info']?['mimetype'] ?? 'image/png';
++        final uri = await client.uploadContent(
++          bytes,
++          filename: filename,
++          contentType: mimetype,
++        );
++        return uri;
++      },
++    );
++
++    final mxcUri = result.result;
++    if (mxcUri == null) {
++      messenger.showSnackBar(
++        const SnackBar(content: Text('Error al subir el sticker a la cuenta')),
++      );
++      return;
++    }
++
++    try {
++      final accountDataEvent = client.accountData['im.ponies.user_emotes'];
++      Map<String, dynamic> packData;
++      if (accountDataEvent != null) {
++        packData = Map<String, dynamic>.from(accountDataEvent.content);
++      } else {
++        packData = {
++          'images': <String, dynamic>{},
++          'pack': {
++            'display_name': 'WhatsApp',
++            'usage': ['sticker'],
++          },
++        };
++      }
++
++      final images = Map<String, dynamic>.from(packData['images'] ?? <String, dynamic>{});
++      
++      final info = <String, dynamic>{};
++      if (event.content['info'] != null) {
++        info.addAll(Map<String, dynamic>.from(event.content['info']));
++      }
++      
++      if (info['w'] is int && info['h'] is int) {
++        final int w = info['w'];
++        final int h = info['h'];
++        final ratio = w / h;
++        if (w > h) {
++          info['w'] = 256;
++          info['h'] = (256.0 / ratio).round();
++        } else {
++          info['h'] = 256;
++          info['w'] = (ratio * 256.0).round();
++        }
++      }
++
++      final stickerContent = <String, dynamic>{
++        'url': mxcUri.toString(),
++        'info': info,
++        'body': event.content['body'] ?? 'sticker',
++        'usage': ['sticker'],
++      };
++
++      final String code = 'sticker_${DateTime.now().millisecondsSinceEpoch}';
++      images[code] = stickerContent;
++      packData['images'] = images;
++
++      await client.setAccountData(
++        client.userID!,
++        'im.ponies.user_emotes',
++        packData,
++      );
++
++      messenger.showSnackBar(
++        const SnackBar(content: Text('Sticker agregado al paquete WhatsApp')),
++      );
++    } catch (e) {
++      messenger.showSnackBar(
++        SnackBar(content: Text('Error al guardar el sticker: $e')),
++      );
++    }
 +  }
 +}
 +
@@ -1032,7 +1504,7 @@ index 0000000..b6f6887
 +            children: [
 +              const SizedBox(height: 8),
 +              Text(
-+                "Calentando Cach├⌐...",
++                "Calentando Caché...",
 +                style: theme.textTheme.titleMedium?.copyWith(
 +                  fontWeight: FontWeight.bold,
 +                ),
