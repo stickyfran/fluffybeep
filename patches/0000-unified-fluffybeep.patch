@@ -41,14 +41,15 @@ index c1b5b91..4d95180 100644
                        pageBuilder: (context, state) => defaultPageBuilder(
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..d8416cc
+index 0000000..13e0417
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,107 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
 +
 +class BeeperReinitController {
 +  final Client client;
@@ -76,7 +77,7 @@ index 0000000..d8416cc
 +      context: context,
 +      builder: (context) => AlertDialog(
 +        title: const Text('Re-sincronizar chats (Beeper)'),
-+        content: const Text('Se limpiará la caché de chats y perfiles. Para completar el proceso, la aplicación se cerrará y deberás volver a abrirla. ¿Deseas continuar?'),
++        content: const Text('La caché se limpiará y la aplicación se cerrará. Al volver a abrirla, descargará todo tu historial y avatares forzosamente.'),
 +        actions: [
 +          TextButton(
 +            onPressed: () => Navigator.of(context).pop(false),
@@ -127,35 +128,10 @@ index 0000000..d8416cc
 +    Overlay.of(context).insert(overlay);
 +
 +    try {
-+      final store = Matrix.of(context).store;
-+      await store.setBool('beeper_needs_cache_refresh', true);
 +      await client.clearCache();
-+      
-+      // Remove overlay before exit
-+      overlay.remove();
-+
-+      // Force close the app
++      final prefs = await SharedPreferences.getInstance();
++      await prefs.setBool('beeper_needs_cache_refresh', true);
 +      exit(0);
-+
-+      // Show success dialog in case exit(0) is intercepted by the system
-+      if (context.mounted) {
-+        await showDialog(
-+          context: context,
-+          barrierDismissible: false,
-+          builder: (context) => AlertDialog(
-+            title: const Text('Caché limpiada'),
-+            content: const Text(
-+              'La caché se ha limpiado correctamente. Si la aplicación no se cerró automáticamente, por favor ciérrala forzadamente desde el menú de aplicaciones recientes de tu teléfono y vuelve a abrirla para completar el proceso.',
-+            ),
-+            actions: [
-+              TextButton(
-+                onPressed: () => Navigator.of(context).pop(),
-+                child: const Text('Aceptar'),
-+              ),
-+            ],
-+          ),
-+        );
-+      }
 +    } catch (e) {
 +      overlay.remove();
 +      if (context.mounted) {
@@ -177,7 +153,7 @@ index 0000000..d8416cc
 +  }
 +}
 diff --git a/lib/pages/chat/chat_app_bar_title.dart b/lib/pages/chat/chat_app_bar_title.dart
-index 6305f45..9e92f5f 100644
+index 6305f45..c9488c6 100644
 --- a/lib/pages/chat/chat_app_bar_title.dart
 +++ b/lib/pages/chat/chat_app_bar_title.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -188,28 +164,18 @@ index 6305f45..9e92f5f 100644
  import 'package:fluffychat/utils/sync_status_localization.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/presence_builder.dart';
-@@ -30,6 +31,9 @@ class ChatAppBarTitle extends StatelessWidget {
-         ),
-       );
-     }
-+    final mxContent = BeeperBridgeUtils.isFakeDM(room)
-+        ? (room.avatar ?? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl)
-+        : room.avatar;
-     return InkWell(
-       hoverColor: Colors.transparent,
-       splashColor: Colors.transparent,
-@@ -44,8 +48,8 @@ class ChatAppBarTitle extends StatelessWidget {
+@@ -44,8 +45,8 @@ class ChatAppBarTitle extends StatelessWidget {
            Hero(
              tag: 'content_banner',
              child: Avatar(
 -              mxContent: room.avatar,
 -              name: room.getLocalizedDisplayname(
-+              mxContent: mxContent,
++              mxContent: room.beeperAvatarUrl,
 +              name: room.getBeeperDisplayname(
                  MatrixLocals(L10n.of(context)),
                ),
                size: 32,
-@@ -57,7 +61,7 @@ class ChatAppBarTitle extends StatelessWidget {
+@@ -57,7 +58,7 @@ class ChatAppBarTitle extends StatelessWidget {
                crossAxisAlignment: .start,
                children: [
                  Text(
@@ -710,7 +676,7 @@ index 8610b92..e82e97b 100644
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..bb8cb4b 100644
+index 55d1d7e..2b27694 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -744,19 +710,17 @@ index 55d1d7e..bb8cb4b 100644
        MatrixLocals(L10n.of(context)),
      );
      final filter = this.filter;
-@@ -63,7 +67,10 @@ class ChatListItem extends StatelessWidget {
+@@ -63,7 +67,8 @@ class ChatListItem extends StatelessWidget {
      final needLastEventSender =
          lastEvent != null &&
          room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
 -    final space = this.space;
 +    final space = isBeeperFakeDM ? null : this.space;
-+    final mxContent = isBeeperFakeDM 
-+        ? (room.avatar ?? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl) 
-+        : room.avatar;
++    final mxContent = room.beeperAvatarUrl;
  
      return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +152,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +150,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -1497,10 +1461,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..65b59c5
+index 0000000..f784a5e
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,560 @@
+@@ -0,0 +1,502 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1524,63 +1488,15 @@ index 0000000..65b59c5
 +  /// 2. The real contact
 +  /// 3. The Beeper bridge bot
 +  static bool isFakeDM(Room room) {
-+    // Check 1 (FAST PATH — no member loading needed):
-+    // directChatMatrixID comes from account data (m.direct), which is loaded
-+    // immediately from the DB before member events. If it points to a Beeper
-+    // network user, this is definitively a Fake DM regardless of isDirectChat.
 +    final directId = room.directChatMatrixID;
-+    if (directId != null && directId.startsWith('@')) {
-+      final localpart = directId.split(':').first.substring(1);
-+      for (final entry in networkMap.entries) {
-+        if (localpart.startsWith('${entry.key}_') || localpart == '${entry.key}bot') {
-+          return true;
-+        }
++    if (directId == null || !directId.startsWith('@')) return false;
++    final localpart = directId.split(':').first.substring(1);
++    for (final key in networkMap.keys) {
++      if (localpart.startsWith('${key}_') || localpart == '${key}bot') {
++        return true;
 +      }
 +    }
-+
-+    // Check 2: Real groups have an explicit name; Beeper fake DMs are anonymous.
-+    final nameEvent = room.states['m.room.name'];
-+    if (nameEvent != null && nameEvent.isNotEmpty) {
-+      final firstName = nameEvent.values.firstOrNull;
-+      final roomName = firstName?.content.tryGet<String>('name') ?? '';
-+      if (roomName.trim().isNotEmpty) {
-+        return false;
-+      }
-+    }
-+
-+    // Check 3: m.bridge state event — explicit bridge marker.
-+    final hasBridgeEvent = room.states['m.bridge']?.isNotEmpty ?? false;
-+    if (hasBridgeEvent && room.isDirectChat) {
-+      return true;
-+    }
-+
-+    // Check 4: Only direct chats can be Fake DMs via the 3-member heuristic.
-+    // Bridged rooms without the isDirectChat flag are already handled above.
-+    if (!room.isDirectChat) return false;
-+
-+    // Check 5: Fallback — 3-member structure: local user + bot + real contact.
-+    final members = room.getParticipants();
-+    if (members.length != 3) {
-+      return false;
-+    }
-+
-+    bool hasLocalUser = false;
-+    bool hasBot = false;
-+    bool hasRealContact = false;
-+
-+    final clientUserId = room.client.userID;
-+
-+    for (var member in members) {
-+      if (member.id == clientUserId) {
-+        hasLocalUser = true;
-+      } else if (isBeeperBot(member.id)) {
-+        hasBot = true;
-+      } else {
-+        hasRealContact = true;
-+      }
-+    }
-+
-+    return hasLocalUser && hasBot && hasRealContact;
++    return false;
 +  }
 +
 +  /// Extracts the real contact from a Fake DM room.
@@ -2022,51 +1938,41 @@ index 0000000..65b59c5
 +}
 +
 +extension RoomBeeperExtension on Room {
-+  String getBeeperDisplayname(MatrixLocalizations localizations) {
-+    // Primary path: room is a confirmed Fake DM
++  Uri? get beeperAvatarUrl {
 +    if (BeeperBridgeUtils.isFakeDM(this)) {
-+      final contact = BeeperBridgeUtils.getRealContactFromFakeDM(this);
-+      if (contact != null) {
-+        return contact.calcDisplayname();
-+      }
-+
-+      // Members are still loading (race condition during initial sync).
-+      // Use the raw directChatMatrixID localpart as a placeholder instead
-+      // of falling back to getLocalizedDisplayname() which would show
-+      // "Group with [Bot]". The UI will re-render once members are loaded.
 +      final directId = directChatMatrixID;
 +      if (directId != null) {
-+        // e.g. "@whatsapp_12345:beeper.local" → "whatsapp_12345"
-+        return directId.split(':').first.replaceAll('@', '');
-+      }
-+    }
-+
-+    // Secondary path: isFakeDM may have returned false during initial load
-+    // (e.g. isDirectChat not yet set), but the directChatMatrixID already
-+    // contains a Beeper network user ID. Detect and display the raw ID
-+    // instead of "Group with..." to avoid the flash.
-+    final directId = directChatMatrixID;
-+    if (directId != null && directId.startsWith('@')) {
-+      final localpart = directId.split(':').first.substring(1);
-+      for (final entry in BeeperBridgeUtils.networkMap.entries) {
-+        if (localpart.startsWith('${entry.key}_') ||
-+            localpart == '${entry.key}bot') {
-+          // This is a Beeper bridged room in its loading window.
-+          // Return the raw localpart (e.g. "whatsapp_12345") as placeholder.
-+          return localpart;
++        final state = states['m.room.member']?[directId];
++        final avatarUrlStr = state?.content['avatar_url'] as String?;
++        if (avatarUrlStr != null && avatarUrlStr.isNotEmpty) {
++          return Uri.tryParse(avatarUrlStr);
 +        }
 +      }
 +    }
++    return avatar;
++  }
 +
++  String getBeeperDisplayname(MatrixLocalizations localizations) {
++    if (BeeperBridgeUtils.isFakeDM(this)) {
++      final directId = directChatMatrixID;
++      if (directId != null) {
++        final state = states['m.room.member']?[directId];
++        final displayname = state?.content['displayname'] as String?;
++        if (displayname != null && displayname.isNotEmpty) {
++          return displayname;
++        }
++        return directId.split(':').first.replaceAll('@', '');
++      }
++    }
 +    return getLocalizedDisplayname(localizations);
 +  }
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..8230a07
+index 0000000..be6efd9
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,161 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -2134,26 +2040,13 @@ index 0000000..8230a07
 +          _currentRoomName = roomName;
 +        });
 +
-+        // Force download history (last 30 messages)
 +        try {
-+          final timeline = await room.getTimeline();
-+          await timeline.requestHistory(historyCount: 30);
-+          timeline.cancelSubscriptions();
++          await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
 +        } catch (_) {}
 +
-+        // Pre-download avatar to local cache
-+        final avatarUri = room.avatar;
-+        if (avatarUri != null) {
++        if (room.beeperAvatarUrl != null) {
 +          try {
-+            await widget.client.downloadMxcCached(avatarUri);
-+          } catch (_) {}
-+        }
-+
-+        // Also pre-download contact avatar for fake DMs
-+        final contactAvatar = BeeperBridgeUtils.getRealContactFromFakeDM(room)?.avatarUrl;
-+        if (contactAvatar != null) {
-+          try {
-+            await widget.client.downloadMxcCached(contactAvatar);
++            await widget.client.downloadMxcCached(room.beeperAvatarUrl!);
 +          } catch (_) {}
 +        }
 +
@@ -2167,7 +2060,8 @@ index 0000000..8230a07
 +      debugPrint('Error during prewarming cache: $e');
 +    } finally {
 +      if (mounted) {
-+        await widget.store.setBool('beeper_needs_cache_refresh', false);
++        final prefs = await SharedPreferences.getInstance();
++        await prefs.setBool('beeper_needs_cache_refresh', false);
 +        setState(() {
 +          _completed = true;
 +        });
