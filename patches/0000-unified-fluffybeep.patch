@@ -337,7 +337,7 @@ index 4cda41c..7354407 100644
            appBar: AppBar(
              leading:
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..fcb5a8a 100644
+index 6ceba8b..b2d2831 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -30,10 +30,11 @@ import 'package:matrix/matrix.dart' as sdk;
@@ -367,7 +367,7 @@ index 6ceba8b..fcb5a8a 100644
        _activeSpaceId = spaceId;
      });
    }
-@@ -137,23 +140,82 @@ class ChatListController extends State<ChatList>
+@@ -137,120 +140,117 @@ class ChatListController extends State<ChatList>
    bool Function(Room) getRoomFilterByActiveFilter(ActiveFilter activeFilter) {
      switch (activeFilter) {
        case ActiveFilter.allChats:
@@ -452,10 +452,124 @@ index 6ceba8b..fcb5a8a 100644
 +  }
  
    bool isSearchMode = false;
-   Future<QueryPublicRoomsResponse>? publicRoomsResponse;
+-  Future<QueryPublicRoomsResponse>? publicRoomsResponse;
++  // NOTE: publicRoomsResponse, searchServer, userSearchResult and roomSearchResult
++  // are kept as null/empty stubs so chat_list_body.dart compiles without changes.
++  // The search is now local-only: it filters filteredRooms in memory.
    String? searchServer;
    Timer? _coolDown;
-@@ -641,23 +703,22 @@ class ChatListController extends State<ChatList>
+   SearchUserDirectoryResponse? userSearchResult;
+   QueryPublicRoomsResponse? roomSearchResult;
+ 
+   bool isSearching = false;
+   static const String _serverStoreNamespace = 'im.fluffychat.search.server';
+ 
+-  Future<void> setServer() async {
+-    final matrix = Matrix.of(context);
+-    final l10n = L10n.of(context);
+-    final newServer = await showTextInputDialog(
+-      useRootNavigator: false,
+-      title: l10n.changeTheHomeserver,
+-      context: context,
+-      okLabel: l10n.ok,
+-      cancelLabel: l10n.cancel,
+-      prefixText: 'https://',
+-      hintText: matrix.client.homeserver?.host,
+-      initialText: searchServer,
+-      keyboardType: TextInputType.url,
+-      autocorrect: false,
+-      validator: (server) =>
+-          server.contains('.') == true ? null : l10n.invalidServerName,
+-    );
+-    if (newServer == null) return;
+-    if (!mounted) return;
+-    matrix.store.setString(_serverStoreNamespace, newServer);
+-    setState(() {
+-      searchServer = newServer;
+-    });
+-    _coolDown?.cancel();
+-    _coolDown = Timer(const Duration(milliseconds: 500), _search);
+-  }
++  // Local-only search: no network calls needed for a Beeper environment.
++  // Rooms are filtered in filteredRooms getter and ChatListItem.filter.
++  // setServer is kept as a no-op stub to avoid removing call sites.
++  Future<void> setServer() async {}
+ 
+   final TextEditingController searchController = TextEditingController();
+   final FocusNode searchFocusNode = FocusNode();
+ 
++  /// Local-only search — filters the already-loaded room list in memory.
++  /// No network requests are made. Results appear instantly.
++  /// The actual text filtering happens in ChatListItem via the `filter` prop
++  /// and in ChatListViewBody via controller.searchController.text.
+   Future<void> _search() async {
+-    final client = Matrix.of(context).client;
+-    final scaffoldMessenger = ScaffoldMessenger.of(context);
+-    if (!isSearching) {
++    if (!isSearchMode) return;
++    // Just trigger a rebuild so the filter string propagates to the list.
++    if (mounted) {
+       setState(() {
+-        isSearching = true;
++        isSearching = false;
++        roomSearchResult = null;
++        userSearchResult = null;
+       });
+     }
+-    SearchUserDirectoryResponse? userSearchResult;
+-    QueryPublicRoomsResponse? roomSearchResult;
+-    final searchQuery = searchController.text.trim();
+-    try {
+-      roomSearchResult = await client.queryPublicRooms(
+-        server: searchServer,
+-        filter: PublicRoomQueryFilter(genericSearchTerm: searchQuery),
+-        limit: 20,
+-      );
+-
+-      if (searchQuery.isValidMatrixIdStrict() &&
+-          searchQuery.sigil == '#' &&
+-          roomSearchResult.chunk.any(
+-                (room) => room.canonicalAlias == searchQuery,
+-              ) ==
+-              false) {
+-        final response = await client.getRoomIdByAlias(searchQuery);
+-        final roomId = response.roomId;
+-        if (roomId != null) {
+-          roomSearchResult.chunk.add(
+-            PublishedRoomsChunk(
+-              name: searchQuery,
+-              guestCanJoin: false,
+-              numJoinedMembers: 0,
+-              roomId: roomId,
+-              worldReadable: false,
+-              canonicalAlias: searchQuery,
+-            ),
+-          );
+-        }
+-      }
+-      userSearchResult = await client.searchUserDirectory(
+-        searchController.text,
+-        limit: 20,
+-      );
+-    } catch (e, s) {
+-      Logs().w('Searching has crashed', e, s);
+-      if (!mounted) return;
+-      scaffoldMessenger.showSnackBar(
+-        SnackBar(content: Text(e.toLocalizedString(context))),
+-      );
+-    }
+-    if (!isSearchMode) return;
+-    setState(() {
+-      isSearching = false;
+-      this.roomSearchResult = roomSearchResult;
+-      this.userSearchResult = userSearchResult;
+-    });
+   }
+ 
+   void onSearchEnter(String text, {bool globalSearch = true}) {
+     if (text.isEmpty) {
+       cancelSearch(unfocus: false);
+@@ -641,23 +641,22 @@ class ChatListController extends State<ChatList>
                          : L10n.of(context).setLowPriority,
                    ),
                  ],
@@ -491,7 +605,7 @@ index 6ceba8b..fcb5a8a 100644
                child: Row(
                  mainAxisSize: .min,
                  children: [
-@@ -798,13 +859,31 @@ class ChatListController extends State<ChatList>
+@@ -798,13 +797,31 @@ class ChatListController extends State<ChatList>
            context: context,
            future: () => room.addTag('u.$newTag'),
          );
@@ -1501,10 +1615,10 @@ index 5ead47d..e5452a3 100644
      if (!firebaseEnabled) {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..d9d0d7d
+index 0000000..416ed10
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,529 @@
+@@ -0,0 +1,551 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1528,7 +1642,16 @@ index 0000000..d9d0d7d
 +  /// 2. The real contact
 +  /// 3. The Beeper bridge bot
 +  static bool isFakeDM(Room room) {
-+    // 0. Early exit: if the room has an explicit name set, it's a real group, not a fake DM.
++    // Guard 1: Only direct chats can be Fake DMs.
++    // This prevents 3-person real groups from being misidentified.
++    if (!room.isDirectChat) {
++      // Exception: rooms with a m.bridge event pointing to a network may still
++      // be bridged DMs even without the isDirectChat flag set initially.
++      final hasBridgeEvent = room.states['m.bridge']?.isNotEmpty ?? false;
++      if (!hasBridgeEvent) return false;
++    }
++
++    // Guard 2: Real groups have an explicit name; Beeper fake DMs are anonymous.
 +    final nameEvent = room.states['m.room.name'];
 +    if (nameEvent != null && nameEvent.isNotEmpty) {
 +      // Check the actual name content to make sure it's not empty/blank
@@ -1984,18 +2107,31 @@ index 0000000..d9d0d7d
 +  /// and other technical events (e.g. m.room.member, m.room.topic, etc.).
 +  /// Only returns events of type m.room.message, m.room.encrypted, or m.sticker.
 +  ///
-+  /// Note: matrix SDK 8.x removed the `Room.timeline` getter. The SDK now
-+  /// exposes only `room.lastEvent` (the most recent event stored in the DB).
-+  /// We check its type and return it if it qualifies as a "real" message.
++  /// Strategy:
++  ///   1. Walk room.timeline?.events backward (in-memory, already loaded events)
++  ///      for the most accurate result without any DB hit.
++  ///   2. Fall back to room.lastEvent if the timeline is empty or unavailable.
 +  static Event? getLastRealMessage(Room room) {
 +    const realMessageTypes = {
-+      EventTypes.Message,      // m.room.message
-+      EventTypes.Encrypted,    // m.room.encrypted
-+      EventTypes.Sticker,      // m.sticker
++      EventTypes.Message,    // m.room.message
++      EventTypes.Encrypted,  // m.room.encrypted
++      EventTypes.Sticker,    // m.sticker
 +    };
++
++    // 1. Walk the in-memory timeline backward (most accurate, zero DB cost)
++    final timelineEvents = room.timeline?.events;
++    if (timelineEvents != null && timelineEvents.isNotEmpty) {
++      for (final event in timelineEvents.reversed) {
++        if (realMessageTypes.contains(event.type)) return event;
++      }
++    }
++
++    // 2. Fallback: check room.lastEvent directly
 +    final lastEvent = room.lastEvent;
-+    if (lastEvent == null) return null;
-+    if (realMessageTypes.contains(lastEvent.type)) return lastEvent;
++    if (lastEvent != null && realMessageTypes.contains(lastEvent.type)) {
++      return lastEvent;
++    }
++
 +    return null;
 +  }
 +}
