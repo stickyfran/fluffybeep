@@ -1615,10 +1615,10 @@ index 5ead47d..e5452a3 100644
      if (!firebaseEnabled) {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..013f66c
+index 0000000..65b59c5
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,567 @@
+@@ -0,0 +1,560 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -2115,15 +2115,8 @@ index 0000000..013f66c
 +      EventTypes.Sticker,    // m.sticker
 +    };
 +
-+    // 1. Walk the in-memory timeline backward (most accurate, zero DB cost)
-+    final timelineEvents = room.timeline?.events;
-+    if (timelineEvents != null && timelineEvents.isNotEmpty) {
-+      for (final event in timelineEvents.reversed) {
-+        if (realMessageTypes.contains(event.type)) return event;
-+      }
-+    }
-+
-+    // 2. Fallback: check room.lastEvent directly
++    // matrix SDK 8.x doesn't expose a room.timeline getter.
++    // Fallback directly to room.lastEvent.
 +    final lastEvent = room.lastEvent;
 +    if (lastEvent != null && realMessageTypes.contains(lastEvent.type)) {
 +      return lastEvent;
