@@ -1475,10 +1475,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..e594280
+index 0000000..d0f1608
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,490 @@
+@@ -0,0 +1,506 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1945,25 +1945,41 @@ index 0000000..e594280
 +  bool get isBeeperFakeDM {
 +    final directId = directChatMatrixID;
 +    if (directId == null || !directId.startsWith('@')) return false;
++    
++    // Si tiene un nombre explícito en el estado, es un grupo real
++    final nameEvent = states['m.room.name']?.values.firstOrNull;
++    if (nameEvent?.content.tryGet<String>('name')?.isNotEmpty == true) return false;
++    
 +    final localpart = directId.split(':').first.substring(1);
 +    for (final key in BeeperBridgeUtils.networkMap.keys) {
 +      if (localpart.startsWith('${key}_') || localpart == '${key}bot') return true;
 +    }
 +    return false;
 +  }
++
 +  Uri? get beeperAvatarUrl {
++    final avatarEvent = states['m.room.avatar']?.values.firstOrNull;
++    final urlStr = avatarEvent?.content.tryGet<String>('url');
++    if (urlStr != null && urlStr.isNotEmpty) return Uri.tryParse(urlStr);
++
 +    if (isBeeperFakeDM && directChatMatrixID != null) {
 +      final state = states['m.room.member']?[directChatMatrixID!];
-+      final urlStr = state?.content['avatar_url'] as String?;
-+      if (urlStr != null && urlStr.isNotEmpty) return Uri.tryParse(urlStr);
++      final memberAvatar = state?.content.tryGet<String>('avatar_url');
++      if (memberAvatar != null && memberAvatar.isNotEmpty) return Uri.tryParse(memberAvatar);
 +    }
 +    return avatar;
 +  }
++
 +  String getBeeperDisplayname(MatrixLocalizations locals) {
++    final nameEvent = states['m.room.name']?.values.firstOrNull;
++    final name = nameEvent?.content.tryGet<String>('name');
++    if (name != null && name.trim().isNotEmpty) return name;
++
 +    if (isBeeperFakeDM && directChatMatrixID != null) {
 +      final state = states['m.room.member']?[directChatMatrixID!];
-+      final name = state?.content['displayname'] as String?;
-+      if (name != null && name.isNotEmpty) return name;
++      final displayname = state?.content.tryGet<String>('displayname');
++      if (displayname != null && displayname.trim().isNotEmpty) return displayname;
++      
 +      return directChatMatrixID!.split(':').first.replaceAll('@', '');
 +    }
 +    return getLocalizedDisplayname(locals);
