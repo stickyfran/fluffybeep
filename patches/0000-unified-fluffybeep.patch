@@ -41,13 +41,14 @@ index c1b5b91..4d95180 100644
                        pageBuilder: (context, state) => defaultPageBuilder(
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..ac61947
+index 0000000..d8416cc
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,131 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:fluffychat/widgets/matrix.dart';
 +
 +class BeeperReinitController {
 +  final Client client;
