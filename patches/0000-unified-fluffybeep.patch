@@ -288,7 +288,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..b2d2831 100644
+index 6ceba8b..7aded77 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -32,6 +32,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -322,7 +322,7 @@ index 6ceba8b..b2d2831 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +152,73 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +152,70 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -353,13 +353,10 @@ index 6ceba8b..b2d2831 100644
 +      final events = await room.client.database.getEventList(room, limit: 30);
 +      for (final ev in events) {
 +        final t = ev.type;
-+        if (t == 'm.room.message' ||
-+            t == 'm.room.encrypted' ||
-+            t == 'm.sticker') {
++        if (t == 'm.room.message' || t == 'm.room.encrypted' || t == 'm.sticker') {
 +          BeeperBridgeUtils.setLastMessageTime(room.id, ev.originServerTs);
-+          if (mounted) {
-+            setState(() {});
-+          }
++          BeeperBridgeUtils.lastRealMessageCache[room.id] = ev; // NUEVO
++          if (mounted) setState(() {});
 +          break;
 +        }
 +      }
@@ -400,7 +397,7 @@ index 6ceba8b..b2d2831 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +227,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +224,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -507,7 +504,7 @@ index 6ceba8b..b2d2831 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -643,19 +643,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +640,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -539,7 +536,7 @@ index 6ceba8b..b2d2831 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +799,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +796,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -693,7 +690,7 @@ index 8610b92..e82e97b 100644
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..2cb9900 100644
+index 55d1d7e..fc93b68 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -704,12 +701,13 @@ index 55d1d7e..2cb9900 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -44,15 +45,16 @@ class ChatListItem extends StatelessWidget {
+@@ -44,15 +45,17 @@ class ChatListItem extends StatelessWidget {
  
      final isMuted = room.pushRuleState != PushRuleState.notify;
      final typingText = room.getLocalizedTypingText(context);
 -    final lastEvent = room.lastEvent;
-+    final lastEvent = BeeperBridgeUtils.getLastRealMessage(room) ?? room.lastEvent;
++    final cachedRealEvent = BeeperBridgeUtils.lastRealMessageCache[room.id];
++    final lastEvent = cachedRealEvent ?? (room.lastEvent?.type.startsWith('com.beeper') == true ? null : room.lastEvent);
      final ownMessage = lastEvent?.senderId == room.client.userID;
 +    final isBeeperFakeDM = room.isBeeperFakeDM;
      final directChatMatrixId = room.directChatMatrixID;
@@ -724,7 +722,7 @@ index 55d1d7e..2cb9900 100644
        MatrixLocals(L10n.of(context)),
      );
      final filter = this.filter;
-@@ -63,7 +65,8 @@ class ChatListItem extends StatelessWidget {
+@@ -63,7 +66,8 @@ class ChatListItem extends StatelessWidget {
      final needLastEventSender =
          lastEvent != null &&
          room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
@@ -734,7 +732,7 @@ index 55d1d7e..2cb9900 100644
  
      return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +148,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +149,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -1475,10 +1473,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..d0f1608
+index 0000000..5ea823e
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,506 @@
+@@ -0,0 +1,522 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1486,6 +1484,8 @@ index 0000000..d0f1608
 +import 'package:matrix/matrix.dart';
 +
 +class BeeperBridgeUtils {
++  static final Map<String, Event> lastRealMessageCache = {};
++
 +  /// Regular expression to detect Beeper bridge bots.
 +  /// Matches pattern like: @whatsappbot:beeper.local
 +  static final RegExp beeperBotRegex = RegExp(r'^@.*bot.*:beeper\..*$');
@@ -1942,30 +1942,43 @@ index 0000000..d0f1608
 +}
 +
 +extension RoomBeeperExtension on Room {
-+  bool get isBeeperFakeDM {
-+    final directId = directChatMatrixID;
-+    if (directId == null || !directId.startsWith('@')) return false;
-+    
-+    // Si tiene un nombre explícito en el estado, es un grupo real
-+    final nameEvent = states['m.room.name']?.values.firstOrNull;
-+    if (nameEvent?.content.tryGet<String>('name')?.isNotEmpty == true) return false;
-+    
-+    final localpart = directId.split(':').first.substring(1);
-+    for (final key in BeeperBridgeUtils.networkMap.keys) {
-+      if (localpart.startsWith('${key}_') || localpart == '${key}bot') return true;
++  String? get beeperContactId {
++    final memberStates = states['m.room.member'];
++    if (memberStates == null) return null;
++
++    String? contactId;
++    int activeMembers = 0;
++
++    for (final entry in memberStates.entries) {
++      final mxid = entry.key;
++      final membership = entry.value.content.tryGet<String>('membership');
++      if (membership == 'join' || membership == 'invite') {
++        activeMembers++;
++        if (mxid != client.userID && !mxid.contains('bot:beeper')) {
++          contactId = mxid;
++        }
++      }
 +    }
-+    return false;
++
++    if (activeMembers <= 3 && contactId != null) return contactId;
++    return null;
++  }
++
++  bool get isBeeperFakeDM {
++    if (states['m.room.name']?.values.firstOrNull?.content.tryGet<String>('name')?.trim().isNotEmpty == true) return false;
++    return beeperContactId != null;
 +  }
 +
 +  Uri? get beeperAvatarUrl {
 +    final avatarEvent = states['m.room.avatar']?.values.firstOrNull;
 +    final urlStr = avatarEvent?.content.tryGet<String>('url');
-+    if (urlStr != null && urlStr.isNotEmpty) return Uri.tryParse(urlStr);
++    if (urlStr != null && urlStr.trim().isNotEmpty) return Uri.tryParse(urlStr);
 +
-+    if (isBeeperFakeDM && directChatMatrixID != null) {
-+      final state = states['m.room.member']?[directChatMatrixID!];
++    final contactId = beeperContactId;
++    if (contactId != null) {
++      final state = states['m.room.member']?[contactId];
 +      final memberAvatar = state?.content.tryGet<String>('avatar_url');
-+      if (memberAvatar != null && memberAvatar.isNotEmpty) return Uri.tryParse(memberAvatar);
++      if (memberAvatar != null && memberAvatar.trim().isNotEmpty) return Uri.tryParse(memberAvatar);
 +    }
 +    return avatar;
 +  }
@@ -1975,12 +1988,13 @@ index 0000000..d0f1608
 +    final name = nameEvent?.content.tryGet<String>('name');
 +    if (name != null && name.trim().isNotEmpty) return name;
 +
-+    if (isBeeperFakeDM && directChatMatrixID != null) {
-+      final state = states['m.room.member']?[directChatMatrixID!];
++    final contactId = beeperContactId;
++    if (contactId != null) {
++      final state = states['m.room.member']?[contactId];
 +      final displayname = state?.content.tryGet<String>('displayname');
 +      if (displayname != null && displayname.trim().isNotEmpty) return displayname;
 +      
-+      return directChatMatrixID!.split(':').first.replaceAll('@', '');
++      return contactId.split(':').first.replaceAll('@', '');
 +    }
 +    return getLocalizedDisplayname(locals);
 +  }
