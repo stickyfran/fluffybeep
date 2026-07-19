@@ -41,10 +41,10 @@ index c1b5b91..4d95180 100644
                        pageBuilder: (context, state) => defaultPageBuilder(
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..13e0417
+index 0000000..5f34c85
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,124 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
@@ -131,7 +131,24 @@ index 0000000..13e0417
 +      await client.clearCache();
 +      final prefs = await SharedPreferences.getInstance();
 +      await prefs.setBool('beeper_needs_cache_refresh', true);
-+      exit(0);
++      await Future.delayed(const Duration(milliseconds: 500));
++      overlay.remove();
++      if (context.mounted) {
++        showDialog(
++          context: context,
++          barrierDismissible: false,
++          builder: (context) => AlertDialog(
++            title: const Text('Caché limpiada'),
++            content: const Text('Para descargar el historial completo de Beeper, CIERRA ESTA APLICACIÓN forzadamente desde las tareas recientes de tu celular y vuelve a abrirla.'),
++            actions: [
++              TextButton(
++                onPressed: () => Navigator.of(context).pop(),
++                child: const Text('Entendido'),
++              ),
++            ],
++          ),
++        );
++      }
 +    } catch (e) {
 +      overlay.remove();
 +      if (context.mounted) {
@@ -676,7 +693,7 @@ index 8610b92..e82e97b 100644
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..2b27694 100644
+index 55d1d7e..2cb9900 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -687,19 +704,16 @@ index 55d1d7e..2b27694 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -44,15 +45,18 @@ class ChatListItem extends StatelessWidget {
+@@ -44,15 +45,16 @@ class ChatListItem extends StatelessWidget {
  
      final isMuted = room.pushRuleState != PushRuleState.notify;
      final typingText = room.getLocalizedTypingText(context);
 -    final lastEvent = room.lastEvent;
 +    final lastEvent = BeeperBridgeUtils.getLastRealMessage(room) ?? room.lastEvent;
      final ownMessage = lastEvent?.senderId == room.client.userID;
--    final directChatMatrixId = room.directChatMatrixID;
++    final isBeeperFakeDM = room.isBeeperFakeDM;
+     final directChatMatrixId = room.directChatMatrixID;
 -    final isDirectChat = directChatMatrixId != null;
-+    final isBeeperFakeDM = BeeperBridgeUtils.isFakeDM(room);
-+    final directChatMatrixId = isBeeperFakeDM 
-+        ? BeeperBridgeUtils.getRealContactFromFakeDM(room)?.id 
-+        : room.directChatMatrixID;
 +    final isDirectChat = directChatMatrixId != null || isBeeperFakeDM;
      final hasNotifications = room.notificationCount > 0;
      final backgroundColor = activeChat
@@ -710,7 +724,7 @@ index 55d1d7e..2b27694 100644
        MatrixLocals(L10n.of(context)),
      );
      final filter = this.filter;
-@@ -63,7 +67,8 @@ class ChatListItem extends StatelessWidget {
+@@ -63,7 +65,8 @@ class ChatListItem extends StatelessWidget {
      final needLastEventSender =
          lastEvent != null &&
          room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
@@ -720,7 +734,7 @@ index 55d1d7e..2b27694 100644
  
      return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +150,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +148,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -1461,10 +1475,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..f784a5e
+index 0000000..e594280
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,502 @@
+@@ -0,0 +1,490 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1487,17 +1501,7 @@ index 0000000..f784a5e
 +  /// 1. The local user (You)
 +  /// 2. The real contact
 +  /// 3. The Beeper bridge bot
-+  static bool isFakeDM(Room room) {
-+    final directId = room.directChatMatrixID;
-+    if (directId == null || !directId.startsWith('@')) return false;
-+    final localpart = directId.split(':').first.substring(1);
-+    for (final key in networkMap.keys) {
-+      if (localpart.startsWith('${key}_') || localpart == '${key}bot') {
-+        return true;
-+      }
-+    }
-+    return false;
-+  }
++  static bool isFakeDM(Room room) => room.isBeeperFakeDM;
 +
 +  /// Extracts the real contact from a Fake DM room.
 +  /// Returns null if it's not a Fake DM or if members haven't loaded yet.
@@ -1938,33 +1942,31 @@ index 0000000..f784a5e
 +}
 +
 +extension RoomBeeperExtension on Room {
++  bool get isBeeperFakeDM {
++    final directId = directChatMatrixID;
++    if (directId == null || !directId.startsWith('@')) return false;
++    final localpart = directId.split(':').first.substring(1);
++    for (final key in BeeperBridgeUtils.networkMap.keys) {
++      if (localpart.startsWith('${key}_') || localpart == '${key}bot') return true;
++    }
++    return false;
++  }
 +  Uri? get beeperAvatarUrl {
-+    if (BeeperBridgeUtils.isFakeDM(this)) {
-+      final directId = directChatMatrixID;
-+      if (directId != null) {
-+        final state = states['m.room.member']?[directId];
-+        final avatarUrlStr = state?.content['avatar_url'] as String?;
-+        if (avatarUrlStr != null && avatarUrlStr.isNotEmpty) {
-+          return Uri.tryParse(avatarUrlStr);
-+        }
-+      }
++    if (isBeeperFakeDM && directChatMatrixID != null) {
++      final state = states['m.room.member']?[directChatMatrixID!];
++      final urlStr = state?.content['avatar_url'] as String?;
++      if (urlStr != null && urlStr.isNotEmpty) return Uri.tryParse(urlStr);
 +    }
 +    return avatar;
 +  }
-+
-+  String getBeeperDisplayname(MatrixLocalizations localizations) {
-+    if (BeeperBridgeUtils.isFakeDM(this)) {
-+      final directId = directChatMatrixID;
-+      if (directId != null) {
-+        final state = states['m.room.member']?[directId];
-+        final displayname = state?.content['displayname'] as String?;
-+        if (displayname != null && displayname.isNotEmpty) {
-+          return displayname;
-+        }
-+        return directId.split(':').first.replaceAll('@', '');
-+      }
++  String getBeeperDisplayname(MatrixLocalizations locals) {
++    if (isBeeperFakeDM && directChatMatrixID != null) {
++      final state = states['m.room.member']?[directChatMatrixID!];
++      final name = state?.content['displayname'] as String?;
++      if (name != null && name.isNotEmpty) return name;
++      return directChatMatrixID!.split(':').first.replaceAll('@', '');
 +    }
-+    return getLocalizedDisplayname(localizations);
++    return getLocalizedDisplayname(locals);
 +  }
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
@@ -2135,7 +2137,7 @@ index 0000000..be6efd9
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..556aa8c 100644
+index 934de68..f9a5551 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -35,6 +35,7 @@ import '../pages/key_verification/key_verification_dialog.dart';
@@ -2146,16 +2148,21 @@ index 934de68..556aa8c 100644
  
  class Matrix extends StatefulWidget {
    final Widget? child;
-@@ -409,7 +410,11 @@ class MatrixState extends State<Matrix> {
+@@ -409,7 +410,16 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
 -    return Provider(create: (_) => this, child: widget.child);
-+    Widget current = widget.child ?? const SizedBox.shrink();
-+    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
-+      current = CacheRefreshOverlay(client: client, store: widget.store, child: current);
-+    }
-+    return Provider(create: (_) => this, child: current);
++    final baseChild = Provider(create: (_) => this, child: widget.child ?? const SizedBox.shrink());
++    return FutureBuilder<SharedPreferences>(
++      future: SharedPreferences.getInstance(),
++      builder: (context, snapshot) {
++        if (snapshot.hasData && snapshot.data!.getBool('beeper_needs_cache_refresh') == true) {
++          return CacheRefreshOverlay(client: client, store: snapshot.data!, child: baseChild);
++        }
++        return baseChild;
++      },
++    );
    }
  
    Future<void> dehydrateAction(BuildContext context) async {
