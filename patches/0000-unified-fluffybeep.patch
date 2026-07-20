@@ -267,10 +267,10 @@ index 731cc94..7c330e1 100644
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa0..9eecd72 100644
+index 91fffa0..aa22d74 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -157,6 +157,85 @@ class MessageContent extends StatelessWidget {
+@@ -157,6 +157,94 @@ class MessageContent extends StatelessWidget {
                }
              }
              continue textmessage;
@@ -278,6 +278,15 @@ index 91fffa0..9eecd72 100644
 +            final sessionId = event.content.tryGet<String>('session_id');
 +            final senderKey = event.content.tryGet<String>('sender_key');
 +            final hasKeys = sessionId != null && senderKey != null;
++            if (hasKeys) {
++              WidgetsBinding.instance.addPostFrameCallback((_) {
++                event.room.client.encryption?.keyManager.maybeAutoRequest(
++                  event.room.id,
++                  sessionId,
++                  senderKey,
++                );
++              });
++            }
 +            return Container(
 +              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
 +              padding: const EdgeInsets.all(12),
@@ -341,7 +350,7 @@ index 91fffa0..9eecd72 100644
 +                            }
 +                          },
 +                          icon: const Icon(Icons.refresh, size: 16),
-+                          label: const Text('Solicitar clave'),
++                          label: const Text('Re-solicitar clave'),
 +                          style: ElevatedButton.styleFrom(
 +                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
 +                            textStyle: const TextStyle(fontSize: 12),
