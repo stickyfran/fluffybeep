@@ -1366,10 +1366,10 @@ index a649171..0ce5ae1 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..8687f98
+index 0000000..4fa7bf4
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,232 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -1381,6 +1381,9 @@ index 0000000..8687f98
 +import 'package:fluffychat/widgets/matrix.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:share_plus/share_plus.dart';
++import 'dart:io';
++import 'package:fluffychat/utils/file_logger.dart';
 +
 +class SettingsPatches extends StatefulWidget {
 +  const SettingsPatches({super.key});
@@ -1390,6 +1393,23 @@ index 0000000..8687f98
 +}
 +
 +class _SettingsPatchesState extends State<SettingsPatches> {
++  int _logSize = 0;
++
++  @override
++  void initState() {
++    super.initState();
++    _loadLogSize();
++  }
++
++  Future<void> _loadLogSize() async {
++    final size = await FileLogger.getLogSize();
++    if (mounted) {
++      setState(() {
++        _logSize = size;
++      });
++    }
++  }
++
 +  @override
 +  Widget build(BuildContext context) {
 +    final client = Matrix.of(context).client;
@@ -1440,6 +1460,60 @@ index 0000000..8687f98
 +            onTap: () => BeeperReinitController.showReinitOverlay(
 +              context,
 +              client,
++            ),
++          ),
++          const Divider(),
++          Padding(
++            padding: const EdgeInsets.all(16.0),
++            child: Text(
++              'Depuración y Diagnóstico',
++              style: TextStyle(
++                color: theme.colorScheme.primary,
++                fontWeight: FontWeight.bold,
++              ),
++            ),
++          ),
++          ListTile(
++            leading: const Icon(Icons.description_outlined),
++            title: const Text('Logs de depuración (Push/Beeper)'),
++            subtitle: Text('Tamaño actual: ${(_logSize / 1024).toStringAsFixed(2)} KB'),
++            trailing: Row(
++              mainAxisSize: MainAxisSize.min,
++              children: [
++                IconButton(
++                  icon: const Icon(Icons.share_outlined),
++                  onPressed: _logSize == 0 ? null : () async {
++                    final path = await FileLogger.getLogPath();
++                    final file = File(path);
++                    if (await file.exists()) {
++                      final bytes = await file.readAsBytes();
++                      final box = context.findRenderObject() as RenderBox?;
++                      await SharePlus.instance.share(
++                        ShareParams(
++                          files: [XFile.fromData(bytes, name: 'fluffybeep_debug.txt', mimeType: 'text/plain')],
++                          sharePositionOrigin: box == null
++                              ? null
++                              : box.localToGlobal(Offset.zero) & box.size,
++                        ),
++                      );
++                    }
++                  },
++                  tooltip: 'Exportar logs',
++                ),
++                IconButton(
++                  icon: const Icon(Icons.delete_outline, color: Colors.red),
++                  onPressed: _logSize == 0 ? null : () async {
++                    await FileLogger.clearLog();
++                    await _loadLogSize();
++                    if (mounted) {
++                      ScaffoldMessenger.of(context).showSnackBar(
++                        const SnackBar(content: Text('Logs eliminados')),
++                      );
++                    }
++                  },
++                  tooltip: 'Borrar logs',
++                ),
++              ],
 +            ),
 +          ),
 +          const Divider(),
@@ -1558,10 +1632,18 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..e5452a3 100644
+index 5ead47d..933b310 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -317,23 +317,7 @@ class BackgroundPush {
+@@ -28,6 +28,7 @@ import '../config/app_config.dart';
+ import '../config/setting_keys.dart';
+ import '../widgets/matrix.dart';
+ import 'platform_infos.dart';
++import 'file_logger.dart';
+ 
+ class BackgroundPush {
+   static BackgroundPush? _instance;
+@@ -317,23 +318,7 @@ class BackgroundPush {
    }
  
    Future<void> _noFcmWarning() async {
@@ -1586,18 +1668,68 @@ index 5ead47d..e5452a3 100644
    }
  
    Future<void> setupFirebase(Client client) async {
+@@ -424,23 +409,31 @@ class BackgroundPush {
+   }
+ 
+   Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
+-    Logs().wtf('Push Notification from UP received', pushMessage);
+-    final message = pushMessage.content;
+-    upAction = true;
+-    final data = Map<String, dynamic>.from(
+-      json.decode(utf8.decode(message))['notification'],
+-    );
+-    // UP may strip the devices list
+-    data['devices'] ??= [];
+-    await pushHelper(
+-      PushNotification.fromJson(data),
+-      clients: clients,
+-      l10n: l10n,
+-      activeRoomId: matrix?.activeRoomId,
+-      flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
+-      useNotificationActions:
+-          false, // Buggy with UP: https://codeberg.org/UnifiedPush/flutter-connector/issues/34
+-    );
++    await FileLogger.log('[UnifiedPush] _onUpMessage triggered');
++    try {
++      final messageContentStr = utf8.decode(pushMessage.content);
++      await FileLogger.log('[UnifiedPush] Payload received: $messageContentStr');
++      upAction = true;
++      final data = Map<String, dynamic>.from(
++        json.decode(messageContentStr)['notification'],
++      );
++      // UP may strip the devices list
++      data['devices'] ??= [];
++      await FileLogger.log('[UnifiedPush] Starting pushHelper sync...');
++      await pushHelper(
++        PushNotification.fromJson(data),
++        clients: clients,
++        l10n: l10n,
++        activeRoomId: matrix?.activeRoomId,
++        flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
++        useNotificationActions:
++            false, // Buggy with UP: https://codeberg.org/UnifiedPush/flutter-connector/issues/34
++      );
++      await FileLogger.log('[UnifiedPush] Finished pushHelper sync successfully');
++    } catch (e, s) {
++      await FileLogger.log('[UnifiedPush] CRITICAL ERROR in _onUpMessage: $e\nStacktrace:\n$s');
++      rethrow;
++    }
+   }
+ }
+ 
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..f69f4be
+index 0000000..9573d56
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,708 @@
+@@ -0,0 +1,712 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
++import 'file_logger.dart';
 +
 +class BeeperRoomData {
 +  final String? contactId;
@@ -1622,6 +1754,7 @@ index 0000000..f69f4be
 +  static SharedPreferences? prefs;
 +
 +  static void initCacheWithPrefs(SharedPreferences sharedPrefs) {
++    FileLogger.log('[BeeperBridgeUtils] initCacheWithPrefs called');
 +    prefs = sharedPrefs;
 +  }
 +
@@ -1730,6 +1863,7 @@ index 0000000..f69f4be
 +
 +  /// Obtener todos los datos Beeper de una sala (RAM cache first)
 +  static BeeperRoomData getRoomData(Room room) {
++    FileLogger.log('[BeeperBridgeUtils] getRoomData called for room ${room.id}');
 +    final cached = _roomDataCache[room.id];
 +    if (cached != null) return cached;
 +
@@ -1750,6 +1884,7 @@ index 0000000..f69f4be
 +  }
 +
 +  static BeeperRoomData _computeRoomData(Room room) {
++    FileLogger.log('[BeeperBridgeUtils] _computeRoomData started for room: ${room.id}');
 +    final memberStates = room.states['m.room.member'];
 +    String? contactId;
 +    String? networkKey;
@@ -2298,6 +2433,73 @@ index 0000000..f69f4be
 +
 +  String getBeeperDisplayname(MatrixLocalizations locals) {
 +    return _beeperData.displayName ?? getLocalizedDisplayname(locals);
++  }
++}
+diff --git a/lib/utils/file_logger.dart b/lib/utils/file_logger.dart
+new file mode 100644
+index 0000000..8b5c788
+--- /dev/null
++++ b/lib/utils/file_logger.dart
+@@ -0,0 +1,61 @@
++import 'dart:io';
++import 'package:path_provider/path_provider.dart';
++
++class FileLogger {
++  static String? _logFilePath;
++
++  static Future<String> _getLogFilePath() async {
++    if (_logFilePath != null) return _logFilePath!;
++    try {
++      final directory = await getApplicationDocumentsDirectory();
++      _logFilePath = '${directory.path}/fluffybeep_debug.txt';
++    } catch (e) {
++      // Fallback path in case path_provider is not fully initialized in background isolate
++      _logFilePath = '/sdcard/Download/fluffybeep_debug.txt';
++    }
++    return _logFilePath!;
++  }
++
++  static Future<void> log(String message) async {
++    try {
++      final path = await _getLogFilePath();
++      final file = File(path);
++      final timestamp = DateTime.now().toIso8601String();
++      await file.writeAsString(
++        '[$timestamp] $message\n',
++        mode: FileMode.append,
++        flush: true,
++      );
++      // Also print to stderr/stdout
++      stderr.writeln('[$timestamp] FileLogger: $message');
++    } catch (e) {
++      // print to console if write fails
++      stderr.writeln('FileLogger write failed: $e');
++    }
++  }
++
++  static Future<int> getLogSize() async {
++    try {
++      final path = await _getLogFilePath();
++      final file = File(path);
++      if (await file.exists()) {
++        return await file.length();
++      }
++    } catch (_) {}
++    return 0;
++  }
++
++  static Future<void> clearLog() async {
++    try {
++      final path = await _getLogFilePath();
++      final file = File(path);
++      if (await file.exists()) {
++        await file.delete();
++      }
++    } catch (_) {}
++  }
++
++  static Future<String> getLogPath() async {
++    return await _getLogFilePath();
 +  }
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
