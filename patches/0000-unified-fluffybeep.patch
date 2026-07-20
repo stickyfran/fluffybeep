@@ -387,10 +387,18 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..b91105e 100644
+index 6ceba8b..a535e41 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -32,6 +32,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -4,6 +4,7 @@
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ import 'dart:async';
++import 'package:flutter/scheduler.dart';
+ 
+ import 'package:collection/collection.dart';
+ import 'package:cross_file/cross_file.dart';
+@@ -32,6 +33,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
@@ -398,7 +406,7 @@ index 6ceba8b..b91105e 100644
  import '../../utils/url_launcher.dart';
  import '../../widgets/matrix.dart';
  
-@@ -83,7 +84,9 @@ class ChatListController extends State<ChatList>
+@@ -83,7 +85,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -409,7 +417,7 @@ index 6ceba8b..b91105e 100644
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +142,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +143,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -421,7 +429,7 @@ index 6ceba8b..b91105e 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +152,86 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +153,122 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -478,14 +486,28 @@ index 6ceba8b..b91105e 100644
 +    } catch (_) {}
 +  }
 +
-+  List<Room> get filteredRooms {
++  // ── Room-list cache ──────────────────────────────────────────────────────────
++  // filteredRooms is O(N log N) and runs on the UI thread. We cache the result
++  // and only recompute when a real Matrix sync arrives (via _onSyncForRoomCache)
++  // instead of on every setState (cancelSearch, filter toggles, etc.).
++  List<Room> _cachedRooms = [];
++  StreamSubscription? _onSyncForRoomCache;
++
++  void _invalidateRoomCache([_]) {
++    _cachedRooms = _computeFilteredRooms();
++    // Also refresh the space-delegate map at the same time (cheap).
++    _cachedSpaceDelegates = _computeSpaceDelegates();
++    if (mounted) setState(() {});
++  }
++
++  List<Room> _computeFilteredRooms() {
 +    final rooms = Matrix.of(context)
 +        .client
 +        .rooms
 +        .where(getRoomFilterByActiveFilter(activeFilter))
 +        .toList();
 +
-+    // Precalculate timestamps to avoid O(N log N) timeline iteration during sorting
++    // Precalculate timestamps to avoid repeated iteration inside comparator
 +    final timestamps = <String, DateTime>{};
 +    for (final r in rooms) {
 +      timestamps[r.id] = _getMessageTimestamp(r);
@@ -503,6 +525,28 @@ index 6ceba8b..b91105e 100644
 +    });
 +    return rooms;
 +  }
++
++  // Returns the cached list. Build methods read this; it is always up to date
++  // because _invalidateRoomCache() is called on every sync event.
++  List<Room> get filteredRooms => _cachedRooms;
++
++  // ── Space-delegate cache ─────────────────────────────────────────────────────
++  // Previously computed inside build() on every frame – now computed once per sync.
++  Map<String, Room> _cachedSpaceDelegates = {};
++
++  Map<String, Room> _computeSpaceDelegates() {
++    final client = Matrix.of(context).client;
++    final result = <String, Room>{};
++    for (final space in client.rooms.where((r) => r.isSpace)) {
++      for (final child in space.spaceChildren) {
++        final roomId = child.roomId;
++        if (roomId != null) result[roomId] = space;
++      }
++    }
++    return result;
++  }
++
++  Map<String, Room> get spaceDelegateCandidates => _cachedSpaceDelegates;
  
    bool isSearchMode = false;
 -  Future<QueryPublicRoomsResponse>? publicRoomsResponse;
@@ -512,7 +556,7 @@ index 6ceba8b..b91105e 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +240,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +277,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -619,7 +663,55 @@ index 6ceba8b..b91105e 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -643,19 +656,18 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +334,17 @@ class ChatListController extends State<ChatList>
+   }
+ 
+   void cancelSearch({bool unfocus = true}) {
+-    setState(() {
+-      searchController.clear();
+-      isSearchMode = false;
+-      roomSearchResult = userSearchResult = null;
+-      isSearching = false;
+-    });
++    // Clear state immediately (cheap) then defer the expensive list rebuild
++    // to the next frame so the navigation pop animation stays smooth.
++    searchController.clear();
++    isSearchMode = false;
++    roomSearchResult = null;
++    userSearchResult = null;
++    isSearching = false;
+     if (unfocus) searchFocusNode.unfocus();
++    SchedulerBinding.instance.addPostFrameCallback((_) {
++      if (mounted) setState(() {});
++    });
+   }
+ 
+   BoxConstraints? snappingSheetContainerSize;
+@@ -396,6 +450,15 @@ class ChatListController extends State<ChatList>
+       );
+     });
+ 
++    // Build initial room cache and hook into sync stream for future updates.
++    // Rate-limit to 1s so rapid syncs don't thrash the sort.
++    _cachedRooms = _computeFilteredRooms();
++    _cachedSpaceDelegates = _computeSpaceDelegates();
++    _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
++        .where((s) => s.hasRoomUpdate)
++        .rateLimit(const Duration(seconds: 1))
++        .listen(_invalidateRoomCache);
++
+     _updateRoomTags();
+     _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
+         .where(
+@@ -432,6 +495,7 @@ class ChatListController extends State<ChatList>
+     _intentDataStreamSubscription?.cancel();
+     _intentFileStreamSubscription?.cancel();
+     _onRoomTagUpdate?.cancel();
++    _onSyncForRoomCache?.cancel();
+     scrollController.removeListener(_onScroll);
+     searchController.dispose();
+     searchFocusNode.dispose();
+@@ -643,19 +707,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -651,7 +743,7 @@ index 6ceba8b..b91105e 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +812,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +863,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -680,8 +772,24 @@ index 6ceba8b..b91105e 100644
          );
          return;
        case ChatContextAction.showMore:
+@@ -913,10 +994,11 @@ class ChatListController extends State<ChatList>
+     if (filter == ActiveFilter.tag && tag == null) {
+       throw ('Must set a tag when setting filter to tags!');
+     }
+-    setState(() {
+-      activeTag = tag;
+-      activeFilter = filter;
+-    });
++    activeTag = tag;
++    activeFilter = filter;
++    // Recompute the room cache immediately for the new filter, then rebuild.
++    _cachedRooms = _computeFilteredRooms();
++    setState(() {});
+     AppSettings.chatFilter.setItem(
+       filter == ActiveFilter.tag ? tag! : filter.name,
+     );
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..e82e97b 100644
+index 8610b92..abeefe4 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -725,7 +833,26 @@ index 8610b92..e82e97b 100644
        return SpaceView(
          key: ValueKey(activeSpace),
          spaceId: activeSpace,
-@@ -67,14 +76,48 @@ class ChatListViewBody extends StatelessWidget {
+@@ -42,15 +51,9 @@ class ChatListViewBody extends StatelessWidget {
+         activeChat: controller.activeChat,
+       );
+     }
+-    final spaces = client.rooms.where((r) => r.isSpace);
+-    final spaceDelegateCandidates = <String, Room>{};
+-    for (final space in spaces) {
+-      for (final spaceChild in space.spaceChildren) {
+-        final roomId = spaceChild.roomId;
+-        if (roomId == null) continue;
+-        spaceDelegateCandidates[roomId] = space;
+-      }
+-    }
++    // spaceDelegateCandidates is now maintained by the controller (recomputed
++    // once per sync, not every frame) to avoid O(N×M) work in build().
++    final spaceDelegateCandidates = controller.spaceDelegateCandidates;
+ 
+     final publicRooms = controller.roomSearchResult?.chunk
+         .where((room) => room.roomType != 'm.space')
+@@ -67,14 +70,48 @@ class ChatListViewBody extends StatelessWidget {
            .where((s) => s.hasRoomUpdate)
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
@@ -775,7 +902,7 @@ index 8610b92..e82e97b 100644
          return CustomScrollView(
            controller: controller.scrollController,
            slivers: [
-@@ -185,13 +228,26 @@ class ChatListViewBody extends StatelessWidget {
+@@ -185,13 +222,26 @@ class ChatListViewBody extends StatelessWidget {
                      rooms.isEmpty &&
                      !controller.isSearchMode) ...[
                    Column(
@@ -1363,10 +1490,10 @@ index a649171..b7bcb61 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..4fa7bf4
+index 0000000..b86b3d2
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,270 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -1379,6 +1506,7 @@ index 0000000..4fa7bf4
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:share_plus/share_plus.dart';
++import 'package:shared_preferences/shared_preferences.dart';
 +import 'dart:io';
 +import 'package:fluffychat/utils/file_logger.dart';
 +
@@ -1391,11 +1519,13 @@ index 0000000..4fa7bf4
 +
 +class _SettingsPatchesState extends State<SettingsPatches> {
 +  int _logSize = 0;
++  bool _debugLoggingEnabled = false;
 +
 +  @override
 +  void initState() {
 +    super.initState();
 +    _loadLogSize();
++    _loadDebugLoggingToggle();
 +  }
 +
 +  Future<void> _loadLogSize() async {
@@ -1403,6 +1533,25 @@ index 0000000..4fa7bf4
 +    if (mounted) {
 +      setState(() {
 +        _logSize = size;
++      });
++    }
++  }
++
++  Future<void> _loadDebugLoggingToggle() async {
++    final prefs = await SharedPreferences.getInstance();
++    if (mounted) {
++      setState(() {
++        _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
++      });
++    }
++  }
++
++  Future<void> _setDebugLoggingEnabled(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_debug_logging_enabled', value);
++    if (mounted) {
++      setState(() {
++        _debugLoggingEnabled = value;
 +      });
 +    }
 +  }
@@ -1470,48 +1619,64 @@ index 0000000..4fa7bf4
 +              ),
 +            ),
 +          ),
++          SwitchListTile.adaptive(
++            secondary: const Icon(Icons.bug_report_outlined),
++            title: const Text('Activar logging de depuración'),
++            subtitle: const Text(
++              'Registra eventos de UnifiedPush y sincronización en disco. '
++              'Desactivar para mejorar rendimiento.',
++            ),
++            value: _debugLoggingEnabled,
++            onChanged: _setDebugLoggingEnabled,
++          ),
 +          ListTile(
 +            leading: const Icon(Icons.description_outlined),
 +            title: const Text('Logs de depuración (Push/Beeper)'),
-+            subtitle: Text('Tamaño actual: ${(_logSize / 1024).toStringAsFixed(2)} KB'),
-+            trailing: Row(
-+              mainAxisSize: MainAxisSize.min,
-+              children: [
-+                IconButton(
-+                  icon: const Icon(Icons.share_outlined),
-+                  onPressed: _logSize == 0 ? null : () async {
-+                    final path = await FileLogger.getLogPath();
-+                    final file = File(path);
-+                    if (await file.exists()) {
-+                      final bytes = await file.readAsBytes();
-+                      final box = context.findRenderObject() as RenderBox?;
-+                      await SharePlus.instance.share(
-+                        ShareParams(
-+                          files: [XFile.fromData(bytes, name: 'fluffybeep_debug.txt', mimeType: 'text/plain')],
-+                          sharePositionOrigin: box == null
-+                              ? null
-+                              : box.localToGlobal(Offset.zero) & box.size,
-+                        ),
-+                      );
-+                    }
-+                  },
-+                  tooltip: 'Exportar logs',
-+                ),
-+                IconButton(
-+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-+                  onPressed: _logSize == 0 ? null : () async {
-+                    await FileLogger.clearLog();
-+                    await _loadLogSize();
-+                    if (mounted) {
-+                      ScaffoldMessenger.of(context).showSnackBar(
-+                        const SnackBar(content: Text('Logs eliminados')),
-+                      );
-+                    }
-+                  },
-+                  tooltip: 'Borrar logs',
-+                ),
-+              ],
++            subtitle: Text(
++              _debugLoggingEnabled
++                  ? 'Tamaño actual: ${(_logSize / 1024).toStringAsFixed(2)} KB'
++                  : 'Logging desactivado — activa el toggle para registrar eventos.',
 +            ),
++            trailing: _debugLoggingEnabled
++                ? Row(
++                    mainAxisSize: MainAxisSize.min,
++                    children: [
++                      IconButton(
++                        icon: const Icon(Icons.share_outlined),
++                        onPressed: _logSize == 0 ? null : () async {
++                          final path = await FileLogger.getLogPath();
++                          final file = File(path);
++                          if (await file.exists()) {
++                            final bytes = await file.readAsBytes();
++                            final box = context.findRenderObject() as RenderBox?;
++                            await SharePlus.instance.share(
++                              ShareParams(
++                                files: [XFile.fromData(bytes, name: 'fluffybeep_debug.txt', mimeType: 'text/plain')],
++                                sharePositionOrigin: box == null
++                                    ? null
++                                    : box.localToGlobal(Offset.zero) & box.size,
++                              ),
++                            );
++                          }
++                        },
++                        tooltip: 'Exportar logs',
++                      ),
++                      IconButton(
++                        icon: const Icon(Icons.delete_outline, color: Colors.red),
++                        onPressed: _logSize == 0 ? null : () async {
++                          await FileLogger.clearLog();
++                          await _loadLogSize();
++                          if (mounted) {
++                            ScaffoldMessenger.of(context).showSnackBar(
++                              const SnackBar(content: Text('Logs eliminados')),
++                            );
++                          }
++                        },
++                        tooltip: 'Borrar logs',
++                      ),
++                    ],
++                  )
++                : null,
 +          ),
 +          const Divider(),
 +          Padding(
