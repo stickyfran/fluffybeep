@@ -582,7 +582,7 @@ index 6ceba8b..b91105e 100644
          return;
        case ChatContextAction.showMore:
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..e82e97b 100644
+index 8610b92..dc3a6a7 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -626,11 +626,12 @@ index 8610b92..e82e97b 100644
        return SpaceView(
          key: ValueKey(activeSpace),
          spaceId: activeSpace,
-@@ -67,14 +76,48 @@ class ChatListViewBody extends StatelessWidget {
+@@ -67,14 +76,49 @@ class ChatListViewBody extends StatelessWidget {
            .where((s) => s.hasRoomUpdate)
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
 -        final rooms = controller.filteredRooms
++        BeeperBridgeUtils.invalidateAllRoomCaches();
 +        var rooms = controller.filteredRooms
              .where(
                (room) =>
@@ -676,7 +677,7 @@ index 8610b92..e82e97b 100644
          return CustomScrollView(
            controller: controller.scrollController,
            slivers: [
-@@ -185,13 +228,26 @@ class ChatListViewBody extends StatelessWidget {
+@@ -185,13 +229,26 @@ class ChatListViewBody extends StatelessWidget {
                      rooms.isEmpty &&
                      !controller.isSearchMode) ...[
                    Column(
@@ -758,7 +759,7 @@ index 55d1d7e..fc93b68 100644
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..264bbb9 100644
+index a649171..0ce5ae1 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,23 @@
@@ -947,21 +948,20 @@ index a649171..264bbb9 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -43,9 +194,69 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -42,10 +193,68 @@ class SpacesNavigationRail extends StatelessWidget {
+               .where((s) => s.hasRoomUpdate)
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
++            BeeperBridgeUtils.invalidateAllRoomCaches();
              final allSpaces = client.rooms
 -                .where((room) => room.isSpace)
-+                .where(
-+                  (room) =>
-+                      room.isSpace &&
-+                      !BeeperBridgeUtils.isBeeperBot(
-+                        room.directChatMatrixID ?? '',
-+                      ) &&
-+                      !room.getParticipants().any(
-+                        (p) => BeeperBridgeUtils.isBeeperBot(p.id),
-+                      ),
-+                )
++                .where((room) {
++                  if (!room.isSpace) return false;
++                  if (BeeperBridgeUtils.isBeeperBot(room.directChatMatrixID ?? '')) return false;
++                  final members = room.states['m.room.member'];
++                  if (members == null) return true;
++                  return !members.keys.any((mxid) => BeeperBridgeUtils.isBeeperBot(mxid));
++                })
                  .toList();
  
 +            // Extract unique Beeper networks and custom tags from client rooms
@@ -1018,7 +1018,7 @@ index a649171..264bbb9 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +265,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +263,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -1037,7 +1037,7 @@ index a649171..264bbb9 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +286,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,7 +284,7 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -1046,7 +1046,7 @@ index a649171..264bbb9 100644
                            return NaviRailItem(
                              isSelected: false,
                              onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +297,142 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -86,38 +295,142 @@ class SpacesNavigationRail extends StatelessWidget {
                              toolTip: L10n.of(context).createNewSpace,
                            );
                          }
@@ -1118,7 +1118,7 @@ index a649171..264bbb9 100644
 +                                isSelected: isSelected,
 +                                onTap: () => widget.onGoToSpaceId('virtual_space_${net.key}'),
 +                                unreadBadgeFilter: (room) =>
-+                                    BeeperBridgeUtils.getRoomNetwork(room)?.key == net.key,
++                                    BeeperBridgeUtils.getRoomData(room).networkKey == net.key,
 +                                icon: Avatar(
 +                                  name: net.name.substring(0, 1),
 +                                  backgroundColor: Color(net.colorHex),
@@ -1215,7 +1215,7 @@ index a649171..264bbb9 100644
                        },
                      ),
                    ),
-@@ -135,3 +450,49 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +448,49 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -1489,16 +1489,34 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..8a99aaa
+index 0000000..f69f4be
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,664 @@
+@@ -0,0 +1,708 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
++
++class BeeperRoomData {
++  final String? contactId;
++  final bool isFakeDM;
++  final Uri? avatarUrl;
++  final String? displayName;
++  final String? networkKey;
++  final bool fromCache;
++
++  const BeeperRoomData({
++    this.contactId,
++    this.isFakeDM = false,
++    this.avatarUrl,
++    this.displayName,
++    this.networkKey,
++    this.fromCache = false,
++  });
++}
 +
 +class BeeperBridgeUtils {
 +  // --- INICIO SISTEMA DE CACHÉ PERSISTENTE ---
@@ -1532,7 +1550,6 @@ index 0000000..8a99aaa
 +    return prefs?.getString('beeper_avatar_$roomId');
 +  }
 +
-+  // --- NUEVOS MÉTODOS DE CACHÉ ---
 +  static void saveContactId(String roomId, String contactId) {
 +    if (prefs == null) return;
 +    final key = 'beeper_contact_$roomId';
@@ -1573,7 +1590,7 @@ index 0000000..8a99aaa
 +  /// Caché de timestamp del último mensaje real (en milisegundos desde epoch)
 +  static void saveLastTimestamp(String roomId, int milliseconds) {
 +    if (prefs == null) return;
-+    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir: el tiempo avanza
++    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir
 +  }
 +
 +  static int? getCachedLastTimestamp(String roomId) {
@@ -1581,32 +1598,204 @@ index 0000000..8a99aaa
 +  }
 +  // --- FIN SISTEMA DE CACHÉ PERSISTENTE ---
 +
++  /// Caché en RAM — O(1) lookup, invalidada por sync
++  static final Map<String, BeeperRoomData> _roomDataCache = {};
++
++  /// Cola de escrituras diferidas a SharedPreferences
++  static final Map<String, BeeperRoomData> _pendingDiskWrites = {};
++  static bool _diskFlushScheduled = false;
++
++  static void _scheduleDiskFlush() {
++    if (_diskFlushScheduled || prefs == null) return;
++    _diskFlushScheduled = true;
++    Future.delayed(const Duration(seconds: 2), _flushToDisk);
++  }
++
++  static Future<void> _flushToDisk() async {
++    _diskFlushScheduled = false;
++    if (prefs == null || _pendingDiskWrites.isEmpty) return;
++
++    final batch = Map<String, BeeperRoomData>.from(_pendingDiskWrites);
++    _pendingDiskWrites.clear();
++
++    for (final entry in batch.entries) {
++      final roomId = entry.key;
++      final d = entry.value;
++      if (d.contactId != null) saveContactId(roomId, d.contactId!);
++      saveIsFakeDM(roomId, d.isFakeDM);
++      if (d.networkKey != null) saveRoomNetwork(roomId, d.networkKey!);
++      if (d.displayName != null) saveName(roomId, d.displayName!);
++      if (d.avatarUrl != null) saveAvatar(roomId, d.avatarUrl.toString());
++    }
++  }
++
++  /// Obtener todos los datos Beeper de una sala (RAM cache first)
++  static BeeperRoomData getRoomData(Room room) {
++    final cached = _roomDataCache[room.id];
++    if (cached != null) return cached;
++
++    final data = _computeRoomData(room);
++    _roomDataCache[room.id] = data;
++
++    // Solo persistir si los datos son frescos (no leídos ya de la caché)
++    if (!data.fromCache) {
++      _pendingDiskWrites[room.id] = data;
++      _scheduleDiskFlush();
++    }
++
++    return data;
++  }
++
++  static void invalidateAllRoomCaches() {
++    _roomDataCache.clear();
++  }
++
++  static BeeperRoomData _computeRoomData(Room room) {
++    final memberStates = room.states['m.room.member'];
++    String? contactId;
++    String? networkKey;
++    int activeMembers = 0;
++    bool onlyBotLoaded = false;
++
++    // 1. Una sola iteración sobre memberStates
++    if (memberStates != null && memberStates.isNotEmpty) {
++      bool foundBot = false;
++      for (final entry in memberStates.entries) {
++        final mxid = entry.key;
++        final membership = entry.value.content.tryGet<String>('membership');
++        if (membership != 'join' && membership != 'invite') continue;
++        activeMembers++;
++        if (mxid == room.client.userID) continue;
++
++        // Detectar red del participante
++        if (networkKey == null) {
++          final localpart = mxid.split(':').first.toLowerCase();
++          if (localpart.startsWith('@')) {
++            final rawPrefix = localpart.substring(1);
++            for (final netEntry in networkMap.entries) {
++              if (rawPrefix.startsWith('${netEntry.key}_') ||
++                  rawPrefix == '${netEntry.key}bot') {
++                networkKey = getBaseNetworkKey(netEntry.key);
++                break;
++              }
++            }
++          }
++        }
++
++        // Clasificar: bot o contacto real
++        if (isBeeperBot(mxid)) {
++          foundBot = true;
++        } else {
++          contactId = mxid;
++        }
++      }
++
++      // Detector de datos incompletos en el primer sync
++      if (foundBot && contactId == null && activeMembers <= 2) {
++        onlyBotLoaded = true;
++      }
++    }
++
++    // 2. Si no hay miembros o sólo se cargó el bot de puente de Beeper, rescatar de la caché
++    if (onlyBotLoaded || memberStates == null || memberStates.isEmpty) {
++      final cachedContactId = getCachedContactId(room.id);
++      final cachedIsFakeDM = getCachedIsFakeDM(room.id);
++      final cachedName = getCachedName(room.id);
++      final cachedAvatar = getCachedAvatar(room.id);
++      final cachedNetwork = getCachedRoomNetwork(room.id);
++
++      if (cachedContactId != null || cachedIsFakeDM != null) {
++        return BeeperRoomData(
++          contactId: cachedContactId,
++          isFakeDM: cachedIsFakeDM ?? false,
++          avatarUrl: cachedAvatar != null ? Uri.tryParse(cachedAvatar) : null,
++          displayName: cachedName,
++          networkKey: cachedNetwork ?? networkKey,
++          fromCache: true,
++        );
++      }
++    }
++
++    // 3. Si hay datos válidos completos, calcular valores vivos
++    final hasRoomName = room.states['m.room.name']
++        ?.values.firstOrNull?.content
++        .tryGet<String>('name')?.trim().isNotEmpty == true;
++
++    final isFakeDM = !hasRoomName && activeMembers > 0
++        && activeMembers <= 3 && contactId != null;
++
++    // Avatar
++    Uri? avatarUrl;
++    final avatarEvent = room.states['m.room.avatar']?.values.firstOrNull;
++    final urlStr = avatarEvent?.content.tryGet<String>('url');
++    if (urlStr != null && urlStr.trim().isNotEmpty) {
++      avatarUrl = Uri.tryParse(urlStr);
++    } else if (contactId != null && memberStates != null) {
++      final memberAvatar = memberStates[contactId]
++          ?.content.tryGet<String>('avatar_url');
++      if (memberAvatar != null && memberAvatar.trim().isNotEmpty) {
++        avatarUrl = Uri.tryParse(memberAvatar);
++      }
++    }
++    // Firewall: si es DM falso sin avatar propio, devolver null para evitar el logo del bot
++    if (avatarUrl == null && !isFakeDM) {
++      avatarUrl = room.avatar;
++    }
++
++    // DisplayName
++    String? displayName;
++    if (hasRoomName) {
++      displayName = room.states['m.room.name']!
++          .values.first.content.tryGet<String>('name')!.trim();
++    } else if (contactId != null && memberStates != null) {
++      final dn = memberStates[contactId]
++          ?.content.tryGet<String>('displayname');
++      if (dn != null && dn.trim().isNotEmpty) {
++        displayName = dn;
++      } else {
++        displayName = contactId.split(':').first.replaceAll('@', '');
++      }
++    }
++
++    // Network fallback
++    if (networkKey == null) {
++      final directId = room.directChatMatrixID;
++      if (directId != null) {
++        final localpart = directId.split(':').first.toLowerCase();
++        if (localpart.startsWith('@')) {
++          final rawPrefix = localpart.substring(1);
++          for (final netEntry in networkMap.entries) {
++            if (rawPrefix.startsWith('${netEntry.key}_') ||
++                rawPrefix == '${netEntry.key}bot') {
++              networkKey = getBaseNetworkKey(netEntry.key);
++              break;
++            }
++          }
++        }
++      }
++    }
++
++    return BeeperRoomData(
++      contactId: contactId,
++      isFakeDM: isFakeDM,
++      avatarUrl: avatarUrl,
++      displayName: displayName,
++      networkKey: networkKey,
++    );
++  }
++
 +  static final Map<String, Event> lastRealMessageCache = {};
 +
-+  // Hacemos la detección del bot más tolerante para evitar falsos positivos
 +  static bool isBeeperBot(String userId) {
 +    final localpart = userId.split(':').first.toLowerCase();
 +    return localpart.endsWith('bot') && userId.contains('beeper');
 +  }
 +
-+  /// Determines if a room is a "Fake DM" created by Beeper.
-+  /// A Fake DM is defined as a room with exactly 3 members:
-+  /// 1. The local user (You)
-+  /// 2. The real contact
-+  /// 3. The Beeper bridge bot
 +  static bool isFakeDM(Room room) => room.isBeeperFakeDM;
 +
-+  /// Extracts the real contact from a Fake DM room.
-+  /// Returns null if it's not a Fake DM or if members haven't loaded yet.
-+  ///
-+  /// Uses directChatMatrixID as a fast-path to avoid the race condition
-+  /// where getParticipants() is incomplete during the initial sync.
 +  static User? getRealContactFromFakeDM(Room room) {
 +    if (!isFakeDM(room)) return null;
 +
-+    // Fast-path: resolve the contact directly from the known DM target ID.
-+    // This works even before all room members are fully loaded from the DB.
-+    // Note: matrix SDK 8.x has no getParticipant(id) — use where+firstOrNull.
 +    final directId = room.directChatMatrixID;
 +    if (directId != null) {
 +      final participant = room
@@ -1619,14 +1808,12 @@ index 0000000..8a99aaa
 +    final members = room.getParticipants();
 +    final clientUserId = room.client.userID;
 +
-+    // First try: member who is neither local user nor bot
 +    for (var member in members) {
 +      if (member.id != clientUserId && !isBeeperBot(member.id)) {
 +        return member;
 +      }
 +    }
 +
-+    // Second try fallback: any member who is not the local user
 +    for (var member in members) {
 +      if (member.id != clientUserId) {
 +        return member;
@@ -1662,56 +1849,13 @@ index 0000000..8a99aaa
 +    return key;
 +  }
 +
-+  /// Returns the detected Beeper network for a given room, or null if none is found.
-+  /// Computed in real-time on every call to avoid caching stale state during initial sync.
 +  static BeeperNetwork? getRoomNetwork(Room room) {
-+    return _detectRoomNetwork(room);
++    final key = getRoomData(room).networkKey;
++    if (key == null || !networkMap.containsKey(key)) return null;
++    final spec = networkMap[key]!;
++    return BeeperNetwork(spec.name, spec.colorHex, key);
 +  }
 +
-+  static BeeperNetwork? _detectRoomNetwork(Room room) {
-+    // 1. Búsqueda ultrarrápida en caché persistente (O(1)) — evita iterar participantes en cada frame
-+    final cachedKey = getCachedRoomNetwork(room.id);
-+    if (cachedKey != null && networkMap.containsKey(cachedKey)) {
-+      final spec = networkMap[cachedKey]!;
-+      return BeeperNetwork(spec.name, spec.colorHex, cachedKey);
-+    }
-+
-+    // 2. Si no está en caché, hacer la detección completa
-+    final participants = room.getParticipants();
-+    for (final p in participants) {
-+      if (p.id == room.client.userID) continue;
-+      final localpart = p.id.split(':').first;
-+      if (localpart.startsWith('@')) {
-+        final rawPrefix = localpart.substring(1);
-+        for (final entry in networkMap.entries) {
-+          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
-+            final baseKey = getBaseNetworkKey(entry.key);
-+            final spec = networkMap[baseKey] ?? entry.value;
-+            // 3. Guardar en caché para no volver a calcular
-+            saveRoomNetwork(room.id, baseKey);
-+            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
-+          }
-+        }
-+      }
-+    }
-+    // Fallback: detectar desde directChatMatrixID (cargado incluso antes de que lleguen los miembros)
-+    final directId = room.directChatMatrixID;
-+    if (directId != null) {
-+      final localpart = directId.split(':').first;
-+      if (localpart.startsWith('@')) {
-+        final rawPrefix = localpart.substring(1);
-+        for (final entry in networkMap.entries) {
-+          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
-+            final baseKey = getBaseNetworkKey(entry.key);
-+            final spec = networkMap[baseKey] ?? entry.value;
-+            saveRoomNetwork(room.id, baseKey);
-+            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
-+          }
-+        }
-+      }
-+    }
-+    return null;
-+  }
 +
 +  static Future<void> addStickerToWhatsappPack(BuildContext context, Event event) async {
 +    final client = event.room.client;
@@ -2047,114 +2191,14 @@ index 0000000..8a99aaa
 +}
 +
 +extension RoomBeeperExtension on Room {
-+  
-+  String? get beeperContactId {
-+    final memberStates = states['m.room.member'];
-+    if (memberStates != null && memberStates.isNotEmpty) {
-+      String? contactId;
-+      int activeMembers = 0;
++  BeeperRoomData get _beeperData => BeeperBridgeUtils.getRoomData(this);
 +
-+      for (final entry in memberStates.entries) {
-+        final mxid = entry.key;
-+        final membership = entry.value.content.tryGet<String>('membership');
-+        if (membership == 'join' || membership == 'invite') {
-+          activeMembers++;
-+          // Excluirte a ti mismo y al bot de Beeper
-+          if (mxid != client.userID && !BeeperBridgeUtils.isBeeperBot(mxid)) {
-+            contactId = mxid;
-+          }
-+        }
-+      }
-+
-+      // Si cargó bien, guardamos en caché
-+      if (activeMembers > 0 && activeMembers <= 3 && contactId != null) {
-+        BeeperBridgeUtils.saveContactId(id, contactId);
-+        return contactId;
-+      }
-+    }
-+
-+    // Retorno ultrarrápido desde la caché si Matrix aún no arrancó
-+    return BeeperBridgeUtils.getCachedContactId(id);
-+  }
-+
-+  bool get isBeeperFakeDM {
-+    // Si la sala tiene un nombre de grupo puesto por el usuario, no es un DM
-+    if (states['m.room.name']?.values.firstOrNull?.content.tryGet<String>('name')?.trim().isNotEmpty == true) {
-+      BeeperBridgeUtils.saveIsFakeDM(id, false);
-+      return false;
-+    }
-+
-+    final contactId = beeperContactId;
-+    if (contactId != null) {
-+      BeeperBridgeUtils.saveIsFakeDM(id, true);
-+      return true;
-+    }
-+
-+    // Retorno ultrarrápido desde la caché para evitar que la UI cambie de forma
-+    final cached = BeeperBridgeUtils.getCachedIsFakeDM(id);
-+    if (cached != null) return cached;
-+
-+    return false;
-+  }
-+
-+  Uri? get beeperAvatarUrl {
-+    final avatarEvent = states['m.room.avatar']?.values.firstOrNull;
-+    final urlStr = avatarEvent?.content.tryGet<String>('url');
-+    if (urlStr != null && urlStr.trim().isNotEmpty) {
-+      BeeperBridgeUtils.saveAvatar(id, urlStr);
-+      return Uri.tryParse(urlStr);
-+    }
-+
-+    final contactId = beeperContactId;
-+    if (contactId != null) {
-+      final state = states['m.room.member']?[contactId];
-+      final memberAvatar = state?.content.tryGet<String>('avatar_url');
-+      if (memberAvatar != null && memberAvatar.trim().isNotEmpty) {
-+        BeeperBridgeUtils.saveAvatar(id, memberAvatar);
-+        return Uri.tryParse(memberAvatar);
-+      }
-+    }
-+
-+    // Rescatar caché
-+    final cached = BeeperBridgeUtils.getCachedAvatar(id);
-+    if (cached != null) return Uri.tryParse(cached);
-+
-+    // CORTAFUEGOS: Si sabemos que es un DM pero no tenemos avatar aún,
-+    // devolvemos nulo en lugar de "avatar" para evitar que el SDK ponga el logo de WhatsApp/IG.
-+    // Esto hará que FluffyChat dibuje un círculo con las iniciales limpiamente.
-+    if (isBeeperFakeDM) {
-+      return null;
-+    }
-+
-+    return avatar;
-+  }
++  String? get beeperContactId => _beeperData.contactId;
++  bool get isBeeperFakeDM => _beeperData.isFakeDM;
++  Uri? get beeperAvatarUrl => _beeperData.avatarUrl;
 +
 +  String getBeeperDisplayname(MatrixLocalizations locals) {
-+    final nameEvent = states['m.room.name']?.values.firstOrNull;
-+    final name = nameEvent?.content.tryGet<String>('name');
-+    if (name != null && name.trim().isNotEmpty) {
-+      BeeperBridgeUtils.saveName(id, name);
-+      return name;
-+    }
-+
-+    final contactId = beeperContactId;
-+    if (contactId != null) {
-+      final state = states['m.room.member']?[contactId];
-+      final displayname = state?.content.tryGet<String>('displayname');
-+      if (displayname != null && displayname.trim().isNotEmpty) {
-+        BeeperBridgeUtils.saveName(id, displayname);
-+        return displayname;
-+      }
-+
-+      final fallback = contactId.split(':').first.replaceAll('@', '');
-+      BeeperBridgeUtils.saveName(id, fallback);
-+      return fallback;
-+    }
-+
-+    final cached = BeeperBridgeUtils.getCachedName(id);
-+    if (cached != null) return cached;
-+
-+    return getLocalizedDisplayname(locals);
++    return _beeperData.displayName ?? getLocalizedDisplayname(locals);
 +  }
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
@@ -2325,7 +2369,7 @@ index 0000000..be6efd9
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..fe63fda 100644
+index 934de68..d45eba6 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -35,6 +35,8 @@ import '../pages/key_verification/key_verification_dialog.dart';
@@ -2337,25 +2381,19 @@ index 934de68..fe63fda 100644
  
  class Matrix extends StatefulWidget {
    final Widget? child;
-@@ -409,7 +411,20 @@ class MatrixState extends State<Matrix> {
+@@ -409,7 +411,14 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
 -    return Provider(create: (_) => this, child: widget.child);
-+    final baseChild = Provider(create: (_) => this, child: widget.child ?? const SizedBox.shrink());
-+    return FutureBuilder<SharedPreferences>(
-+      future: SharedPreferences.getInstance(),
-+      builder: (context, snapshot) {
-+        if (snapshot.hasData) {
-+          BeeperBridgeUtils.initCacheWithPrefs(snapshot.data!);
++    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
 +
-+          if (snapshot.data!.getBool('beeper_needs_cache_refresh') == true) {
-+            return CacheRefreshOverlay(client: client, store: snapshot.data!, child: baseChild);
-+          }
-+        }
-+        return baseChild;
-+      },
-+    );
++    final child = Provider(create: (_) => this, child: widget.child ?? const SizedBox.shrink());
++
++    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
++      return CacheRefreshOverlay(client: client, store: widget.store, child: child);
++    }
++    return child;
    }
  
    Future<void> dehydrateAction(BuildContext context) async {
