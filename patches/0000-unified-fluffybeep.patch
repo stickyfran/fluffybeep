@@ -1716,10 +1716,10 @@ index 5ead47d..933b310 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..62eca5c
+index 0000000..58a7444
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,727 @@
+@@ -0,0 +1,729 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1834,9 +1834,11 @@ index 0000000..62eca5c
 +  static String _getRoomSignature(Room room) {
 +    final lastEventId = room.lastEvent?.eventId ?? '';
 +    final memberCount = room.states['m.room.member']?.length ?? 0;
-+    final nameEventId = room.states['m.room.name']?.values.firstOrNull?.eventId ?? '';
-+    final avatarEventId = room.states['m.room.avatar']?.values.firstOrNull?.eventId ?? '';
-+    return '$lastEventId|$memberCount|$nameEventId|$avatarEventId';
++    final nameEvent = room.states['m.room.name']?.values.firstOrNull;
++    final nameEventSig = nameEvent != null ? '${nameEvent.content}' : '';
++    final avatarEvent = room.states['m.room.avatar']?.values.firstOrNull;
++    final avatarEventSig = avatarEvent != null ? '${avatarEvent.content}' : '';
++    return '$lastEventId|$memberCount|$nameEventSig|$avatarEventSig';
 +  }
 +
 +  /// Cola de escrituras diferidas a SharedPreferences
