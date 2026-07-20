@@ -288,7 +288,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..7aded77 100644
+index 6ceba8b..b91105e 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -32,6 +32,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -322,7 +322,7 @@ index 6ceba8b..7aded77 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +152,70 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +152,86 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -330,9 +330,11 @@ index 6ceba8b..7aded77 100644
 -    context,
 -  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +  DateTime _getMessageTimestamp(Room room) {
++    // 1. RAM: in-session cache (fastest)
 +    final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
 +    if (cached != null) return cached;
 +
++    // 2. SDK: evento ya cargado en memoria por Matrix
 +    final event = room.lastEvent;
 +    if (event != null) {
 +      final type = event.type;
@@ -340,10 +342,23 @@ index 6ceba8b..7aded77 100644
 +          type == 'm.room.encrypted' ||
 +          type == 'm.sticker') {
 +        BeeperBridgeUtils.setLastMessageTime(room.id, event.originServerTs);
++        // Persistir en disco para el próximo arranque
++        BeeperBridgeUtils.saveLastTimestamp(room.id, event.originServerTs.millisecondsSinceEpoch);
 +        return event.originServerTs;
 +      }
 +    }
 +
++    // 3. Disco: SharedPreferences — disponible instantáneamente al abrir la app,
++    //    antes de que Matrix lea su SQLite. Evita el "salto" del orden de la lista.
++    final cachedDiskTs = BeeperBridgeUtils.getCachedLastTimestamp(room.id);
++    if (cachedDiskTs != null) {
++      final ts = DateTime.fromMillisecondsSinceEpoch(cachedDiskTs);
++      BeeperBridgeUtils.setLastMessageTime(room.id, ts); // promover a RAM
++      _fetchLastMessageTimeAsync(room); // actualizar en segundo plano si cambio
++      return ts;
++    }
++
++    // 4. Último recurso: disparar búsqueda async en la DB de Matrix
 +    _fetchLastMessageTimeAsync(room);
 +    return room.latestEventReceivedTime;
 +  }
@@ -355,7 +370,8 @@ index 6ceba8b..7aded77 100644
 +        final t = ev.type;
 +        if (t == 'm.room.message' || t == 'm.room.encrypted' || t == 'm.sticker') {
 +          BeeperBridgeUtils.setLastMessageTime(room.id, ev.originServerTs);
-+          BeeperBridgeUtils.lastRealMessageCache[room.id] = ev; // NUEVO
++          BeeperBridgeUtils.saveLastTimestamp(room.id, ev.originServerTs.millisecondsSinceEpoch);
++          BeeperBridgeUtils.lastRealMessageCache[room.id] = ev;
 +          if (mounted) setState(() {});
 +          break;
 +        }
@@ -397,7 +413,7 @@ index 6ceba8b..7aded77 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +224,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +240,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -504,7 +520,7 @@ index 6ceba8b..7aded77 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -643,19 +640,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +656,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -536,7 +552,7 @@ index 6ceba8b..7aded77 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +796,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +812,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -1473,10 +1489,10 @@ index 5ead47d..e5452a3 100644
    Future<void> setupFirebase(Client client) async {
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..b732fc7
+index 0000000..8a99aaa
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,664 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -1539,6 +1555,29 @@ index 0000000..b732fc7
 +
 +  static bool? getCachedIsFakeDM(String roomId) {
 +    return prefs?.getBool('beeper_isfakedm_$roomId');
++  }
++
++  /// Caché de red Beeper (clave como 'whatsapp', 'instagram', etc.)
++  static void saveRoomNetwork(String roomId, String networkKey) {
++    if (prefs == null) return;
++    final key = 'beeper_net_$roomId';
++    if (prefs!.getString(key) != networkKey) {
++      prefs!.setString(key, networkKey);
++    }
++  }
++
++  static String? getCachedRoomNetwork(String roomId) {
++    return prefs?.getString('beeper_net_$roomId');
++  }
++
++  /// Caché de timestamp del último mensaje real (en milisegundos desde epoch)
++  static void saveLastTimestamp(String roomId, int milliseconds) {
++    if (prefs == null) return;
++    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir: el tiempo avanza
++  }
++
++  static int? getCachedLastTimestamp(String roomId) {
++    return prefs?.getInt('beeper_ts_$roomId');
 +  }
 +  // --- FIN SISTEMA DE CACHÉ PERSISTENTE ---
 +
@@ -1630,6 +1669,14 @@ index 0000000..b732fc7
 +  }
 +
 +  static BeeperNetwork? _detectRoomNetwork(Room room) {
++    // 1. Búsqueda ultrarrápida en caché persistente (O(1)) — evita iterar participantes en cada frame
++    final cachedKey = getCachedRoomNetwork(room.id);
++    if (cachedKey != null && networkMap.containsKey(cachedKey)) {
++      final spec = networkMap[cachedKey]!;
++      return BeeperNetwork(spec.name, spec.colorHex, cachedKey);
++    }
++
++    // 2. Si no está en caché, hacer la detección completa
 +    final participants = room.getParticipants();
 +    for (final p in participants) {
 +      if (p.id == room.client.userID) continue;
@@ -1640,11 +1687,14 @@ index 0000000..b732fc7
 +          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
 +            final baseKey = getBaseNetworkKey(entry.key);
 +            final spec = networkMap[baseKey] ?? entry.value;
++            // 3. Guardar en caché para no volver a calcular
++            saveRoomNetwork(room.id, baseKey);
 +            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
 +          }
 +        }
 +      }
 +    }
++    // Fallback: detectar desde directChatMatrixID (cargado incluso antes de que lleguen los miembros)
 +    final directId = room.directChatMatrixID;
 +    if (directId != null) {
 +      final localpart = directId.split(':').first;
@@ -1654,6 +1704,7 @@ index 0000000..b732fc7
 +          if (rawPrefix.startsWith('${entry.key}_') || rawPrefix == '${entry.key}bot') {
 +            final baseKey = getBaseNetworkKey(entry.key);
 +            final spec = networkMap[baseKey] ?? entry.value;
++            saveRoomNetwork(room.id, baseKey);
 +            return BeeperNetwork(spec.name, spec.colorHex, baseKey);
 +          }
 +        }
