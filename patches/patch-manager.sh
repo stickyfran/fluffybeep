@@ -2,6 +2,11 @@
 
 # patch-manager.sh
 # Administers patches for Fluffychat to add Beeper bridge support.
+#
+# UPSTREAM BASE COMMIT: 259bc72fb897e99303058712fcdfaee033bd4d33
+# This is the exact commit of krille-chan/fluffychat used in the CI workflow.
+# The unified patch is always generated as: git diff 259bc72 HEAD
+# NEVER use plain `git diff` (unstaged only) — it will miss committed changes.
 
 set -e
 
@@ -9,11 +14,13 @@ set -e
 FLUFFYCHAT_DIR="."
 NEW_FILES_DIR="./patches/NEW_FILES"
 PATCHES_DIR="./patches"
+UPSTREAM_BASE="259bc72fb897e99303058712fcdfaee033bd4d33"
 
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 log_info() {
@@ -28,22 +35,27 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+log_step() {
+    echo -e "${BLUE}[STEP]${NC} $1"
+}
+
 # Functions
 apply_patches() {
     log_info "Applying patches..."
     
-    # 1. Clean Windows line endings and apply the unified patch
+    # 1. Apply the unified patch with whitespace tolerance
     local patch_file="$PATCHES_DIR/0000-unified-fluffybeep.patch"
     if [ -f "$patch_file" ]; then
         log_info "Processing $patch_file"
         
-        # Try git apply first as it is more robust with line endings and binary files
+        # Try git apply first (more robust with new files and line endings)
+        # --whitespace=warn tolerates trailing whitespace without failing
         if [ "$FLUFFYCHAT_DIR" = "." ]; then
-            git apply "$patch_file"
+            git apply --whitespace=warn "$patch_file"
         else
-            git apply --directory="$FLUFFYCHAT_DIR" "$patch_file"
+            git apply --whitespace=warn --directory="$FLUFFYCHAT_DIR" "$patch_file"
         fi || {
-            log_warn "git apply failed or not available, falling back to patch utility..."
+            log_warn "git apply failed, falling back to patch utility..."
             cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
                 log_error "Failed to apply patch $patch_file"
                 exit 1
@@ -54,12 +66,10 @@ apply_patches() {
         exit 1
     fi
 
-    # 2. Copy new files
+    # 2. Copy new files (if any extra files outside the patch)
     if [ -d "$NEW_FILES_DIR" ]; then
         log_info "Copying new files from $NEW_FILES_DIR..."
         cp -R "$NEW_FILES_DIR/." "$FLUFFYCHAT_DIR/"
-    else
-        log_warn "No NEW_FILES directory found at $NEW_FILES_DIR"
     fi
     
     log_info "Patching completed."
@@ -72,9 +82,9 @@ reverse_patches() {
     if [ -f "$patch_file" ]; then
         log_info "Reversing $patch_file"
         if [ "$FLUFFYCHAT_DIR" = "." ]; then
-            git apply -R "$patch_file"
+            git apply -R --whitespace=warn "$patch_file"
         else
-            git apply -R --directory="$FLUFFYCHAT_DIR" "$patch_file"
+            git apply -R --whitespace=warn --directory="$FLUFFYCHAT_DIR" "$patch_file"
         fi || {
             cat "$patch_file" | tr -d '\r' | patch -p1 -R -d "$FLUFFYCHAT_DIR" || true
         }
@@ -82,6 +92,61 @@ reverse_patches() {
         log_warn "Unified patch file not found at $patch_file"
     fi
     log_info "Patches reversed."
+}
+
+# Regenerate the unified patch from the upstream base commit to current HEAD.
+# This is the CORRECT way to generate the patch — it includes ALL committed changes.
+# NEVER use plain `git diff` (that only captures unstaged changes).
+regenerate_patch() {
+    log_step "Regenerating unified patch from upstream base $UPSTREAM_BASE -> HEAD..."
+    
+    # Ensure all current changes are committed before generating the patch.
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        log_warn "You have uncommitted changes. Committing them first is recommended."
+        log_warn "Run: git add -A && git commit -m 'your message'"
+        log_warn "Then re-run: ./patches/patch-manager.sh regenerate"
+        log_error "Aborting to prevent incomplete patch."
+        exit 1
+    fi
+    
+    # Generate the patch from upstream base to HEAD
+    git diff "$UPSTREAM_BASE" HEAD > "$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    log_info "Patch written to $PATCHES_DIR/0000-unified-fluffybeep.patch"
+    log_info "Patch size: $(wc -c < "$PATCHES_DIR/0000-unified-fluffybeep.patch") bytes"
+    
+    # Validate the generated patch against a clean worktree
+    validate_patch
+}
+
+# Validate that the patch applies cleanly against the upstream base commit.
+validate_patch() {
+    log_step "Validating patch against clean upstream worktree..."
+    
+    local patch_file="$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    if [ ! -f "$patch_file" ]; then
+        log_error "Patch file not found: $patch_file"
+        exit 1
+    fi
+    
+    local test_dir="/tmp/fluffybeep_patch_test_$$"
+    git worktree add "$test_dir" "$UPSTREAM_BASE" 2>/dev/null
+    
+    if git apply --check --whitespace=warn "$patch_file" 2>&1; then
+        log_info "✅ Patch validates successfully against upstream base."
+    else
+        # Test against the clean worktree instead
+        if (cd "$test_dir" && git apply --check --whitespace=warn "$(pwd)/../../../$patch_file" 2>&1); then
+            log_info "✅ Patch validates successfully against upstream base."
+        else
+            log_error "❌ Patch does NOT apply cleanly to upstream base $UPSTREAM_BASE"
+            log_error "The patch was likely generated incorrectly. Use 'regenerate' command."
+            git worktree remove "$test_dir" --force 2>/dev/null || true
+            exit 1
+        fi
+    fi
+    
+    git worktree remove "$test_dir" --force 2>/dev/null || true
+    log_info "Validation complete."
 }
 
 build_app() {
@@ -94,7 +159,13 @@ build_app() {
 
 # Argument parsing
 if [ $# -eq 0 ]; then
-    echo "Usage: $0 [patch-only|clean|build]"
+    echo "Usage: $0 [patch-only|clean|build|regenerate|validate]"
+    echo ""
+    echo "  patch-only   Apply the unified patch to the current directory"
+    echo "  clean        Reverse the unified patch"
+    echo "  build        Apply patches and build the APK"
+    echo "  regenerate   Regenerate the patch from upstream base to HEAD (CORRECT method)"
+    echo "  validate     Check that the patch applies cleanly to the upstream base"
     exit 1
 fi
 
@@ -109,9 +180,15 @@ case "$1" in
         apply_patches
         build_app
         ;;
+    regenerate)
+        regenerate_patch
+        ;;
+    validate)
+        validate_patch
+        ;;
     *)
         log_error "Invalid argument: $1"
-        echo "Usage: $0 [patch-only|clean|build]"
+        echo "Usage: $0 [patch-only|clean|build|regenerate|validate]"
         exit 1
         ;;
 esac
