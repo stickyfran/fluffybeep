@@ -266,6 +266,96 @@ index 731cc94..7c330e1 100644
            ListTile(
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
+diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
+index 91fffa0..9eecd72 100644
+--- a/lib/pages/chat/events/message_content.dart
++++ b/lib/pages/chat/events/message_content.dart
+@@ -157,6 +157,85 @@ class MessageContent extends StatelessWidget {
+               }
+             }
+             continue textmessage;
++          case MessageTypes.BadEncrypted:
++            final sessionId = event.content.tryGet<String>('session_id');
++            final senderKey = event.content.tryGet<String>('sender_key');
++            final hasKeys = sessionId != null && senderKey != null;
++            return Container(
++              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
++              padding: const EdgeInsets.all(12),
++              decoration: BoxDecoration(
++                color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.2),
++                border: Border.all(
++                  color: Theme.of(context).colorScheme.error.withOpacity(0.4),
++                  width: 1,
++                ),
++                borderRadius: borderRadius,
++              ),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.start,
++                mainAxisSize: MainAxisSize.min,
++                children: [
++                  Row(
++                    children: [
++                      Icon(
++                        Icons.lock_open_outlined,
++                        color: Theme.of(context).colorScheme.error,
++                        size: 20,
++                      ),
++                      const SizedBox(width: 8),
++                      Expanded(
++                        child: Text(
++                          L10n.of(context).couldNotDecryptMessage(''),
++                          style: TextStyle(
++                            fontWeight: FontWeight.bold,
++                            color: Theme.of(context).colorScheme.onErrorContainer,
++                          ),
++                        ),
++                      ),
++                    ],
++                  ),
++                  const SizedBox(height: 6),
++                  Text(
++                    event.body,
++                    style: TextStyle(
++                      fontSize: 13,
++                      color: Theme.of(context).colorScheme.onSurfaceVariant,
++                    ),
++                  ),
++                  if (hasKeys) ...[
++                    const SizedBox(height: 10),
++                    Row(
++                      children: [
++                        ElevatedButton.icon(
++                          onPressed: () async {
++                            final client = event.room.client;
++                            await client.encryption?.keyManager.maybeAutoRequest(
++                              event.room.id,
++                              sessionId,
++                              senderKey,
++                            );
++                            if (context.mounted) {
++                              ScaffoldMessenger.of(context).showSnackBar(
++                                const SnackBar(
++                                  content: Text('Solicitud de clave enviada al bridge/dispositivos'),
++                                ),
++                              );
++                            }
++                          },
++                          icon: const Icon(Icons.refresh, size: 16),
++                          label: const Text('Solicitar clave'),
++                          style: ElevatedButton.styleFrom(
++                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++                            textStyle: const TextStyle(fontSize: 12),
++                          ),
++                        ),
++                      ],
++                    ),
++                  ],
++                ],
++              ),
++            );
+           case MessageTypes.Text:
+           case MessageTypes.Notice:
+           case MessageTypes.Emote:
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..7354407 100644
 --- a/lib/pages/chat_details/chat_details_view.dart

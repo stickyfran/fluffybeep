@@ -40,4 +40,6 @@ When a sticker message (`m.sticker`) is received:
 - Added in-memory static caching in `BeeperBridgeUtils` for `isFakeDM` and `getRoomNetwork` results, resolving critical rendering lag in the chat list.
 - Consolidated duplicate network keys (like `whatsapp` and `whatsappgo`) into unified virtual spaces and settings.
 - **Beeper DM Cache & Bot Firewall**: Expanded the caching system to persist and retrieve the DM state (`isFakeDM`), contact ID (`beeperContactId`), and profile avatar/displayname using `SharedPreferences`. Applied a firewall to filter out Beeper bridge bots (e.g., `@whatsappbot:beeper.local`) to prevent them from showing as room members or flashing their bridge logo as contact avatars during initial sync.
+- **E2EE Decryption Error UI & Key Requests**: Added a dedicated warning card for timeline events that fail decryption (`MessageTypes.BadEncrypted`, e.g. "The secure channel with the sender was corrupted."). Included an interactive "Solicitar clave" button allowing one-click key requests directly to the user's other devices or the Beeper bridge.
+
 
