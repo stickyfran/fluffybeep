@@ -170,7 +170,7 @@ index 0000000..5f34c85
 +  }
 +}
 diff --git a/lib/pages/chat/chat_app_bar_title.dart b/lib/pages/chat/chat_app_bar_title.dart
-index 6305f45..c9488c6 100644
+index 6305f45..80e70f6 100644
 --- a/lib/pages/chat/chat_app_bar_title.dart
 +++ b/lib/pages/chat/chat_app_bar_title.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -181,26 +181,54 @@ index 6305f45..c9488c6 100644
  import 'package:fluffychat/utils/sync_status_localization.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/presence_builder.dart';
-@@ -44,8 +45,8 @@ class ChatAppBarTitle extends StatelessWidget {
+@@ -43,25 +44,35 @@ class ChatAppBarTitle extends StatelessWidget {
+         children: [
            Hero(
              tag: 'content_banner',
-             child: Avatar(
+-            child: Avatar(
 -              mxContent: room.avatar,
 -              name: room.getLocalizedDisplayname(
-+              mxContent: room.beeperAvatarUrl,
-+              name: room.getBeeperDisplayname(
++            child: () {
++              final beeperData = BeeperBridgeUtils.getRoomData(room);
++              final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
                  MatrixLocals(L10n.of(context)),
-               ),
-               size: 32,
-@@ -57,7 +58,7 @@ class ChatAppBarTitle extends StatelessWidget {
+-              ),
+-              size: 32,
+-            ),
++              );
++              return Avatar(
++                mxContent: beeperData.avatarUrl,
++                name: displayname,
++                size: 32,
++              );
++            }(),
+           ),
+           const SizedBox(width: 12),
+           Expanded(
+             child: Column(
                crossAxisAlignment: .start,
                children: [
-                 Text(
+-                Text(
 -                  room.getLocalizedDisplayname(MatrixLocals(L10n.of(context))),
-+                  room.getBeeperDisplayname(MatrixLocals(L10n.of(context))),
-                   maxLines: 1,
-                   overflow: TextOverflow.ellipsis,
-                   style: const TextStyle(fontSize: 16),
+-                  maxLines: 1,
+-                  overflow: TextOverflow.ellipsis,
+-                  style: const TextStyle(fontSize: 16),
+-                ),
++                () {
++                  final beeperData = BeeperBridgeUtils.getRoomData(room);
++                  final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
++                    MatrixLocals(L10n.of(context)),
++                  );
++                  return Text(
++                    displayname,
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                    style: const TextStyle(fontSize: 16),
++                  );
++                }(),
+                 StreamBuilder(
+                   stream: room.client.onSyncStatus.stream,
+                   builder: (context, snapshot) {
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
 index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
@@ -387,7 +415,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..804f5c7 100644
+index 6ceba8b..9f0a998 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -430,7 +458,7 @@ index 6ceba8b..804f5c7 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +154,122 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +154,148 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -471,20 +499,46 @@ index 6ceba8b..804f5c7 100644
 +    return room.latestEventReceivedTime;
 +  }
 +
-+  void _fetchLastMessageTimeAsync(Room room) async {
-+    try {
-+      final events = await room.client.database.getEventList(room, limit: 30);
-+      for (final ev in events) {
-+        final t = ev.type;
-+        if (t == 'm.room.message' || t == 'm.room.encrypted' || t == 'm.sticker') {
-+          BeeperBridgeUtils.setLastMessageTime(room.id, ev.originServerTs);
-+          BeeperBridgeUtils.saveLastTimestamp(room.id, ev.originServerTs.millisecondsSinceEpoch);
-+          BeeperBridgeUtils.lastRealMessageCache[room.id] = ev;
-+          if (mounted) setState(() {});
-+          break;
++  static final Set<String> _pendingTimestampFetches = {};
++  static Timer? _batchTimestampTimer;
++
++  void _fetchLastMessageTimeAsync(Room room) {
++    if (_pendingTimestampFetches.contains(room.id)) return;
++    _pendingTimestampFetches.add(room.id);
++    
++    _batchTimestampTimer?.cancel();
++    _batchTimestampTimer = Timer(const Duration(milliseconds: 300), () {
++      _processPendingTimestamps();
++    });
++  }
++
++  Future<void> _processPendingTimestamps() async {
++    final batch = Set<String>.from(_pendingTimestampFetches);
++    _pendingTimestampFetches.clear();
++    bool anyUpdated = false;
++    
++    for (final roomId in batch) {
++      if (!mounted) break;
++      final room = Matrix.of(context).client.getRoomById(roomId);
++      if (room == null) continue;
++      try {
++        final events = await room.client.database.getEventList(room, limit: 30);
++        for (final ev in events) {
++          final t = ev.type;
++          if (t == 'm.room.message' || t == 'm.room.encrypted' || t == 'm.sticker') {
++            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
++            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
++            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
++            anyUpdated = true;
++            break;
++          }
 +        }
-+      }
-+    } catch (_) {}
++      } catch (_) {}
++    }
++    
++    if (anyUpdated && mounted) {
++      _invalidateRoomCache();
++    }
 +  }
 +
 +  // ── Room-list cache ──────────────────────────────────────────────────────────
@@ -557,7 +611,7 @@ index 6ceba8b..804f5c7 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +278,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +304,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -664,7 +718,7 @@ index 6ceba8b..804f5c7 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +335,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +361,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -688,7 +742,7 @@ index 6ceba8b..804f5c7 100644
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -380,51 +435,68 @@ class ChatListController extends State<ChatList>
+@@ -380,51 +461,68 @@ class ChatListController extends State<ChatList>
  
      scrollController.addListener(_onScroll);
      _waitForFirstSync();
@@ -794,7 +848,7 @@ index 6ceba8b..804f5c7 100644
    }
  
    @override
-@@ -432,6 +504,7 @@ class ChatListController extends State<ChatList>
+@@ -432,6 +530,7 @@ class ChatListController extends State<ChatList>
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -802,7 +856,7 @@ index 6ceba8b..804f5c7 100644
      scrollController.removeListener(_onScroll);
      searchController.dispose();
      searchFocusNode.dispose();
-@@ -643,19 +716,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +742,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -834,7 +888,7 @@ index 6ceba8b..804f5c7 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +872,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +898,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -863,7 +917,7 @@ index 6ceba8b..804f5c7 100644
          );
          return;
        case ChatContextAction.showMore:
-@@ -913,10 +1003,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1029,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -1023,7 +1077,7 @@ index 8610b92..abeefe4 100644
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..fc93b68 100644
+index 55d1d7e..f5990dd 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -1034,15 +1088,20 @@ index 55d1d7e..fc93b68 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -44,15 +45,17 @@ class ChatListItem extends StatelessWidget {
+@@ -42,17 +43,22 @@ class ChatListItem extends StatelessWidget {
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
  
++    // Retrieve and cache bridge data once for the build cycle
++    final beeperData = BeeperBridgeUtils.getRoomData(room);
++
      final isMuted = room.pushRuleState != PushRuleState.notify;
      final typingText = room.getLocalizedTypingText(context);
 -    final lastEvent = room.lastEvent;
 +    final cachedRealEvent = BeeperBridgeUtils.lastRealMessageCache[room.id];
 +    final lastEvent = cachedRealEvent ?? (room.lastEvent?.type.startsWith('com.beeper') == true ? null : room.lastEvent);
      final ownMessage = lastEvent?.senderId == room.client.userID;
-+    final isBeeperFakeDM = room.isBeeperFakeDM;
++    final isBeeperFakeDM = beeperData.isFakeDM;
      final directChatMatrixId = room.directChatMatrixID;
 -    final isDirectChat = directChatMatrixId != null;
 +    final isDirectChat = directChatMatrixId != null || isBeeperFakeDM;
@@ -1051,21 +1110,21 @@ index 55d1d7e..fc93b68 100644
          ? theme.colorScheme.secondaryContainer
          : null;
 -    final displayname = room.getLocalizedDisplayname(
-+    final displayname = room.getBeeperDisplayname(
++    final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
        MatrixLocals(L10n.of(context)),
      );
      final filter = this.filter;
-@@ -63,7 +66,8 @@ class ChatListItem extends StatelessWidget {
+@@ -63,7 +69,8 @@ class ChatListItem extends StatelessWidget {
      final needLastEventSender =
          lastEvent != null &&
          room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
 -    final space = this.space;
 +    final space = isBeeperFakeDM ? null : this.space;
-+    final mxContent = room.beeperAvatarUrl;
++    final mxContent = beeperData.avatarUrl;
  
      return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +149,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +152,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -1988,10 +2047,10 @@ index 5ead47d..02abd8d 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..58a7444
+index 0000000..13b4bff
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,729 @@
+@@ -0,0 +1,688 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -2035,82 +2094,42 @@ index 0000000..58a7444
 +    }
 +  }
 +
-+  static String? getCachedName(String roomId) {
-+    return prefs?.getString('beeper_name_$roomId');
-+  }
-+
-+  static void saveAvatar(String roomId, String url) {
-+    if (prefs == null) return;
-+    final key = 'beeper_avatar_$roomId';
-+    if (prefs!.getString(key) != url) {
-+      prefs!.setString(key, url);
++  static void preloadCacheFromDisk(SharedPreferences sharedPrefs, List<String> roomIds) {
++    prefs = sharedPrefs;
++    for (final roomId in roomIds) {
++      final name = prefs!.getString('beeper_name_$roomId');
++      final avatar = prefs!.getString('beeper_avatar_$roomId');
++      final contact = prefs!.getString('beeper_contact_$roomId');
++      final isFake = prefs!.getBool('beeper_isfakedm_$roomId');
++      final network = prefs!.getString('beeper_net_$roomId');
++      
++      if (name != null || avatar != null || contact != null) {
++        _roomDataCache[roomId] = BeeperRoomData(
++          contactId: contact,
++          isFakeDM: isFake ?? false,
++          avatarUrl: avatar != null ? Uri.tryParse(avatar) : null,
++          displayName: name,
++          networkKey: network,
++          fromCache: true,
++        );
++        _roomDataSignatures[roomId] = -1; // Special hash value for preloaded entries
++      }
 +    }
-+  }
-+
-+  static String? getCachedAvatar(String roomId) {
-+    return prefs?.getString('beeper_avatar_$roomId');
-+  }
-+
-+  static void saveContactId(String roomId, String contactId) {
-+    if (prefs == null) return;
-+    final key = 'beeper_contact_$roomId';
-+    if (prefs!.getString(key) != contactId) {
-+      prefs!.setString(key, contactId);
-+    }
-+  }
-+
-+  static String? getCachedContactId(String roomId) {
-+    return prefs?.getString('beeper_contact_$roomId');
-+  }
-+
-+  static void saveIsFakeDM(String roomId, bool isFake) {
-+    if (prefs == null) return;
-+    final key = 'beeper_isfakedm_$roomId';
-+    if (prefs!.getBool(key) != isFake) {
-+      prefs!.setBool(key, isFake);
-+    }
-+  }
-+
-+  static bool? getCachedIsFakeDM(String roomId) {
-+    return prefs?.getBool('beeper_isfakedm_$roomId');
-+  }
-+
-+  /// Caché de red Beeper (clave como 'whatsapp', 'instagram', etc.)
-+  static void saveRoomNetwork(String roomId, String networkKey) {
-+    if (prefs == null) return;
-+    final key = 'beeper_net_$roomId';
-+    if (prefs!.getString(key) != networkKey) {
-+      prefs!.setString(key, networkKey);
-+    }
-+  }
-+
-+  static String? getCachedRoomNetwork(String roomId) {
-+    return prefs?.getString('beeper_net_$roomId');
-+  }
-+
-+  /// Caché de timestamp del último mensaje real (en milisegundos desde epoch)
-+  static void saveLastTimestamp(String roomId, int milliseconds) {
-+    if (prefs == null) return;
-+    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir
-+  }
-+
-+  static int? getCachedLastTimestamp(String roomId) {
-+    return prefs?.getInt('beeper_ts_$roomId');
 +  }
 +  // --- FIN SISTEMA DE CACHÉ PERSISTENTE ---
 +
 +  /// Caché en RAM — O(1) lookup, invalidada por sync
 +  static final Map<String, BeeperRoomData> _roomDataCache = {};
-+  static final Map<String, String> _roomDataSignatures = {};
++  static final Map<String, int> _roomDataSignatures = {};
 +
-+  static String _getRoomSignature(Room room) {
-+    final lastEventId = room.lastEvent?.eventId ?? '';
++  static int _getRoomSignature(Room room) {
++    final lastEventId = room.lastEvent?.eventId?.hashCode ?? 0;
 +    final memberCount = room.states['m.room.member']?.length ?? 0;
 +    final nameEvent = room.states['m.room.name']?.values.firstOrNull;
-+    final nameEventSig = nameEvent != null ? '${nameEvent.content}' : '';
++    final nameEventSig = nameEvent != null ? nameEvent.content.hashCode : 0;
 +    final avatarEvent = room.states['m.room.avatar']?.values.firstOrNull;
-+    final avatarEventSig = avatarEvent != null ? '${avatarEvent.content}' : '';
-+    return '$lastEventId|$memberCount|$nameEventSig|$avatarEventSig';
++    final avatarEventSig = avatarEvent != null ? avatarEvent.content.hashCode : 0;
++    return Object.hash(lastEventId, memberCount, nameEventSig, avatarEventSig);
 +  }
 +
 +  /// Cola de escrituras diferidas a SharedPreferences
@@ -2143,7 +2162,6 @@ index 0000000..58a7444
 +
 +  /// Obtener todos los datos Beeper de una sala (RAM cache first with signature check)
 +  static BeeperRoomData getRoomData(Room room) {
-+    FileLogger.log('[BeeperBridgeUtils] getRoomData called for room ${room.id}');
 +    final sig = _getRoomSignature(room);
 +    final cachedSig = _roomDataSignatures[room.id];
 +    if (cachedSig == sig) {
@@ -2170,7 +2188,7 @@ index 0000000..58a7444
 +  }
 +
 +  static BeeperRoomData _computeRoomData(Room room) {
-+    FileLogger.log('[BeeperBridgeUtils] _computeRoomData started for room: ${room.id}');
++    // Logging removed from hot path to improve scroll performance.
 +    final memberStates = room.states['m.room.member'];
 +    String? contactId;
 +    String? networkKey;
@@ -2863,10 +2881,10 @@ index e90e649..75f2db1 100644
    }
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..be6efd9
+index 0000000..e0591d3
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,164 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -2926,27 +2944,30 @@ index 0000000..be6efd9
 +
 +      final locals = MatrixLocals(L10n.of(context));
 +
-+      // 3. Process each room
-+      for (final room in rooms) {
++      // 3. Process rooms in parallel batches of 5
++      const batchSize = 5;
++      for (var i = 0; i < rooms.length; i += batchSize) {
 +        if (!mounted) break;
-+        final roomName = room.getBeeperDisplayname(locals);
-+        setState(() {
-+          _currentRoomName = roomName;
-+        });
-+
-+        try {
-+          await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
-+        } catch (_) {}
-+
-+        if (room.beeperAvatarUrl != null) {
++        final batch = rooms.sublist(i, (i + batchSize).clamp(0, rooms.length));
++        
++        await Future.wait(batch.map((room) async {
 +          try {
-+            await widget.client.downloadMxcCached(room.beeperAvatarUrl!);
++            final roomName = room.getBeeperDisplayname(locals);
++            if (mounted) {
++              setState(() {
++                _currentRoomName = roomName;
++              });
++            }
++            await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
++            if (room.beeperAvatarUrl != null) {
++              await widget.client.downloadMxcCached(room.beeperAvatarUrl!);
++            }
 +          } catch (_) {}
-+        }
++        }));
 +
 +        if (mounted) {
 +          setState(() {
-+            _processedRooms++;
++            _processedRooms += batch.length;
 +          });
 +        }
 +      }
@@ -3029,7 +3050,7 @@ index 0000000..be6efd9
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..d45eba6 100644
+index 934de68..68e3bdf 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -35,6 +35,8 @@ import '../pages/key_verification/key_verification_dialog.dart';
@@ -3041,13 +3062,47 @@ index 934de68..d45eba6 100644
  
  class Matrix extends StatefulWidget {
    final Widget? child;
-@@ -409,7 +411,14 @@ class MatrixState extends State<Matrix> {
+@@ -205,9 +207,25 @@ class MatrixState extends State<Matrix> {
+   void initState() {
+     super.initState();
+     _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
++    
++    // Initialize and preload Beeper bridge cache
++    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
++    _preloadBridgeCache();
++
+     initMatrix();
+   }
+ 
++  void _preloadBridgeCache() {
++    final allKeys = widget.store.getKeys();
++    final roomIds = <String>{};
++    for (final key in allKeys) {
++      if (key.startsWith('beeper_name_')) {
++        roomIds.add(key.substring('beeper_name_'.length));
++      }
++    }
++    BeeperBridgeUtils.preloadCacheFromDisk(widget.store, roomIds.toList());
++  }
++
+   AppLifecycleListener? _listener;
+ 
+   void _registerSubs(String name) {
+@@ -375,6 +393,9 @@ class MatrixState extends State<Matrix> {
+         Logs().v('Set background sync to', foreground);
+       }
+     }
++    if (state == AppLifecycleState.resumed) {
++      BeeperBridgeUtils.invalidateAllRoomCaches();
++    }
+   }
+ 
+   @override
+@@ -409,7 +430,12 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
 -    return Provider(create: (_) => this, child: widget.child);
-+    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
-+
 +    final child = Provider(create: (_) => this, child: widget.child ?? const SizedBox.shrink());
 +
 +    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
