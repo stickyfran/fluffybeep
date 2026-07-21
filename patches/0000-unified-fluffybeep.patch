@@ -387,7 +387,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..a535e41 100644
+index 6ceba8b..3854296 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -398,15 +398,16 @@ index 6ceba8b..a535e41 100644
  
  import 'package:collection/collection.dart';
  import 'package:cross_file/cross_file.dart';
-@@ -32,6 +33,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -32,6 +33,8 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
 +import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/stream_extension.dart';
  import '../../utils/url_launcher.dart';
  import '../../widgets/matrix.dart';
  
-@@ -83,7 +85,9 @@ class ChatListController extends State<ChatList>
+@@ -83,7 +86,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -417,7 +418,7 @@ index 6ceba8b..a535e41 100644
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +143,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +144,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -429,7 +430,7 @@ index 6ceba8b..a535e41 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +153,122 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +154,122 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -556,7 +557,7 @@ index 6ceba8b..a535e41 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +277,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +278,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -663,7 +664,7 @@ index 6ceba8b..a535e41 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +334,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +335,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -687,7 +688,7 @@ index 6ceba8b..a535e41 100644
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -396,6 +450,15 @@ class ChatListController extends State<ChatList>
+@@ -396,6 +451,15 @@ class ChatListController extends State<ChatList>
        );
      });
  
@@ -703,7 +704,7 @@ index 6ceba8b..a535e41 100644
      _updateRoomTags();
      _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
          .where(
-@@ -432,6 +495,7 @@ class ChatListController extends State<ChatList>
+@@ -432,6 +496,7 @@ class ChatListController extends State<ChatList>
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -711,7 +712,7 @@ index 6ceba8b..a535e41 100644
      scrollController.removeListener(_onScroll);
      searchController.dispose();
      searchFocusNode.dispose();
-@@ -643,19 +707,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +708,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -743,7 +744,7 @@ index 6ceba8b..a535e41 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +863,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +864,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -772,7 +773,7 @@ index 6ceba8b..a535e41 100644
          );
          return;
        case ChatContextAction.showMore:
-@@ -913,10 +994,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +995,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
