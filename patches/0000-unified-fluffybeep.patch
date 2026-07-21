@@ -2085,7 +2085,7 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..5a60382 100644
+index 5ead47d..52ee459 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -28,6 +28,7 @@ import '../config/app_config.dart';
@@ -2110,7 +2110,7 @@ index 5ead47d..5a60382 100644
      final pushers =
 -        await (client.getPushers().catchError((e) {
 +        await (client.getPushers().then((value) {
-+          FileLogger.log('[UnifiedPush] Fetched ${value.length} existing pushers from server.');
++          FileLogger.log('[UnifiedPush] Fetched ${value?.length} existing pushers from server.');
 +          return value;
 +        }).catchError((e) {
            Logs().w('[Push] Unable to request pushers', e);
