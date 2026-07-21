@@ -1885,7 +1885,7 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..933b310 100644
+index 5ead47d..02abd8d 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -28,6 +28,7 @@ import '../config/app_config.dart';
@@ -1896,7 +1896,21 @@ index 5ead47d..933b310 100644
  
  class BackgroundPush {
    static BackgroundPush? _instance;
-@@ -317,23 +318,7 @@ class BackgroundPush {
+@@ -217,7 +218,12 @@ class BackgroundPush {
+ 
+     if (!client.isLogged()) return;
+ 
+-    final legacyPushers = pushers.where((pusher) => pusher.pushkey == token);
++    final legacyPushers = pushers.where(
++      (pusher) =>
++          pusher.kind == 'http' &&
++          (pusher.pushkey == token ||
++              pusher.appId.startsWith(AppConfig.pushNotificationsAppId)),
++    );
+     for (final pusher in legacyPushers) {
+       try {
+         await client.deletePusher(pusher);
+@@ -317,23 +323,7 @@ class BackgroundPush {
    }
  
    Future<void> _noFcmWarning() async {
@@ -1921,7 +1935,7 @@ index 5ead47d..933b310 100644
    }
  
    Future<void> setupFirebase(Client client) async {
-@@ -424,23 +409,31 @@ class BackgroundPush {
+@@ -424,23 +414,33 @@ class BackgroundPush {
    }
  
    Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
@@ -1947,9 +1961,11 @@ index 5ead47d..933b310 100644
 +      final messageContentStr = utf8.decode(pushMessage.content);
 +      await FileLogger.log('[UnifiedPush] Payload received: $messageContentStr');
 +      upAction = true;
-+      final data = Map<String, dynamic>.from(
-+        json.decode(messageContentStr)['notification'],
-+      );
++      final rawJson = json.decode(messageContentStr);
++      final notificationMap = (rawJson is Map && rawJson.containsKey('notification') && rawJson['notification'] is Map)
++          ? rawJson['notification'] as Map
++          : (rawJson is Map ? rawJson : <String, dynamic>{});
++      final data = Map<String, dynamic>.from(notificationMap);
 +      // UP may strip the devices list
 +      data['devices'] ??= [];
 +      await FileLogger.log('[UnifiedPush] Starting pushHelper sync...');
@@ -2821,6 +2837,30 @@ index 0000000..6f499d6
 +    return await _getLogFilePath();
 +  }
 +}
+diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
+index e90e649..75f2db1 100644
+--- a/lib/utils/push_helper.dart
++++ b/lib/utils/push_helper.dart
+@@ -166,7 +166,18 @@ Future<void> _tryPushHelper(
+   }
+   Logs().v('Push helper got notification event of type ${event.type}.');
+ 
+-  if (!client.pushruleEvaluator.match(event).notify) {
++  final isMuted = event.room.pushRuleState == PushRuleState.dontNotify;
++  final isBeeperMessage = event.room.isBeeperFakeDM ||
++      event.type == EventTypes.Message ||
++      event.type == EventTypes.Encrypted ||
++      event.type == EventTypes.Sticker;
++
++  if (isMuted) {
++    Logs().i('Push helper: room is muted, skipping notification.');
++    return;
++  }
++
++  if (!isBeeperMessage && !client.pushruleEvaluator.match(event).notify) {
+     Logs().i('Push helper: filtered by client-side push rules.');
+     return;
+   }
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
 index 0000000..be6efd9
