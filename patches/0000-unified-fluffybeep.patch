@@ -169,6 +169,18 @@ index 0000000..5f34c85
 +    }
 +  }
 +}
+diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
+index 7470749..4fca235 100644
+--- a/lib/pages/chat/chat.dart
++++ b/lib/pages/chat/chat.dart
+@@ -590,6 +590,7 @@ class ChatController extends State<ChatPageWithRoom>
+ 
+   @override
+   void dispose() {
++    MxcImage.clearCache(room.id);
+     timeline?.cancelSubscriptions();
+     timeline = null;
+     _storeInputTimeoutTimer?.cancel();
 diff --git a/lib/pages/chat/chat_app_bar_title.dart b/lib/pages/chat/chat_app_bar_title.dart
 index 6305f45..80e70f6 100644
 --- a/lib/pages/chat/chat_app_bar_title.dart
@@ -415,7 +427,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..9f0a998 100644
+index 6ceba8b..cddcf2b 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -888,7 +900,36 @@ index 6ceba8b..9f0a998 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +898,27 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +777,28 @@ class ChatListController extends State<ChatList>
+                 ],
+               ),
+             ),
++          PopupMenuItem(
++            value: ChatContextAction.addToLabel,
++            child: Row(
++              mainAxisSize: .min,
++              children: [
++                const Icon(Icons.label_outline),
++                const SizedBox(width: 12),
++                const Text('Agregar a etiqueta'),
++              ],
++            ),
++          ),
++          PopupMenuItem(
++            value: ChatContextAction.removeFromLabel,
++            child: Row(
++              mainAxisSize: .min,
++              children: [
++                const Icon(Icons.label_off_outlined),
++                const SizedBox(width: 12),
++                const Text('Quitar de etiqueta'),
++              ],
++            ),
++          ),
+         ],
+       );
+     }
+@@ -800,13 +920,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -917,7 +958,100 @@ index 6ceba8b..9f0a998 100644
          );
          return;
        case ChatContextAction.showMore:
-@@ -913,10 +1029,11 @@ class ChatListController extends State<ChatList>
+         throw ('Should not be handled!');
++      case ChatContextAction.addToLabel:
++        final client = Matrix.of(context).client;
++        final labels = BeeperBridgeUtils.getBeeperLabels(client);
++        if (labels.isEmpty) {
++          ScaffoldMessenger.of(context).showSnackBar(
++            const SnackBar(content: Text('No tienes etiquetas creadas. Crea una desde la barra lateral.')),
++          );
++          return;
++        }
++        final selectedUuid = await showModalActionPopup<String>(
++          context: context,
++          title: 'Seleccionar etiqueta',
++          actions: labels.entries
++              .where((entry) => entry.key != '_hidden_networks')
++              .map((entry) {
++                final val = entry.value as Map;
++                final emoji = val['emoji']?.toString() ?? '';
++                final title = val['title']?.toString() ?? '';
++                return AdaptiveModalAction(
++                  label: '$emoji $title'.trim(),
++                  value: entry.key,
++                );
++              })
++              .toList(),
++        );
++        if (selectedUuid == null) return;
++        if (!mounted) return;
++        
++        final updatedLabels = Map<String, dynamic>.from(labels);
++        final labelData = Map<String, dynamic>.from(updatedLabels[selectedUuid] as Map);
++        final rooms = List<String>.from(labelData['rooms'] ?? []);
++        if (!rooms.contains(room.id)) {
++          rooms.add(room.id);
++        }
++        labelData['rooms'] = rooms;
++        updatedLabels[selectedUuid] = labelData;
++        await showFutureLoadingDialog(
++          context: context,
++          future: () => BeeperBridgeUtils.setBeeperLabels(client, updatedLabels),
++        );
++        return;
++      case ChatContextAction.removeFromLabel:
++        final client = Matrix.of(context).client;
++        final labels = BeeperBridgeUtils.getBeeperLabels(client);
++        final activeLabelsForRoom = labels.entries
++            .where((entry) {
++              if (entry.key == '_hidden_networks') return false;
++              final val = entry.value;
++              if (val is! Map) return false;
++              final rooms = val['rooms'];
++              return rooms is List && rooms.contains(room.id);
++            })
++            .toList();
++            
++        if (activeLabelsForRoom.isEmpty) {
++          ScaffoldMessenger.of(context).showSnackBar(
++            const SnackBar(content: Text('Este chat no está en ninguna etiqueta.')),
++          );
++          return;
++        }
++        final selectedUuid = await showModalActionPopup<String>(
++          context: context,
++          title: 'Quitar de etiqueta',
++          actions: activeLabelsForRoom
++              .map((entry) {
++                final val = entry.value as Map;
++                final emoji = val['emoji']?.toString() ?? '';
++                final title = val['title']?.toString() ?? '';
++                return AdaptiveModalAction(
++                  label: '$emoji $title'.trim(),
++                  value: entry.key,
++                );
++              })
++              .toList(),
++        );
++        if (selectedUuid == null) return;
++        if (!mounted) return;
++        
++        final updatedLabels = Map<String, dynamic>.from(labels);
++        final labelData = Map<String, dynamic>.from(updatedLabels[selectedUuid] as Map);
++        final rooms = List<String>.from(labelData['rooms'] ?? []);
++        rooms.remove(room.id);
++        labelData['rooms'] = rooms;
++        updatedLabels[selectedUuid] = labelData;
++        await showFutureLoadingDialog(
++          context: context,
++          future: () => BeeperBridgeUtils.setBeeperLabels(client, updatedLabels),
++        );
++        return;
+     }
+   }
+ 
+@@ -913,10 +1140,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -933,8 +1067,15 @@ index 6ceba8b..9f0a998 100644
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
+@@ -1038,4 +1266,6 @@ enum ChatContextAction {
+   addToSpace,
+   block,
+   showMore,
++  addToLabel,
++  removeFromLabel,
+ }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..abeefe4 100644
+index 8610b92..b6cc359 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -948,7 +1089,7 @@ index 8610b92..abeefe4 100644
  import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/chat_list.dart';
-@@ -10,12 +14,10 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+@@ -10,78 +14,130 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/search_title.dart';
  import 'package:fluffychat/pages/chat_list/space_view.dart';
@@ -962,11 +1103,32 @@ index 8610b92..abeefe4 100644
  
  import '../../config/themes.dart';
  import '../../widgets/adaptive_dialogs/user_dialog.dart';
-@@ -33,7 +35,14 @@ class ChatListViewBody extends StatelessWidget {
+ import '../../widgets/matrix.dart';
+ import 'chat_list_header.dart';
+ 
+-class ChatListViewBody extends StatelessWidget {
++class ChatListViewBody extends StatefulWidget {
+   final ChatListController controller;
+ 
+   const ChatListViewBody(this.controller, {super.key});
+ 
++  @override
++  State<ChatListViewBody> createState() => _ChatListViewBodyState();
++}
++
++class _ChatListViewBodyState extends State<ChatListViewBody> with AutomaticKeepAliveClientMixin {
++  @override
++  bool get wantKeepAlive => true;
++
+   @override
+   Widget build(BuildContext context) {
++    super.build(context);
+     final theme = Theme.of(context);
  
      final client = Matrix.of(context).client;
-     final activeSpace = controller.activeSpaceId;
+-    final activeSpace = controller.activeSpaceId;
 -    if (activeSpace != null) {
++    final activeSpace = widget.controller.activeSpaceId;
 +    final isVirtualSpace = activeSpace?.startsWith('virtual_space_') ?? false;
 +    final isVirtualTag = activeSpace?.startsWith('virtual_tag_') ?? false;
 +    final isVirtualBeeperLabel =
@@ -978,8 +1140,12 @@ index 8610b92..abeefe4 100644
        return SpaceView(
          key: ValueKey(activeSpace),
          spaceId: activeSpace,
-@@ -42,15 +51,9 @@ class ChatListViewBody extends StatelessWidget {
-         activeChat: controller.activeChat,
+-        onBack: controller.clearActiveSpace,
+-        onChatTab: controller.onChatTap,
+-        activeChat: controller.activeChat,
++        onBack: widget.controller.clearActiveSpace,
++        onChatTab: widget.controller.onChatTap,
++        activeChat: widget.controller.activeChat,
        );
      }
 -    final spaces = client.rooms.where((r) => r.isSpace);
@@ -993,22 +1159,35 @@ index 8610b92..abeefe4 100644
 -    }
 +    // spaceDelegateCandidates is now maintained by the controller (recomputed
 +    // once per sync, not every frame) to avoid O(N×M) work in build().
-+    final spaceDelegateCandidates = controller.spaceDelegateCandidates;
++    final spaceDelegateCandidates = widget.controller.spaceDelegateCandidates;
  
-     final publicRooms = controller.roomSearchResult?.chunk
+-    final publicRooms = controller.roomSearchResult?.chunk
++    final publicRooms = widget.controller.roomSearchResult?.chunk
          .where((room) => room.roomType != 'm.space')
-@@ -67,14 +70,48 @@ class ChatListViewBody extends StatelessWidget {
+         .toList();
+-    final publicSpaces = controller.roomSearchResult?.chunk
++    final publicSpaces = widget.controller.roomSearchResult?.chunk
+         .where((room) => room.roomType == 'm.space')
+         .toList();
+-    final userSearchResult = controller.userSearchResult;
++    final userSearchResult = widget.controller.userSearchResult;
+     const dummyChatCount = 4;
+-    final filter = controller.searchController.text.toLowerCase();
++    final filter = widget.controller.searchController.text.toLowerCase();
+     return StreamBuilder(
+       key: ValueKey(client.userID.toString()),
+       stream: client.onSync.stream
            .where((s) => s.hasRoomUpdate)
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
 -        final rooms = controller.filteredRooms
-+        var rooms = controller.filteredRooms
++        var rooms = widget.controller.filteredRooms
              .where(
                (room) =>
 +                  isVirtualSpace ||
 +                  isVirtualTag ||
 +                  isVirtualBeeperLabel ||
-+                  controller.activeFilter == ActiveFilter.tag ||
++                  widget.controller.activeFilter == ActiveFilter.tag ||
                    !AppSettings.hideRoomsInSpaces.value ||
                    spaceDelegateCandidates[room.id] == null,
              )
@@ -1044,12 +1223,114 @@ index 8610b92..abeefe4 100644
 +          }
 +        }
 +
++        if (filter.isNotEmpty) {
++          rooms = rooms.where((room) {
++            final beeperData = BeeperBridgeUtils.getRoomData(room);
++            final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
++              MatrixLocals(L10n.of(context)),
++            );
++            return displayname.toLowerCase().contains(filter);
++          }).toList();
++        }
++
          return CustomScrollView(
-           controller: controller.scrollController,
+-          controller: controller.scrollController,
++          controller: widget.controller.scrollController,
            slivers: [
-@@ -185,13 +222,26 @@ class ChatListViewBody extends StatelessWidget {
+-            ChatListHeader(controller: controller),
++            ChatListHeader(controller: widget.controller),
+             SliverList(
+               delegate: SliverChildListDelegate([
+-                if (controller.isSearchMode) ...[
++                if (widget.controller.isSearchMode) ...[
+                   SearchTitle(
+                     title: L10n.of(context).publicRooms,
+                     icon: const Icon(Icons.explore_outlined),
+@@ -128,7 +184,7 @@ class ChatListViewBody extends StatelessWidget {
+                           ),
+                   ),
+                 ],
+-                if (client.rooms.isNotEmpty && !controller.isSearchMode)
++                if (client.rooms.isNotEmpty && !widget.controller.isSearchMode)
+                   Container(
+                     height: 36 + 8 + 8,
+                     padding: EdgeInsets.symmetric(vertical: 8),
+@@ -146,8 +202,8 @@ class ChatListViewBody extends StatelessWidget {
+                                 ),
+                                 child: Center(
+                                   child: FilterChip(
+-                                    selected: filter == controller.activeFilter,
+-                                    onSelected: (_) => controller
++                                    selected: filter == widget.controller.activeFilter,
++                                    onSelected: (_) => widget.controller
+                                         .setActiveFilter(filter, null),
+                                     label: Text(
+                                       filter.toLocalizedString(context),
+@@ -156,15 +212,15 @@ class ChatListViewBody extends StatelessWidget {
+                                 ),
+                               ),
+                             ),
+-                        ...controller.roomTags.entries.map(
++                        ...widget.controller.roomTags.entries.map(
+                           (entry) => Padding(
+                             padding: const EdgeInsets.symmetric(
+                               horizontal: 4.0,
+                             ),
+                             child: Center(
+                               child: FilterChip(
+-                                selected: entry.key == controller.activeTag,
+-                                onSelected: (_) => controller.setActiveFilter(
++                                selected: entry.key == widget.controller.activeTag,
++                                onSelected: (_) => widget.controller.setActiveFilter(
+                                   ActiveFilter.tag,
+                                   entry.key,
+                                 ),
+@@ -176,22 +232,67 @@ class ChatListViewBody extends StatelessWidget {
+                       ],
+                     ),
+                   ),
+-                if (controller.isSearchMode)
++                if (isVirtualBeeperLabel) () {
++                  final uuid = activeSpace!.replaceFirst('virtual_beeper_label_', '');
++                  final labels = BeeperBridgeUtils.getBeeperLabels(client);
++                  final labelData = labels[uuid] as Map? ?? {};
++                  final emoji = labelData['emoji']?.toString() ?? '🏷️';
++                  final title = labelData['title']?.toString() ?? 'Etiqueta';
++                  return Container(
++                    padding: const EdgeInsets.all(16.0),
++                    color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
++                    child: Row(
++                      children: [
++                        Text(emoji, style: const TextStyle(fontSize: 32)),
++                        const SizedBox(width: 16),
++                        Expanded(
++                          child: Column(
++                            crossAxisAlignment: CrossAxisAlignment.start,
++                            children: [
++                              Text(
++                                title,
++                                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
++                              ),
++                              Text(
++                                '${rooms.length} chats',
++                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
++                              ),
++                            ],
++                          ),
++                        ),
++                      ],
++                    ),
++                  );
++                }(),
++                if (widget.controller.isSearchMode)
+                   SearchTitle(
+                     title: L10n.of(context).chats,
+                     icon: const Icon(Icons.forum_outlined),
+                   ),
+                 if (client.prevBatch != null &&
                      rooms.isEmpty &&
-                     !controller.isSearchMode) ...[
+-                    !controller.isSearchMode) ...[
++                    !widget.controller.isSearchMode) ...[
                    Column(
 -                    mainAxisAlignment: .center,
 +                    mainAxisAlignment: MainAxisAlignment.center,
@@ -1076,8 +1357,22 @@ index 8610b92..abeefe4 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
+@@ -245,10 +346,10 @@ class ChatListViewBody extends StatelessWidget {
+                       space: space,
+                       key: Key('chat_list_item_${room.id}'),
+                       filter: filter,
+-                      onTap: () => controller.onChatTap(room),
++                      onTap: () => widget.controller.onChatTap(room),
+                       onLongPress: (context) =>
+-                          controller.chatContextAction(room, context, space),
+-                      activeChat: controller.activeChat == room.id,
++                          widget.controller.chatContextAction(room, context, space),
++                      activeChat: widget.controller.activeChat == room.id,
+                     );
+                   },
+                 ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..f5990dd 100644
+index 55d1d7e..c1505e7 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -1088,7 +1383,7 @@ index 55d1d7e..f5990dd 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -42,17 +43,22 @@ class ChatListItem extends StatelessWidget {
+@@ -42,28 +43,30 @@ class ChatListItem extends StatelessWidget {
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
  
@@ -1113,8 +1408,11 @@ index 55d1d7e..f5990dd 100644
 +    final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
        MatrixLocals(L10n.of(context)),
      );
-     final filter = this.filter;
-@@ -63,7 +69,8 @@ class ChatListItem extends StatelessWidget {
+-    final filter = this.filter;
+-    if (filter != null && !displayname.toLowerCase().contains(filter)) {
+-      return const SizedBox.shrink();
+-    }
+ 
      final needLastEventSender =
          lastEvent != null &&
          room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
@@ -1124,7 +1422,7 @@ index 55d1d7e..f5990dd 100644
  
      return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +152,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +148,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -1133,11 +1431,179 @@ index 55d1d7e..f5990dd 100644
                              size: space != null
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
+diff --git a/lib/pages/chat_list/label_editor_dialog.dart b/lib/pages/chat_list/label_editor_dialog.dart
+new file mode 100644
+index 0000000..20a0df4
+--- /dev/null
++++ b/lib/pages/chat_list/label_editor_dialog.dart
+@@ -0,0 +1,162 @@
++import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
++import 'package:flutter/foundation.dart' as foundation;
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/widgets/matrix.dart';
++
++class LabelEditorDialog extends StatefulWidget {
++  final String? labelUuid;
++  final String? initialTitle;
++  final String? initialEmoji;
++  final bool initialIsShownInInbox;
++
++  const LabelEditorDialog({
++    this.labelUuid,
++    this.initialTitle,
++    this.initialEmoji,
++    this.initialIsShownInInbox = true,
++    super.key,
++  });
++
++  @override
++  State<LabelEditorDialog> createState() => _LabelEditorDialogState();
++}
++
++class _LabelEditorDialogState extends State<LabelEditorDialog> {
++  late final TextEditingController _titleController;
++  String? _selectedEmoji;
++  bool _isShownInInbox = true;
++  bool _showEmojiPicker = false;
++
++  @override
++  void initState() {
++    super.initState();
++    _titleController = TextEditingController(text: widget.initialTitle);
++    _selectedEmoji = widget.initialEmoji;
++    _isShownInInbox = widget.initialIsShownInInbox;
++  }
++
++  @override
++  void dispose() {
++    _titleController.dispose();
++    super.dispose();
++  }
++
++  Future<void> _save() async {
++    final title = _titleController.text.trim();
++    if (title.isEmpty) return;
++
++    final client = Matrix.of(context).client;
++    final labels = Map<String, dynamic>.from(BeeperBridgeUtils.getBeeperLabels(client));
++
++    final uuid = widget.labelUuid ?? 'label_${DateTime.now().millisecondsSinceEpoch}';
++    final existingLabel = labels[uuid] as Map?;
++
++    labels[uuid] = {
++      'title': title,
++      'emoji': _selectedEmoji,
++      'isShownInInbox': _isShownInInbox,
++      'rooms': existingLabel != null ? List<String>.from(existingLabel['rooms'] ?? []) : <String>[],
++      'createdAt': existingLabel != null ? (existingLabel['createdAt'] ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000)) : (DateTime.now().millisecondsSinceEpoch ~/ 1000),
++    };
++
++    await BeeperBridgeUtils.setBeeperLabels(client, labels);
++    if (mounted) {
++      Navigator.of(context).pop(true);
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++
++    return Scaffold(
++      appBar: AppBar(
++        title: Text(widget.labelUuid == null ? 'Nueva etiqueta' : 'Editar etiqueta'),
++        actions: [
++          IconButton(
++            icon: const Icon(Icons.check),
++            onPressed: _save,
++          ),
++        ],
++      ),
++      body: SafeArea(
++        child: Column(
++          children: [
++            Expanded(
++              child: ListView(
++                padding: const EdgeInsets.all(16),
++                children: [
++                  Row(
++                    children: [
++                      InkWell(
++                        onTap: () {
++                          setState(() {
++                            _showEmojiPicker = !_showEmojiPicker;
++                          });
++                        },
++                        child: CircleAvatar(
++                          radius: 28,
++                          backgroundColor: theme.colorScheme.primaryContainer,
++                          child: Text(
++                            _selectedEmoji ?? '🏷️',
++                            style: const TextStyle(fontSize: 28),
++                          ),
++                        ),
++                      ),
++                      const SizedBox(width: 16),
++                      Expanded(
++                        child: TextField(
++                          controller: _titleController,
++                          decoration: const InputDecoration(
++                            labelText: 'Título de la etiqueta',
++                            border: OutlineInputBorder(),
++                          ),
++                        ),
++                      ),
++                    ],
++                  ),
++                  const SizedBox(height: 16),
++                  SwitchListTile(
++                    title: const Text('Mostrar en la bandeja de entrada'),
++                    subtitle: const Text('Si se desactiva, los chats con esta etiqueta no aparecerán en el buzón general.'),
++                    value: _isShownInInbox,
++                    onChanged: (val) {
++                      setState(() {
++                        _isShownInInbox = val;
++                      });
++                    },
++                  ),
++                ],
++              ),
++            ),
++            if (_showEmojiPicker)
++              SizedBox(
++                height: 250,
++                child: EmojiPicker(
++                  onEmojiSelected: (category, emoji) {
++                    setState(() {
++                      _selectedEmoji = emoji.emoji;
++                      _showEmojiPicker = false;
++                    });
++                  },
++                  config: Config(
++                    height: 256,
++                    checkPlatformCompatibility: true,
++                    emojiViewConfig: EmojiViewConfig(
++                      emojiSizeMax: 28 *
++                          (foundation.defaultTargetPlatform ==
++                                  TargetPlatform.iOS
++                              ? 1.20
++                              : 1.0),
++                    ),
++                  ),
++                ),
++              ),
++          ],
++        ),
++      ),
++    );
++  }
++}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..b7bcb61 100644
+index a649171..b680ae2 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -3,20 +3,23 @@
+@@ -3,20 +3,25 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -1151,6 +1617,8 @@ index a649171..b7bcb61 100644
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/navi_rail_item.dart';
  import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
++import 'package:fluffychat/pages/chat_list/label_editor_dialog.dart';
++import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
  import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
  import 'package:fluffychat/utils/stream_extension.dart';
@@ -1165,7 +1633,7 @@ index a649171..b7bcb61 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +31,157 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +33,219 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -1268,6 +1736,68 @@ index a649171..b7bcb61 100644
 +    );
 +  }
 +
++  void _showLabelMenu(
++    BuildContext context,
++    String uuid,
++    String title,
++    String? emoji,
++    Map labelData,
++    Client client,
++  ) {
++    showModalBottomSheet(
++      context: context,
++      builder: (context) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.edit_outlined),
++              title: const Text('Editar etiqueta'),
++              onTap: () async {
++                Navigator.of(context).pop();
++                final edited = await showDialog<bool>(
++                  context: context,
++                  useRootNavigator: false,
++                  builder: (context) => LabelEditorDialog(
++                    labelUuid: uuid,
++                    initialTitle: title,
++                    initialEmoji: emoji,
++                    initialIsShownInInbox: labelData['isShownInInbox'] != false,
++                  ),
++                );
++                if (edited == true && mounted) {
++                  setState(() {});
++                }
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.delete_outline, color: Colors.red),
++              title: const Text('Eliminar etiqueta', style: TextStyle(color: Colors.red)),
++              onTap: () async {
++                final navigator = Navigator.of(context);
++                final confirmed = await showOkCancelAlertDialog(
++                  context: context,
++                  title: '¿Eliminar etiqueta?',
++                  message: '¿Estás seguro de que quieres eliminar la etiqueta "$title"? Esta acción no se puede deshacer.',
++                  okLabel: 'Eliminar',
++                  cancelLabel: 'Cancelar',
++                  isDestructive: true,
++                );
++                if (confirmed == OkCancelResult.ok) {
++                  final labels = Map<String, dynamic>.from(BeeperBridgeUtils.getBeeperLabels(client));
++                  labels.remove(uuid);
++                  await BeeperBridgeUtils.setBeeperLabels(client, labels);
++                  navigator.pop();
++                  setState(() {});
++                }
++              },
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
 +  void _showManageHiddenNetworksDialog(BuildContext context, Client client) {
 +    showDialog(
 +      context: context,
@@ -1323,7 +1853,7 @@ index a649171..b7bcb61 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -43,9 +194,66 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -43,9 +258,68 @@ class SpacesNavigationRail extends StatelessWidget {
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
              final allSpaces = client.rooms
@@ -1343,7 +1873,8 @@ index a649171..b7bcb61 100644
 +            for (final r in client.rooms) {
 +              final net = BeeperBridgeUtils.getRoomNetwork(r);
 +              if (net != null) {
-+                beeperNetworks[net.key] = net;
++                final baseKey = BeeperBridgeUtils.getBaseNetworkKey(net.key);
++                beeperNetworks[baseKey] = BeeperNetwork(net.name, net.colorHex, baseKey);
 +              }
 +              for (final tag in r.tags.keys) {
 +                if (tag.startsWith('u.')) customTags.add(tag);
@@ -1385,13 +1916,14 @@ index a649171..b7bcb61 100644
 +              if (val is! Map) continue;
 +              final title = val['title']?.toString() ?? '';
 +              if (title.isEmpty) continue;
-+              combinedItems.add(_CombinedRailItem.beeperLabel(entry.key, title));
++              final emoji = val['emoji']?.toString();
++              combinedItems.add(_CombinedRailItem.beeperLabel(entry.key, title, emoji: emoji));
 +            }
 +
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +262,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +328,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -1410,17 +1942,64 @@ index a649171..b7bcb61 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,7 +283,7 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,49 +349,206 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
 -                        if (i == allSpaces.length) {
+-                          return NaviRailItem(
+-                            isSelected: false,
+-                            onTap: () => context.go('/rooms/newspace'),
+-                            icon: const Padding(
+-                              padding: EdgeInsets.all(12.0),
+-                              child: Icon(Icons.add),
 +                        if (i == combinedItems.length) {
-                           return NaviRailItem(
-                             isSelected: false,
-                             onTap: () => context.go('/rooms/newspace'),
-@@ -86,38 +294,142 @@ class SpacesNavigationRail extends StatelessWidget {
-                             toolTip: L10n.of(context).createNewSpace,
++                          return Material(
++                            color: Colors.transparent,
++                            child: PopupMenuButton<String>(
++                              icon: const Padding(
++                                padding: EdgeInsets.all(12.0),
++                                child: Icon(Icons.add),
++                              ),
++                              tooltip: 'Agregar...',
++                              onSelected: (val) async {
++                                if (val == 'space') {
++                                  context.go('/rooms/newspace');
++                                } else if (val == 'label') {
++                                  final created = await showDialog<bool>(
++                                    context: context,
++                                    useRootNavigator: false,
++                                    builder: (context) => const LabelEditorDialog(),
++                                  );
++                                  if (created == true && mounted) {
++                                    setState(() {});
++                                  }
++                                }
++                              },
++                              itemBuilder: (context) => [
++                                const PopupMenuItem(
++                                  value: 'space',
++                                  child: Row(
++                                    children: [
++                                      Icon(Icons.workspaces_outlined),
++                                      SizedBox(width: 8),
++                                      Text('Nuevo Espacio'),
++                                    ],
++                                  ),
++                                ),
++                                const PopupMenuItem(
++                                  value: 'label',
++                                  child: Row(
++                                    children: [
++                                      Icon(Icons.label_outline),
++                                      SizedBox(width: 8),
++                                      Text('Nueva Etiqueta'),
++                                    ],
++                                  ),
++                                ),
++                              ],
+                             ),
+-                            toolTip: L10n.of(context).createNewSpace,
                            );
                          }
 -                        final space = allSpaces[i];
@@ -1482,6 +2061,20 @@ index a649171..b7bcb61 100644
 +                        } else if (item.isNetwork) {
 +                          final net = item.network!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
++                          
++                          // Mapa de emojis para cada red
++                          const emojiMap = {
++                            'whatsapp': '🟢',
++                            'instagram': '📸',
++                            'telegram': '✈️',
++                            'signal': '🔵',
++                            'discord': '👾',
++                            'facebook': '💬',
++                            'slack': '💼',
++                            'googlechat': '✉️',
++                          };
++                          final emoji = emojiMap[net.key] ?? net.name.substring(0, 1);
++
 +                          return Material(
 +                            color: Colors.transparent,
 +                            child: InkWell(
@@ -1491,10 +2084,10 @@ index a649171..b7bcb61 100644
 +                                isSelected: isSelected,
 +                                onTap: () => widget.onGoToSpaceId('virtual_space_${net.key}'),
 +                                unreadBadgeFilter: (room) =>
-+                                    BeeperBridgeUtils.getRoomData(room).networkKey == net.key,
++                                    BeeperBridgeUtils.getBaseNetworkKey(BeeperBridgeUtils.getRoomData(room).networkKey ?? '') == net.key,
 +                                icon: Avatar(
-+                                  name: net.name.substring(0, 1),
-+                                  backgroundColor: Color(net.colorHex),
++                                  name: emoji,
++                                  backgroundColor: Color(net.colorHex).withOpacity(0.2),
 +                                  textColor: Colors.white,
 +                                  shapeBorder: RoundedSuperellipseBorder(
 +                                    side: BorderSide(
@@ -1517,37 +2110,39 @@ index a649171..b7bcb61 100644
 +                          final title = item.labelTitle!;
 +                          final virtualId = 'virtual_beeper_label_$uuid';
 +                          final isSelected = widget.activeSpaceId == virtualId;
++                          final labels = BeeperBridgeUtils.getBeeperLabels(client);
++                          final labelData = labels[uuid] as Map? ?? {};
 +                          return Material(
 +                            color: Colors.transparent,
-+                            child: NaviRailItem(
-+                              toolTip: title,
-+                              isSelected: isSelected,
-+                              onTap: () => widget.onGoToSpaceId(virtualId),
-+                              unreadBadgeFilter: (room) {
-+                                final labels = BeeperBridgeUtils.getBeeperLabels(client);
-+                                final labelData = labels[uuid];
-+                                if (labelData is! Map) return false;
-+                                final rooms = labelData['rooms'];
-+                                if (rooms is! List) return false;
-+                                return rooms.contains(room.id);
-+                              },
-+                              icon: Avatar(
-+                                name: title,
-+                                backgroundColor:
-+                                    Theme.of(context).colorScheme.tertiaryContainer,
-+                                textColor:
-+                                    Theme.of(context).colorScheme.onTertiaryContainer,
-+                                shapeBorder: RoundedSuperellipseBorder(
-+                                  side: BorderSide(
-+                                    width: 1,
-+                                    color: Theme.of(context).dividerColor,
++                            child: InkWell(
++                              onLongPress: () => _showLabelMenu(context, uuid, title, item.labelEmoji, labelData, client),
++                              child: NaviRailItem(
++                                toolTip: title,
++                                isSelected: isSelected,
++                                onTap: () => widget.onGoToSpaceId(virtualId),
++                                unreadBadgeFilter: (room) {
++                                  final rooms = labelData['rooms'];
++                                  if (rooms is! List) return false;
++                                  return rooms.contains(room.id);
++                                },
++                                icon: Avatar(
++                                  name: item.labelEmoji ?? title,
++                                  backgroundColor:
++                                      Theme.of(context).colorScheme.tertiaryContainer,
++                                  textColor:
++                                      Theme.of(context).colorScheme.onTertiaryContainer,
++                                  shapeBorder: RoundedSuperellipseBorder(
++                                    side: BorderSide(
++                                      width: 1,
++                                      color: Theme.of(context).dividerColor,
++                                    ),
++                                    borderRadius: BorderRadius.circular(
++                                      AppConfig.spaceBorderRadius,
++                                    ),
 +                                  ),
 +                                  borderRadius: BorderRadius.circular(
 +                                    AppConfig.spaceBorderRadius,
 +                                  ),
-+                                ),
-+                                borderRadius: BorderRadius.circular(
-+                                  AppConfig.spaceBorderRadius,
 +                                ),
 +                              ),
                              ),
@@ -1588,7 +2183,7 @@ index a649171..b7bcb61 100644
                        },
                      ),
                    ),
-@@ -135,3 +447,49 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +566,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -1599,6 +2194,7 @@ index a649171..b7bcb61 100644
 +  final String? tag;
 +  final String? labelUuid;
 +  final String? labelTitle;
++  final String? labelEmoji;
 +  final bool isSpace;
 +  final bool isNetwork;
 +  final bool isBeeperLabel;
@@ -1608,6 +2204,7 @@ index a649171..b7bcb61 100644
 +        tag = null,
 +        labelUuid = null,
 +        labelTitle = null,
++        labelEmoji = null,
 +        isSpace = true,
 +        isNetwork = false,
 +        isBeeperLabel = false;
@@ -1617,6 +2214,7 @@ index a649171..b7bcb61 100644
 +        tag = null,
 +        labelUuid = null,
 +        labelTitle = null,
++        labelEmoji = null,
 +        isSpace = false,
 +        isNetwork = true,
 +        isBeeperLabel = false;
@@ -1626,14 +2224,16 @@ index a649171..b7bcb61 100644
 +        network = null,
 +        labelUuid = null,
 +        labelTitle = null,
++        labelEmoji = null,
 +        isSpace = false,
 +        isNetwork = false,
 +        isBeeperLabel = false;
 +
-+  _CombinedRailItem.beeperLabel(this.labelUuid, this.labelTitle)
++  _CombinedRailItem.beeperLabel(this.labelUuid, this.labelTitle, {String? emoji})
 +      : space = null,
 +        network = null,
 +        tag = null,
++        labelEmoji = emoji,
 +        isSpace = false,
 +        isNetwork = false,
 +        isBeeperLabel = true;
@@ -2374,10 +2974,10 @@ index 5ead47d..4ca17b6 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..27aeef7
+index 0000000..962894e
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,751 @@
+@@ -0,0 +1,753 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -2762,8 +3362,8 @@ index 0000000..27aeef7
 +    'signalgo': BeeperNetSpec('Signal', 0xFF3A76F0),
 +    'discord': BeeperNetSpec('Discord', 0xFF5865F2),
 +    'discordgo': BeeperNetSpec('Discord', 0xFF5865F2),
-+    'facebook': BeeperNetSpec('Messenger', 0xFF00B2FF),
-+    'facebookgo': BeeperNetSpec('Messenger', 0xFF00B2FF),
++    'facebook': BeeperNetSpec('Facebook', 0xFF00B2FF),
++    'facebookgo': BeeperNetSpec('Facebook', 0xFF00B2FF),
 +    'slack': BeeperNetSpec('Slack', 0xFF4A154B),
 +    'slackgo': BeeperNetSpec('Slack', 0xFF4A154B),
 +    'googlechat': BeeperNetSpec('Google Chat', 0xFF34A853),
@@ -2778,8 +3378,10 @@ index 0000000..27aeef7
 +  }
 +
 +  static BeeperNetwork? getRoomNetwork(Room room) {
-+    final key = getRoomData(room).networkKey;
-+    if (key == null || !networkMap.containsKey(key)) return null;
++    var key = getRoomData(room).networkKey;
++    if (key == null) return null;
++    key = getBaseNetworkKey(key);
++    if (!networkMap.containsKey(key)) return null;
 +    final spec = networkMap[key]!;
 +    return BeeperNetwork(spec.name, spec.colorHex, key);
 +  }
@@ -3492,7 +4094,7 @@ index 0000000..e0591d3
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..68e3bdf 100644
+index 934de68..73a702c 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -35,6 +35,8 @@ import '../pages/key_verification/key_verification_dialog.dart';
@@ -3530,17 +4132,19 @@ index 934de68..68e3bdf 100644
    AppLifecycleListener? _listener;
  
    void _registerSubs(String name) {
-@@ -375,6 +393,9 @@ class MatrixState extends State<Matrix> {
+@@ -375,6 +393,11 @@ class MatrixState extends State<Matrix> {
          Logs().v('Set background sync to', foreground);
        }
      }
 +    if (state == AppLifecycleState.resumed) {
 +      BeeperBridgeUtils.invalidateAllRoomCaches();
++    } else if (state == AppLifecycleState.paused) {
++      MxcImage.trimAllCaches();
 +    }
    }
  
    @override
-@@ -409,7 +430,12 @@ class MatrixState extends State<Matrix> {
+@@ -409,7 +432,12 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
@@ -3554,3 +4158,96 @@ index 934de68..68e3bdf 100644
    }
  
    Future<void> dehydrateAction(BuildContext context) async {
+diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
+index f9b2df0..b0c0f0a 100644
+--- a/lib/widgets/mxc_image.dart
++++ b/lib/widgets/mxc_image.dart
+@@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
+   final Client? client;
+   final BorderRadius borderRadius;
+ 
++  static final Map<String?, _LruMemoryCache> _imageDataCaches = {};
++
+   static void clearCache(String cacheName) =>
+-      _MxcImageState._imageDataCaches.remove(cacheName);
++      _imageDataCaches.remove(cacheName);
++
++  static void trimAllCaches() {
++    for (final cache in _imageDataCaches.values) {
++      cache.clear();
++    }
++    _imageDataCaches.clear();
++  }
+ 
+   const MxcImage({
+     this.uri,
+@@ -59,23 +68,62 @@ class MxcImage extends StatefulWidget {
+   State<MxcImage> createState() => _MxcImageState();
+ }
+ 
++class _LruMemoryCache {
++  final Map<String, Uint8List> _map = {};
++  final List<String> _keysOrder = [];
++  int _currentSizeBytes = 0;
++  static const int _maxSizeBytes = 30 * 1024 * 1024; // 30 MB
++
++  Uint8List? get(String key) {
++    if (!_map.containsKey(key)) return null;
++    _keysOrder.remove(key);
++    _keysOrder.add(key);
++    return _map[key];
++  }
++
++  void put(String key, Uint8List val) {
++    if (_map.containsKey(key)) {
++      _currentSizeBytes -= _map[key]!.length;
++      _keysOrder.remove(key);
++    }
++    _map[key] = val;
++    _keysOrder.add(key);
++    _currentSizeBytes += val.length;
++
++    while (_currentSizeBytes > _maxSizeBytes && _keysOrder.isNotEmpty) {
++      final oldestKey = _keysOrder.removeAt(0);
++      final removedVal = _map.remove(oldestKey);
++      if (removedVal != null) {
++        _currentSizeBytes -= removedVal.length;
++      }
++    }
++  }
++
++  void clear() {
++    _map.clear();
++    _keysOrder.clear();
++    _currentSizeBytes = 0;
++  }
++}
++
+ class _MxcImageState extends State<MxcImage> {
+-  static final Map<String?, Map<String, Uint8List>> _imageDataCaches = {};
+-  Map<String, Uint8List> get _imageDataCache =>
+-      _imageDataCaches[widget.cacheName ?? ''] ??= {};
++  _LruMemoryCache get _imageDataCache =>
++      MxcImage._imageDataCaches[widget.cacheName ?? ''] ??= _LruMemoryCache();
+ 
+   Uint8List? _imageDataNoCache;
+ 
+   Uint8List? get _imageData => widget.cacheKey == null
+       ? _imageDataNoCache
+-      : _imageDataCache[widget.cacheKey];
++      : _imageDataCache.get(widget.cacheKey!);
+ 
+   set _imageData(Uint8List? data) {
+     if (data == null) return;
+     final cacheKey = widget.cacheKey;
+-    cacheKey == null
+-        ? _imageDataNoCache = data
+-        : _imageDataCache[cacheKey] = data;
++    if (cacheKey == null) {
++      _imageDataNoCache = data;
++    } else {
++      _imageDataCache.put(cacheKey, data);
++    }
+   }
+ 
+   Future<void> _load() async {
