@@ -1640,10 +1640,10 @@ index a649171..b7bcb61 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..b86b3d2
+index 0000000..d708f32
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,411 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -1670,12 +1670,25 @@ index 0000000..b86b3d2
 +class _SettingsPatchesState extends State<SettingsPatches> {
 +  int _logSize = 0;
 +  bool _debugLoggingEnabled = false;
++  List<Pusher>? _pushers;
++  bool _loadingPushers = false;
++  bool _didLoadPushers = false;
 +
 +  @override
 +  void initState() {
 +    super.initState();
 +    _loadLogSize();
 +    _loadDebugLoggingToggle();
++  }
++
++  @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    if (!_didLoadPushers) {
++      _didLoadPushers = true;
++      final client = Matrix.of(context).client;
++      _loadPushers(client);
++    }
 +  }
 +
 +  Future<void> _loadLogSize() async {
@@ -1703,6 +1716,31 @@ index 0000000..b86b3d2
 +      setState(() {
 +        _debugLoggingEnabled = value;
 +      });
++    }
++  }
++
++  Future<void> _loadPushers(Client client) async {
++    if (_loadingPushers) return;
++    setState(() {
++      _loadingPushers = true;
++    });
++    try {
++      final pushers = await client.getPushers();
++      if (mounted) {
++        setState(() {
++          _pushers = pushers;
++          _loadingPushers = false;
++        });
++      }
++    } catch (e) {
++      if (mounted) {
++        setState(() {
++          _loadingPushers = false;
++        });
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(content: Text('Error al cargar pushers: $e')),
++        );
++      }
 +    }
 +  }
 +
@@ -1829,6 +1867,109 @@ index 0000000..b86b3d2
 +                : null,
 +          ),
 +          const Divider(),
++          ListTile(
++            leading: const Icon(Icons.notifications_active_outlined),
++            title: const Text('Pushers activos en el servidor'),
++            subtitle: Text(
++              _pushers == null
++                  ? 'Cargando pushers...'
++                  : _pushers!.isEmpty
++                      ? 'No hay pushers registrados en este servidor.'
++                      : '${_pushers!.length} pushers registrados en Matrix.',
++            ),
++            trailing: IconButton(
++              icon: _loadingPushers
++                  ? const SizedBox(
++                      width: 20,
++                      height: 20,
++                      child: CircularProgressIndicator(strokeWidth: 2),
++                    )
++                  : const Icon(Icons.refresh_outlined),
++              onPressed: () => _loadPushers(client),
++            ),
++          ),
++          if (_pushers != null && _pushers!.isNotEmpty)
++            ..._pushers!.map((pusher) {
++              final isUnifiedPush = pusher.appId.contains('chat.fluffy.fluffychat');
++              return Card(
++                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
++                child: Padding(
++                  padding: const EdgeInsets.all(12.0),
++                  child: Column(
++                    crossAxisAlignment: CrossAxisAlignment.start,
++                    children: [
++                      Row(
++                        children: [
++                          Icon(
++                            isUnifiedPush ? Icons.phonelink_ring : Icons.devices,
++                            color: isUnifiedPush ? theme.colorScheme.primary : Colors.grey,
++                            size: 20,
++                          ),
++                          const SizedBox(width: 8),
++                          Expanded(
++                            child: Text(
++                              pusher.appDisplayName ?? 'Dispositivo desconocido',
++                              style: const TextStyle(fontWeight: FontWeight.bold),
++                            ),
++                          ),
++                          Container(
++                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
++                            decoration: BoxDecoration(
++                              color: isUnifiedPush ? theme.colorScheme.primaryContainer : Colors.grey.shade200,
++                              borderRadius: BorderRadius.circular(4),
++                            ),
++                            child: Text(
++                              isUnifiedPush ? 'UnifiedPush' : 'Otro',
++                              style: TextStyle(
++                                fontSize: 10,
++                                color: isUnifiedPush ? theme.colorScheme.onPrimaryContainer : Colors.black87,
++                                fontWeight: FontWeight.bold,
++                              ),
++                            ),
++                          ),
++                        ],
++                      ),
++                      const SizedBox(height: 6),
++                      Text('App ID: ${pusher.appId}', style: const TextStyle(fontSize: 12)),
++                      Text('Gateway: ${pusher.data.url}', style: const TextStyle(fontSize: 12)),
++                      Text('Pushkey: ${pusher.pushkey}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
++                    ],
++                  ),
++                ),
++              );
++            }),
++          ListTile(
++            leading: const Icon(Icons.install_mobile_outlined),
++            title: const Text('Forzar re-registro de notificaciones'),
++            subtitle: const Text('Solicita un nuevo token a ntfy y vuelve a registrar el pusher en Beeper.'),
++            onTap: () async {
++              setState(() {
++                _loadingPushers = true;
++              });
++              try {
++                final bgPush = Matrix.of(context).backgroundPush;
++                if (bgPush != null) {
++                  await bgPush.setupPush();
++                  // wait a moment and reload pushers
++                  await Future.delayed(const Duration(seconds: 3));
++                  await _loadPushers(client);
++                } else {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(content: Text('Error: backgroundPush no inicializado')),
++                  );
++                }
++              } catch (e) {
++                ScaffoldMessenger.of(context).showSnackBar(
++                  SnackBar(content: Text('Error al re-registrar push: $e')),
++                );
++              } finally {
++                setState(() {
++                  _loadingPushers = false;
++                });
++              }
++            },
++          ),
++          const Divider(),
 +          Padding(
 +            padding: const EdgeInsets.all(16.0),
 +            child: Text(
@@ -1944,7 +2085,7 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..02abd8d 100644
+index 5ead47d..5a60382 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -28,6 +28,7 @@ import '../config/app_config.dart';
@@ -1955,9 +2096,54 @@ index 5ead47d..02abd8d 100644
  
  class BackgroundPush {
    static BackgroundPush? _instance;
-@@ -217,7 +218,12 @@ class BackgroundPush {
+@@ -159,6 +160,7 @@ class BackgroundPush {
+     String? token,
+     bool useDeviceSpecificAppId = false,
+   }) async {
++    await FileLogger.log('[UnifiedPush] setupPusher started for client: ${client.clientName}, useDeviceSpecificAppId: $useDeviceSpecificAppId');
+     if (PlatformInfos.isIOS) {
+       //<GOOGLE_SERVICES>await firebase.requestPermission();
+     }
+@@ -172,8 +174,12 @@ class BackgroundPush {
+     final appDisplayName = PlatformInfos.appDisplayName;
  
-     if (!client.isLogged()) return;
+     final pushers =
+-        await (client.getPushers().catchError((e) {
++        await (client.getPushers().then((value) {
++          FileLogger.log('[UnifiedPush] Fetched ${value.length} existing pushers from server.');
++          return value;
++        }).catchError((e) {
+           Logs().w('[Push] Unable to request pushers', e);
++          FileLogger.log('[UnifiedPush] Error fetching existing pushers: $e');
+           return <Pusher>[];
+         })) ??
+         [];
+@@ -192,9 +198,12 @@ class BackgroundPush {
+     final thisAppId = useDeviceSpecificAppId ? deviceAppId : appId;
+     if (gatewayUrl == null || token == null) {
+       Logs().w('[Push] Missing required push credentials');
++      await FileLogger.log('[UnifiedPush] Missing required push credentials: gatewayUrl=$gatewayUrl, token=$token');
+       return;
+     }
+ 
++    await FileLogger.log('[UnifiedPush] Target configuration: appId=$thisAppId, token=$token, gatewayUrl=$gatewayUrl');
++
+     if (pushers.any(
+       (currentPusher) =>
+           currentPusher.pushkey == token &&
+@@ -212,25 +221,37 @@ class BackgroundPush {
+               pusherDataMessageFormat,
+     )) {
+       Logs().i('[Push] Pusher already set for ${client.clientName}');
++      await FileLogger.log('[UnifiedPush] Pusher already set and matching on server. Skip posting.');
+       return;
+     }
+ 
+-    if (!client.isLogged()) return;
++    if (!client.isLogged()) {
++      await FileLogger.log('[UnifiedPush] Client not logged in. Cannot post pusher.');
++      return;
++    }
  
 -    final legacyPushers = pushers.where((pusher) => pusher.pushkey == token);
 +    final legacyPushers = pushers.where(
@@ -1969,7 +2155,34 @@ index 5ead47d..02abd8d 100644
      for (final pusher in legacyPushers) {
        try {
          await client.deletePusher(pusher);
-@@ -317,23 +323,7 @@ class BackgroundPush {
+         Logs().i('[Push] Removed legacy pusher for ${client.clientName}');
++        await FileLogger.log('[UnifiedPush] Removed legacy/conflicting pusher: ${pusher.appId}');
+       } catch (err) {
+         Logs().w(
+           '[Push] Failed to remove old pusher for ${client.clientName}',
+           err,
+         );
++        await FileLogger.log('[UnifiedPush] Failed to remove legacy pusher: $err');
+       }
+     }
+ 
+     Logs().i('Need to set new pusher for ${client.clientName}');
++    await FileLogger.log('[UnifiedPush] Need to register new pusher. Sending postPusher...');
+     try {
+       await client.postPusher(
+         Pusher(
+@@ -251,8 +272,10 @@ class BackgroundPush {
+         ),
+         append: true,
+       );
++      await FileLogger.log('[UnifiedPush] postPusher completed successfully!');
+     } catch (e, s) {
+       Logs().e('[Push] Unable to set pushers', e, s);
++      await FileLogger.log('[UnifiedPush] CRITICAL: postPusher failed! Error: $e\nStacktrace:\n$s');
+     }
+   }
+ 
+@@ -317,23 +340,7 @@ class BackgroundPush {
    }
  
    Future<void> _noFcmWarning() async {
@@ -1994,7 +2207,56 @@ index 5ead47d..02abd8d 100644
    }
  
    Future<void> setupFirebase(Client client) async {
-@@ -424,23 +414,33 @@ class BackgroundPush {
+@@ -375,7 +382,9 @@ class BackgroundPush {
+   Future<void> _newUpEndpoint(PushEndpoint newPushEndpoint, String i) async {
+     final newEndpoint = newPushEndpoint.url;
+     upAction = true;
++    await FileLogger.log('[UnifiedPush] _newUpEndpoint triggered with endpoint: $newEndpoint');
+     if (newEndpoint.isEmpty) {
++      await FileLogger.log('[UnifiedPush] Endpoint is empty, unregistering...');
+       await _upUnregistered(i);
+       return;
+     }
+@@ -387,6 +396,7 @@ class BackgroundPush {
+           .toString()
+           .split('?')
+           .first;
++      await FileLogger.log('[UnifiedPush] Checking self-hosted gateway URL: $url');
+       final res = json.decode(
+         utf8.decode((await http.get(Uri.parse(url))).bodyBytes),
+       );
+@@ -394,13 +404,16 @@ class BackgroundPush {
+           (res['unifiedpush'] is Map &&
+               res['unifiedpush']['gateway'] == 'matrix')) {
+         endpoint = url;
++        await FileLogger.log('[UnifiedPush] Self-hosted gateway detected successfully!');
+       }
+     } catch (e) {
+       Logs().i(
+         '[Push] No self-hosted unified push gateway present: $newEndpoint',
+       );
++      await FileLogger.log('[UnifiedPush] Self-hosted check failed (expected if using public/standard ntfy.sh): $e. Using fallback endpoint.');
+     }
+     Logs().i('[Push] UnifiedPush using endpoint $endpoint');
++    await FileLogger.log('[UnifiedPush] UnifiedPush will register using gateway endpoint: $endpoint');
+ 
+     for (final client in clients) {
+       await setupPusher(
+@@ -412,11 +425,13 @@ class BackgroundPush {
+     }
+     await AppSettings.unifiedPushEndpoint.setItem(newEndpoint);
+     await AppSettings.unifiedPushRegistered.setItem(true);
++    await FileLogger.log('[UnifiedPush] Registration settings saved to disk (registered=true)');
+   }
+ 
+   Future<void> _upUnregistered(String i) async {
+     upAction = true;
+     Logs().i('[Push] Removing UnifiedPush endpoint...');
++    await FileLogger.log('[UnifiedPush] _upUnregistered triggered. Clearing endpoint from settings...');
+     await AppSettings.unifiedPushEndpoint.setItem(
+       AppSettings.unifiedPushEndpoint.defaultValue,
+     );
+@@ -424,23 +439,33 @@ class BackgroundPush {
    }
  
    Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
