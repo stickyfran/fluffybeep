@@ -3246,7 +3246,7 @@ index 0000000..6f499d6
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..69c4149 100644
+index e90e649..9d33b6d 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -3277,6 +3277,50 @@ index e90e649..69c4149 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
+@@ -247,12 +259,13 @@ Future<void> _tryPushHelper(
+       : null;
+   messagingStyleInformation?.messages?.add(newMessage);
+ 
+-  final roomName = event.room.getLocalizedDisplayname(MatrixLocals(l10n));
++  final roomName = event.room.getBeeperDisplayname(MatrixLocals(l10n));
+ 
+-  final notificationGroupId = event.room.isDirectChat
++  final isDirectChat = event.room.isDirectChat || event.room.isBeeperFakeDM;
++  final notificationGroupId = isDirectChat
+       ? 'directChats'
+       : 'groupChats';
+-  final groupName = event.room.isDirectChat ? l10n.directChats : l10n.groups;
++  final groupName = isDirectChat ? l10n.directChats : l10n.groups;
+ 
+   final messageRooms = AndroidNotificationChannelGroup(
+     notificationGroupId,
+@@ -291,14 +304,14 @@ Future<void> _tryPushHelper(
+                 : ByteArrayAndroidIcon(userAvatarFile),
+             key: event.room.client.userID,
+           ),
+-          conversationTitle: event.room.isDirectChat ? null : roomName,
+-          groupConversation: !event.room.isDirectChat,
++          conversationTitle: isDirectChat ? null : roomName,
++          groupConversation: !isDirectChat,
+           messages: [newMessage],
+         ),
+     ticker: event.calcLocalizedBodyFallback(
+       matrixLocals,
+       plaintextBody: true,
+-      withSenderNamePrefix: !event.room.isDirectChat,
++      withSenderNamePrefix: !isDirectChat,
+       hideReply: true,
+       hideEdit: true,
+       removeMarkdown: true,
+@@ -338,7 +351,7 @@ Future<void> _tryPushHelper(
+     iOS: iOSPlatformChannelSpecifics,
+   );
+ 
+-  final title = event.room.getLocalizedDisplayname(MatrixLocals(l10n));
++  final title = event.room.getBeeperDisplayname(MatrixLocals(l10n));
+ 
+   if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
+     await _setShortcut(event, l10n, title, roomAvatarFile);
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
 index 0000000..e0591d3
