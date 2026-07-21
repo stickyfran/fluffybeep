@@ -387,7 +387,7 @@ index 4cda41c..7354407 100644
          );
          return Scaffold(
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..3854296 100644
+index 6ceba8b..804f5c7 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -688,23 +688,113 @@ index 6ceba8b..3854296 100644
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -396,6 +451,15 @@ class ChatListController extends State<ChatList>
-       );
-     });
+@@ -380,51 +435,68 @@ class ChatListController extends State<ChatList>
  
-+    // Build initial room cache and hook into sync stream for future updates.
-+    // Rate-limit to 1s so rapid syncs don't thrash the sort.
-+    _cachedRooms = _computeFilteredRooms();
-+    _cachedSpaceDelegates = _computeSpaceDelegates();
-+    _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
-+        .where((s) => s.hasRoomUpdate)
-+        .rateLimit(const Duration(seconds: 1))
-+        .listen(_invalidateRoomCache);
+     scrollController.addListener(_onScroll);
+     _waitForFirstSync();
+-    Matrix.of(context).voipPlugin?.context = context;
+-    WidgetsBinding.instance.addPostFrameCallback((_) {
+-      if (mounted) {
+-        searchServer = Matrix.of(
+-          context,
+-        ).store.getString(_serverStoreNamespace);
+-        Matrix.of(context).backgroundPush?.setupPush();
+-        UpdateNotifier.showUpdateDialog(context);
+-      }
++    super.initState();
++  }
 +
-     _updateRoomTags();
-     _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
-         .where(
-@@ -432,6 +496,7 @@ class ChatListController extends State<ChatList>
++  bool _initialized = false;
++
++  @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    if (!_initialized) {
++      _initialized = true;
++
++      // Safe to lookup context here
++      Matrix.of(context).voipPlugin?.context = context;
++      
++      searchServer = Matrix.of(
++        context,
++      ).store.getString(_serverStoreNamespace);
++      Matrix.of(context).backgroundPush?.setupPush();
++      UpdateNotifier.showUpdateDialog(context);
+ 
+       // Workaround for system UI overlay style not applied on app start
+       SystemChrome.setSystemUIOverlayStyle(
+         Theme.of(context).appBarTheme.systemOverlayStyle!,
+       );
+-    });
+ 
+-    _updateRoomTags();
+-    _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
+-        .where(
+-          (syncUpdate) =>
+-              syncUpdate.rooms?.join?.values.any(
+-                (roomUpdate) =>
+-                    roomUpdate.accountData?.any(
+-                      (accountData) => accountData.type == 'm.tag',
+-                    ) ??
+-                    false,
+-              ) ??
+-              false,
+-        )
+-        .listen(_updateRoomTags);
+-
+-    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
+-      activeFilter = ActiveFilter.tag;
+-      activeTag = AppSettings.chatFilter.value;
+-    } else {
+-      activeFilter =
+-          ActiveFilter.values.singleWhereOrNull(
+-            (filter) => AppSettings.chatFilter.value == filter.name,
+-          ) ??
+-          ActiveFilter.allChats;
+-    }
++      _updateRoomTags();
++      _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
++          .where(
++            (syncUpdate) =>
++                syncUpdate.rooms?.join?.values.any(
++                  (roomUpdate) =>
++                      roomUpdate.accountData?.any(
++                        (accountData) => accountData.type == 'm.tag',
++                      ) ??
++                      false,
++                ) ??
++                false,
++          )
++          .listen(_updateRoomTags);
++
++      if (roomTags.containsKey(AppSettings.chatFilter.value)) {
++        activeFilter = ActiveFilter.tag;
++        activeTag = AppSettings.chatFilter.value;
++      } else {
++        activeFilter =
++            ActiveFilter.values.singleWhereOrNull(
++              (filter) => AppSettings.chatFilter.value == filter.name,
++            ) ??
++            ActiveFilter.allChats;
++      }
+ 
+-    _processPushHelperCrashReport();
++      // Build initial room cache and hook into sync stream for future updates.
++      // Rate-limit to 1s so rapid syncs don't thrash the sort. Safe to use Matrix.of(context) here.
++      _cachedRooms = _computeFilteredRooms();
++      _cachedSpaceDelegates = _computeSpaceDelegates();
++      _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
++          .where((s) => s.hasRoomUpdate)
++          .rateLimit(const Duration(seconds: 1))
++          .listen(_invalidateRoomCache);
+ 
+-    super.initState();
++      _processPushHelperCrashReport();
++    }
+   }
+ 
+   @override
+@@ -432,6 +504,7 @@ class ChatListController extends State<ChatList>
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -712,7 +802,7 @@ index 6ceba8b..3854296 100644
      scrollController.removeListener(_onScroll);
      searchController.dispose();
      searchFocusNode.dispose();
-@@ -643,19 +708,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +716,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -744,7 +834,7 @@ index 6ceba8b..3854296 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -800,9 +864,27 @@ class ChatListController extends State<ChatList>
+@@ -800,9 +872,27 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -773,7 +863,7 @@ index 6ceba8b..3854296 100644
          );
          return;
        case ChatContextAction.showMore:
-@@ -913,10 +995,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1003,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
