@@ -2047,10 +2047,10 @@ index 5ead47d..02abd8d 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..13b4bff
+index 0000000..27aeef7
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,688 @@
+@@ -0,0 +1,751 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -2092,6 +2092,69 @@ index 0000000..13b4bff
 +    if (prefs!.getString(key) != name) {
 +      prefs!.setString(key, name);
 +    }
++  }
++
++  static String? getCachedName(String roomId) {
++    return prefs?.getString('beeper_name_$roomId');
++  }
++
++  static void saveAvatar(String roomId, String url) {
++    if (prefs == null) return;
++    final key = 'beeper_avatar_$roomId';
++    if (prefs!.getString(key) != url) {
++      prefs!.setString(key, url);
++    }
++  }
++
++  static String? getCachedAvatar(String roomId) {
++    return prefs?.getString('beeper_avatar_$roomId');
++  }
++
++  static void saveContactId(String roomId, String contactId) {
++    if (prefs == null) return;
++    final key = 'beeper_contact_$roomId';
++    if (prefs!.getString(key) != contactId) {
++      prefs!.setString(key, contactId);
++    }
++  }
++
++  static String? getCachedContactId(String roomId) {
++    return prefs?.getString('beeper_contact_$roomId');
++  }
++
++  static void saveIsFakeDM(String roomId, bool isFake) {
++    if (prefs == null) return;
++    final key = 'beeper_isfakedm_$roomId';
++    if (prefs!.getBool(key) != isFake) {
++      prefs!.setBool(key, isFake);
++    }
++  }
++
++  static bool? getCachedIsFakeDM(String roomId) {
++    return prefs?.getBool('beeper_isfakedm_$roomId');
++  }
++
++  /// Caché de red Beeper (clave como 'whatsapp', 'instagram', etc.)
++  static void saveRoomNetwork(String roomId, String networkKey) {
++    if (prefs == null) return;
++    final key = 'beeper_net_$roomId';
++    if (prefs!.getString(key) != networkKey) {
++      prefs!.setString(key, networkKey);
++    }
++  }
++
++  static String? getCachedRoomNetwork(String roomId) {
++    return prefs?.getString('beeper_net_$roomId');
++  }
++
++  /// Caché de timestamp del último mensaje real (en milisegundos desde epoch)
++  static void saveLastTimestamp(String roomId, int milliseconds) {
++    if (prefs == null) return;
++    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir
++  }
++
++  static int? getCachedLastTimestamp(String roomId) {
++    return prefs?.getInt('beeper_ts_$roomId');
 +  }
 +
 +  static void preloadCacheFromDisk(SharedPreferences sharedPrefs, List<String> roomIds) {
@@ -2856,10 +2919,18 @@ index 0000000..6f499d6
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..75f2db1 100644
+index e90e649..69c4149 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -166,7 +166,18 @@ Future<void> _tryPushHelper(
+@@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
+ import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
+ import 'package:matrix/matrix.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ 
+ const notificationAvatarDimension = 128;
+ final Map<String, DateTime> lastReceivedPushNotification = {};
+@@ -166,7 +167,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
  
