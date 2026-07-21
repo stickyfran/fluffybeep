@@ -306,6 +306,18 @@ index 731cc94..7c330e1 100644
            ListTile(
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
+diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
+index 930de3b..faed57c 100644
+--- a/lib/pages/chat/events/message.dart
++++ b/lib/pages/chat/events/message.dart
+@@ -89,6 +89,7 @@ class Message extends StatelessWidget {
+       EventTypes.Sticker,
+       EventTypes.CallInvite,
+       PollEventContent.startType,
++      EventTypes.Encrypted,
+     }.contains(event.type)) {
+       if (event.type.startsWith('m.call.')) {
+         return const SizedBox.shrink();
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
 index 91fffa0..aa22d74 100644
 --- a/lib/pages/chat/events/message_content.dart
@@ -1075,7 +1087,7 @@ index 6ceba8b..cddcf2b 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..b6cc359 100644
+index 8610b92..7a60e50 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -1089,12 +1101,13 @@ index 8610b92..b6cc359 100644
  import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/chat_list.dart';
-@@ -10,78 +14,130 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+@@ -10,78 +14,131 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/search_title.dart';
  import 'package:fluffychat/pages/chat_list/space_view.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
  import 'package:fluffychat/utils/stream_extension.dart';
++import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
  import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
  import 'package:fluffychat/widgets/avatar.dart';
 -import 'package:flutter/cupertino.dart';
@@ -1246,7 +1259,7 @@ index 8610b92..b6cc359 100644
                    SearchTitle(
                      title: L10n.of(context).publicRooms,
                      icon: const Icon(Icons.explore_outlined),
-@@ -128,7 +184,7 @@ class ChatListViewBody extends StatelessWidget {
+@@ -128,7 +185,7 @@ class ChatListViewBody extends StatelessWidget {
                            ),
                    ),
                  ],
@@ -1255,7 +1268,7 @@ index 8610b92..b6cc359 100644
                    Container(
                      height: 36 + 8 + 8,
                      padding: EdgeInsets.symmetric(vertical: 8),
-@@ -146,8 +202,8 @@ class ChatListViewBody extends StatelessWidget {
+@@ -146,8 +203,8 @@ class ChatListViewBody extends StatelessWidget {
                                  ),
                                  child: Center(
                                    child: FilterChip(
@@ -1266,7 +1279,7 @@ index 8610b92..b6cc359 100644
                                          .setActiveFilter(filter, null),
                                      label: Text(
                                        filter.toLocalizedString(context),
-@@ -156,15 +212,15 @@ class ChatListViewBody extends StatelessWidget {
+@@ -156,15 +213,15 @@ class ChatListViewBody extends StatelessWidget {
                                  ),
                                ),
                              ),
@@ -1285,7 +1298,7 @@ index 8610b92..b6cc359 100644
                                    ActiveFilter.tag,
                                    entry.key,
                                  ),
-@@ -176,22 +232,67 @@ class ChatListViewBody extends StatelessWidget {
+@@ -176,22 +233,67 @@ class ChatListViewBody extends StatelessWidget {
                        ],
                      ),
                    ),
@@ -1357,7 +1370,7 @@ index 8610b92..b6cc359 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
-@@ -245,10 +346,10 @@ class ChatListViewBody extends StatelessWidget {
+@@ -245,10 +347,10 @@ class ChatListViewBody extends StatelessWidget {
                        space: space,
                        key: Key('chat_list_item_${room.id}'),
                        filter: filter,
@@ -4094,19 +4107,20 @@ index 0000000..e0591d3
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..73a702c 100644
+index 934de68..5670e2a 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -35,6 +35,8 @@ import '../pages/key_verification/key_verification_dialog.dart';
+@@ -35,6 +35,9 @@ import '../pages/key_verification/key_verification_dialog.dart';
  import '../utils/account_bundles.dart';
  import '../utils/background_push.dart';
  import 'local_notifications_extension.dart';
 +import 'cache_refresh_overlay.dart';
 +import '../utils/beeper_bridge_utils.dart';
++import 'mxc_image.dart';
  
  class Matrix extends StatefulWidget {
    final Widget? child;
-@@ -205,9 +207,25 @@ class MatrixState extends State<Matrix> {
+@@ -205,9 +208,25 @@ class MatrixState extends State<Matrix> {
    void initState() {
      super.initState();
      _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
@@ -4132,7 +4146,7 @@ index 934de68..73a702c 100644
    AppLifecycleListener? _listener;
  
    void _registerSubs(String name) {
-@@ -375,6 +393,11 @@ class MatrixState extends State<Matrix> {
+@@ -375,6 +394,11 @@ class MatrixState extends State<Matrix> {
          Logs().v('Set background sync to', foreground);
        }
      }
@@ -4144,7 +4158,7 @@ index 934de68..73a702c 100644
    }
  
    @override
-@@ -409,7 +432,12 @@ class MatrixState extends State<Matrix> {
+@@ -409,7 +433,12 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
