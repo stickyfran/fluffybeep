@@ -1640,10 +1640,10 @@ index a649171..b7bcb61 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..d708f32
+index 0000000..7124c41
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,411 @@
+@@ -0,0 +1,448 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -1670,6 +1670,7 @@ index 0000000..d708f32
 +class _SettingsPatchesState extends State<SettingsPatches> {
 +  int _logSize = 0;
 +  bool _debugLoggingEnabled = false;
++  bool _forcePublicPushGateway = false;
 +  List<Pusher>? _pushers;
 +  bool _loadingPushers = false;
 +  bool _didLoadPushers = false;
@@ -1679,6 +1680,7 @@ index 0000000..d708f32
 +    super.initState();
 +    _loadLogSize();
 +    _loadDebugLoggingToggle();
++    _loadForcePublicToggle();
 +  }
 +
 +  @override
@@ -1709,6 +1711,15 @@ index 0000000..d708f32
 +    }
 +  }
 +
++  Future<void> _loadForcePublicToggle() async {
++    final prefs = await SharedPreferences.getInstance();
++    if (mounted) {
++      setState(() {
++        _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
++      });
++    }
++  }
++
 +  Future<void> _setDebugLoggingEnabled(bool value) async {
 +    final prefs = await SharedPreferences.getInstance();
 +    await prefs.setBool('beeper_debug_logging_enabled', value);
@@ -1716,6 +1727,22 @@ index 0000000..d708f32
 +      setState(() {
 +        _debugLoggingEnabled = value;
 +      });
++    }
++  }
++
++  Future<void> _setForcePublicPushGateway(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_force_public_push_gateway', value);
++    if (mounted) {
++      setState(() {
++        _forcePublicPushGateway = value;
++      });
++      // Force setupPush so that the endpoint is recalculated and re-registered!
++      final bgPush = Matrix.of(context).backgroundPush;
++      if (bgPush != null) {
++        await bgPush.setupPush();
++        await _loadPushers(Matrix.of(context).client);
++      }
 +    }
 +  }
 +
@@ -1816,6 +1843,16 @@ index 0000000..d708f32
 +            ),
 +            value: _debugLoggingEnabled,
 +            onChanged: _setDebugLoggingEnabled,
++          ),
++          SwitchListTile.adaptive(
++            secondary: const Icon(Icons.cloud_queue_outlined),
++            title: const Text('Forzar pasarela pública UnifiedPush'),
++            subtitle: const Text(
++              'Usa matrix.gateway.unifiedpush.org en lugar del endpoint directo del distribuidor (ntfy). '
++              'Útil si el servidor de Beeper bloquea las conexiones salientes a tu distribuidor.',
++            ),
++            value: _forcePublicPushGateway,
++            onChanged: _setForcePublicPushGateway,
 +          ),
 +          ListTile(
 +            leading: const Icon(Icons.description_outlined),
@@ -2085,10 +2122,16 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..52ee459 100644
+index 5ead47d..4ca17b6 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -28,6 +28,7 @@ import '../config/app_config.dart';
+@@ -24,10 +24,13 @@ import 'package:matrix/matrix.dart';
+ import 'package:unifiedpush/unifiedpush.dart';
+ import 'package:unifiedpush_ui/unifiedpush_ui.dart';
+ 
++import 'package:shared_preferences/shared_preferences.dart';
++
+ import '../config/app_config.dart';
  import '../config/setting_keys.dart';
  import '../widgets/matrix.dart';
  import 'platform_infos.dart';
@@ -2096,7 +2139,7 @@ index 5ead47d..52ee459 100644
  
  class BackgroundPush {
    static BackgroundPush? _instance;
-@@ -159,6 +160,7 @@ class BackgroundPush {
+@@ -159,6 +162,7 @@ class BackgroundPush {
      String? token,
      bool useDeviceSpecificAppId = false,
    }) async {
@@ -2104,7 +2147,7 @@ index 5ead47d..52ee459 100644
      if (PlatformInfos.isIOS) {
        //<GOOGLE_SERVICES>await firebase.requestPermission();
      }
-@@ -172,8 +174,12 @@ class BackgroundPush {
+@@ -172,8 +176,12 @@ class BackgroundPush {
      final appDisplayName = PlatformInfos.appDisplayName;
  
      final pushers =
@@ -2118,7 +2161,7 @@ index 5ead47d..52ee459 100644
            return <Pusher>[];
          })) ??
          [];
-@@ -192,9 +198,12 @@ class BackgroundPush {
+@@ -192,9 +200,12 @@ class BackgroundPush {
      final thisAppId = useDeviceSpecificAppId ? deviceAppId : appId;
      if (gatewayUrl == null || token == null) {
        Logs().w('[Push] Missing required push credentials');
@@ -2131,7 +2174,7 @@ index 5ead47d..52ee459 100644
      if (pushers.any(
        (currentPusher) =>
            currentPusher.pushkey == token &&
-@@ -212,25 +221,37 @@ class BackgroundPush {
+@@ -212,25 +223,37 @@ class BackgroundPush {
                pusherDataMessageFormat,
      )) {
        Logs().i('[Push] Pusher already set for ${client.clientName}');
@@ -2171,7 +2214,7 @@ index 5ead47d..52ee459 100644
      try {
        await client.postPusher(
          Pusher(
-@@ -251,8 +272,10 @@ class BackgroundPush {
+@@ -251,8 +274,10 @@ class BackgroundPush {
          ),
          append: true,
        );
@@ -2182,7 +2225,7 @@ index 5ead47d..52ee459 100644
      }
    }
  
-@@ -317,23 +340,7 @@ class BackgroundPush {
+@@ -317,23 +342,7 @@ class BackgroundPush {
    }
  
    Future<void> _noFcmWarning() async {
@@ -2207,7 +2250,7 @@ index 5ead47d..52ee459 100644
    }
  
    Future<void> setupFirebase(Client client) async {
-@@ -375,7 +382,9 @@ class BackgroundPush {
+@@ -375,32 +384,44 @@ class BackgroundPush {
    Future<void> _newUpEndpoint(PushEndpoint newPushEndpoint, String i) async {
      final newEndpoint = newPushEndpoint.url;
      upAction = true;
@@ -2217,19 +2260,41 @@ index 5ead47d..52ee459 100644
        await _upUnregistered(i);
        return;
      }
-@@ -387,6 +396,7 @@ class BackgroundPush {
-           .toString()
-           .split('?')
-           .first;
-+      await FileLogger.log('[UnifiedPush] Checking self-hosted gateway URL: $url');
-       final res = json.decode(
-         utf8.decode((await http.get(Uri.parse(url))).bodyBytes),
-       );
-@@ -394,13 +404,16 @@ class BackgroundPush {
-           (res['unifiedpush'] is Map &&
-               res['unifiedpush']['gateway'] == 'matrix')) {
-         endpoint = url;
-+        await FileLogger.log('[UnifiedPush] Self-hosted gateway detected successfully!');
+     var endpoint =
+         'https://matrix.gateway.unifiedpush.org/_matrix/push/v1/notify';
+     try {
+-      final url = Uri.parse(newEndpoint)
+-          .replace(path: '/_matrix/push/v1/notify', query: '')
+-          .toString()
+-          .split('?')
+-          .first;
+-      final res = json.decode(
+-        utf8.decode((await http.get(Uri.parse(url))).bodyBytes),
+-      );
+-      if (res['gateway'] == 'matrix' ||
+-          (res['unifiedpush'] is Map &&
+-              res['unifiedpush']['gateway'] == 'matrix')) {
+-        endpoint = url;
++      final prefs = await SharedPreferences.getInstance();
++      final forcePublic = prefs.getBool('beeper_force_public_push_gateway') ?? false;
++      if (!forcePublic) {
++        final url = Uri.parse(newEndpoint)
++            .replace(path: '/_matrix/push/v1/notify', query: '')
++            .toString()
++            .split('?')
++            .first;
++        await FileLogger.log('[UnifiedPush] Checking self-hosted gateway URL: $url');
++        final res = json.decode(
++          utf8.decode((await http.get(Uri.parse(url))).bodyBytes),
++        );
++        if (res['gateway'] == 'matrix' ||
++            (res['unifiedpush'] is Map &&
++                res['unifiedpush']['gateway'] == 'matrix')) {
++          endpoint = url;
++          await FileLogger.log('[UnifiedPush] Self-hosted gateway detected successfully!');
++        }
++      } else {
++        await FileLogger.log('[UnifiedPush] Forcing public UnifiedPush gateway as per settings (beeper_force_public_push_gateway = true)');
        }
      } catch (e) {
        Logs().i(
@@ -2242,7 +2307,7 @@ index 5ead47d..52ee459 100644
  
      for (final client in clients) {
        await setupPusher(
-@@ -412,11 +425,13 @@ class BackgroundPush {
+@@ -412,11 +433,13 @@ class BackgroundPush {
      }
      await AppSettings.unifiedPushEndpoint.setItem(newEndpoint);
      await AppSettings.unifiedPushRegistered.setItem(true);
@@ -2256,7 +2321,7 @@ index 5ead47d..52ee459 100644
      await AppSettings.unifiedPushEndpoint.setItem(
        AppSettings.unifiedPushEndpoint.defaultValue,
      );
-@@ -424,23 +439,33 @@ class BackgroundPush {
+@@ -424,23 +447,33 @@ class BackgroundPush {
    }
  
    Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
