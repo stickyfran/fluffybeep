@@ -418,7 +418,7 @@ index 91fffa0..aa22d74 100644
            case MessageTypes.Notice:
            case MessageTypes.Emote:
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index 4cda41c..7ceb695 100644
+index 4cda41c..9d64854 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
@@ -452,7 +452,7 @@ index 4cda41c..7ceb695 100644
          return Scaffold(
            appBar: AppBar(
              leading:
-@@ -77,49 +78,47 @@ class ChatDetailsView extends StatelessWidget {
+@@ -77,8 +78,10 @@ class ChatDetailsView extends StatelessWidget {
                  IconButton(
                    tooltip: L10n.of(context).share,
                    icon: const Icon(Icons.qr_code_rounded),
@@ -463,80 +463,44 @@ index 4cda41c..7ceb695 100644
 +                    directChatMatrixID,
 +                  ),
                  ),
--              if (controller.widget.embeddedCloseButton == null)
--                ChatSettingsPopupMenu(room, false),
-+              ChatSettingsPopupMenu(
-+                room,
-+                directChatMatrixID: directChatMatrixID,
-+              ),
-             ],
-             title: Text(L10n.of(context).chatDetails),
-             backgroundColor: theme.appBarTheme.backgroundColor,
-           ),
-           body: MaxWidthBody(
--            child: ListView.builder(
--              physics: const NeverScrollableScrollPhysics(),
--              shrinkWrap: true,
--              itemCount: members.length + 1 + (canRequestMoreMembers ? 1 : 0),
--              itemBuilder: (BuildContext context, int i) => i == 0
--                  ? Column(
+               if (controller.widget.embeddedCloseButton == null)
+                 ChatSettingsPopupMenu(room, false),
+@@ -93,7 +96,7 @@ class ChatDetailsView extends StatelessWidget {
+               itemCount: members.length + 1 + (canRequestMoreMembers ? 1 : 0),
+               itemBuilder: (BuildContext context, int i) => i == 0
+                   ? Column(
 -                      crossAxisAlignment: .stretch,
--                      children: <Widget>[
--                        Row(
--                          children: [
--                            Padding(
--                              padding: const EdgeInsets.all(32.0),
--                              child: Stack(
--                                children: [
--                                  Hero(
--                                    tag:
--                                        controller.widget.embeddedCloseButton !=
++                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                       children: <Widget>[
+                         Row(
+                           children: [
+@@ -104,11 +107,11 @@ class ChatDetailsView extends StatelessWidget {
+                                   Hero(
+                                     tag:
+                                         controller.widget.embeddedCloseButton !=
 -                                            null
 -                                        ? 'embedded_content_banner'
 -                                        : 'content_banner',
--                                    child: Avatar(
++                                                null
++                                            ? 'embedded_content_banner'
++                                            : 'content_banner',
+                                     child: Avatar(
 -                                      mxContent: room.avatar,
--                                      name: displayname,
--                                      size: Avatar.defaultSize * 2.5,
--                                      onTap: roomAvatar != null
--                                          ? () => showDialog(
--                                              context: context,
--                                              builder: (_) =>
--                                                  MxcImageViewer(roomAvatar),
--                                            )
--                                          : null,
--                                    ),
--                                  ),
-+            child: ListView(
-+              children: [
-+                Column(
-+                  children: [
-+                    Padding(
-+                      padding: const EdgeInsets.all(32.0),
-+                      child: Stack(
-+                        children: [
-+                          Hero(
-+                            tag:
-+                                controller.widget.embeddedCloseButton !=
-+                                        null
-+                                    ? 'embedded_content_banner'
-+                                    : 'content_banner',
-+                            child: Avatar(
-+                              mxContent: roomAvatar,
-+                              name: displayname,
-+                              size: Avatar.defaultSize * 2.5,
-+                              onTap: roomAvatar != null
-+                                  ? () => showDialog(
-+                                      context: context,
-+                                      builder: (_) =>
-+                                          MxcImageViewer(roomAvatar),
-+                                    )
-+                                  : null,
-+                            ),
-+                          ),
-                                   if (!room.isDirectChat &&
-                                       room.canChangeStateEvent(
-                                         EventTypes.RoomAvatar,
++                                      mxContent: roomAvatar,
+                                       name: displayname,
+                                       size: Avatar.defaultSize * 2.5,
+                                       onTap: roomAvatar != null
+@@ -140,8 +143,8 @@ class ChatDetailsView extends StatelessWidget {
+                             ),
+                             Expanded(
+                               child: Column(
+-                                mainAxisAlignment: .center,
+-                                crossAxisAlignment: .start,
++                                mainAxisAlignment: MainAxisAlignment.center,
++                                crossAxisAlignment: CrossAxisAlignment.start,
+                                 children: [
+                                   TextButton.icon(
+                                     onPressed: () => room.isDirectChat
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
 index 6ceba8b..cddcf2b 100644
 --- a/lib/pages/chat_list/chat_list.dart
@@ -1543,19 +1507,6 @@ index 55d1d7e..c1505e7 100644
                              size: space != null
                                  ? Avatar.defaultSize * 0.75
                                  : Avatar.defaultSize,
-diff --git a/lib/pages/chat_list/client_chooser_button.dart b/lib/pages/chat_list/client_chooser_button.dart
-index de6594c..0eba177 100644
---- a/lib/pages/chat_list/client_chooser_button.dart
-+++ b/lib/pages/chat_list/client_chooser_button.dart
-@@ -186,7 +186,7 @@ class ClientChooserButton extends StatelessWidget {
-           itemBuilder: _bundleMenuItems,
-           child: Center(
-             child: Avatar(
--              mxContent: snapshot.data?.avatarUrl,
-+              mxContent: snapshot.data?.avatarUrl ?? client?.avatar,
-               name: snapshot.data?.displayName ?? client?.userID?.localpart,
-               size: 32,
-             ),
 diff --git a/lib/pages/chat_list/label_editor_dialog.dart b/lib/pages/chat_list/label_editor_dialog.dart
 new file mode 100644
 index 0000000..20a0df4
