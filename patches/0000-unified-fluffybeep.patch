@@ -1677,7 +1677,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..4b90723 100644
+index a649171..6660174 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -2186,7 +2186,7 @@ index a649171..4b90723 100644
 +                          return Material(
 +                            color: Colors.transparent,
 +                            child: InkWell(
-+                              onLongPress: () => _showNetworkMenu(context, net, networksList, store),
++                              onLongPress: () => _showNetworkMenu(context, net, visibleNetworks, store),
 +                              child: NaviRailItem(
 +                                toolTip: net.name,
 +                                isSelected: isSelected,
@@ -2348,14 +2348,16 @@ index a649171..4b90723 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..946e875
+index 0000000..ffa5b8e
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,603 @@
+@@ -0,0 +1,605 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:io';
 +
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/controllers/beeper_reinit_controller.dart';
