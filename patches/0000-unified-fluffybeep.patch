@@ -4460,7 +4460,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..9dd9c77 100644
+index e90e649..ca8e590 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4471,15 +4471,6 @@ index e90e649..9dd9c77 100644
  
  const notificationAvatarDimension = 128;
  final Map<String, DateTime> lastReceivedPushNotification = {};
-@@ -121,7 +122,7 @@ Future<void> _tryPushHelper(
- 
-   final event = await client.getEventByPushNotification(
-     notification,
--    storeInDatabase: false,
-+    storeInDatabase: true,
-   );
- 
-   final awaitingOneShotSync = client.oneShotSync();
 @@ -166,7 +167,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
