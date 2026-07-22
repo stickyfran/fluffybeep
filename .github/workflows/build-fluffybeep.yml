@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: 🛎️ Checkout Patches (stickyfran/fluffybeep)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 🛎️ Checkout Fluffychat (Official Repo)
         uses: actions/checkout@v4
         with:
@@ -22,11 +27,6 @@ jobs:
           ref: '259bc72fb897e99303058712fcdfaee033bd4d33'
           submodules: recursive
           path: 'fluffychat'
-
-      - name: 🛎️ Checkout Patches (stickyfran/fluffybeep)
-        uses: actions/checkout@v4
-        with:
-          path: 'patches-repo'
 
       - name: ⚙️ Setup Java 17
         uses: actions/setup-java@v3
@@ -43,8 +43,7 @@ jobs:
 
       - name: 🩹 Apply Fluffybeep Patches
         run: |
-          # Copia la carpeta de parches al directorio de fluffychat
-          cp -r patches-repo/patches fluffychat/patches
+          cp -r patches fluffychat/patches
           cd fluffychat
           chmod +x ./patches/patch-manager.sh
           ./patches/patch-manager.sh patch-only
@@ -56,7 +55,7 @@ jobs:
 
       - name: 🔑 Copy Release Keystore
         run: |
-          cp patches-repo/patches/release.keystore fluffychat/android/app/dummy.keystore
+          cp patches/release.keystore fluffychat/android/app/dummy.keystore
 
       - name: 🏗️ Build APK
         run: |
@@ -75,6 +74,7 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "Fluffybeep v1.0.${{ github.run_number }} - Beeper Patches"
+          target_commitish: ${{ github.sha }}
           body: |
             ### Initial Release & Beeper Enhancements
             This release contains the custom compiled APK for Fluffychat with native Beeper bridge support.
