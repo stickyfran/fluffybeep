@@ -169,8 +169,49 @@ index 0000000..5f34c85
 +    }
 +  }
 +}
+diff --git a/lib/pages/bootstrap/view_model/bootstrap_view_model.dart b/lib/pages/bootstrap/view_model/bootstrap_view_model.dart
+index 161f83d..b757431 100644
+--- a/lib/pages/bootstrap/view_model/bootstrap_view_model.dart
++++ b/lib/pages/bootstrap/view_model/bootstrap_view_model.dart
+@@ -221,21 +221,21 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
+ 
+   void goToRoomsPageAfterSuccess(BuildContext context) {
+     for (final room in client.rooms) {
+-      final lastEvent = room.lastEvent;
+-      if (lastEvent == null ||
+-          lastEvent.messageType != MessageTypes.BadEncrypted ||
+-          lastEvent.content['can_request_session'] != true) {
+-        continue;
+-      }
+-      final sessionId = lastEvent.content.tryGet<String>('session_id');
+-      final senderKey = lastEvent.content.tryGet<String>('sender_key');
+-      if (sessionId != null && senderKey != null) {
+-        client.encryption?.keyManager.maybeAutoRequest(
+-          room.id,
+-          sessionId,
+-          senderKey,
+-        );
+-      }
++      room.getTimeline().then((timeline) {
++        timeline.requestKeys(onlineKeyBackupOnly: false);
++        final badEvents = timeline.events.where((e) => e.messageType == MessageTypes.BadEncrypted);
++        for (final event in badEvents) {
++          final sessionId = event.content.tryGet<String>('session_id');
++          final senderKey = event.content.tryGet<String>('sender_key');
++          if (sessionId != null && senderKey != null) {
++            client.encryption?.keyManager.maybeAutoRequest(
++              room.id,
++              sessionId,
++              senderKey,
++            );
++          }
++        }
++      }).catchError((_) {});
+     }
+     ScaffoldMessenger.of(context).showSnackBar(
+       SnackBar(
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..727f261 100644
+index 7470749..0643960 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -21,6 +21,7 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
@@ -181,7 +222,31 @@ index 7470749..727f261 100644
  import 'package:fluffychat/utils/error_reporter.dart';
  import 'package:fluffychat/utils/file_selector.dart';
  import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
-@@ -556,7 +557,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -552,11 +553,34 @@ class ChatController extends State<ChatPageWithRoom>
+     if (state != AppLifecycleState.resumed) return;
+     if (!mounted) return;
+     setReadMarker();
++    _tryRecoverBadEncryptedMessages();
++  }
++
++  Future<void> _tryRecoverBadEncryptedMessages() async {
++    final client = room.client;
++    await client.oneShotSync().catchError((_) {});
++    
++    final badEvents = timeline?.events
++      .where((e) => e.messageType == MessageTypes.BadEncrypted)
++      .take(10) ?? [];
++    
++    for (final event in badEvents) {
++      final sessionId = event.content.tryGet<String>('session_id');
++      final senderKey = event.content.tryGet<String>('sender_key');
++      if (sessionId != null && senderKey != null) {
++        await client.encryption?.keyManager.maybeAutoRequest(
++          room.id, sessionId, senderKey,
++        );
++      }
++    }
+   }
  
    Future<void>? _setReadMarkerFuture;
  
@@ -193,7 +258,7 @@ index 7470749..727f261 100644
      if (eventId?.isValidMatrixIdStrict() == false) return;
      if (_setReadMarkerFuture != null) return;
      if (_scrolledUp) return;
-@@ -590,6 +594,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -590,6 +614,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -526,10 +591,18 @@ index 930de3b..faed57c 100644
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa0..e2e633f 100644
+index 91fffa0..029cd9f 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -157,6 +157,95 @@ class MessageContent extends StatelessWidget {
+@@ -11,6 +11,7 @@ import 'package:fluffychat/pages/chat/events/poll.dart';
+ import 'package:fluffychat/pages/chat/events/video_player.dart';
+ import 'package:fluffychat/pages/image_viewer/image_viewer.dart';
+ import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+ import '../../../config/app_config.dart';
+@@ -157,6 +158,137 @@ class MessageContent extends StatelessWidget {
                }
              }
              continue textmessage;
@@ -591,29 +664,71 @@ index 91fffa0..e2e633f 100644
 +                  if (hasKeys) ...[
 +                    const SizedBox(height: 10),
 +                    Row(
++                      mainAxisAlignment: MainAxisAlignment.start,
 +                      children: [
-+                        ElevatedButton.icon(
-+                          onPressed: () async {
-+                            final client = event.room.client;
-+                            await client.oneShotSync().catchError((_) {});
-+                            await client.encryption?.keyManager.maybeAutoRequest(
-+                              event.room.id,
-+                              sessionId,
-+                              senderKey,
-+                            );
-+                            if (context.mounted) {
-+                              ScaffoldMessenger.of(context).showSnackBar(
-+                                const SnackBar(
-+                                  content: Text('Solicitud de clave enviada al bridge/dispositivos'),
++                        Flexible(
++                          child: Wrap(
++                            spacing: 8,
++                            runSpacing: 8,
++                            children: [
++                              ElevatedButton.icon(
++                                onPressed: () async {
++                                  final client = event.room.client;
++                                  await client.oneShotSync().catchError((_) {});
++                                  await client.encryption?.keyManager.maybeAutoRequest(
++                                    event.room.id,
++                                    sessionId,
++                                    senderKey,
++                                  );
++                                  if (context.mounted) {
++                                    ScaffoldMessenger.of(context).showSnackBar(
++                                      const SnackBar(
++                                        content: Text('Solicitud de clave enviada al bridge/dispositivos'),
++                                      ),
++                                    );
++                                  }
++                                },
++                                icon: const Icon(Icons.refresh, size: 16),
++                                label: const Text('Re-solicitar clave'),
++                                style: ElevatedButton.styleFrom(
++                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++                                  textStyle: const TextStyle(fontSize: 12),
 +                                ),
-+                              );
-+                            }
-+                          },
-+                          icon: const Icon(Icons.refresh, size: 16),
-+                          label: const Text('Re-solicitar clave'),
-+                          style: ElevatedButton.styleFrom(
-+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-+                            textStyle: const TextStyle(fontSize: 12),
++                              ),
++                              ElevatedButton.icon(
++                                onPressed: () async {
++                                  if (context.mounted) {
++                                    ScaffoldMessenger.of(context).showSnackBar(
++                                      const SnackBar(
++                                        content: Text('Intentando recuperar del backup online...'),
++                                      ),
++                                    );
++                                  }
++                                  await event.room.getTimeline().then((timeline) {
++                                    timeline.requestKeys(onlineKeyBackupOnly: true);
++                                  }).catchError((e) {
++                                    Logs().w('Failed to request keys from backup', e);
++                                  });
++                                },
++                                icon: const Icon(Icons.cloud_download_outlined, size: 16),
++                                label: const Text('Restaurar desde backup'),
++                                style: ElevatedButton.styleFrom(
++                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++                                  textStyle: const TextStyle(fontSize: 12),
++                                ),
++                              ),
++                              ElevatedButton.icon(
++                                onPressed: () {
++                                  context.go('/bootstrap');
++                                },
++                                icon: const Icon(Icons.security, size: 16),
++                                label: const Text('Verificar sesión'),
++                                style: ElevatedButton.styleFrom(
++                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++                                  textStyle: const TextStyle(fontSize: 12),
++                                ),
++                              ),
++                            ],
 +                          ),
 +                        ),
 +                      ],
@@ -710,7 +825,7 @@ index 4cda41c..9d64854 100644
                                    TextButton.icon(
                                      onPressed: () => room.isDirectChat
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..cddcf2b 100644
+index 6ceba8b..ecf2b7f 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -721,16 +836,18 @@ index 6ceba8b..cddcf2b 100644
  
  import 'package:collection/collection.dart';
  import 'package:cross_file/cross_file.dart';
-@@ -32,6 +33,8 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -32,7 +33,10 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
 +import '../../utils/beeper_bridge_utils.dart';
 +import '../../utils/stream_extension.dart';
  import '../../utils/url_launcher.dart';
++import '../../utils/encryption_health_monitor.dart';
  import '../../widgets/matrix.dart';
  
-@@ -83,7 +86,9 @@ class ChatListController extends State<ChatList>
+ enum ActiveFilter { allChats, unread, groups, messages, tag }
+@@ -83,7 +87,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -741,7 +858,7 @@ index 6ceba8b..cddcf2b 100644
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +144,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +145,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -753,7 +870,7 @@ index 6ceba8b..cddcf2b 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +154,148 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +155,148 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -906,7 +1023,7 @@ index 6ceba8b..cddcf2b 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +304,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +305,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -1013,7 +1130,7 @@ index 6ceba8b..cddcf2b 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +361,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +362,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -1037,7 +1154,7 @@ index 6ceba8b..cddcf2b 100644
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -380,51 +461,68 @@ class ChatListController extends State<ChatList>
+@@ -380,51 +462,71 @@ class ChatListController extends State<ChatList>
  
      scrollController.addListener(_onScroll);
      _waitForFirstSync();
@@ -1063,6 +1180,9 @@ index 6ceba8b..cddcf2b 100644
 +
 +      // Safe to lookup context here
 +      Matrix.of(context).voipPlugin?.context = context;
++      
++      final client = Matrix.of(context).client;
++      EncryptionHealthMonitor().start(client, context);
 +      
 +      searchServer = Matrix.of(
 +        context,
@@ -1143,7 +1263,7 @@ index 6ceba8b..cddcf2b 100644
    }
  
    @override
-@@ -432,6 +530,7 @@ class ChatListController extends State<ChatList>
+@@ -432,6 +534,7 @@ class ChatListController extends State<ChatList>
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -1151,7 +1271,7 @@ index 6ceba8b..cddcf2b 100644
      scrollController.removeListener(_onScroll);
      searchController.dispose();
      searchFocusNode.dispose();
-@@ -643,19 +742,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +746,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -1183,7 +1303,7 @@ index 6ceba8b..cddcf2b 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +777,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +781,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -1212,7 +1332,7 @@ index 6ceba8b..cddcf2b 100644
          ],
        );
      }
-@@ -800,13 +920,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +924,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -1334,7 +1454,7 @@ index 6ceba8b..cddcf2b 100644
      }
    }
  
-@@ -913,10 +1140,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1144,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -1350,7 +1470,7 @@ index 6ceba8b..cddcf2b 100644
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1266,6 @@ enum ChatContextAction {
+@@ -1038,4 +1270,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -4328,6 +4448,94 @@ index 0000000..8a972ca
 +    return _beeperData.displayName ?? getLocalizedDisplayname(locals);
 +  }
 +}
+diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
+new file mode 100644
+index 0000000..5b1b27a
+--- /dev/null
++++ b/lib/utils/encryption_health_monitor.dart
+@@ -0,0 +1,82 @@
++import 'dart:async';
++import 'package:fluffychat/utils/platform_infos.dart';
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import 'package:flutter_secure_storage/flutter_secure_storage.dart';
++import 'package:go_router/go_router.dart';
++
++class EncryptionHealthMonitor {
++  static final EncryptionHealthMonitor _instance = EncryptionHealthMonitor._internal();
++  factory EncryptionHealthMonitor() => _instance;
++  EncryptionHealthMonitor._internal();
++
++  Timer? _timer;
++  Client? _client;
++  BuildContext? _context;
++  bool _isPrompting = false;
++
++  void start(Client client, BuildContext context) {
++    _client = client;
++    _context = context;
++    _timer?.cancel();
++    // Check every 5 minutes
++    _timer = Timer.periodic(const Duration(minutes: 5), (_) => _checkHealth());
++    _checkHealth(); // Initial check
++  }
++
++  void stop() {
++    _timer?.cancel();
++    _timer = null;
++    _client = null;
++    _context = null;
++  }
++
++  Future<void> _checkHealth() async {
++    if (_client == null || _context == null || !_context!.mounted || _isPrompting) return;
++    final state = await _client!.getCryptoIdentityState();
++    
++    if (state.initialized && !state.connected) {
++      // Try to auto-restore using secure storage
++      final supportsSecureStorage = PlatformInfos.isMobile || PlatformInfos.isDesktop;
++      if (supportsSecureStorage) {
++        try {
++          final keyFromSecureStorage = await const FlutterSecureStorage().read(
++            key: 'ssss_recovery_key_${_client!.userID}',
++          );
++          if (keyFromSecureStorage != null) {
++            await _client!.restoreCryptoIdentity(keyFromSecureStorage);
++            final newState = await _client!.getCryptoIdentityState();
++            if (newState.connected) {
++              Logs().i('EncryptionHealthMonitor: Successfully auto-restored crypto identity from secure storage.');
++              return;
++            }
++          }
++        } catch (e) {
++          Logs().w('EncryptionHealthMonitor: Failed to auto-restore crypto identity', e);
++        }
++      }
++
++      // If auto-restore failed, prompt user
++      _isPrompting = true;
++      if (_context!.mounted) {
++        ScaffoldMessenger.of(_context!).showSnackBar(
++          SnackBar(
++            content: const Text('Problema con el cifrado de extremo a extremo. Por favor verifica tu sesión.'),
++            action: SnackBarAction(
++              label: 'Verificar',
++              onPressed: () {
++                _context!.go('/bootstrap');
++              },
++            ),
++            duration: const Duration(seconds: 10),
++          ),
++        );
++      }
++      
++      // Cooldown before prompting again
++      Future.delayed(const Duration(minutes: 10), () {
++        _isPrompting = false;
++      });
++    }
++  }
++}
 diff --git a/lib/utils/file_logger.dart b/lib/utils/file_logger.dart
 new file mode 100644
 index 0000000..6f499d6
@@ -4471,7 +4679,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..ca8e590 100644
+index e90e649..d4596de 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4482,7 +4690,27 @@ index e90e649..ca8e590 100644
  
  const notificationAvatarDimension = 128;
  final Map<String, DateTime> lastReceivedPushNotification = {};
-@@ -166,7 +167,18 @@ Future<void> _tryPushHelper(
+@@ -121,10 +122,17 @@ Future<void> _tryPushHelper(
+ 
+   final event = await client.getEventByPushNotification(
+     notification,
+-    storeInDatabase: false,
++    storeInDatabase: true,
+   );
+ 
+-  final awaitingOneShotSync = client.oneShotSync();
++  final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
++        AppConfig.mainIsolatePortName,
++      ) != null;
++
++  final awaitingOneShotSync = !isMainIsolateAlive ? client.oneShotSync() : Future.value();
++  if (isMainIsolateAlive) {
++    Logs().v('Main isolate active, skipping background oneShotSync to protect Olm session');
++  }
+   l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
+ 
+   updateAppBadge(notification.counts?.unread ?? 0);
+@@ -166,7 +174,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
  
@@ -4502,7 +4730,7 @@ index e90e649..ca8e590 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
-@@ -247,12 +259,13 @@ Future<void> _tryPushHelper(
+@@ -247,12 +266,13 @@ Future<void> _tryPushHelper(
        : null;
    messagingStyleInformation?.messages?.add(newMessage);
  
@@ -4519,7 +4747,7 @@ index e90e649..ca8e590 100644
  
    final messageRooms = AndroidNotificationChannelGroup(
      notificationGroupId,
-@@ -291,14 +304,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +311,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -4537,7 +4765,7 @@ index e90e649..ca8e590 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -338,7 +351,7 @@ Future<void> _tryPushHelper(
+@@ -338,7 +358,7 @@ Future<void> _tryPushHelper(
      iOS: iOSPlatformChannelSpecifics,
    );
  
@@ -4546,15 +4774,17 @@ index e90e649..ca8e590 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +379,17 @@ Future<void> _tryPushHelper(
+@@ -366,6 +386,19 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
 +
-+  try {
-+    await awaitingOneShotSync;
-+  } catch (e) {
-+    Logs().w('Background oneShotSync failed or timed out', e);
++  if (!isMainIsolateAlive) {
++    try {
++      await awaitingOneShotSync.timeout(const Duration(seconds: 15));
++    } catch (e) {
++      Logs().w('Background oneShotSync failed or timed out', e);
++    }
 +  }
 +  
 +  if (isBackgroundMessage) {
