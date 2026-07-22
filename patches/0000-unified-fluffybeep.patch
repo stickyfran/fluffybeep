@@ -3488,7 +3488,7 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..f19a23e 100644
+index 5ead47d..7e7aa4a 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -24,10 +24,13 @@ import 'package:matrix/matrix.dart';
@@ -3591,7 +3591,48 @@ index 5ead47d..f19a23e 100644
      }
    }
  
-@@ -317,23 +342,7 @@ class BackgroundPush {
+@@ -277,6 +302,40 @@ class BackgroundPush {
+         showNoDistribDialog: false,
+         onNoDistribDialogDismissed: () {}, // TODO: Implement me
+       ).registerAppWithDialog();
++
++      final savedEndpoint = AppSettings.unifiedPushEndpoint.value;
++      final isRegistered = AppSettings.unifiedPushRegistered.value;
++      if (isRegistered && savedEndpoint.isNotEmpty) {
++        await FileLogger.log('[UnifiedPush] Startup: Force verifying pusher with saved endpoint: $savedEndpoint');
++        var endpoint = 'https://matrix.gateway.unifiedpush.org/_matrix/push/v1/notify';
++        try {
++          final prefs = await SharedPreferences.getInstance();
++          final forcePublic = prefs.getBool('beeper_force_public_push_gateway') ?? false;
++          if (!forcePublic) {
++            final url = Uri.parse(savedEndpoint)
++                .replace(path: '/_matrix/push/v1/notify', query: '')
++                .toString()
++                .split('?')
++                .first;
++            final res = json.decode(
++              utf8.decode((await http.get(Uri.parse(url))).bodyBytes),
++            );
++            if (res['gateway'] == 'matrix' ||
++                (res['unifiedpush'] is Map &&
++                    res['unifiedpush']['gateway'] == 'matrix')) {
++              endpoint = url;
++            }
++          }
++        } catch (_) {}
++        for (final client in clients) {
++          await setupPusher(
++            client: client,
++            gatewayUrl: endpoint,
++            token: savedEndpoint,
++            useDeviceSpecificAppId: true,
++          );
++        }
++      }
+     } else {
+       for (final client in clients) {
+         Logs().d('SetupPush for Client ${client.clientName}');
+@@ -317,23 +376,7 @@ class BackgroundPush {
    }
  
    Future<void> _noFcmWarning() async {
@@ -3616,7 +3657,7 @@ index 5ead47d..f19a23e 100644
    }
  
    Future<void> setupFirebase(Client client) async {
-@@ -375,32 +384,44 @@ class BackgroundPush {
+@@ -375,32 +418,44 @@ class BackgroundPush {
    Future<void> _newUpEndpoint(PushEndpoint newPushEndpoint, String i) async {
      final newEndpoint = newPushEndpoint.url;
      upAction = true;
@@ -3673,7 +3714,7 @@ index 5ead47d..f19a23e 100644
  
      for (final client in clients) {
        await setupPusher(
-@@ -412,11 +433,13 @@ class BackgroundPush {
+@@ -412,11 +467,13 @@ class BackgroundPush {
      }
      await AppSettings.unifiedPushEndpoint.setItem(newEndpoint);
      await AppSettings.unifiedPushRegistered.setItem(true);
@@ -3687,7 +3728,7 @@ index 5ead47d..f19a23e 100644
      await AppSettings.unifiedPushEndpoint.setItem(
        AppSettings.unifiedPushEndpoint.defaultValue,
      );
-@@ -424,23 +447,42 @@ class BackgroundPush {
+@@ -424,23 +481,42 @@ class BackgroundPush {
    }
  
    Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
@@ -4731,7 +4772,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..211c335 100644
+index e90e649..5eee1ab 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4742,22 +4783,16 @@ index e90e649..211c335 100644
  
  const notificationAvatarDimension = 128;
  final Map<String, DateTime> lastReceivedPushNotification = {};
-@@ -119,12 +120,39 @@ Future<void> _tryPushHelper(
+@@ -119,12 +120,66 @@ Future<void> _tryPushHelper(
  
    lastReceivedPushNotification[client.clientName] = DateTime.now();
  
+-  final event = await client.getEventByPushNotification(
+-    notification,
+-    storeInDatabase: false,
 +  final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
 +        AppConfig.mainIsolatePortName,
 +      ) != null;
-+
-+  if (!isMainIsolateAlive) {
-+    Logs().v('[PushCrypto] Main isolate is dead. Running background oneShotSync to fetch decryption keys...');
-+    await client.oneShotSync().timeout(const Duration(seconds: 20)).catchError((e, s) {
-+      Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
-+    });
-+  } else {
-+    Logs().v('[PushCrypto] Main isolate active, skipping background oneShotSync to protect Olm session');
-+  }
 +
 +  final safeNotification = PushNotification(
 +    content: null,
@@ -4771,20 +4806,55 @@ index e90e649..211c335 100644
 +    sender: notification.sender,
 +    senderDisplayName: notification.senderDisplayName,
 +    type: notification.type,
-+  );
-+
-   final event = await client.getEventByPushNotification(
--    notification,
-+    safeNotification,
-     storeInDatabase: false,
    );
  
 -  final awaitingOneShotSync = client.oneShotSync();
++  Event? event;
++  try {
++    event = await client.getEventByPushNotification(
++      safeNotification,
++      storeInDatabase: false,
++    );
++  } catch (e, s) {
++    Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
++  }
++
++  if (event == null || event.type == EventTypes.Encrypted) {
++    Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
++    await client.oneShotSync().timeout(const Duration(seconds: 20)).catchError((e, s) {
++      Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
++    });
++
++    try {
++      event = await client.getEventByPushNotification(
++        safeNotification,
++        storeInDatabase: false,
++      );
++    } catch (e, s) {
++      Logs().w('[PushCrypto] Second getEventByPushNotification failed', e, s);
++    }
++  }
++
++  var retries = 3;
++  while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
++    Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1.5s for keys... (Retries left: $retries)');
++    await Future.delayed(const Duration(milliseconds: 1500));
++    try {
++      event = await client.getEventByPushNotification(
++        safeNotification,
++        storeInDatabase: false,
++      );
++    } catch (e, s) {
++      Logs().w('[PushCrypto] Retry getEventByPushNotification failed', e, s);
++    }
++    retries--;
++  }
++
 +  final awaitingOneShotSync = Future.value();
    l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
  
    updateAppBadge(notification.counts?.unread ?? 0);
-@@ -166,7 +194,18 @@ Future<void> _tryPushHelper(
+@@ -166,7 +221,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
  
@@ -4804,7 +4874,7 @@ index e90e649..211c335 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
-@@ -247,12 +286,13 @@ Future<void> _tryPushHelper(
+@@ -247,12 +313,13 @@ Future<void> _tryPushHelper(
        : null;
    messagingStyleInformation?.messages?.add(newMessage);
  
@@ -4821,7 +4891,7 @@ index e90e649..211c335 100644
  
    final messageRooms = AndroidNotificationChannelGroup(
      notificationGroupId,
-@@ -291,14 +331,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +358,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -4839,7 +4909,7 @@ index e90e649..211c335 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -338,7 +378,7 @@ Future<void> _tryPushHelper(
+@@ -338,7 +405,7 @@ Future<void> _tryPushHelper(
      iOS: iOSPlatformChannelSpecifics,
    );
  
@@ -4848,7 +4918,7 @@ index e90e649..211c335 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +406,14 @@ Future<void> _tryPushHelper(
+@@ -366,6 +433,14 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
