@@ -1677,7 +1677,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..b680ae2 100644
+index a649171..4b90723 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -1930,7 +1930,7 @@ index a649171..b680ae2 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -43,9 +258,68 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -43,9 +258,99 @@ class SpacesNavigationRail extends StatelessWidget {
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
              final allSpaces = client.rooms
@@ -1944,6 +1944,37 @@ index a649171..b680ae2 100644
 +                })
                  .toList();
  
++            final hiddenNets = BeeperBridgeUtils.getHiddenNetworks(client);
++
++            // Read real Beeper labels from account data (com.beeper.labels)
++            final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
++            final beeperLabelItems = <_CombinedRailItem>[];
++            final roomsInVisibleLabels = <String>{};
++            final labelTitlesLower = <String>{};
++
++            for (final entry in beeperLabels.entries) {
++              if (entry.key == '_hidden_networks') continue;
++              final val = entry.value;
++              if (val is! Map) continue;
++              final title = val['title']?.toString() ?? '';
++              if (title.isEmpty) continue;
++
++              final isHidden = hiddenNets.contains(entry.key) ||
++                  hiddenNets.contains(title) ||
++                  hiddenNets.contains(title.toLowerCase());
++              if (isHidden) continue;
++
++              final rooms = (val['rooms'] as List?)?.cast<String>() ?? [];
++              final isSelected = widget.activeSpaceId == 'virtual_beeper_label_${entry.key}';
++              if (rooms.isEmpty && !isSelected) continue;
++
++              roomsInVisibleLabels.addAll(rooms);
++              labelTitlesLower.add(title.toLowerCase());
++
++              final emoji = val['emoji']?.toString();
++              beeperLabelItems.add(_CombinedRailItem.beeperLabel(entry.key, title, emoji: emoji));
++            }
++
 +            // Extract unique Beeper networks and custom tags from client rooms
 +            final beeperNetworks = <String, BeeperNetwork>{};
 +            final customTags = <String>{};
@@ -1951,16 +1982,26 @@ index a649171..b680ae2 100644
 +              final net = BeeperBridgeUtils.getRoomNetwork(r);
 +              if (net != null) {
 +                final baseKey = BeeperBridgeUtils.getBaseNetworkKey(net.key);
-+                beeperNetworks[baseKey] = BeeperNetwork(net.name, net.colorHex, baseKey);
++                final netNameLower = net.name.toLowerCase();
++                final isHidden = hiddenNets.contains(baseKey) ||
++                    hiddenNets.contains(net.key) ||
++                    hiddenNets.contains(netNameLower);
++
++                final coveredByLabel = labelTitlesLower.any(
++                      (t) => t.contains(baseKey) || t.contains(netNameLower) || netNameLower.contains(t),
++                    ) ||
++                    roomsInVisibleLabels.contains(r.id);
++
++                if (!isHidden && !coveredByLabel) {
++                  beeperNetworks[baseKey] = BeeperNetwork(net.name, net.colorHex, baseKey);
++                }
 +              }
 +              for (final tag in r.tags.keys) {
 +                if (tag.startsWith('u.')) customTags.add(tag);
 +              }
 +            }
 +
-+            final networksList = beeperNetworks.values.toList();
-+            final hiddenNets = BeeperBridgeUtils.getHiddenNetworks(client);
-+            final visibleNetworks = networksList.where((n) => !hiddenNets.contains(n.key)).toList();
++            final visibleNetworks = beeperNetworks.values.toList();
 +            final tagsList = customTags.toList()..sort();
 +
 +            final order = store.getStringList('beeper_networks_order') ?? [];
@@ -1980,27 +2021,17 @@ index a649171..b680ae2 100644
 +            for (final net in visibleNetworks) {
 +              combinedItems.add(_CombinedRailItem.network(net));
 +            }
++            for (final labelItem in beeperLabelItems) {
++              combinedItems.add(labelItem);
++            }
 +            for (final tag in tagsList) {
 +              combinedItems.add(_CombinedRailItem.tag(tag));
-+            }
-+
-+            // Read real Beeper labels from account data (com.beeper.labels)
-+            final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
-+            for (final entry in beeperLabels.entries) {
-+              // Skip the internal _hidden_networks meta-entry
-+              if (entry.key == '_hidden_networks') continue;
-+              final val = entry.value;
-+              if (val is! Map) continue;
-+              final title = val['title']?.toString() ?? '';
-+              if (title.isEmpty) continue;
-+              final emoji = val['emoji']?.toString();
-+              combinedItems.add(_CombinedRailItem.beeperLabel(entry.key, title, emoji: emoji));
 +            }
 +
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +328,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +359,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -2019,7 +2050,7 @@ index a649171..b680ae2 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,49 +349,206 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,49 +380,206 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -2222,9 +2253,7 @@ index a649171..b680ae2 100644
 +                                  ),
 +                                ),
 +                              ),
-                             ),
--                          ),
--                        );
++                            ),
 +                          );
 +                        } else {
 +                          final tag = item.tag!;
@@ -2254,13 +2283,15 @@ index a649171..b680ae2 100644
 +                                  AppConfig.spaceBorderRadius,
 +                                ),
 +                              ),
-+                            ),
+                             ),
+-                          ),
+-                        );
 +                          );
 +                        }
                        },
                      ),
                    ),
-@@ -135,3 +566,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +597,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -2317,10 +2348,10 @@ index a649171..b680ae2 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..7124c41
+index 0000000..946e875
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,448 @@
+@@ -0,0 +1,603 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -2334,7 +2365,8 @@ index 0000000..7124c41
 +import 'package:matrix/matrix.dart';
 +import 'package:share_plus/share_plus.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
-+import 'dart:io';
++import 'package:fluffychat/pages/chat_list/label_editor_dialog.dart';
++import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 +import 'package:fluffychat/utils/file_logger.dart';
 +
 +class SettingsPatches extends StatefulWidget {
@@ -2737,20 +2769,173 @@ index 0000000..7124c41
 +          const Divider(),
 +          Padding(
 +            padding: const EdgeInsets.all(16.0),
-+            child: Text(
-+              'Contener Etiquetas personalizadas (Labels)',
-+              style: TextStyle(
-+                color: theme.colorScheme.primary,
-+                fontWeight: FontWeight.bold,
-+              ),
++            child: Row(
++              mainAxisAlignment: MainAxisAlignment.spaceBetween,
++              children: [
++                Text(
++                  'Etiquetas de Beeper (Labels)',
++                  style: TextStyle(
++                    color: theme.colorScheme.primary,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++                IconButton(
++                  icon: const Icon(Icons.add),
++                  tooltip: 'Nueva etiqueta',
++                  onPressed: () async {
++                    final created = await showDialog<bool>(
++                      context: context,
++                      useRootNavigator: false,
++                      builder: (context) => const LabelEditorDialog(),
++                    );
++                    if (created == true && mounted) {
++                      setState(() {});
++                    }
++                  },
++                ),
++              ],
 +            ),
 +          ),
-+          if (tagsList.isEmpty)
-+            const Padding(
-+              padding: EdgeInsets.symmetric(horizontal: 16.0),
-+              child: Text('No tienes etiquetas (u.xxx) creadas todavía.'),
-+            )
-+          else
++          Builder(
++            builder: (context) {
++              final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
++              final hiddenNets = BeeperBridgeUtils.getHiddenNetworks(client);
++
++              final validEntries = beeperLabels.entries
++                  .where((e) => e.key != '_hidden_networks' && e.value is Map && (e.value['title']?.toString().isNotEmpty ?? false))
++                  .toList();
++
++              if (validEntries.isEmpty) {
++                return const Padding(
++                  padding: EdgeInsets.symmetric(horizontal: 16.0),
++                  child: Text('No tienes etiquetas de Beeper creadas actualmente.'),
++                );
++              }
++
++              return Column(
++                children: validEntries.map((entry) {
++                  final uuid = entry.key;
++                  final map = Map<String, dynamic>.from(entry.value as Map);
++                  final title = map['title']?.toString() ?? '';
++                  final emoji = map['emoji']?.toString() ?? '🏷️';
++                  final rooms = (map['rooms'] as List?) ?? [];
++                  final isContained = map['isShownInInbox'] == false;
++
++                  final isHidden = hiddenNets.contains(uuid) ||
++                      hiddenNets.contains(title) ||
++                      hiddenNets.contains(title.toLowerCase());
++
++                  return Card(
++                    margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
++                    child: Padding(
++                      padding: const EdgeInsets.all(8.0),
++                      child: Column(
++                        crossAxisAlignment: CrossAxisAlignment.start,
++                        children: [
++                          ListTile(
++                            leading: CircleAvatar(
++                              backgroundColor: theme.colorScheme.tertiaryContainer,
++                              child: Text(emoji, style: const TextStyle(fontSize: 20)),
++                            ),
++                            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
++                            subtitle: Text('${rooms.length} chats asignados'),
++                            trailing: Row(
++                              mainAxisSize: MainAxisSize.min,
++                              children: [
++                                IconButton(
++                                  icon: const Icon(Icons.edit_outlined),
++                                  tooltip: 'Editar etiqueta',
++                                  onPressed: () async {
++                                    final edited = await showDialog<bool>(
++                                      context: context,
++                                      useRootNavigator: false,
++                                      builder: (context) => LabelEditorDialog(
++                                        labelUuid: uuid,
++                                        initialTitle: title,
++                                        initialEmoji: emoji,
++                                        initialIsShownInInbox: !isContained,
++                                      ),
++                                    );
++                                    if (edited == true && mounted) {
++                                      setState(() {});
++                                    }
++                                  },
++                                ),
++                                IconButton(
++                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
++                                  tooltip: 'Eliminar etiqueta',
++                                  onPressed: () async {
++                                    final confirmed = await showOkCancelAlertDialog(
++                                      context: context,
++                                      title: '¿Eliminar etiqueta?',
++                                      message: '¿Estás seguro de que quieres eliminar "$title"?',
++                                      okLabel: 'Eliminar',
++                                      cancelLabel: 'Cancelar',
++                                      isDestructive: true,
++                                    );
++                                    if (confirmed == OkCancelResult.ok) {
++                                      final labels = Map<String, dynamic>.from(BeeperBridgeUtils.getBeeperLabels(client));
++                                      labels.remove(uuid);
++                                      await BeeperBridgeUtils.setBeeperLabels(client, labels);
++                                      if (mounted) setState(() {});
++                                    }
++                                  },
++                                ),
++                              ],
++                            ),
++                          ),
++                          SwitchListTile.adaptive(
++                            dense: true,
++                            value: isContained,
++                            title: const Text('Contener chats'),
++                            subtitle: const Text('Muestra los chats solo dentro de la etiqueta.'),
++                            onChanged: (val) async {
++                              final labels = Map<String, dynamic>.from(BeeperBridgeUtils.getBeeperLabels(client));
++                              map['isShownInInbox'] = !val;
++                              labels[uuid] = map;
++                              await BeeperBridgeUtils.setBeeperLabels(client, labels);
++                              if (mounted) setState(() {});
++                            },
++                          ),
++                          SwitchListTile.adaptive(
++                            dense: true,
++                            value: isHidden,
++                            title: const Text('Ocultar de la barra lateral'),
++                            subtitle: const Text('Oculta este ícono del menú de la izquierda.'),
++                            onChanged: (val) async {
++                              final newHidden = List<String>.from(hiddenNets);
++                              if (val) {
++                                if (!newHidden.contains(uuid)) newHidden.add(uuid);
++                                if (!newHidden.contains(title)) newHidden.add(title);
++                              } else {
++                                newHidden.remove(uuid);
++                                newHidden.remove(title);
++                                newHidden.remove(title.toLowerCase());
++                              }
++                              await BeeperBridgeUtils.setHiddenNetworks(client, newHidden);
++                              if (mounted) setState(() {});
++                            },
++                          ),
++                        ],
++                      ),
++                    ),
++                  );
++                }).toList(),
++              );
++            },
++          ),
++          if (tagsList.isNotEmpty) ...[
++            const Divider(),
++            Padding(
++              padding: const EdgeInsets.all(16.0),
++              child: Text(
++                'Etiquetas personalizadas Matrix (u.xxx)',
++                style: TextStyle(
++                  color: theme.colorScheme.primary,
++                  fontWeight: FontWeight.bold,
++                ),
++              ),
++            ),
 +            ...tagsList.map((tag) {
 +              final displayName = tag.replaceFirst('u.', '');
 +              final isContained = BeeperBridgeUtils.isTagContained(client, tag);
@@ -2764,6 +2949,7 @@ index 0000000..7124c41
 +                },
 +              );
 +            }),
++          ],
 +        ],
 +      ),
 +    );
@@ -4074,6 +4260,28 @@ index 93fa60d..9dd114f 100644
        subscription.cancel();
        controller.close();
      };
+diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
+index 8ef1126..589b320 100644
+--- a/lib/widgets/avatar.dart
++++ b/lib/widgets/avatar.dart
+@@ -45,9 +45,14 @@ class Avatar extends StatelessWidget {
+     final theme = Theme.of(context);
+ 
+     final name = this.name;
+-    final fallbackLetters = name == null || name.isEmpty
+-        ? '@'
+-        : name.substring(0, 1);
++    final String fallbackLetters;
++    if (name == null || name.trim().isEmpty) {
++      fallbackLetters = '@';
++    } else {
++      final trimmed = name.trim();
++      final chars = trimmed.characters;
++      fallbackLetters = chars.length <= 2 ? trimmed : chars.first;
++    }
+ 
+     final noPic =
+         mxContent == null ||
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
 index 0000000..e0591d3
