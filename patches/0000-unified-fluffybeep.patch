@@ -170,10 +170,18 @@ index 0000000..5f34c85
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..e66380b 100644
+index 7470749..727f261 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -556,7 +556,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -21,6 +21,7 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+ import 'package:fluffychat/pages/chat/utils/web_file_to_x_file.dart';
+ import 'package:fluffychat/pages/chat_details/chat_details.dart';
+ import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:fluffychat/utils/error_reporter.dart';
+ import 'package:fluffychat/utils/file_selector.dart';
+ import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
+@@ -556,7 +557,10 @@ class ChatController extends State<ChatPageWithRoom>
  
    Future<void>? _setReadMarkerFuture;
  
@@ -185,7 +193,7 @@ index 7470749..e66380b 100644
      if (eventId?.isValidMatrixIdStrict() == false) return;
      if (_setReadMarkerFuture != null) return;
      if (_scrolledUp) return;
-@@ -590,6 +593,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -590,6 +594,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -1873,7 +1881,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..b5b48aa 100644
+index a649171..c075b11 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -2061,7 +2069,7 @@ index a649171..b5b48aa 100644
 +                  labels.remove(uuid);
 +                  await BeeperBridgeUtils.setBeeperLabels(client, labels);
 +                  navigator.pop();
-+                  setState(() {});
++                  if (mounted) setState(() {});
 +                }
 +              },
 +            ),
