@@ -1151,7 +1151,7 @@ index 6ceba8b..cddcf2b 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..bc3458b 100644
+index 8610b92..7a60e50 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -1434,12 +1434,9 @@ index 8610b92..bc3458b 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
-@@ -243,12 +345,12 @@ class ChatListViewBody extends StatelessWidget {
-                     return ChatListItem(
-                       room,
+@@ -245,10 +347,10 @@ class ChatListViewBody extends StatelessWidget {
                        space: space,
--                      key: Key('chat_list_item_${room.id}'),
-+                      key: ValueKey(room.id),
+                       key: Key('chat_list_item_${room.id}'),
                        filter: filter,
 -                      onTap: () => controller.onChatTap(room),
 +                      onTap: () => widget.controller.onChatTap(room),
@@ -4543,18 +4540,10 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..4b407db 100644
+index f9b2df0..1a394d6 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
-@@ -3,6 +3,7 @@
- //
- // SPDX-License-Identifier: AGPL-3.0-or-later
- 
-+import 'dart:collection';
- import 'dart:io';
- import 'dart:math';
- import 'dart:typed_data';
-@@ -32,8 +33,17 @@ class MxcImage extends StatefulWidget {
+@@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
    final Client? client;
    final BorderRadius borderRadius;
  
@@ -4573,36 +4562,34 @@ index f9b2df0..4b407db 100644
  
    const MxcImage({
      this.uri,
-@@ -59,23 +69,63 @@ class MxcImage extends StatefulWidget {
+@@ -59,23 +68,62 @@ class MxcImage extends StatefulWidget {
    State<MxcImage> createState() => _MxcImageState();
  }
  
 +class _LruMemoryCache {
-+  final LinkedHashMap<String, Uint8List> _map = LinkedHashMap<String, Uint8List>();
++  final Map<String, Uint8List> _map = {};
++  final List<String> _keysOrder = [];
 +  int _currentSizeBytes = 0;
 +  static const int _maxSizeBytes = 30 * 1024 * 1024; // 30 MB
 +
 +  Uint8List? get(String key) {
-+    final value = _map.remove(key);
-+    if (value != null) {
-+      _map[key] = value;
-+      return value;
-+    }
-+    return null;
++    if (!_map.containsKey(key)) return null;
++    _keysOrder.remove(key);
++    _keysOrder.add(key);
++    return _map[key];
 +  }
 +
 +  void put(String key, Uint8List val) {
 +    if (_map.containsKey(key)) {
-+      final oldVal = _map.remove(key);
-+      if (oldVal != null) {
-+        _currentSizeBytes -= oldVal.length;
-+      }
++      _currentSizeBytes -= _map[key]!.length;
++      _keysOrder.remove(key);
 +    }
 +    _map[key] = val;
++    _keysOrder.add(key);
 +    _currentSizeBytes += val.length;
 +
-+    while (_currentSizeBytes > _maxSizeBytes && _map.isNotEmpty) {
-+      final oldestKey = _map.keys.first;
++    while (_currentSizeBytes > _maxSizeBytes && _keysOrder.isNotEmpty) {
++      final oldestKey = _keysOrder.removeAt(0);
 +      final removedVal = _map.remove(oldestKey);
 +      if (removedVal != null) {
 +        _currentSizeBytes -= removedVal.length;
@@ -4612,6 +4599,7 @@ index f9b2df0..4b407db 100644
 +
 +  void clear() {
 +    _map.clear();
++    _keysOrder.clear();
 +    _currentSizeBytes = 0;
 +  }
 +}
@@ -4644,7 +4632,7 @@ index f9b2df0..4b407db 100644
    }
  
    Future<void> _load() async {
-@@ -144,7 +194,9 @@ class _MxcImageState extends State<MxcImage> {
+@@ -144,7 +192,9 @@ class _MxcImageState extends State<MxcImage> {
    @override
    void initState() {
      super.initState();
