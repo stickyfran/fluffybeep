@@ -448,7 +448,7 @@ index 9dd1bde..b3f9722 100644
      final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
      final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..5c745e6 100644
+index 930de3b..2be4f6c 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -89,6 +89,7 @@ class Message extends StatelessWidget {
@@ -489,23 +489,7 @@ index 930de3b..5c745e6 100644
                                          return ConstrainedBox(
                                            constraints: BoxConstraints(
                                              maxWidth: 200,
-@@ -884,7 +881,6 @@ class BubbleBackground extends StatelessWidget {
-     if (ignore) return child;
-     return CustomPaint(
-       painter: BubblePainter(
--        repaint: scrollController,
-         colors: colors,
-         context: context,
-       ),
-@@ -897,7 +893,6 @@ class BubblePainter extends CustomPainter {
-   BubblePainter({
-     required this.context,
-     required this.colors,
--    required super.repaint,
-   });
- 
-   final BuildContext context;
-@@ -907,9 +902,19 @@ class BubblePainter extends CustomPainter {
+@@ -907,9 +904,19 @@ class BubblePainter extends CustomPainter {
    @override
    void paint(Canvas canvas, Size size) {
      final scrollable = _scrollable ??= Scrollable.of(context);
@@ -527,7 +511,7 @@ index 930de3b..5c745e6 100644
  
      final origin = bubbleBox.localToGlobal(
        Offset.zero,
-@@ -929,10 +934,7 @@ class BubblePainter extends CustomPainter {
+@@ -929,10 +936,7 @@ class BubblePainter extends CustomPainter {
  
    @override
    bool shouldRepaint(BubblePainter oldDelegate) {
