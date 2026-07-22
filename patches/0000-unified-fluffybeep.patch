@@ -4723,7 +4723,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..61047ff 100644
+index e90e649..211c335 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4734,7 +4734,7 @@ index e90e649..61047ff 100644
  
  const notificationAvatarDimension = 128;
  final Map<String, DateTime> lastReceivedPushNotification = {};
-@@ -119,12 +120,25 @@ Future<void> _tryPushHelper(
+@@ -119,12 +120,39 @@ Future<void> _tryPushHelper(
  
    lastReceivedPushNotification[client.clientName] = DateTime.now();
  
@@ -4751,8 +4751,23 @@ index e90e649..61047ff 100644
 +    Logs().v('[PushCrypto] Main isolate active, skipping background oneShotSync to protect Olm session');
 +  }
 +
++  final safeNotification = PushNotification(
++    content: null,
++    counts: notification.counts,
++    devices: notification.devices,
++    eventId: notification.eventId,
++    prio: notification.prio,
++    roomAlias: notification.roomAlias,
++    roomId: notification.roomId,
++    roomName: notification.roomName,
++    sender: notification.sender,
++    senderDisplayName: notification.senderDisplayName,
++    type: notification.type,
++  );
++
    final event = await client.getEventByPushNotification(
-     notification,
+-    notification,
++    safeNotification,
      storeInDatabase: false,
    );
  
@@ -4761,7 +4776,7 @@ index e90e649..61047ff 100644
    l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
  
    updateAppBadge(notification.counts?.unread ?? 0);
-@@ -166,7 +180,18 @@ Future<void> _tryPushHelper(
+@@ -166,7 +194,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
  
@@ -4781,7 +4796,7 @@ index e90e649..61047ff 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
-@@ -247,12 +272,13 @@ Future<void> _tryPushHelper(
+@@ -247,12 +286,13 @@ Future<void> _tryPushHelper(
        : null;
    messagingStyleInformation?.messages?.add(newMessage);
  
@@ -4798,7 +4813,7 @@ index e90e649..61047ff 100644
  
    final messageRooms = AndroidNotificationChannelGroup(
      notificationGroupId,
-@@ -291,14 +317,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +331,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -4816,7 +4831,7 @@ index e90e649..61047ff 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -338,7 +364,7 @@ Future<void> _tryPushHelper(
+@@ -338,7 +378,7 @@ Future<void> _tryPushHelper(
      iOS: iOSPlatformChannelSpecifics,
    );
  
@@ -4825,7 +4840,7 @@ index e90e649..61047ff 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +392,14 @@ Future<void> _tryPushHelper(
+@@ -366,6 +406,14 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
