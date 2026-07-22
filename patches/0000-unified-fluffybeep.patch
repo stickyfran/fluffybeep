@@ -170,10 +170,36 @@ index 0000000..5f34c85
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..4fca235 100644
+index 7470749..0437639 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -590,6 +590,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -199,6 +199,10 @@ class ChatController extends State<ChatPageWithRoom>
+     selectedEvents.clear();
+   });
+ 
++  static final Set<String> _staticBigEmojis = defaultEmojiSet
++      .expand((cat) => cat.emoji.map((e) => e.emoji))
++      .toSet();
++
+   void closeThread() => setState(() {
+     activeThreadId = null;
+     selectedEvents.clear();
+@@ -395,13 +399,7 @@ class ChatController extends State<ChatPageWithRoom>
+       AppSettings.displayChatDetailsColumn.value,
+     );
+ 
+-    bigEmojis = defaultEmojiSet.fold(
+-      <String>{},
+-      (emojis, category) => {
+-        ...emojis,
+-        ...(category.emoji.map((emoji) => emoji.emoji)),
+-      },
+-    );
++    bigEmojis = _staticBigEmojis;
+ 
+     sendingClient = Matrix.of(context).client;
+     final lastEventThreadId =
+@@ -590,6 +588,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -241,6 +267,82 @@ index 6305f45..80e70f6 100644
                  StreamBuilder(
                    stream: room.client.onSyncStatus.stream,
                    builder: (context, snapshot) {
+diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
+index 0022f82..2ccba54 100644
+--- a/lib/pages/chat/chat_event_list.dart
++++ b/lib/pages/chat/chat_event_list.dart
+@@ -23,13 +23,49 @@ import 'package:scroll_to_index/scroll_to_index.dart';
+ import '../../config/app_config.dart';
+ import '../../utils/date_time_extension.dart';
+ 
+-class ChatEventList extends StatelessWidget {
++class ChatEventList extends StatefulWidget {
+   final ChatController controller;
+ 
+   const ChatEventList({super.key, required this.controller});
+ 
++  @override
++  State<ChatEventList> createState() => _ChatEventListState();
++}
++
++class _ChatEventListState extends State<ChatEventList> {
++  List<Event>? _cachedEvents;
++  Map<String, int>? _cachedKeyMap;
++  int? _lastEventsLength;
++  String? _lastThreadId;
++  Timeline? _lastTimeline;
++
++  (List<Event>, Map<String, int>) _getEventsAndKeyMap(Timeline timeline, String? threadId) {
++    if (_lastTimeline == timeline &&
++        _lastEventsLength == timeline.events.length &&
++        _lastThreadId == threadId &&
++        _cachedEvents != null &&
++        _cachedKeyMap != null) {
++      return (_cachedEvents!, _cachedKeyMap!);
++    }
++
++    _lastTimeline = timeline;
++    _lastEventsLength = timeline.events.length;
++    _lastThreadId = threadId;
++
++    final events = timeline.events.filterByVisibleInGui(threadId: threadId);
++    final keyMap = <String, int>{};
++    for (var i = 0; i < events.length; i++) {
++      keyMap[events[i].eventId] = i;
++    }
++
++    _cachedEvents = events;
++    _cachedKeyMap = keyMap;
++    return (events, keyMap);
++  }
++
+   @override
+   Widget build(BuildContext context) {
++    final controller = widget.controller;
+     final timeline = controller.timeline;
+ 
+     if (timeline == null) {
+@@ -41,17 +77,11 @@ class ChatEventList extends StatelessWidget {
+ 
+     final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
+ 
+-    final events = timeline.events.filterByVisibleInGui(
+-      threadId: controller.activeThreadId,
++    final (events, thisEventsKeyMap) = _getEventsAndKeyMap(
++      timeline,
++      controller.activeThreadId,
+     );
+ 
+-    // create a map of eventId --> index to greatly improve performance of
+-    // ListView's findChildIndexCallback
+-    final thisEventsKeyMap = <String, int>{};
+-    for (var i = 0; i < events.length; i++) {
+-      thisEventsKeyMap[events[i].eventId] = i;
+-    }
+-
+     final hasWallpaper =
+         controller.room.client.applicationAccountConfig.wallpaperUrl != null;
+ 
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
 index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
@@ -306,8 +408,47 @@ index 731cc94..7c330e1 100644
            ListTile(
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
+diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
+index 9dd1bde..b3f9722 100644
+--- a/lib/pages/chat/events/html_message.dart
++++ b/lib/pages/chat/events/html_message.dart
+@@ -21,8 +21,25 @@ import 'package:html/parser.dart' as parser;
+ import 'package:matrix/matrix.dart';
+ 
+ import '../../../utils/url_launcher.dart';
++import 'dart:collection';
+ 
+ class HtmlMessage extends StatelessWidget {
++  static final _elementCache = LinkedHashMap<String, dom.Element>();
++  static const _maxCacheEntries = 200;
++
++  static dom.Element _getCachedElement(String html) {
++    final cached = _elementCache.remove(html);
++    if (cached != null) {
++      _elementCache[html] = cached;
++      return cached;
++    }
++    final parsed = parser.parse(html).body ?? dom.Element.html('');
++    _elementCache[html] = parsed;
++    while (_elementCache.length > _maxCacheEntries) {
++      _elementCache.remove(_elementCache.keys.first);
++    }
++    return parsed;
++  }
+   final String html;
+   final Room room;
+   final Color textColor;
+@@ -584,7 +601,7 @@ class HtmlMessage extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final element = parser.parse(html).body ?? dom.Element.html('');
++    final element = _getCachedElement(html);
+     final configuredMaxLines = AppSettings.messagePreviewMaxLines.value;
+     final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
+     final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..faed57c 100644
+index 930de3b..5c745e6 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -89,6 +89,7 @@ class Message extends StatelessWidget {
@@ -318,6 +459,86 @@ index 930de3b..faed57c 100644
      }.contains(event.type)) {
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
+@@ -293,10 +294,9 @@ class Message extends StatelessWidget {
+                       else if (nextEventSameSender || ownMessage)
+                         SizedBox(width: avatarSize)
+                       else
+-                        FutureBuilder<User?>(
+-                          future: event.fetchSenderUser(),
+-                          builder: (context, snapshot) {
+-                            final user = snapshot.data ?? sender;
++                        Builder(
++                          builder: (context) {
++                            final user = event.senderFromMemoryOrFallback;
+                             return Avatar(
+                               mxContent: user.avatarUrl,
+                               name: user.calcDisplayname(),
+@@ -344,12 +344,9 @@ class Message extends StatelessWidget {
+                                       ),
+                                     ),
+                                   if ((!nextEventSameSender) && !ownMessage)
+-                                    FutureBuilder<User?>(
+-                                      future: event.fetchSenderUser(),
+-                                      builder: (context, snapshot) {
+-                                        final displayname =
+-                                            snapshot.data?.calcDisplayname() ??
+-                                            sender.calcDisplayname();
++                                    Builder(
++                                      builder: (context) {
++                                        final displayname = event.senderFromMemoryOrFallback.calcDisplayname();
+                                         return ConstrainedBox(
+                                           constraints: BoxConstraints(
+                                             maxWidth: 200,
+@@ -884,7 +881,6 @@ class BubbleBackground extends StatelessWidget {
+     if (ignore) return child;
+     return CustomPaint(
+       painter: BubblePainter(
+-        repaint: scrollController,
+         colors: colors,
+         context: context,
+       ),
+@@ -897,7 +893,6 @@ class BubblePainter extends CustomPainter {
+   BubblePainter({
+     required this.context,
+     required this.colors,
+-    required super.repaint,
+   });
+ 
+   final BuildContext context;
+@@ -907,9 +902,19 @@ class BubblePainter extends CustomPainter {
+   @override
+   void paint(Canvas canvas, Size size) {
+     final scrollable = _scrollable ??= Scrollable.of(context);
+-    final scrollableBox = scrollable.context.findRenderObject() as RenderBox;
++    final scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
++    if (scrollableBox == null || !scrollableBox.attached) {
++      final paint = Paint()..color = colors.first;
++      canvas.drawRect(Offset.zero & size, paint);
++      return;
++    }
+     final scrollableRect = Offset.zero & scrollableBox.size;
+-    final bubbleBox = context.findRenderObject() as RenderBox;
++    final bubbleBox = context.findRenderObject() as RenderBox?;
++    if (bubbleBox == null || !bubbleBox.attached) {
++      final paint = Paint()..color = colors.first;
++      canvas.drawRect(Offset.zero & size, paint);
++      return;
++    }
+ 
+     final origin = bubbleBox.localToGlobal(
+       Offset.zero,
+@@ -929,10 +934,7 @@ class BubblePainter extends CustomPainter {
+ 
+   @override
+   bool shouldRepaint(BubblePainter oldDelegate) {
+-    final scrollable = Scrollable.of(context);
+-    final oldScrollable = _scrollable;
+-    _scrollable = scrollable;
+-    return scrollable.position != oldScrollable?.position;
++    return oldDelegate.colors != colors;
+   }
+ }
+ 
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
 index 91fffa0..e2e633f 100644
 --- a/lib/pages/chat/events/message_content.dart
@@ -1151,7 +1372,7 @@ index 6ceba8b..cddcf2b 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..7a60e50 100644
+index 8610b92..bc3458b 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -1434,9 +1655,12 @@ index 8610b92..7a60e50 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
-@@ -245,10 +347,10 @@ class ChatListViewBody extends StatelessWidget {
+@@ -243,12 +345,12 @@ class ChatListViewBody extends StatelessWidget {
+                     return ChatListItem(
+                       room,
                        space: space,
-                       key: Key('chat_list_item_${room.id}'),
+-                      key: Key('chat_list_item_${room.id}'),
++                      key: ValueKey(room.id),
                        filter: filter,
 -                      onTap: () => controller.onChatTap(room),
 +                      onTap: () => widget.controller.onChatTap(room),
@@ -1449,7 +1673,7 @@ index 8610b92..7a60e50 100644
                    },
                  ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..c1505e7 100644
+index 55d1d7e..e0aa844 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -1460,7 +1684,7 @@ index 55d1d7e..c1505e7 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -42,28 +43,30 @@ class ChatListItem extends StatelessWidget {
+@@ -42,30 +43,33 @@ class ChatListItem extends StatelessWidget {
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
  
@@ -1497,9 +1721,13 @@ index 55d1d7e..c1505e7 100644
 +    final space = isBeeperFakeDM ? null : this.space;
 +    final mxContent = beeperData.avatarUrl;
  
-     return Padding(
+-    return Padding(
++    return RepaintBoundary(
++      child: Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-@@ -145,7 +148,7 @@ class ChatListItem extends StatelessWidget {
+       child: Material(
+         borderRadius: BorderRadius.circular(AppConfig.borderRadius),
+@@ -145,7 +149,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
@@ -3247,10 +3475,10 @@ index 5ead47d..f19a23e 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..962894e
+index 0000000..6178b7f
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,772 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -3763,22 +3991,53 @@ index 0000000..962894e
 +    }
 +  }
 +
++  static Map<String, dynamic>? _cachedLabelsMap;
++  static int? _cachedLabelsHash;
++  static Set<String>? _hiddenRoomIdsCache;
++
 +  /// Get all Beeper labels from Account Data.
 +  static Map<String, dynamic> getBeeperLabels(Client client) {
 +    try {
 +      final accountDataEvent = client.accountData['com.beeper.labels'];
-+      if (accountDataEvent != null && accountDataEvent.content is Map) {
-+        return Map<String, dynamic>.from(accountDataEvent.content);
++      final content = accountDataEvent?.content;
++      final hash = content.hashCode;
++      if (_cachedLabelsHash == hash && _cachedLabelsMap != null) {
++        return _cachedLabelsMap!;
++      }
++      if (content is Map) {
++        _cachedLabelsMap = Map<String, dynamic>.from(content);
++        _cachedLabelsHash = hash;
++        
++        final hiddenSet = <String>{};
++        for (final entry in _cachedLabelsMap!.entries) {
++          final val = entry.value;
++          if (val is Map && val['isShownInInbox'] == false) {
++            final rooms = val['rooms'];
++            if (rooms is List) {
++              for (final r in rooms) {
++                if (r is String) hiddenSet.add(r);
++              }
++            }
++          }
++        }
++        _hiddenRoomIdsCache = hiddenSet;
++        return _cachedLabelsMap!;
 +      }
 +    } catch (e) {
 +      Logs().e('Error reading com.beeper.labels: $e');
 +    }
++    _cachedLabelsMap = {};
++    _cachedLabelsHash = null;
++    _hiddenRoomIdsCache = {};
 +    return {};
 +  }
 +
 +  /// Save Beeper labels map to Account Data.
 +  static Future<void> setBeeperLabels(Client client, Map<String, dynamic> labels) async {
 +    try {
++      _cachedLabelsMap = null;
++      _cachedLabelsHash = null;
++      _hiddenRoomIdsCache = null;
 +      await client.setAccountData(
 +        client.userID!,
 +        'com.beeper.labels',
@@ -3791,20 +4050,8 @@ index 0000000..962894e
 +
 +  /// Check if a room is hidden from the main inbox due to a label with isShownInInbox = false.
 +  static bool isRoomHiddenInInbox(Client client, String roomId) {
-+    final labels = getBeeperLabels(client);
-+    for (final entry in labels.entries) {
-+      final val = entry.value;
-+      if (val is Map) {
-+        final isShown = val['isShownInInbox'];
-+        if (isShown == false) {
-+          final rooms = val['rooms'];
-+          if (rooms is List && rooms.contains(roomId)) {
-+            return true;
-+          }
-+        }
-+      }
-+    }
-+    return false;
++    getBeeperLabels(client);
++    return _hiddenRoomIdsCache?.contains(roomId) ?? false;
 +  }
 +
 +  /// Helper to get hidden networks using a special '_hidden_networks' key in Beeper labels.
@@ -4521,10 +4768,18 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..1a394d6 100644
+index f9b2df0..4b407db 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
-@@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
+@@ -3,6 +3,7 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
++import 'dart:collection';
+ import 'dart:io';
+ import 'dart:math';
+ import 'dart:typed_data';
+@@ -32,8 +33,17 @@ class MxcImage extends StatefulWidget {
    final Client? client;
    final BorderRadius borderRadius;
  
@@ -4543,34 +4798,36 @@ index f9b2df0..1a394d6 100644
  
    const MxcImage({
      this.uri,
-@@ -59,23 +68,62 @@ class MxcImage extends StatefulWidget {
+@@ -59,23 +69,63 @@ class MxcImage extends StatefulWidget {
    State<MxcImage> createState() => _MxcImageState();
  }
  
 +class _LruMemoryCache {
-+  final Map<String, Uint8List> _map = {};
-+  final List<String> _keysOrder = [];
++  final LinkedHashMap<String, Uint8List> _map = LinkedHashMap<String, Uint8List>();
 +  int _currentSizeBytes = 0;
 +  static const int _maxSizeBytes = 30 * 1024 * 1024; // 30 MB
 +
 +  Uint8List? get(String key) {
-+    if (!_map.containsKey(key)) return null;
-+    _keysOrder.remove(key);
-+    _keysOrder.add(key);
-+    return _map[key];
++    final value = _map.remove(key);
++    if (value != null) {
++      _map[key] = value;
++      return value;
++    }
++    return null;
 +  }
 +
 +  void put(String key, Uint8List val) {
 +    if (_map.containsKey(key)) {
-+      _currentSizeBytes -= _map[key]!.length;
-+      _keysOrder.remove(key);
++      final oldVal = _map.remove(key);
++      if (oldVal != null) {
++        _currentSizeBytes -= oldVal.length;
++      }
 +    }
 +    _map[key] = val;
-+    _keysOrder.add(key);
 +    _currentSizeBytes += val.length;
 +
-+    while (_currentSizeBytes > _maxSizeBytes && _keysOrder.isNotEmpty) {
-+      final oldestKey = _keysOrder.removeAt(0);
++    while (_currentSizeBytes > _maxSizeBytes && _map.isNotEmpty) {
++      final oldestKey = _map.keys.first;
 +      final removedVal = _map.remove(oldestKey);
 +      if (removedVal != null) {
 +        _currentSizeBytes -= removedVal.length;
@@ -4580,7 +4837,6 @@ index f9b2df0..1a394d6 100644
 +
 +  void clear() {
 +    _map.clear();
-+    _keysOrder.clear();
 +    _currentSizeBytes = 0;
 +  }
 +}
@@ -4613,7 +4869,7 @@ index f9b2df0..1a394d6 100644
    }
  
    Future<void> _load() async {
-@@ -144,7 +192,9 @@ class _MxcImageState extends State<MxcImage> {
+@@ -144,7 +194,9 @@ class _MxcImageState extends State<MxcImage> {
    @override
    void initState() {
      super.initState();
