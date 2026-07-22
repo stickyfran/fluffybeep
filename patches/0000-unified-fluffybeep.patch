@@ -268,10 +268,10 @@ index 6305f45..80e70f6 100644
                    stream: room.client.onSyncStatus.stream,
                    builder: (context, snapshot) {
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..2ccba54 100644
+index 0022f82..3269d41 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -23,13 +23,49 @@ import 'package:scroll_to_index/scroll_to_index.dart';
+@@ -23,13 +23,55 @@ import 'package:scroll_to_index/scroll_to_index.dart';
  import '../../config/app_config.dart';
  import '../../utils/date_time_extension.dart';
  
@@ -285,6 +285,12 @@ index 0022f82..2ccba54 100644
 +  State<ChatEventList> createState() => _ChatEventListState();
 +}
 +
++class _EventsAndKeyMap {
++  final List<Event> events;
++  final Map<String, int> keyMap;
++  _EventsAndKeyMap(this.events, this.keyMap);
++}
++
 +class _ChatEventListState extends State<ChatEventList> {
 +  List<Event>? _cachedEvents;
 +  Map<String, int>? _cachedKeyMap;
@@ -292,13 +298,13 @@ index 0022f82..2ccba54 100644
 +  String? _lastThreadId;
 +  Timeline? _lastTimeline;
 +
-+  (List<Event>, Map<String, int>) _getEventsAndKeyMap(Timeline timeline, String? threadId) {
++  _EventsAndKeyMap _getEventsAndKeyMap(Timeline timeline, String? threadId) {
 +    if (_lastTimeline == timeline &&
 +        _lastEventsLength == timeline.events.length &&
 +        _lastThreadId == threadId &&
 +        _cachedEvents != null &&
 +        _cachedKeyMap != null) {
-+      return (_cachedEvents!, _cachedKeyMap!);
++      return _EventsAndKeyMap(_cachedEvents!, _cachedKeyMap!);
 +    }
 +
 +    _lastTimeline = timeline;
@@ -313,7 +319,7 @@ index 0022f82..2ccba54 100644
 +
 +    _cachedEvents = events;
 +    _cachedKeyMap = keyMap;
-+    return (events, keyMap);
++    return _EventsAndKeyMap(events, keyMap);
 +  }
 +
    @override
@@ -322,27 +328,28 @@ index 0022f82..2ccba54 100644
      final timeline = controller.timeline;
  
      if (timeline == null) {
-@@ -41,17 +77,11 @@ class ChatEventList extends StatelessWidget {
+@@ -41,16 +83,12 @@ class ChatEventList extends StatelessWidget {
  
      final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
  
 -    final events = timeline.events.filterByVisibleInGui(
 -      threadId: controller.activeThreadId,
-+    final (events, thisEventsKeyMap) = _getEventsAndKeyMap(
++    final result = _getEventsAndKeyMap(
 +      timeline,
 +      controller.activeThreadId,
      );
- 
+-
 -    // create a map of eventId --> index to greatly improve performance of
 -    // ListView's findChildIndexCallback
 -    final thisEventsKeyMap = <String, int>{};
 -    for (var i = 0; i < events.length; i++) {
 -      thisEventsKeyMap[events[i].eventId] = i;
 -    }
--
++    final events = result.events;
++    final thisEventsKeyMap = result.keyMap;
+ 
      final hasWallpaper =
          controller.room.client.applicationAccountConfig.wallpaperUrl != null;
- 
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
 index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
