@@ -41,14 +41,15 @@ index c1b5b91..4d95180 100644
                        pageBuilder: (context, state) => defaultPageBuilder(
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000..5f34c85
+index 0000000..d2bfaac
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,132 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
++import 'package:fluffychat/widgets/cache_refresh_overlay.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +
 +class BeeperReinitController {
@@ -131,23 +132,30 @@ index 0000000..5f34c85
 +      await client.clearCache();
 +      final prefs = await SharedPreferences.getInstance();
 +      await prefs.setBool('beeper_needs_cache_refresh', true);
-+      await Future.delayed(const Duration(milliseconds: 500));
 +      overlay.remove();
++
 +      if (context.mounted) {
-+        showDialog(
-+          context: context,
-+          barrierDismissible: false,
-+          builder: (context) => AlertDialog(
-+            title: const Text('Caché limpiada'),
-+            content: const Text('Para descargar el historial completo de Beeper, CIERRA ESTA APLICACIÓN forzadamente desde las tareas recientes de tu celular y vuelve a abrirla.'),
-+            actions: [
-+              TextButton(
-+                onPressed: () => Navigator.of(context).pop(),
-+                child: const Text('Entendido'),
-+              ),
-+            ],
++        // Mount CacheRefreshOverlay directly in the running app's overlay.
++        late OverlayEntry refreshOverlayEntry;
++        refreshOverlayEntry = OverlayEntry(
++          builder: (overlayContext) => CacheRefreshOverlay(
++            client: client,
++            store: prefs,
++            onCompleted: () {
++              refreshOverlayEntry.remove();
++              if (context.mounted) {
++                ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(
++                    content: Text('Sincronización de Beeper completada con éxito.'),
++                    duration: Duration(seconds: 3),
++                  ),
++                );
++              }
++            },
++            child: const SizedBox.shrink(),
 +          ),
 +        );
++        Overlay.of(context).insert(refreshOverlayEntry);
 +      }
 +    } catch (e) {
 +      overlay.remove();
@@ -4892,10 +4900,10 @@ index 8ef1126..589b320 100644
          mxContent == null ||
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..e0591d3
+index 0000000..a2b049d
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,236 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -4903,16 +4911,19 @@ index 0000000..e0591d3
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
++import 'package:wakelock_plus/wakelock_plus.dart';
 +
 +class CacheRefreshOverlay extends StatefulWidget {
 +  final Client client;
 +  final SharedPreferences store;
 +  final Widget child;
++  final VoidCallback? onCompleted;
 +
 +  const CacheRefreshOverlay({
 +    required this.client,
 +    required this.store,
 +    required this.child,
++    this.onCompleted,
 +    super.key,
 +  });
 +
@@ -4922,6 +4933,7 @@ index 0000000..e0591d3
 +
 +class _CacheRefreshOverlayState extends State<CacheRefreshOverlay> {
 +  bool _completed = false;
++  bool _fullscreenDismissed = false;
 +  int _processedRooms = 0;
 +  int _totalRooms = 0;
 +  String _currentRoomName = '';
@@ -4981,16 +4993,29 @@ index 0000000..e0591d3
 +            _processedRooms += batch.length;
 +          });
 +        }
++
++        // Once we process at least 30 rooms (or all of them if less),
++        // dismiss the fullscreen overlay and enable the wakelock to prevent suspension.
++        if (!_fullscreenDismissed && (_processedRooms >= 30 || _processedRooms >= rooms.length)) {
++          WakelockPlus.enable().catchError((_) {});
++          if (mounted) {
++            setState(() {
++              _fullscreenDismissed = true;
++            });
++          }
++        }
 +      }
 +    } catch (e) {
 +      debugPrint('Error during prewarming cache: $e');
 +    } finally {
++      WakelockPlus.disable().catchError((_) {});
 +      if (mounted) {
 +        final prefs = await SharedPreferences.getInstance();
 +        await prefs.setBool('beeper_needs_cache_refresh', false);
 +        setState(() {
 +          _completed = true;
 +        });
++        widget.onCompleted?.call();
 +      }
 +    }
 +  }
@@ -5002,8 +5027,8 @@ index 0000000..e0591d3
 +        // Always build the main app child first in the background
 +        widget.child,
 +
-+        // If not completed, display the progress overlay on top
-+        if (!_completed)
++        // If not completed and fullscreen not dismissed, display the progress overlay on top
++        if (!_completed && !_fullscreenDismissed)
 +          Positioned.fill(
 +            child: Scaffold(
 +              backgroundColor: Colors.black.withOpacity(0.9),
@@ -5050,6 +5075,61 @@ index 0000000..e0591d3
 +                          overflow: TextOverflow.ellipsis,
 +                        ),
 +                      ],
++                    ],
++                  ),
++                ),
++              ),
++            ),
++          ),
++
++        // If fullscreen is dismissed but not completed, show a small floating progress indicator
++        if (!_completed && _fullscreenDismissed)
++          Positioned(
++            bottom: 16,
++            left: 16,
++            right: 16,
++            child: SafeArea(
++              child: Card(
++                elevation: 6,
++                color: Theme.of(context).cardColor,
++                child: Padding(
++                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
++                  child: Row(
++                    children: [
++                      const SizedBox(
++                        width: 20,
++                        height: 20,
++                        child: CircularProgressIndicator(
++                          strokeWidth: 2,
++                        ),
++                      ),
++                      const SizedBox(width: 16),
++                      Expanded(
++                        child: Column(
++                          crossAxisAlignment: CrossAxisAlignment.start,
++                          mainAxisSize: MainAxisSize.min,
++                          children: [
++                            Text(
++                              'Sincronizando chats de Beeper...',
++                              style: TextStyle(
++                                fontWeight: FontWeight.bold,
++                                fontSize: 13,
++                                color: Theme.of(context).textTheme.bodyLarge?.color,
++                              ),
++                            ),
++                            const SizedBox(height: 2),
++                            Text(
++                              'Procesados $_processedRooms de $_totalRooms ($_currentRoomName)',
++                              style: TextStyle(
++                                fontSize: 11,
++                                color: Theme.of(context).textTheme.bodySmall?.color,
++                              ),
++                              maxLines: 1,
++                              overflow: TextOverflow.ellipsis,
++                            ),
++                          ],
++                        ),
++                      ),
 +                    ],
 +                  ),
 +                ),
