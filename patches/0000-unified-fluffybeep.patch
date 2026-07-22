@@ -170,10 +170,22 @@ index 0000000..5f34c85
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..4fca235 100644
+index 7470749..e66380b 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -590,6 +590,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -556,7 +556,10 @@ class ChatController extends State<ChatPageWithRoom>
+ 
+   Future<void>? _setReadMarkerFuture;
+ 
+-  void setReadMarker({String? eventId}) {
++  void setReadMarker({String? eventId, bool force = false}) {
++    if (!force && (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false)) {
++      return;
++    }
+     if (eventId?.isValidMatrixIdStrict() == false) return;
+     if (_setReadMarkerFuture != null) return;
+     if (_scrolledUp) return;
+@@ -590,6 +593,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -241,6 +253,19 @@ index 6305f45..80e70f6 100644
                  StreamBuilder(
                    stream: room.client.onSyncStatus.stream,
                    builder: (context, snapshot) {
+diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
+index 0022f82..515fe3a 100644
+--- a/lib/pages/chat/chat_event_list.dart
++++ b/lib/pages/chat/chat_event_list.dart
+@@ -97,7 +97,7 @@ class ChatEventList extends StatelessWidget {
+                   children: [
+                     if (events.isNotEmpty) SeenByRow(event: events.first),
+                     TypingIndicators(controller),
+-                    EncryptionInfo(room: controller.room),
++                    EncryptionInfo(room: controller.room, controller: controller),
+                   ],
+                 );
+               }
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
 index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
@@ -276,6 +301,177 @@ index ae1b35f..ab67799 100644
                            if (controller.canSaveSelectedEvent)
                              PopupMenuItem(
                                onTap: () =>
+diff --git a/lib/pages/chat/encrpytion_info.dart b/lib/pages/chat/encrpytion_info.dart
+index c6d2f0b..d002331 100644
+--- a/lib/pages/chat/encrpytion_info.dart
++++ b/lib/pages/chat/encrpytion_info.dart
+@@ -5,103 +5,83 @@
+ 
+ import 'package:fluffychat/config/app_config.dart';
+ import 'package:fluffychat/config/themes.dart';
+-import 'package:fluffychat/l10n/l10n.dart';
+-import 'package:flutter/gestures.dart';
++import 'package:fluffychat/pages/chat/chat.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:flutter/material.dart';
+-import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+-class EncryptionInfo extends StatelessWidget {
++class EncryptionInfo extends StatefulWidget {
+   final Room room;
++  final ChatController? controller;
+ 
+-  const EncryptionInfo({super.key, required this.room});
++  const EncryptionInfo({super.key, required this.room, this.controller});
+ 
+-  Future<int> _unverifiedDevices() async {
+-    if (!room.encrypted) return 0;
+-    final users = await room.requestParticipants();
+-    final devicesKeysLists = users
+-        .map((user) => room.client.userDeviceKeys[user.id])
+-        .nonNulls;
+-    final devices = devicesKeysLists.fold<List<DeviceKeys>>(
+-      [],
+-      (devices, devicesKeysList) => [
+-        ...devices,
+-        ...devicesKeysList.deviceKeys.values,
+-      ],
+-    );
+-    return devices
+-        .where(
+-          (device) =>
+-              !device.verified &&
+-              !device.blocked &&
+-              !device.hasValidSignatureChain(verifiedByTheirMasterKey: true) &&
+-              device.encryptToDevice,
+-        )
+-        .length;
+-  }
++  @override
++  State<EncryptionInfo> createState() => _EncryptionInfoState();
++}
++
++class _EncryptionInfoState extends State<EncryptionInfo> {
++  bool _markedReadLocal = false;
+ 
+   @override
+   Widget build(BuildContext context) {
++    final manualRead = BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false;
+     final theme = Theme.of(context);
+-    return AnimatedSize(
+-      duration: FluffyThemes.animationDuration,
+-      curve: FluffyThemes.animationCurve,
+-      child: FutureBuilder(
+-        future: _unverifiedDevices(),
+-        builder: (context, asyncSnapshot) {
+-          final unverifiedDevices = asyncSnapshot.data ?? 0;
+-          if (unverifiedDevices == 0) return const SizedBox.shrink();
+-          return Padding(
+-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+-            child: Center(
+-              child: Padding(
+-                padding: const EdgeInsets.all(4),
+-                child: Material(
+-                  color: theme.colorScheme.surface.withAlpha(128),
+-                  borderRadius: BorderRadius.circular(
+-                    AppConfig.borderRadius / 3,
+-                  ),
+-                  child: Padding(
+-                    padding: const EdgeInsets.symmetric(
+-                      horizontal: 8.0,
+-                      vertical: 4.0,
+-                    ),
+-                    child: Text.rich(
+-                      TextSpan(
+-                        children: [
+-                          WidgetSpan(
+-                            child: Icon(Icons.lock_person_outlined, size: 13),
+-                          ),
+-                          TextSpan(text: ' '),
+-                          TextSpan(
+-                            text: L10n.of(
+-                              context,
+-                            ).countUnverifiedDevices(unverifiedDevices),
+-                          ),
+-                          TextSpan(text: ' '),
+-                          TextSpan(
+-                            style: TextStyle(
+-                              color: theme.colorScheme.primary,
+-                              decoration: TextDecoration.underline,
+-                              decorationColor: theme.colorScheme.primary,
+-                            ),
+-                            recognizer: TapGestureRecognizer()
+-                              ..onTap = () =>
+-                                  context.go('/rooms/${room.id}/encryption'),
+-                            text: 'Check',
+-                          ),
+-                        ],
++
++    if (manualRead) {
++      final room = widget.room;
++      final hasUnread = (room.hasNewMessages || room.notificationCount > 0 || room.markedUnread) && !_markedReadLocal;
++      if (!hasUnread) return const SizedBox.shrink();
++
++      return AnimatedSize(
++        duration: FluffyThemes.animationDuration,
++        curve: FluffyThemes.animationCurve,
++        child: Padding(
++          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
++          child: Center(
++            child: Material(
++              color: theme.colorScheme.primaryContainer,
++              borderRadius: BorderRadius.circular(AppConfig.borderRadius / 3),
++              child: InkWell(
++                borderRadius: BorderRadius.circular(AppConfig.borderRadius / 3),
++                onTap: () async {
++                  if (widget.controller != null) {
++                    widget.controller!.setReadMarker(force: true);
++                  } else {
++                    await room.setReadMarker();
++                  }
++                  if (mounted) {
++                    setState(() {
++                      _markedReadLocal = true;
++                    });
++                  }
++                },
++                child: Padding(
++                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
++                  child: Row(
++                    mainAxisSize: MainAxisSize.min,
++                    children: [
++                      Icon(Icons.done_all, size: 16, color: theme.colorScheme.onPrimaryContainer),
++                      const SizedBox(width: 6),
++                      Text(
++                        'Marcar como leído',
++                        style: TextStyle(
++                          fontSize: 12,
++                          fontWeight: FontWeight.bold,
++                          color: theme.colorScheme.onPrimaryContainer,
++                        ),
+                       ),
+-                      textAlign: TextAlign.center,
+-                      style: TextStyle(fontSize: 11),
+-                    ),
++                    ],
+                   ),
+                 ),
+               ),
+             ),
+-          );
+-        },
+-      ),
+-    );
++          ),
++        ),
++      );
++    }
++
++    // Unverified devices warning is intentionally disabled per user request
++    return const SizedBox.shrink();
+   }
+ }
 diff --git a/lib/pages/chat/event_info_dialog.dart b/lib/pages/chat/event_info_dialog.dart
 index 731cc94..7c330e1 100644
 --- a/lib/pages/chat/event_info_dialog.dart
@@ -1677,7 +1873,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..6660174 100644
+index a649171..b5b48aa 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -1710,7 +1906,7 @@ index a649171..6660174 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +33,219 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +33,300 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -1875,6 +2071,87 @@ index a649171..6660174 100644
 +    );
 +  }
 +
++  void _showTagMenu(
++    BuildContext context,
++    String tag,
++    Client client,
++  ) {
++    final displayName = tag.replaceFirst('u.', '');
++    showModalBottomSheet(
++      context: context,
++      builder: (context) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            ListTile(
++              leading: const Icon(Icons.edit_outlined),
++              title: const Text('Editar etiqueta'),
++              onTap: () async {
++                Navigator.of(context).pop();
++                final textController = TextEditingController(text: displayName);
++                final newName = await showDialog<String>(
++                  context: context,
++                  builder: (context) => AlertDialog(
++                    title: const Text('Editar etiqueta'),
++                    content: TextField(
++                      controller: textController,
++                      autofocus: true,
++                      decoration: const InputDecoration(labelText: 'Nombre de la etiqueta'),
++                    ),
++                    actions: [
++                      TextButton(
++                        onPressed: () => Navigator.of(context).pop(),
++                        child: const Text('Cancelar'),
++                      ),
++                      ElevatedButton(
++                        onPressed: () => Navigator.of(context).pop(textController.text.trim()),
++                        child: const Text('Guardar'),
++                      ),
++                    ],
++                  ),
++                );
++                if (newName != null && newName.isNotEmpty && newName != displayName) {
++                  final newTag = 'u.$newName';
++                  for (final room in client.rooms) {
++                    if (room.tags.containsKey(tag)) {
++                      await room.setTag(newTag);
++                      await room.removeTag(tag);
++                    }
++                  }
++                  if (mounted) setState(() {});
++                }
++              },
++            ),
++            ListTile(
++              leading: const Icon(Icons.delete_outline, color: Colors.red),
++              title: const Text('Eliminar etiqueta', style: TextStyle(color: Colors.red)),
++              onTap: () async {
++                final confirmed = await showOkCancelAlertDialog(
++                  context: context,
++                  title: '¿Eliminar etiqueta?',
++                  message: '¿Estás seguro de que quieres eliminar la etiqueta "$displayName"? Esta acción eliminará la etiqueta de todos tus chats.',
++                  okLabel: 'Eliminar',
++                  cancelLabel: 'Cancelar',
++                  isDestructive: true,
++                );
++                if (confirmed == OkCancelResult.ok) {
++                  final navigator = Navigator.of(context);
++                  for (final room in client.rooms) {
++                    if (room.tags.containsKey(tag)) {
++                      await room.removeTag(tag);
++                    }
++                  }
++                  navigator.pop();
++                  if (mounted) setState(() {});
++                }
++              },
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
 +  void _showManageHiddenNetworksDialog(BuildContext context, Client client) {
 +    showDialog(
 +      context: context,
@@ -1930,7 +2207,7 @@ index a649171..6660174 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -43,9 +258,99 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -43,9 +339,108 @@ class SpacesNavigationRail extends StatelessWidget {
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
              final allSpaces = client.rooms
@@ -1961,7 +2238,12 @@ index a649171..6660174 100644
 +
 +              final isHidden = hiddenNets.contains(entry.key) ||
 +                  hiddenNets.contains(title) ||
-+                  hiddenNets.contains(title.toLowerCase());
++                  hiddenNets.contains(title.toLowerCase()) ||
++                  hiddenNets.any((hn) {
++                    final hnl = hn.toLowerCase();
++                    final tl = title.toLowerCase();
++                    return tl.contains(hnl) || hnl.contains(tl);
++                  });
 +              if (isHidden) continue;
 +
 +              final rooms = (val['rooms'] as List?)?.cast<String>() ?? [];
@@ -1985,7 +2267,11 @@ index a649171..6660174 100644
 +                final netNameLower = net.name.toLowerCase();
 +                final isHidden = hiddenNets.contains(baseKey) ||
 +                    hiddenNets.contains(net.key) ||
-+                    hiddenNets.contains(netNameLower);
++                    hiddenNets.contains(netNameLower) ||
++                    hiddenNets.any((hn) {
++                      final hnl = hn.toLowerCase();
++                      return netNameLower.contains(hnl) || hnl.contains(netNameLower) || baseKey.contains(hnl);
++                    });
 +
 +                final coveredByLabel = labelTitlesLower.any(
 +                      (t) => t.contains(baseKey) || t.contains(netNameLower) || netNameLower.contains(t),
@@ -2031,7 +2317,7 @@ index a649171..6660174 100644
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
                    ? FluffyThemes.navRailWidth
-@@ -54,14 +359,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +449,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -2050,7 +2336,7 @@ index a649171..6660174 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,49 +380,206 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,49 +470,209 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -2261,26 +2547,29 @@ index a649171..6660174 100644
 +                          final displayName = tag.replaceFirst('u.', '');
 +                          return Material(
 +                            color: Colors.transparent,
-+                            child: NaviRailItem(
-+                              toolTip: displayName,
-+                              isSelected: isSelected,
-+                              onTap: () => widget.onGoToSpaceId('virtual_tag_$tag'),
-+                              unreadBadgeFilter: (room) => room.tags.containsKey(tag),
-+                              icon: Avatar(
-+                                name: displayName,
-+                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-+                                textColor: Theme.of(context).colorScheme.onPrimaryContainer,
-+                                shapeBorder: RoundedSuperellipseBorder(
-+                                  side: BorderSide(
-+                                    width: 1,
-+                                    color: Theme.of(context).dividerColor,
++                            child: InkWell(
++                              onLongPress: () => _showTagMenu(context, tag, client),
++                              child: NaviRailItem(
++                                toolTip: displayName,
++                                isSelected: isSelected,
++                                onTap: () => widget.onGoToSpaceId('virtual_tag_$tag'),
++                                unreadBadgeFilter: (room) => room.tags.containsKey(tag),
++                                icon: Avatar(
++                                  name: displayName,
++                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
++                                  textColor: Theme.of(context).colorScheme.onPrimaryContainer,
++                                  shapeBorder: RoundedSuperellipseBorder(
++                                    side: BorderSide(
++                                      width: 1,
++                                      color: Theme.of(context).dividerColor,
++                                    ),
++                                    borderRadius: BorderRadius.circular(
++                                      AppConfig.spaceBorderRadius,
++                                    ),
 +                                  ),
 +                                  borderRadius: BorderRadius.circular(
 +                                    AppConfig.spaceBorderRadius,
 +                                  ),
-+                                ),
-+                                borderRadius: BorderRadius.circular(
-+                                  AppConfig.spaceBorderRadius,
 +                                ),
 +                              ),
                              ),
@@ -2291,7 +2580,7 @@ index a649171..6660174 100644
                        },
                      ),
                    ),
-@@ -135,3 +597,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +690,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -2348,10 +2637,10 @@ index a649171..6660174 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..ffa5b8e
+index 0000000..ad73aaf
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,605 @@
+@@ -0,0 +1,635 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -2382,6 +2671,7 @@ index 0000000..ffa5b8e
 +  int _logSize = 0;
 +  bool _debugLoggingEnabled = false;
 +  bool _forcePublicPushGateway = false;
++  bool _manualReadReceipts = false;
 +  List<Pusher>? _pushers;
 +  bool _loadingPushers = false;
 +  bool _didLoadPushers = false;
@@ -2392,6 +2682,7 @@ index 0000000..ffa5b8e
 +    _loadLogSize();
 +    _loadDebugLoggingToggle();
 +    _loadForcePublicToggle();
++    _loadManualReadToggle();
 +  }
 +
 +  @override
@@ -2427,6 +2718,25 @@ index 0000000..ffa5b8e
 +    if (mounted) {
 +      setState(() {
 +        _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
++      });
++    }
++  }
++
++  Future<void> _loadManualReadToggle() async {
++    final prefs = await SharedPreferences.getInstance();
++    if (mounted) {
++      setState(() {
++        _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
++      });
++    }
++  }
++
++  Future<void> _setManualReadReceipts(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_manual_read_receipts', value);
++    if (mounted) {
++      setState(() {
++        _manualReadReceipts = value;
 +      });
 +    }
 +  }
@@ -2564,6 +2874,15 @@ index 0000000..ffa5b8e
 +            ),
 +            value: _forcePublicPushGateway,
 +            onChanged: _setForcePublicPushGateway,
++          ),
++          SwitchListTile.adaptive(
++            secondary: const Icon(Icons.mark_chat_read_outlined),
++            title: const Text('Lectura manual de mensajes'),
++            subtitle: const Text(
++              'No marca los mensajes como leídos al abrir el chat hasta que presiones "Marcar como leído".',
++            ),
++            value: _manualReadReceipts,
++            onChanged: _setManualReadReceipts,
 +          ),
 +          ListTile(
 +            leading: const Icon(Icons.description_outlined),
