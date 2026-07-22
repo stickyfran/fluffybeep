@@ -3247,10 +3247,10 @@ index 5ead47d..f19a23e 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..6178b7f
+index 0000000..8a972ca
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,772 @@
+@@ -0,0 +1,747 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -3763,53 +3763,22 @@ index 0000000..6178b7f
 +    }
 +  }
 +
-+  static Map<String, dynamic>? _cachedLabelsMap;
-+  static int? _cachedLabelsHash;
-+  static Set<String>? _hiddenRoomIdsCache;
-+
 +  /// Get all Beeper labels from Account Data.
 +  static Map<String, dynamic> getBeeperLabels(Client client) {
 +    try {
 +      final accountDataEvent = client.accountData['com.beeper.labels'];
-+      final content = accountDataEvent?.content;
-+      final hash = content.hashCode;
-+      if (_cachedLabelsHash == hash && _cachedLabelsMap != null) {
-+        return _cachedLabelsMap!;
-+      }
-+      if (content is Map) {
-+        _cachedLabelsMap = Map<String, dynamic>.from(content);
-+        _cachedLabelsHash = hash;
-+        
-+        final hiddenSet = <String>{};
-+        for (final entry in _cachedLabelsMap!.entries) {
-+          final val = entry.value;
-+          if (val is Map && val['isShownInInbox'] == false) {
-+            final rooms = val['rooms'];
-+            if (rooms is List) {
-+              for (final r in rooms) {
-+                if (r is String) hiddenSet.add(r);
-+              }
-+            }
-+          }
-+        }
-+        _hiddenRoomIdsCache = hiddenSet;
-+        return _cachedLabelsMap!;
++      if (accountDataEvent != null && accountDataEvent.content is Map) {
++        return Map<String, dynamic>.from(accountDataEvent.content);
 +      }
 +    } catch (e) {
 +      Logs().e('Error reading com.beeper.labels: $e');
 +    }
-+    _cachedLabelsMap = {};
-+    _cachedLabelsHash = null;
-+    _hiddenRoomIdsCache = {};
 +    return {};
 +  }
 +
 +  /// Save Beeper labels map to Account Data.
 +  static Future<void> setBeeperLabels(Client client, Map<String, dynamic> labels) async {
 +    try {
-+      _cachedLabelsMap = null;
-+      _cachedLabelsHash = null;
-+      _hiddenRoomIdsCache = null;
 +      await client.setAccountData(
 +        client.userID!,
 +        'com.beeper.labels',
@@ -3822,8 +3791,14 @@ index 0000000..6178b7f
 +
 +  /// Check if a room is hidden from the main inbox due to a label with isShownInInbox = false.
 +  static bool isRoomHiddenInInbox(Client client, String roomId) {
-+    getBeeperLabels(client);
-+    return _hiddenRoomIdsCache?.contains(roomId) ?? false;
++    final labels = getBeeperLabels(client);
++    for (final entry in labels.values) {
++      if (entry is Map && entry['isShownInInbox'] == false) {
++        final rooms = entry['rooms'];
++        if (rooms is List && rooms.contains(roomId)) return true;
++      }
++    }
++    return false;
 +  }
 +
 +  /// Helper to get hidden networks using a special '_hidden_networks' key in Beeper labels.
