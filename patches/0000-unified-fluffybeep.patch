@@ -2799,7 +2799,7 @@ index 029e7bc..4830f61 100644
                leading: const Icon(Icons.format_paint_outlined),
                title: Text(L10n.of(context).changeTheme),
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..4ca17b6 100644
+index 5ead47d..f19a23e 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -24,10 +24,13 @@ import 'package:matrix/matrix.dart';
@@ -2998,7 +2998,7 @@ index 5ead47d..4ca17b6 100644
      await AppSettings.unifiedPushEndpoint.setItem(
        AppSettings.unifiedPushEndpoint.defaultValue,
      );
-@@ -424,23 +447,33 @@ class BackgroundPush {
+@@ -424,23 +447,42 @@ class BackgroundPush {
    }
  
    Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
@@ -3018,8 +3018,13 @@ index 5ead47d..4ca17b6 100644
 -      flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
 -      useNotificationActions:
 -          false, // Buggy with UP: https://codeberg.org/UnifiedPush/flutter-connector/issues/34
--    );
 +    await FileLogger.log('[UnifiedPush] _onUpMessage triggered');
++    final pushIsolateReceivePort = ReceivePort();
++    IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
++    IsolateNameServer.registerPortWithName(
++      pushIsolateReceivePort.sendPort,
++      AppConfig.pushIsolatePortName,
+     );
 +    try {
 +      final messageContentStr = utf8.decode(pushMessage.content);
 +      await FileLogger.log('[UnifiedPush] Payload received: $messageContentStr');
@@ -3045,6 +3050,9 @@ index 5ead47d..4ca17b6 100644
 +    } catch (e, s) {
 +      await FileLogger.log('[UnifiedPush] CRITICAL ERROR in _onUpMessage: $e\nStacktrace:\n$s');
 +      rethrow;
++    } finally {
++      IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
++      pushIsolateReceivePort.close();
 +    }
    }
  }
