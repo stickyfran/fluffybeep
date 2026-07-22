@@ -319,10 +319,10 @@ index 930de3b..faed57c 100644
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa0..aa22d74 100644
+index 91fffa0..e2e633f 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -157,6 +157,94 @@ class MessageContent extends StatelessWidget {
+@@ -157,6 +157,95 @@ class MessageContent extends StatelessWidget {
                }
              }
              continue textmessage;
@@ -388,6 +388,7 @@ index 91fffa0..aa22d74 100644
 +                        ElevatedButton.icon(
 +                          onPressed: () async {
 +                            final client = event.room.client;
++                            await client.oneShotSync().catchError((_) {});
 +                            await client.encryption?.keyManager.maybeAutoRequest(
 +                              event.room.id,
 +                              sessionId,
@@ -3923,6 +3924,32 @@ index 0000000..6f499d6
 +    return await _getLogFilePath();
 +  }
 +}
+diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
+index f056efc..9d39445 100644
+--- a/lib/utils/notification_background_handler.dart
++++ b/lib/utils/notification_background_handler.dart
+@@ -47,13 +47,17 @@ extension NotificationResponseJson on NotificationResponse {
+ }
+ 
+ Future<void> waitForPushIsolateDone() async {
+-  if (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) !=
+-      null) {
+-    Logs().i('Wait for Push Isolate to be done...');
+-    await Future.delayed(const Duration(milliseconds: 300));
++  int attempts = 0;
++  while (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) !=
++          null &&
++      attempts < 30) {
++    Logs().i('Wait for Push Isolate to be done... attempt $attempts');
++    await Future.delayed(const Duration(milliseconds: 200));
++    attempts++;
+   }
+ }
+ 
++
+ @pragma('vm:entry-point')
+ Future<void> notificationTapBackground(
+   NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
 index e90e649..c049092 100644
 --- a/lib/utils/push_helper.dart
