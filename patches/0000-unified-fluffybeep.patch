@@ -3959,7 +3959,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..c049092 100644
+index e90e649..9dd9c77 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4043,6 +4043,24 @@ index e90e649..c049092 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
+@@ -366,6 +379,17 @@ Future<void> _tryPushHelper(
+       flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
+     );
+   }
++
++  try {
++    await awaitingOneShotSync;
++  } catch (e) {
++    Logs().w('Background oneShotSync failed or timed out', e);
++  }
++  
++  if (isBackgroundMessage) {
++    await client.dispose(closeDatabase: false);
++  }
++
+   Logs().v('Push helper has been completed!');
+ }
+ 
 diff --git a/lib/utils/stream_extension.dart b/lib/utils/stream_extension.dart
 index 93fa60d..9dd114f 100644
 --- a/lib/utils/stream_extension.dart
