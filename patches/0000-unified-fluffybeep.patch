@@ -4450,14 +4450,15 @@ index 0000000..8a972ca
 +}
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000..5b1b27a
+index 0000000..b342485
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,83 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:matrix/encryption.dart';
 +import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 +import 'package:go_router/go_router.dart';
 +
