@@ -211,7 +211,7 @@ index 161f83d..b757431 100644
      ScaffoldMessenger.of(context).showSnackBar(
        SnackBar(
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..0643960 100644
+index 7470749..77b99f4 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -21,6 +21,7 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
@@ -222,7 +222,7 @@ index 7470749..0643960 100644
  import 'package:fluffychat/utils/error_reporter.dart';
  import 'package:fluffychat/utils/file_selector.dart';
  import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
-@@ -552,11 +553,34 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -552,11 +553,36 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -235,7 +235,7 @@ index 7470749..0643960 100644
 +    
 +    final badEvents = timeline?.events
 +      .where((e) => e.messageType == MessageTypes.BadEncrypted)
-+      .take(10) ?? [];
++      .take(20) ?? [];
 +    
 +    for (final event in badEvents) {
 +      final sessionId = event.content.tryGet<String>('session_id');
@@ -246,6 +246,8 @@ index 7470749..0643960 100644
 +        );
 +      }
 +    }
++
++    timeline?.requestKeys(onlineKeyBackupOnly: false);
    }
  
    Future<void>? _setReadMarkerFuture;
@@ -258,7 +260,7 @@ index 7470749..0643960 100644
      if (eventId?.isValidMatrixIdStrict() == false) return;
      if (_setReadMarkerFuture != null) return;
      if (_scrolledUp) return;
-@@ -590,6 +614,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -590,6 +616,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -2768,10 +2770,10 @@ index a649171..e401db6 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..ad73aaf
+index 0000000..8fc75ec
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,635 @@
+@@ -0,0 +1,676 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -3014,6 +3016,47 @@ index 0000000..ad73aaf
 +            ),
 +            value: _manualReadReceipts,
 +            onChanged: _setManualReadReceipts,
++          ),
++          ListTile(
++            leading: const Icon(Icons.vpn_key_outlined),
++            title: const Text('Re-solicitar claves de cifrado'),
++            subtitle: const Text('Intenta recuperar mensajes que no se pudieron descifrar en todos los chats.'),
++            onTap: () async {
++              final client = Matrix.of(context).client;
++              ScaffoldMessenger.of(context).showSnackBar(
++                const SnackBar(content: Text('Iniciando re-solicitud de claves...')),
++              );
++              try {
++                await client.oneShotSync().catchError((_) {});
++                for (final room in client.rooms) {
++                  final timeline = await room.getTimeline();
++                  timeline.requestKeys(onlineKeyBackupOnly: false);
++                  final badEvents = timeline.events.where(
++                    (e) => e.messageType == MessageTypes.BadEncrypted,
++                  ).take(10);
++                  for (final event in badEvents) {
++                    final sessionId = event.content.tryGet<String>('session_id');
++                    final senderKey = event.content.tryGet<String>('sender_key');
++                    if (sessionId != null && senderKey != null) {
++                      await client.encryption?.keyManager.maybeAutoRequest(
++                        room.id, sessionId, senderKey,
++                      );
++                    }
++                  }
++                }
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(content: Text('Claves re-solicitadas exitosamente.')),
++                  );
++                }
++              } catch (e) {
++                if (context.mounted) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    SnackBar(content: Text('Error al re-solicitar claves: $e')),
++                  );
++                }
++              }
++            },
 +          ),
 +          ListTile(
 +            leading: const Icon(Icons.description_outlined),
@@ -4680,7 +4723,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..d4596de 100644
+index e90e649..61047ff 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -4691,27 +4734,34 @@ index e90e649..d4596de 100644
  
  const notificationAvatarDimension = 128;
  final Map<String, DateTime> lastReceivedPushNotification = {};
-@@ -121,10 +122,17 @@ Future<void> _tryPushHelper(
+@@ -119,12 +120,25 @@ Future<void> _tryPushHelper(
  
-   final event = await client.getEventByPushNotification(
-     notification,
--    storeInDatabase: false,
-+    storeInDatabase: true,
-   );
+   lastReceivedPushNotification[client.clientName] = DateTime.now();
  
--  final awaitingOneShotSync = client.oneShotSync();
 +  final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
 +        AppConfig.mainIsolatePortName,
 +      ) != null;
 +
-+  final awaitingOneShotSync = !isMainIsolateAlive ? client.oneShotSync() : Future.value();
-+  if (isMainIsolateAlive) {
-+    Logs().v('Main isolate active, skipping background oneShotSync to protect Olm session');
++  if (!isMainIsolateAlive) {
++    Logs().v('[PushCrypto] Main isolate is dead. Running background oneShotSync to fetch decryption keys...');
++    await client.oneShotSync().timeout(const Duration(seconds: 20)).catchError((e, s) {
++      Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
++    });
++  } else {
++    Logs().v('[PushCrypto] Main isolate active, skipping background oneShotSync to protect Olm session');
 +  }
++
+   final event = await client.getEventByPushNotification(
+     notification,
+     storeInDatabase: false,
+   );
+ 
+-  final awaitingOneShotSync = client.oneShotSync();
++  final awaitingOneShotSync = Future.value();
    l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
  
    updateAppBadge(notification.counts?.unread ?? 0);
-@@ -166,7 +174,18 @@ Future<void> _tryPushHelper(
+@@ -166,7 +180,18 @@ Future<void> _tryPushHelper(
    }
    Logs().v('Push helper got notification event of type ${event.type}.');
  
@@ -4731,7 +4781,7 @@ index e90e649..d4596de 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
-@@ -247,12 +266,13 @@ Future<void> _tryPushHelper(
+@@ -247,12 +272,13 @@ Future<void> _tryPushHelper(
        : null;
    messagingStyleInformation?.messages?.add(newMessage);
  
@@ -4748,7 +4798,7 @@ index e90e649..d4596de 100644
  
    final messageRooms = AndroidNotificationChannelGroup(
      notificationGroupId,
-@@ -291,14 +311,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +317,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -4766,7 +4816,7 @@ index e90e649..d4596de 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -338,7 +358,7 @@ Future<void> _tryPushHelper(
+@@ -338,7 +364,7 @@ Future<void> _tryPushHelper(
      iOS: iOSPlatformChannelSpecifics,
    );
  
@@ -4775,21 +4825,16 @@ index e90e649..d4596de 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +386,19 @@ Future<void> _tryPushHelper(
+@@ -366,6 +392,14 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
 +
-+  if (!isMainIsolateAlive) {
-+    try {
-+      await awaitingOneShotSync.timeout(const Duration(seconds: 15));
-+    } catch (e) {
-+      Logs().w('Background oneShotSync failed or timed out', e);
-+    }
-+  }
-+  
++  Logs().v('[PushCrypto] Decryption attempt finished. Event is encrypted: ${event.type == EventTypes.Encrypted}');
++
 +  if (isBackgroundMessage) {
-+    await client.dispose(closeDatabase: false);
++    Logs().v('[PushCrypto] Background message: disposing client and closing database to flush WAL...');
++    await client.dispose(closeDatabase: true);
 +  }
 +
    Logs().v('Push helper has been completed!');
