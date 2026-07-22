@@ -1884,7 +1884,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..c075b11 100644
+index a649171..e401db6 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -2125,7 +2125,7 @@ index a649171..c075b11 100644
 +                  final newTag = 'u.$newName';
 +                  for (final room in client.rooms) {
 +                    if (room.tags.containsKey(tag)) {
-+                      await room.setTag(newTag);
++                      await room.addTag(newTag);
 +                      await room.removeTag(tag);
 +                    }
 +                  }
