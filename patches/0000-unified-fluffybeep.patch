@@ -170,36 +170,10 @@ index 0000000..5f34c85
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..0437639 100644
+index 7470749..4fca235 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -199,6 +199,10 @@ class ChatController extends State<ChatPageWithRoom>
-     selectedEvents.clear();
-   });
- 
-+  static final Set<String> _staticBigEmojis = defaultEmojiSet
-+      .expand((cat) => cat.emoji.map((e) => e.emoji))
-+      .toSet();
-+
-   void closeThread() => setState(() {
-     activeThreadId = null;
-     selectedEvents.clear();
-@@ -395,13 +399,7 @@ class ChatController extends State<ChatPageWithRoom>
-       AppSettings.displayChatDetailsColumn.value,
-     );
- 
--    bigEmojis = defaultEmojiSet.fold(
--      <String>{},
--      (emojis, category) => {
--        ...emojis,
--        ...(category.emoji.map((emoji) => emoji.emoji)),
--      },
--    );
-+    bigEmojis = _staticBigEmojis;
- 
-     sendingClient = Matrix.of(context).client;
-     final lastEventThreadId =
-@@ -590,6 +588,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -590,6 +590,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -332,50 +306,6 @@ index 731cc94..7c330e1 100644
            ListTile(
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
-diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
-index 9dd1bde..dbe89e9 100644
---- a/lib/pages/chat/events/html_message.dart
-+++ b/lib/pages/chat/events/html_message.dart
-@@ -3,6 +3,7 @@
- //
- // SPDX-License-Identifier: AGPL-3.0-or-later
- 
-+import 'dart:collection';
- import 'package:collection/collection.dart';
- import 'package:fluffychat/config/setting_keys.dart';
- import 'package:fluffychat/config/themes.dart';
-@@ -23,6 +24,22 @@ import 'package:matrix/matrix.dart';
- import '../../../utils/url_launcher.dart';
- 
- class HtmlMessage extends StatelessWidget {
-+  static final _elementCache = LinkedHashMap<String, dom.Element>();
-+  static const _maxCacheEntries = 200;
-+
-+  static dom.Element _getCachedElement(String html) {
-+    final cached = _elementCache.remove(html);
-+    if (cached != null) {
-+      _elementCache[html] = cached;
-+      return cached;
-+    }
-+    final parsed = parser.parse(html).body ?? dom.Element.html('');
-+    _elementCache[html] = parsed;
-+    while (_elementCache.length > _maxCacheEntries) {
-+      _elementCache.remove(_elementCache.keys.first);
-+    }
-+    return parsed;
-+  }
-   final String html;
-   final Room room;
-   final Color textColor;
-@@ -584,7 +601,7 @@ class HtmlMessage extends StatelessWidget {
- 
-   @override
-   Widget build(BuildContext context) {
--    final element = parser.parse(html).body ?? dom.Element.html('');
-+    final element = _getCachedElement(html);
-     final configuredMaxLines = AppSettings.messagePreviewMaxLines.value;
-     final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
-     final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
 index 930de3b..faed57c 100644
 --- a/lib/pages/chat/events/message.dart
@@ -1522,7 +1452,7 @@ index 8610b92..bc3458b 100644
                    },
                  ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..e0aa844 100644
+index 55d1d7e..c1505e7 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -1533,7 +1463,7 @@ index 55d1d7e..e0aa844 100644
  import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
  import 'package:fluffychat/widgets/future_loading_dialog.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -42,30 +43,33 @@ class ChatListItem extends StatelessWidget {
+@@ -42,28 +43,30 @@ class ChatListItem extends StatelessWidget {
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
  
@@ -1570,13 +1500,9 @@ index 55d1d7e..e0aa844 100644
 +    final space = isBeeperFakeDM ? null : this.space;
 +    final mxContent = beeperData.avatarUrl;
  
--    return Padding(
-+    return RepaintBoundary(
-+      child: Padding(
+     return Padding(
        padding: const EdgeInsets.symmetric(horizontal: 8),
-       child: Material(
-         borderRadius: BorderRadius.circular(AppConfig.borderRadius),
-@@ -145,7 +149,7 @@ class ChatListItem extends StatelessWidget {
+@@ -145,7 +148,7 @@ class ChatListItem extends StatelessWidget {
                                      AppConfig.spaceBorderRadius,
                                    )
                                  : null,
