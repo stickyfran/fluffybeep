@@ -69,6 +69,9 @@ jobs:
           path: fluffychat/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
 
+      - name: 🧹 Remove Fluffychat Git Context
+        run: rm -rf fluffychat/.git
+
       - name: 🚀 Release APK on GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
