@@ -959,6 +959,18 @@ index 91fffa0..029cd9f 100644
            case MessageTypes.Text:
            case MessageTypes.Notice:
            case MessageTypes.Emote:
+diff --git a/lib/pages/chat/sticker_picker_dialog.dart b/lib/pages/chat/sticker_picker_dialog.dart
+index 1ef4962..b85a076 100644
+--- a/lib/pages/chat/sticker_picker_dialog.dart
++++ b/lib/pages/chat/sticker_picker_dialog.dart
+@@ -39,6 +39,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+     return Material(
+       color: theme.colorScheme.onInverseSurface,
+       child: SafeArea(
++        top: false,
+         child: CustomScrollView(
+           slivers: <Widget>[
+             SliverAppBar(
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..9d64854 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
@@ -1044,7 +1056,7 @@ index 4cda41c..9d64854 100644
                                    TextButton.icon(
                                      onPressed: () => room.isDirectChat
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..ecf2b7f 100644
+index 6ceba8b..9844dd4 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -1089,7 +1101,7 @@ index 6ceba8b..ecf2b7f 100644
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +155,148 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +155,145 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -1176,30 +1188,20 @@ index 6ceba8b..ecf2b7f 100644
 +  // filteredRooms is O(N log N) and runs on the UI thread. We cache the result
 +  // and only recompute when a real Matrix sync arrives (via _onSyncForRoomCache)
 +  // instead of on every setState (cancelSearch, filter toggles, etc.).
-+  List<Room> _cachedRooms = [];
++  List<Room> _cachedAllRoomsSorted = [];
++  List<Room> _cachedFilteredRooms = [];
 +  StreamSubscription? _onSyncForRoomCache;
 +
 +  void _invalidateRoomCache([_]) {
-+    _cachedRooms = _computeFilteredRooms();
-+    // Also refresh the space-delegate map at the same time (cheap).
-+    _cachedSpaceDelegates = _computeSpaceDelegates();
-+    if (mounted) setState(() {});
-+  }
-+
-+  List<Room> _computeFilteredRooms() {
-+    final rooms = Matrix.of(context)
-+        .client
-+        .rooms
-+        .where(getRoomFilterByActiveFilter(activeFilter))
-+        .toList();
++    final allRooms = Matrix.of(context).client.rooms.toList();
 +
 +    // Precalculate timestamps to avoid repeated iteration inside comparator
 +    final timestamps = <String, DateTime>{};
-+    for (final r in rooms) {
++    for (final r in allRooms) {
 +      timestamps[r.id] = _getMessageTimestamp(r);
 +    }
 +
-+    rooms.sort((a, b) {
++    allRooms.sort((a, b) {
 +      if (a.isFavourite && !b.isFavourite) return -1;
 +      if (!a.isFavourite && b.isFavourite) return 1;
 +      if (a.isLowPriority && !b.isLowPriority) return 1;
@@ -1209,12 +1211,19 @@ index 6ceba8b..ecf2b7f 100644
 +      final bTime = timestamps[b.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
 +      return bTime.compareTo(aTime);
 +    });
-+    return rooms;
++
++    _cachedAllRoomsSorted = allRooms;
++    _cachedFilteredRooms =
++        allRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
++    // Also refresh the space-delegate map at the same time (cheap).
++    _cachedSpaceDelegates = _computeSpaceDelegates();
++    if (mounted) setState(() {});
 +  }
 +
 +  // Returns the cached list. Build methods read this; it is always up to date
 +  // because _invalidateRoomCache() is called on every sync event.
-+  List<Room> get filteredRooms => _cachedRooms;
++  List<Room> get filteredRooms => _cachedFilteredRooms;
++  List<Room> get allRoomsSorted => _cachedAllRoomsSorted;
 +
 +  // ── Space-delegate cache ─────────────────────────────────────────────────────
 +  // Previously computed inside build() on every frame – now computed once per sync.
@@ -1242,7 +1251,7 @@ index 6ceba8b..ecf2b7f 100644
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +305,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +302,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -1349,7 +1358,7 @@ index 6ceba8b..ecf2b7f 100644
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +362,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +359,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -1373,7 +1382,7 @@ index 6ceba8b..ecf2b7f 100644
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -380,51 +462,71 @@ class ChatListController extends State<ChatList>
+@@ -380,51 +459,71 @@ class ChatListController extends State<ChatList>
  
      scrollController.addListener(_onScroll);
      _waitForFirstSync();
@@ -1469,7 +1478,7 @@ index 6ceba8b..ecf2b7f 100644
 -    _processPushHelperCrashReport();
 +      // Build initial room cache and hook into sync stream for future updates.
 +      // Rate-limit to 1s so rapid syncs don't thrash the sort. Safe to use Matrix.of(context) here.
-+      _cachedRooms = _computeFilteredRooms();
++      _invalidateRoomCache();
 +      _cachedSpaceDelegates = _computeSpaceDelegates();
 +      _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
 +          .where((s) => s.hasRoomUpdate)
@@ -1482,7 +1491,7 @@ index 6ceba8b..ecf2b7f 100644
    }
  
    @override
-@@ -432,6 +534,7 @@ class ChatListController extends State<ChatList>
+@@ -432,6 +531,7 @@ class ChatListController extends State<ChatList>
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -1490,7 +1499,7 @@ index 6ceba8b..ecf2b7f 100644
      scrollController.removeListener(_onScroll);
      searchController.dispose();
      searchFocusNode.dispose();
-@@ -643,19 +746,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +743,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -1522,7 +1531,7 @@ index 6ceba8b..ecf2b7f 100644
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +781,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +778,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -1551,7 +1560,7 @@ index 6ceba8b..ecf2b7f 100644
          ],
        );
      }
-@@ -800,13 +924,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +921,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -1673,7 +1682,7 @@ index 6ceba8b..ecf2b7f 100644
      }
    }
  
-@@ -913,10 +1144,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1141,11 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -1689,7 +1698,7 @@ index 6ceba8b..ecf2b7f 100644
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1270,6 @@ enum ChatContextAction {
+@@ -1038,4 +1267,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -1697,7 +1706,7 @@ index 6ceba8b..ecf2b7f 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..7a60e50 100644
+index 8610b92..942d6fb 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -1711,7 +1720,7 @@ index 8610b92..7a60e50 100644
  import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/chat_list.dart';
-@@ -10,78 +14,131 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+@@ -10,78 +14,133 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/search_title.dart';
  import 'package:fluffychat/pages/chat_list/space_view.dart';
@@ -1804,7 +1813,9 @@ index 8610b92..7a60e50 100644
            .rateLimit(const Duration(seconds: 1)),
        builder: (context, _) {
 -        final rooms = controller.filteredRooms
-+        var rooms = widget.controller.filteredRooms
++        var rooms = (filter.isNotEmpty || widget.controller.isSearchMode
++                ? widget.controller.allRoomsSorted
++                : widget.controller.filteredRooms)
              .where(
                (room) =>
 +                  isVirtualSpace ||
@@ -1869,7 +1880,7 @@ index 8610b92..7a60e50 100644
                    SearchTitle(
                      title: L10n.of(context).publicRooms,
                      icon: const Icon(Icons.explore_outlined),
-@@ -128,7 +185,7 @@ class ChatListViewBody extends StatelessWidget {
+@@ -128,7 +187,7 @@ class ChatListViewBody extends StatelessWidget {
                            ),
                    ),
                  ],
@@ -1878,7 +1889,7 @@ index 8610b92..7a60e50 100644
                    Container(
                      height: 36 + 8 + 8,
                      padding: EdgeInsets.symmetric(vertical: 8),
-@@ -146,8 +203,8 @@ class ChatListViewBody extends StatelessWidget {
+@@ -146,8 +205,8 @@ class ChatListViewBody extends StatelessWidget {
                                  ),
                                  child: Center(
                                    child: FilterChip(
@@ -1889,7 +1900,7 @@ index 8610b92..7a60e50 100644
                                          .setActiveFilter(filter, null),
                                      label: Text(
                                        filter.toLocalizedString(context),
-@@ -156,15 +213,15 @@ class ChatListViewBody extends StatelessWidget {
+@@ -156,15 +215,15 @@ class ChatListViewBody extends StatelessWidget {
                                  ),
                                ),
                              ),
@@ -1908,7 +1919,7 @@ index 8610b92..7a60e50 100644
                                    ActiveFilter.tag,
                                    entry.key,
                                  ),
-@@ -176,22 +233,67 @@ class ChatListViewBody extends StatelessWidget {
+@@ -176,22 +235,67 @@ class ChatListViewBody extends StatelessWidget {
                        ],
                      ),
                    ),
@@ -1980,7 +1991,7 @@ index 8610b92..7a60e50 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
-@@ -245,10 +347,10 @@ class ChatListViewBody extends StatelessWidget {
+@@ -245,10 +349,10 @@ class ChatListViewBody extends StatelessWidget {
                        space: space,
                        key: Key('chat_list_item_${room.id}'),
                        filter: filter,
@@ -1995,10 +2006,10 @@ index 8610b92..7a60e50 100644
                    },
                  ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..1890506 100644
+index 55d1d7e..39799e7 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,470 @@
+@@ -1,410 +1,472 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -2566,78 +2577,80 @@ index 55d1d7e..1890506 100644
 +                  duration: FluffyThemes.animationDuration,
 +                  curve: FluffyThemes.animationCurve,
 +                  scale: hovered ? 1.1 : 1.0,
-+                  child: SizedBox(
-+                    width: Avatar.defaultSize,
-+                    height: Avatar.defaultSize,
-+                    child: Stack(
-+                      children: [
-+                        if (space != null)
-+                          Positioned(
-+                            top: 0,
-+                            left: 0,
-+                            child: Avatar(
-+                              shapeBorder: RoundedSuperellipseBorder(
-+                                side: BorderSide(
-+                                  width: 2,
-+                                  color:
-+                                      backgroundColor ??
-+                                      theme.colorScheme.surface,
++                  child: Builder(builder: (context) {
++                    final showSpaceAvatar = space != null && BeeperBridgeUtils.getRoomNetwork(space!) == null;
++                    return SizedBox(
++                      width: Avatar.defaultSize,
++                      height: Avatar.defaultSize,
++                      child: Stack(
++                        children: [
++                          if (showSpaceAvatar)
++                            Positioned(
++                              top: 0,
++                              left: 0,
++                              child: Avatar(
++                                shapeBorder: RoundedSuperellipseBorder(
++                                  side: BorderSide(
++                                    width: 2,
++                                    color:
++                                        backgroundColor ??
++                                        theme.colorScheme.surface,
++                                  ),
++                                  borderRadius: BorderRadius.circular(
++                                    AppConfig.spaceBorderRadius * 0.75,
++                                  ),
 +                                ),
 +                                borderRadius: BorderRadius.circular(
 +                                  AppConfig.spaceBorderRadius * 0.75,
 +                                ),
++                                mxContent: space!.avatar,
++                                size: Avatar.defaultSize * 0.75,
++                                name: space!.getLocalizedDisplayname(),
++                                onTap: () => widget.onLongPress?.call(context),
 +                              ),
-+                              borderRadius: BorderRadius.circular(
-+                                AppConfig.spaceBorderRadius * 0.75,
-+                              ),
-+                              mxContent: space.avatar,
-+                              size: Avatar.defaultSize * 0.75,
-+                              name: space.getLocalizedDisplayname(),
++                            ),
++                          Positioned(
++                            bottom: 0,
++                            right: 0,
++                            child: Avatar(
++                              shapeBorder: !showSpaceAvatar
++                                  ? widget.room.isSpace
++                                        ? RoundedSuperellipseBorder(
++                                            side: BorderSide(
++                                              width: 1,
++                                              color: theme.dividerColor,
++                                            ),
++                                            borderRadius: BorderRadius.circular(
++                                              AppConfig.spaceBorderRadius,
++                                            ),
++                                          )
++                                        : null
++                                  : RoundedRectangleBorder(
++                                      side: BorderSide(
++                                        width: 2,
++                                        color:
++                                            backgroundColor ??
++                                            theme.colorScheme.surface,
++                                      ),
++                                      borderRadius: BorderRadius.circular(
++                                        Avatar.defaultSize,
++                                      ),
++                                    ),
++                              borderRadius: widget.room.isSpace
++                                  ? BorderRadius.circular(
++                                      AppConfig.spaceBorderRadius,
++                                    )
++                                  : null,
++                              mxContent: mxContent,
++                              size: showSpaceAvatar
++                                  ? Avatar.defaultSize * 0.75
++                                  : Avatar.defaultSize,
++                              name: displayname,
++                              presenceUserId: directChatMatrixId,
++                              presenceBackgroundColor: backgroundColor,
 +                              onTap: () => widget.onLongPress?.call(context),
 +                            ),
 +                          ),
-+                        Positioned(
-+                          bottom: 0,
-+                          right: 0,
-+                          child: Avatar(
-+                            shapeBorder: space == null
-+                                ? widget.room.isSpace
-+                                      ? RoundedSuperellipseBorder(
-+                                          side: BorderSide(
-+                                            width: 1,
-+                                            color: theme.dividerColor,
-+                                          ),
-+                                          borderRadius: BorderRadius.circular(
-+                                            AppConfig.spaceBorderRadius,
-+                                          ),
-+                                        )
-+                                      : null
-+                                : RoundedRectangleBorder(
-+                                    side: BorderSide(
-+                                      width: 2,
-+                                      color:
-+                                          backgroundColor ??
-+                                          theme.colorScheme.surface,
-+                                    ),
-+                                    borderRadius: BorderRadius.circular(
-+                                      Avatar.defaultSize,
-+                                    ),
-+                                  ),
-+                            borderRadius: widget.room.isSpace
-+                                ? BorderRadius.circular(
-+                                    AppConfig.spaceBorderRadius,
-+                                  )
-+                                : null,
-+                            mxContent: mxContent,
-+                            size: space != null
-+                                ? Avatar.defaultSize * 0.75
-+                                : Avatar.defaultSize,
-+                            name: displayname,
-+                            presenceUserId: directChatMatrixId,
-+                            presenceBackgroundColor: backgroundColor,
-+                            onTap: () => widget.onLongPress?.call(context),
-+                          ),
-+                        ),
 +                        Positioned(
 +                          top: 0,
 +                          right: 0,
