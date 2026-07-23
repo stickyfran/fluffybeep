@@ -336,6 +336,146 @@ index 6305f45..80e70f6 100644
                  StreamBuilder(
                    stream: room.client.onSyncStatus.stream,
                    builder: (context, snapshot) {
+diff --git a/lib/pages/chat/chat_emoji_picker.dart b/lib/pages/chat/chat_emoji_picker.dart
+index 76cf1aa..e9d9468 100644
+--- a/lib/pages/chat/chat_emoji_picker.dart
++++ b/lib/pages/chat/chat_emoji_picker.dart
+@@ -3,9 +3,7 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+ import 'package:fluffychat/config/themes.dart';
+-import 'package:fluffychat/l10n/l10n.dart';
+ import 'package:fluffychat/pages/chat/sticker_picker_dialog.dart';
+ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+ import 'package:flutter/material.dart';
+@@ -19,7 +17,6 @@ class ChatEmojiPicker extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final theme = Theme.of(context);
+     return AnimatedContainer(
+       duration: FluffyThemes.animationDuration,
+       curve: FluffyThemes.animationCurve,
+@@ -29,97 +26,28 @@ class ChatEmojiPicker extends StatelessWidget {
+           ? MediaQuery.sizeOf(context).height / 2
+           : 0,
+       child: controller.showEmojiPicker
+-          ? DefaultTabController(
+-              length: 2,
+-              child: Column(
+-                children: [
+-                  TabBar(
+-                    tabs: [
+-                      Tab(text: L10n.of(context).emojis),
+-                      Tab(text: L10n.of(context).stickers),
+-                    ],
+-                  ),
+-                  Expanded(
+-                    child: TabBarView(
+-                      children: [
+-                        EmojiPicker(
+-                          onEmojiSelected: controller.onEmojiSelected,
+-                          onBackspacePressed: controller.emojiPickerBackspace,
+-                          config: Config(
+-                            locale: Localizations.localeOf(context),
+-                            emojiViewConfig: EmojiViewConfig(
+-                              noRecents: const NoRecent(),
+-                              backgroundColor:
+-                                  theme.colorScheme.onInverseSurface,
+-                            ),
+-                            bottomActionBarConfig: const BottomActionBarConfig(
+-                              enabled: false,
+-                            ),
+-                            categoryViewConfig: CategoryViewConfig(
+-                              backspaceColor: theme.colorScheme.primary,
+-                              iconColor: theme.colorScheme.primary.withAlpha(
+-                                128,
+-                              ),
+-                              iconColorSelected: theme.colorScheme.primary,
+-                              indicatorColor: theme.colorScheme.primary,
+-                              backgroundColor: theme.colorScheme.surface,
+-                            ),
+-                            skinToneConfig: SkinToneConfig(
+-                              dialogBackgroundColor: Color.lerp(
+-                                theme.colorScheme.surface,
+-                                theme.colorScheme.primaryContainer,
+-                                0.75,
+-                              )!,
+-                              indicatorColor: theme.colorScheme.onSurface,
+-                            ),
+-                          ),
+-                        ),
+-                        StickerPickerDialog(
+-                          room: controller.room,
+-                          onSelected: (sticker) async {
+-                            final proceed = await showTrustUserInRoomDialog(
+-                              context,
+-                              controller.room,
+-                            );
+-                            if (!proceed) return;
+-                            controller.room.sendEvent(
+-                              {
+-                                'body': sticker.body,
+-                                'info': sticker.info ?? {},
+-                                'url': sticker.url.toString(),
+-                              },
+-                              type: EventTypes.Sticker,
+-                              threadRootEventId: controller.activeThreadId,
+-                              threadLastEventId: controller.threadLastEventId,
+-                            );
+-                            controller.hideEmojiPicker();
+-                          },
+-                        ),
+-                      ],
+-                    ),
+-                  ),
+-                ],
+-              ),
++          ? StickerPickerDialog(
++              room: controller.room,
++              onSelected: (sticker) async {
++                final proceed = await showTrustUserInRoomDialog(
++                  context,
++                  controller.room,
++                );
++                if (!proceed) return;
++                controller.room.sendEvent(
++                  {
++                    'body': sticker.body,
++                    'info': sticker.info ?? {},
++                    'url': sticker.url.toString(),
++                  },
++                  type: EventTypes.Sticker,
++                  threadRootEventId: controller.activeThreadId,
++                  threadLastEventId: controller.threadLastEventId,
++                );
++                controller.hideEmojiPicker();
++              },
+             )
+           : null,
+     );
+   }
+ }
+-
+-class NoRecent extends StatelessWidget {
+-  const NoRecent({super.key});
+-
+-  @override
+-  Widget build(BuildContext context) {
+-    return Center(
+-      child: Padding(
+-        padding: const EdgeInsets.all(16.0),
+-        child: Text(
+-          L10n.of(context).emoteKeyboardNoRecents,
+-          style: Theme.of(context).textTheme.bodyLarge,
+-          textAlign: TextAlign.center,
+-        ),
+-      ),
+-    );
+-  }
+-}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
 index 0022f82..515fe3a 100644
 --- a/lib/pages/chat/chat_event_list.dart
@@ -349,6 +489,36 @@ index 0022f82..515fe3a 100644
                    ],
                  );
                }
+diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
+index 879717f..35c7605 100644
+--- a/lib/pages/chat/chat_input_row.dart
++++ b/lib/pages/chat/chat_input_row.dart
+@@ -260,12 +260,23 @@ class ChatInputRow extends StatelessWidget {
+                     width: 48,
+                     alignment: Alignment.center,
+                     child: IconButton(
+-                      tooltip: L10n.of(context).emojis,
++                      tooltip: L10n.of(context).sendImage,
++                      color: theme.colorScheme.onPrimaryContainer,
++                      icon: const Icon(Icons.image_outlined),
++                      onPressed: () => controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.image),
++                    ),
++                  ),
++                  Container(
++                    height: height,
++                    width: 48,
++                    alignment: Alignment.center,
++                    child: IconButton(
++                      tooltip: L10n.of(context).stickers,
+                       color: theme.colorScheme.onPrimaryContainer,
+                       icon: Icon(
+                         controller.showEmojiPicker
+                             ? Icons.keyboard
+-                            : Icons.add_reaction_outlined,
++                            : Icons.sticky_note_2_outlined,
+                         key: ValueKey(controller.showEmojiPicker),
+                       ),
+                       onPressed: controller.emojiPickerAction,
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
 index ae1b35f..ab67799 100644
 --- a/lib/pages/chat/chat_view.dart
@@ -5277,7 +5447,7 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..6223614 100644
+index f9b2df0..a43e341 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
 @@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
@@ -5407,3 +5577,83 @@ index f9b2df0..6223614 100644
    }
  
    @override
+@@ -152,49 +221,40 @@ class _MxcImageState extends State<MxcImage> {
+     final data = _imageData;
+     final hasData = data != null && data.isNotEmpty;
+ 
+-    return AnimatedCrossFade(
+-      duration: FluffyThemes.animationDuration,
+-      firstChild: ClipRRect(
+-        borderRadius: widget.borderRadius,
+-        child: data == null
+-            ? _MxcImagePlaceholder(
+-                width: widget.width,
+-                height: widget.height,
+-                placeholder: widget.placeholder,
+-              )
+-            : Image.memory(
+-                data,
+-                width: widget.width,
+-                height: widget.height,
+-                fit: widget.fit,
+-                filterQuality: widget.isThumbnail
+-                    ? FilterQuality.low
+-                    : FilterQuality.medium,
+-                errorBuilder: (context, e, s) {
+-                  Logs().d('Unable to render mxc image', e, s);
+-                  return SizedBox(
+-                    width: widget.width,
+-                    height: widget.height,
+-                    child: Material(
+-                      color: Theme.of(context).colorScheme.surfaceContainer,
+-                      child: Icon(
+-                        Icons.broken_image_outlined,
+-                        size: min(widget.height ?? 64, 64),
+-                        color: Theme.of(context).colorScheme.onSurface,
+-                      ),
+-                    ),
+-                  );
+-                },
+-              ),
+-      ),
+-      secondChild: _MxcImagePlaceholder(
++    if (!hasData) {
++      return _MxcImagePlaceholder(
+         width: widget.width,
+         height: widget.height,
+         placeholder: widget.placeholder,
++      );
++    }
++
++    return ClipRRect(
++      borderRadius: widget.borderRadius,
++      child: Image.memory(
++        data,
++        width: widget.width,
++        height: widget.height,
++        fit: widget.fit,
++        filterQuality: widget.isThumbnail
++            ? FilterQuality.low
++            : FilterQuality.medium,
++        errorBuilder: (context, e, s) {
++          Logs().d('Unable to render mxc image', e, s);
++          return SizedBox(
++            width: widget.width,
++            height: widget.height,
++            child: Material(
++              color: Theme.of(context).colorScheme.surfaceContainer,
++              child: Icon(
++                Icons.broken_image_outlined,
++                size: min(widget.height ?? 64, 64),
++                color: Theme.of(context).colorScheme.onSurface,
++              ),
++            ),
++          );
++        },
+       ),
+-      crossFadeState: hasData
+-          ? CrossFadeState.showFirst
+-          : CrossFadeState.showSecond,
+     );
+   }
+ }
