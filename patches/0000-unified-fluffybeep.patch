@@ -5277,7 +5277,7 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..1a394d6 100644
+index f9b2df0..6223614 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
 @@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
@@ -5299,7 +5299,7 @@ index f9b2df0..1a394d6 100644
  
    const MxcImage({
      this.uri,
-@@ -59,23 +68,62 @@ class MxcImage extends StatefulWidget {
+@@ -59,23 +68,63 @@ class MxcImage extends StatefulWidget {
    State<MxcImage> createState() => _MxcImageState();
  }
  
@@ -5348,34 +5348,61 @@ index f9b2df0..1a394d6 100644
 +  _LruMemoryCache get _imageDataCache =>
 +      MxcImage._imageDataCaches[widget.cacheName ?? ''] ??= _LruMemoryCache();
  
-   Uint8List? _imageDataNoCache;
+-  Uint8List? _imageDataNoCache;
++  Uint8List? _localImageData;
  
-   Uint8List? get _imageData => widget.cacheKey == null
-       ? _imageDataNoCache
+-  Uint8List? get _imageData => widget.cacheKey == null
+-      ? _imageDataNoCache
 -      : _imageDataCache[widget.cacheKey];
-+      : _imageDataCache.get(widget.cacheKey!);
++  Uint8List? get _imageData =>
++      _localImageData ??
++      (widget.cacheKey == null
++          ? null
++          : _imageDataCache.get(widget.cacheKey!));
  
    set _imageData(Uint8List? data) {
      if (data == null) return;
++    _localImageData = data;
      final cacheKey = widget.cacheKey;
 -    cacheKey == null
 -        ? _imageDataNoCache = data
 -        : _imageDataCache[cacheKey] = data;
-+    if (cacheKey == null) {
-+      _imageDataNoCache = data;
-+    } else {
++    if (cacheKey != null) {
 +      _imageDataCache.put(cacheKey, data);
 +    }
    }
  
    Future<void> _load() async {
-@@ -144,7 +192,9 @@ class _MxcImageState extends State<MxcImage> {
+@@ -141,10 +190,30 @@ class _MxcImageState extends State<MxcImage> {
+     }
+   }
+ 
++  bool _initialized = false;
++
++  @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    if (!_initialized) {
++      _initialized = true;
++      if (_imageData == null) {
++        _tryLoad();
++      }
++    }
++  }
++
    @override
-   void initState() {
-     super.initState();
+-  void initState() {
+-    super.initState();
 -    WidgetsBinding.instance.addPostFrameCallback((_) => _tryLoad());
-+    if (_imageData == null) {
-+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryLoad());
++  void didUpdateWidget(MxcImage oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (widget.uri != oldWidget.uri ||
++        widget.cacheKey != oldWidget.cacheKey ||
++        widget.event != oldWidget.event) {
++      _localImageData = null;
++      if (_imageData == null) {
++        _tryLoad();
++      }
 +    }
    }
  
