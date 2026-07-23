@@ -2004,7 +2004,7 @@ index 8610b92..942d6fb 100644
                    },
                  ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..d3e4826 100644
+index 55d1d7e..002de85 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -1,410 +1,473 @@
@@ -2736,7 +2736,7 @@ index 55d1d7e..d3e4826 100644
 +              ),
 +              subtitle: Row(
 +                crossAxisAlignment: CrossAxisAlignment.start,
-+                mainAxisAlignment: .center,
++                mainAxisAlignment: MainAxisAlignment.center,
 +                children: <Widget>[
 +                  if (typingText.isEmpty &&
 +                      ownMessage &&
@@ -2777,7 +2777,7 @@ index 55d1d7e..d3e4826 100644
 +                            ),
 +                            margin: const EdgeInsets.only(right: 4.0),
 +                            child: Row(
-+                              mainAxisSize: .min,
++                              mainAxisSize: MainAxisSize.min,
 +                              children: [
 +                                Icon(
 +                                  Icons.message_outlined,
