@@ -6324,7 +6324,7 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..a43e341 100644
+index f9b2df0..0baa01d 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
 @@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
@@ -6346,7 +6346,7 @@ index f9b2df0..a43e341 100644
  
    const MxcImage({
      this.uri,
-@@ -59,23 +68,63 @@ class MxcImage extends StatefulWidget {
+@@ -59,23 +68,71 @@ class MxcImage extends StatefulWidget {
    State<MxcImage> createState() => _MxcImageState();
  }
  
@@ -6401,11 +6401,19 @@ index f9b2df0..a43e341 100644
 -  Uint8List? get _imageData => widget.cacheKey == null
 -      ? _imageDataNoCache
 -      : _imageDataCache[widget.cacheKey];
-+  Uint8List? get _imageData =>
-+      _localImageData ??
-+      (widget.cacheKey == null
-+          ? null
-+          : _imageDataCache.get(widget.cacheKey!));
++  Uint8List? get _imageData {
++    if (_localImageData != null) {
++      return _localImageData;
++    }
++    if (widget.cacheKey != null) {
++      final cached = _imageDataCache.get(widget.cacheKey!);
++      if (cached != null) {
++        _localImageData = cached;
++        return cached;
++      }
++    }
++    return null;
++  }
  
    set _imageData(Uint8List? data) {
      if (data == null) return;
@@ -6420,13 +6428,16 @@ index f9b2df0..a43e341 100644
    }
  
    Future<void> _load() async {
-@@ -141,10 +190,30 @@ class _MxcImageState extends State<MxcImage> {
+@@ -141,10 +198,30 @@ class _MxcImageState extends State<MxcImage> {
      }
    }
  
 +  bool _initialized = false;
 +
-+  @override
+   @override
+-  void initState() {
+-    super.initState();
+-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryLoad());
 +  void didChangeDependencies() {
 +    super.didChangeDependencies();
 +    if (!_initialized) {
@@ -6437,10 +6448,7 @@ index f9b2df0..a43e341 100644
 +    }
 +  }
 +
-   @override
--  void initState() {
--    super.initState();
--    WidgetsBinding.instance.addPostFrameCallback((_) => _tryLoad());
++  @override
 +  void didUpdateWidget(MxcImage oldWidget) {
 +    super.didUpdateWidget(oldWidget);
 +    if (widget.uri != oldWidget.uri ||
@@ -6454,7 +6462,7 @@ index f9b2df0..a43e341 100644
    }
  
    @override
-@@ -152,49 +221,40 @@ class _MxcImageState extends State<MxcImage> {
+@@ -152,49 +229,40 @@ class _MxcImageState extends State<MxcImage> {
      final data = _imageData;
      final hasData = data != null && data.isNotEmpty;
  
