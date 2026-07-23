@@ -1056,7 +1056,7 @@ index 4cda41c..9d64854 100644
                                    TextButton.icon(
                                      onPressed: () => room.isDirectChat
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..9844dd4 100644
+index 6ceba8b..613f334 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,6 +4,7 @@
@@ -1682,7 +1682,7 @@ index 6ceba8b..9844dd4 100644
      }
    }
  
-@@ -913,10 +1141,11 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1141,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -1692,13 +1692,11 @@ index 6ceba8b..9844dd4 100644
 -    });
 +    activeTag = tag;
 +    activeFilter = filter;
-+    // Recompute the room cache immediately for the new filter, then rebuild.
-+    _cachedRooms = _computeFilteredRooms();
-+    setState(() {});
++    _invalidateRoomCache();
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1267,6 @@ enum ChatContextAction {
+@@ -1038,4 +1265,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -2006,10 +2004,10 @@ index 8610b92..942d6fb 100644
                    },
                  ),
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..39799e7 100644
+index 55d1d7e..d3e4826 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,472 @@
+@@ -1,410 +1,473 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -2673,9 +2671,10 @@ index 55d1d7e..39799e7 100644
 +                        ),
 +                      ],
 +                    ),
-+                  ),
-+                ),
++                  );
++                }),
 +              ),
++            ),
 +              title: Row(
 +                children: <Widget>[
 +                  Expanded(
