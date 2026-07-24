@@ -1085,7 +1085,7 @@ index 9dd1bde..5bee6fa 100644
      final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
      final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..a1c0fd1 100644
+index 930de3b..9c62946 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -28,7 +28,7 @@ import 'message_reactions.dart';
@@ -1156,7 +1156,15 @@ index 930de3b..a1c0fd1 100644
      }.contains(event.type)) {
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
-@@ -217,7 +250,8 @@ class Message extends StatelessWidget {
+@@ -203,7 +236,6 @@ class Message extends StatelessWidget {
+     final showReactionPicker =
+         singleSelected && event.room.canSendDefaultMessages;
+ 
+-    final enterThread = this.enterThread;
+     final sender = event.senderFromMemoryOrFallback;
+ 
+     final wallpaperTextShadow = !wallpaperMode
+@@ -217,7 +249,8 @@ class Message extends StatelessWidget {
            ];
      final eventStateTextColor = theme.colorScheme.onSurface;
  
@@ -1166,7 +1174,7 @@ index 930de3b..a1c0fd1 100644
        child: Swipeable(
          key: ValueKey(event.transactionId ?? event.eventId),
          background: const Padding(
-@@ -293,25 +327,19 @@ class Message extends StatelessWidget {
+@@ -293,25 +326,19 @@ class Message extends StatelessWidget {
                        else if (nextEventSameSender || ownMessage)
                          SizedBox(width: avatarSize)
                        else
@@ -1205,7 +1213,7 @@ index 930de3b..a1c0fd1 100644
                          ),
                        Expanded(
                          child: Column(
-@@ -521,7 +549,11 @@ class Message extends StatelessWidget {
+@@ -521,7 +548,11 @@ class Message extends StatelessWidget {
                                          left: 8.0,
                                          right: ownMessage ? 0 : 12.0,
                                        ),
@@ -1218,7 +1226,7 @@ index 930de3b..a1c0fd1 100644
                                      ),
                              ),
                              Row(
-@@ -861,7 +893,8 @@ class Message extends StatelessWidget {
+@@ -861,7 +892,8 @@ class Message extends StatelessWidget {
            ),
          ),
        ),
