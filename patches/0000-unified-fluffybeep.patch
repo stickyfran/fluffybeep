@@ -11,6 +11,29 @@ index 0aa18d9..7953214 100644
              keyPassword = "dummyPassword"
              storeFile = file("dummy.keystore")
              storePassword = "dummyStorePassword"
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index eab308e..2fd033b 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -1,6 +1,18 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+           xmlns:tools="http://schemas.android.com/tools"
+     android:installLocation="auto">
++
++    <queries>
++        <intent>
++            <action android:name="android.intent.action.DIAL" />
++            <data android:scheme="tel" />
++        </intent>
++        <intent>
++            <action android:name="android.intent.action.VIEW" />
++            <data android:scheme="tel" />
++        </intent>
++    </queries>
++
+     <!-- io.flutter.app.FlutterApplication is an android.app.Application that
+          calls FlutterMain.startInitialization(this); in its onCreate method.
+          In most cases you can leave this as-is, but you if you want to provide
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
 index c1b5b91..fca325e 100644
 --- a/lib/config/routes.dart
@@ -6868,7 +6891,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..8b57314 100644
+index e90e649..3b81056 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -6970,12 +6993,14 @@ index e90e649..8b57314 100644
      Logs().i('Push helper: filtered by client-side push rules.');
      return;
    }
-@@ -247,21 +313,53 @@ Future<void> _tryPushHelper(
+@@ -247,21 +313,60 @@ Future<void> _tryPushHelper(
        : null;
    messagingStyleInformation?.messages?.add(newMessage);
  
 -  final roomName = event.room.getLocalizedDisplayname(MatrixLocals(l10n));
 +  String? targetSound;
++  String? labelId;
++  String? labelName;
 +  final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
 +  for (final entry in beeperLabels.entries) {
 +    if (entry.key == '_hidden_networks') continue;
@@ -6983,19 +7008,22 @@ index e90e649..8b57314 100644
 +    if (val is Map) {
 +      final rooms = val['rooms'];
 +      if (rooms is List && rooms.contains(event.room.id)) {
++        labelId = entry.key;
++        labelName = val['name'] as String?;
 +        final sound = store.getString('beeper_sound_${entry.key}');
 +        if (sound != null && sound != 'default') {
 +          targetSound = sound;
-+          break;
 +        }
++        break;
 +      }
 +    }
 +  }
-+  if (targetSound == null) {
++  if (labelId == null) {
 +    final net = BeeperBridgeUtils.getRoomNetwork(event.room);
 +    if (net != null) {
-+      final baseKey = BeeperBridgeUtils.getBaseNetworkKey(net.key);
-+      final sound = store.getString('beeper_sound_$baseKey');
++      labelId = BeeperBridgeUtils.getBaseNetworkKey(net.key);
++      labelName = net.name;
++      final sound = store.getString('beeper_sound_$labelId');
 +      if (sound != null && sound != 'default') {
 +        targetSound = sound;
 +      }
@@ -7003,8 +7031,10 @@ index e90e649..8b57314 100644
 +  }
  
 -  final notificationGroupId = event.room.isDirectChat
-+  final channelId = targetSound != null ? '${event.room.id}_$targetSound' : event.room.id;
-+  final roomName = event.room.getBeeperDisplayname(MatrixLocals(l10n));
++  final channelId = labelId != null
++      ? (targetSound != null ? 'label_${labelId}_$targetSound' : 'label_$labelId')
++      : (targetSound != null ? '${AppConfig.pushNotificationsChannelId}_$targetSound' : AppConfig.pushNotificationsChannelId);
++  final channelName = labelName ?? l10n.incomingMessages;
 +
 +  final isDirectChat = event.room.isDirectChat || event.room.isBeeperFakeDM;
 +  final notificationGroupId = isDirectChat
@@ -7019,8 +7049,9 @@ index e90e649..8b57314 100644
    );
    final roomsChannel = AndroidNotificationChannel(
 -    event.room.id,
+-    roomName,
 +    channelId,
-     roomName,
++    channelName,
      groupId: notificationGroupId,
 +    sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
 +    playSound: true,
@@ -7028,7 +7059,7 @@ index e90e649..8b57314 100644
    );
  
    await flutterLocalNotificationsPlugin
-@@ -276,8 +374,8 @@ Future<void> _tryPushHelper(
+@@ -276,8 +381,8 @@ Future<void> _tryPushHelper(
        ?.createNotificationChannel(roomsChannel);
  
    final androidPlatformChannelSpecifics = AndroidNotificationDetails(
@@ -7039,7 +7070,7 @@ index e90e649..8b57314 100644
      number: notification.counts?.unread,
      category: AndroidNotificationCategory.message,
      shortcutId: event.room.id,
-@@ -291,14 +389,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +396,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -7057,7 +7088,7 @@ index e90e649..8b57314 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -332,13 +430,14 @@ Future<void> _tryPushHelper(
+@@ -332,13 +437,14 @@ Future<void> _tryPushHelper(
    );
    final iOSPlatformChannelSpecifics = DarwinNotificationDetails(
      threadIdentifier: event.room.id,
@@ -7073,7 +7104,7 @@ index e90e649..8b57314 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +465,14 @@ Future<void> _tryPushHelper(
+@@ -366,6 +472,14 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
