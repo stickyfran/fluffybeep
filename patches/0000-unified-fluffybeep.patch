@@ -6868,7 +6868,7 @@ index f056efc..9d39445 100644
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..3afcbf3 100644
+index e90e649..8b57314 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -24,6 +24,7 @@ import 'package:flutter_new_badger/flutter_new_badger.dart';
@@ -7028,7 +7028,7 @@ index e90e649..3afcbf3 100644
    );
  
    await flutterLocalNotificationsPlugin
-@@ -276,8 +374,9 @@ Future<void> _tryPushHelper(
+@@ -276,8 +374,8 @@ Future<void> _tryPushHelper(
        ?.createNotificationChannel(roomsChannel);
  
    final androidPlatformChannelSpecifics = AndroidNotificationDetails(
@@ -7036,11 +7036,10 @@ index e90e649..3afcbf3 100644
 -    l10n.incomingMessages,
 +    roomsChannel.id,
 +    roomsChannel.name,
-+    channelGroupId: notificationGroupId,
      number: notification.counts?.unread,
      category: AndroidNotificationCategory.message,
      shortcutId: event.room.id,
-@@ -291,14 +390,14 @@ Future<void> _tryPushHelper(
+@@ -291,14 +389,14 @@ Future<void> _tryPushHelper(
                  : ByteArrayAndroidIcon(userAvatarFile),
              key: event.room.client.userID,
            ),
@@ -7058,7 +7057,7 @@ index e90e649..3afcbf3 100644
        hideReply: true,
        hideEdit: true,
        removeMarkdown: true,
-@@ -332,13 +431,14 @@ Future<void> _tryPushHelper(
+@@ -332,13 +430,14 @@ Future<void> _tryPushHelper(
    );
    final iOSPlatformChannelSpecifics = DarwinNotificationDetails(
      threadIdentifier: event.room.id,
@@ -7074,7 +7073,7 @@ index e90e649..3afcbf3 100644
  
    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
      await _setShortcut(event, l10n, title, roomAvatarFile);
-@@ -366,6 +466,14 @@ Future<void> _tryPushHelper(
+@@ -366,6 +465,14 @@ Future<void> _tryPushHelper(
        flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
      );
    }
