@@ -12,7 +12,7 @@ index 0aa18d9..7953214 100644
              storeFile = file("dummy.keystore")
              storePassword = "dummyStorePassword"
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index c1b5b91..5f93406 100644
+index c1b5b91..7459819 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
 @@ -22,16 +22,17 @@ import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart'
@@ -86,7 +86,21 @@ index c1b5b91..5f93406 100644
                        ),
                        routes: [
                          GoRoute(
-@@ -319,7 +330,7 @@ abstract class AppRoutes {
+@@ -267,8 +278,11 @@ abstract class AppRoutes {
+                           pageBuilder: (context, state) => defaultPageBuilder(
+                             context,
+                             state,
+-                            EmotesSettings(
+-                              roomId: state.pathParameters['roomid'],
++                            DeferredWidget(
++                              libraryLoader: settings_emotes.loadLibrary,
++                              createWidget: () => settings_emotes.EmotesSettings(
++                                roomId: state.pathParameters['roomid'],
++                              ),
+                             ),
+                           ),
+                         ),
+@@ -319,7 +333,7 @@ abstract class AppRoutes {
                          return defaultPageBuilder(
                            context,
                            state,
@@ -95,7 +109,7 @@ index c1b5b91..5f93406 100644
                          );
                        },
                        redirect: loggedOutRedirect,
-@@ -330,7 +341,7 @@ abstract class AppRoutes {
+@@ -330,7 +344,7 @@ abstract class AppRoutes {
                        pageBuilder: (context, state) => defaultPageBuilder(
                          context,
                          state,
@@ -104,7 +118,7 @@ index c1b5b91..5f93406 100644
                        ),
                        routes: [
                          GoRoute(
-@@ -339,7 +350,7 @@ abstract class AppRoutes {
+@@ -339,7 +353,7 @@ abstract class AppRoutes {
                              return defaultPageBuilder(
                                context,
                                state,
@@ -113,7 +127,21 @@ index c1b5b91..5f93406 100644
                              );
                            },
                            redirect: loggedOutRedirect,
-@@ -362,7 +373,7 @@ abstract class AppRoutes {
+@@ -350,8 +364,11 @@ abstract class AppRoutes {
+                             return defaultPageBuilder(
+                               context,
+                               state,
+-                              SettingsIgnoreList(
+-                                initialUserId: state.extra?.toString(),
++                              DeferredWidget(
++                                libraryLoader: settings_ignore_list.loadLibrary,
++                                createWidget: () => settings_ignore_list.SettingsIgnoreList(
++                                  initialUserId: state.extra?.toString(),
++                                ),
+                               ),
+                             );
+                           },
+@@ -362,7 +379,7 @@ abstract class AppRoutes {
                            pageBuilder: (context, state) => defaultPageBuilder(
                              context,
                              state,
@@ -122,6 +150,18 @@ index c1b5b91..5f93406 100644
                            ),
                            redirect: loggedOutRedirect,
                          ),
+@@ -480,7 +497,10 @@ abstract class AppRoutes {
+                       pageBuilder: (context, state) => defaultPageBuilder(
+                         context,
+                         state,
+-                        EmotesSettings(roomId: state.pathParameters['roomid']),
++                        DeferredWidget(
++                          libraryLoader: settings_emotes.loadLibrary,
++                          createWidget: () => settings_emotes.EmotesSettings(roomId: state.pathParameters['roomid']),
++                        ),
+                       ),
+                       redirect: loggedOutRedirect,
+                     ),
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
 index 0000000..d2bfaac
@@ -1045,7 +1085,7 @@ index 9dd1bde..5bee6fa 100644
      final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
      final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..58569b2 100644
+index 930de3b..a1c0fd1 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -28,7 +28,7 @@ import 'message_reactions.dart';
@@ -1065,7 +1105,7 @@ index 930de3b..58569b2 100644
  
    const Message(
      this.event, {
-@@ -77,9 +78,40 @@ class Message extends StatelessWidget {
+@@ -77,11 +78,42 @@ class Message extends StatelessWidget {
      this.onExpand,
      required this.enterThread,
      this.isCollapsed = false,
@@ -1078,6 +1118,8 @@ index 930de3b..58569b2 100644
 +}
 +
 +class _MessageState extends State<Message> {
+   @override
+   Widget build(BuildContext context) {
 +    final event = widget.event;
 +    final nextEvent = widget.nextEvent;
 +    final previousEvent = widget.previousEvent;
@@ -1103,9 +1145,9 @@ index 930de3b..58569b2 100644
 +    final bigEmojis = widget.bigEmojis;
 +    final cachedReactions = widget.cachedReactions;
 +
-   @override
-   Widget build(BuildContext context) {
      final theme = Theme.of(context);
+ 
+     if (!{
 @@ -89,6 +121,7 @@ class Message extends StatelessWidget {
        EventTypes.Sticker,
        EventTypes.CallInvite,
@@ -2178,7 +2220,7 @@ index 6ceba8b..613f334 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..00e96d1 100644
+index 8610b92..1fe3cc0 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -2480,7 +2522,7 @@ index 8610b92..00e96d1 100644
                      final room = rooms[i];
                      final space = spaceDelegateCandidates[room.id];
                      return ChatListItem(
-@@ -245,12 +353,13 @@ class ChatListViewBody extends StatelessWidget {
+@@ -245,14 +353,16 @@ class ChatListViewBody extends StatelessWidget {
                        space: space,
                        key: Key('chat_list_item_${room.id}'),
                        filter: filter,
@@ -2496,7 +2538,10 @@ index 8610b92..00e96d1 100644
 +                  childCount: rooms.length,
                  ),
                ),
++            ),
            ],
+         );
+       },
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
 index 55d1d7e..fd3f469 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
@@ -3556,7 +3601,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..c116f23 100644
+index a649171..0746133 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -3589,7 +3634,7 @@ index a649171..c116f23 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +33,303 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +33,304 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -3599,6 +3644,7 @@ index a649171..c116f23 100644
 +
 +class _SpacesNavigationRailState extends State<SpacesNavigationRail> {
 +  List<_CombinedRailItem>? _cachedCombinedItems;
++  List<BeeperNetwork>? _cachedVisibleNetworks;
 +  String _lastCombinedHash = '';
 +
 +  void _showNetworkMenu(
@@ -3893,7 +3939,7 @@ index a649171..c116f23 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -42,9 +341,119 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -42,9 +342,133 @@ class SpacesNavigationRail extends StatelessWidget {
                .where((s) => s.hasRoomUpdate)
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
@@ -3939,18 +3985,30 @@ index a649171..c116f23 100644
 +                final title = val['title']?.toString() ?? '';
 +                if (title.isEmpty) continue;
 +
-+                final isHidden = val['isShownInInbox'] == false;
-+                if (!isHidden) {
-+                  final rooms = List<String>.from(val['rooms'] ?? []);
-+                  roomsInVisibleLabels.addAll(rooms);
-+                  labelTitlesLower.add(title.toLowerCase());
-+                }
-+                beeperLabelItems.add(_CombinedRailItem.beeperLabel(entry.key, val));
++                final isHidden = hiddenNets.contains(entry.key) ||
++                    hiddenNets.contains(title) ||
++                    hiddenNets.contains(title.toLowerCase()) ||
++                    hiddenNets.any((hn) {
++                      final hnl = hn.toLowerCase();
++                      final tl = title.toLowerCase();
++                      return tl.contains(hnl) || hnl.contains(tl);
++                    });
++                if (isHidden) continue;
++
++                final rooms = (val['rooms'] as List?)?.cast<String>() ?? [];
++                final isSelected = widget.activeSpaceId == 'virtual_beeper_label_${entry.key}';
++                if (rooms.isEmpty && !isSelected) continue;
++
++                roomsInVisibleLabels.addAll(rooms);
++                labelTitlesLower.add(title.toLowerCase());
++
++                final emoji = val['emoji']?.toString();
++                beeperLabelItems.add(_CombinedRailItem.beeperLabel(entry.key, title, emoji: emoji));
 +              }
 +
 +              beeperLabelItems.sort((a, b) {
-+                final cA = a.beeperLabelData!['createdAt'] ?? 0;
-+                final cB = b.beeperLabelData!['createdAt'] ?? 0;
++                final cA = beeperLabels[a.labelUuid]?['createdAt'] ?? 0;
++                final cB = beeperLabels[b.labelUuid]?['createdAt'] ?? 0;
 +                return cB.compareTo(cA); // Newer first
 +              });
 +
@@ -4009,14 +4067,16 @@ index a649171..c116f23 100644
 +              for (final tag in tagsList) {
 +                combinedItems.add(_CombinedRailItem.tag(tag));
 +              }
-+              _cachedCombinedItems = combinedItems;
++               _cachedCombinedItems = combinedItems;
++              _cachedVisibleNetworks = visibleNetworks;
 +            }
 +            
 +            final combinedItems = _cachedCombinedItems!;
++            final visibleNetworks = _cachedVisibleNetworks!;
  
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
-@@ -54,14 +463,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +478,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -4035,7 +4095,7 @@ index a649171..c116f23 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,49 +484,209 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,49 +499,209 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -4279,7 +4339,7 @@ index a649171..c116f23 100644
                        },
                      ),
                    ),
-@@ -135,3 +704,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +719,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
