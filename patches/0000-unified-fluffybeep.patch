@@ -960,10 +960,10 @@ index 91fffa0..029cd9f 100644
            case MessageTypes.Notice:
            case MessageTypes.Emote:
 diff --git a/lib/pages/chat/sticker_picker_dialog.dart b/lib/pages/chat/sticker_picker_dialog.dart
-index 1ef4962..b85a076 100644
+index 1ef4962..fd455e2 100644
 --- a/lib/pages/chat/sticker_picker_dialog.dart
 +++ b/lib/pages/chat/sticker_picker_dialog.dart
-@@ -39,6 +39,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+@@ -39,11 +39,13 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
      return Material(
        color: theme.colorScheme.onInverseSurface,
        child: SafeArea(
@@ -971,6 +971,13 @@ index 1ef4962..b85a076 100644
          child: CustomScrollView(
            slivers: <Widget>[
              SliverAppBar(
++              primary: false,
+               floating: true,
+-              toolbarHeight: 72,
++              toolbarHeight: 56,
+               scrolledUnderElevation: 0,
+               backgroundColor: Colors.transparent,
+               automaticallyImplyLeading: false,
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..9d64854 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
