@@ -12,33 +12,116 @@ index 0aa18d9..7953214 100644
              storeFile = file("dummy.keystore")
              storePassword = "dummyStorePassword"
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index c1b5b91..4d95180 100644
+index c1b5b91..5f93406 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
-@@ -22,6 +22,7 @@ import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart'
+@@ -22,16 +22,17 @@ import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart'
  import 'package:fluffychat/pages/login/login.dart';
  import 'package:fluffychat/pages/new_group/new_group.dart';
  import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
-+import 'package:fluffychat/pages/settings/patches_settings.dart';
++import 'package:fluffychat/pages/settings/patches_settings.dart' deferred as patches;
  import 'package:fluffychat/pages/settings/settings.dart';
- import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
- import 'package:fluffychat/pages/settings_chat/settings_chat.dart';
-@@ -236,6 +237,15 @@ abstract class AppRoutes {
-                       ),
-                       redirect: loggedOutRedirect,
-                     ),
+-import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
+-import 'package:fluffychat/pages/settings_chat/settings_chat.dart';
+-import 'package:fluffychat/pages/settings_emotes/settings_emotes.dart';
+-import 'package:fluffychat/pages/settings_homeserver/settings_homeserver.dart';
+-import 'package:fluffychat/pages/settings_ignore_list/settings_ignore_list.dart';
+-import 'package:fluffychat/pages/settings_notifications/settings_notifications.dart';
+-import 'package:fluffychat/pages/settings_password/settings_password.dart';
+-import 'package:fluffychat/pages/settings_security/settings_security.dart';
+-import 'package:fluffychat/pages/settings_style/settings_style.dart';
++import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart' deferred as settings_3pid;
++import 'package:fluffychat/pages/settings_chat/settings_chat.dart' deferred as settings_chat;
++import 'package:fluffychat/pages/settings_emotes/settings_emotes.dart' deferred as settings_emotes;
++import 'package:fluffychat/pages/settings_homeserver/settings_homeserver.dart' deferred as settings_homeserver;
++import 'package:fluffychat/pages/settings_ignore_list/settings_ignore_list.dart' deferred as settings_ignore_list;
++import 'package:fluffychat/pages/settings_notifications/settings_notifications.dart' deferred as settings_notifications;
++import 'package:fluffychat/pages/settings_password/settings_password.dart' deferred as settings_password;
++import 'package:fluffychat/pages/settings_security/settings_security.dart' deferred as settings_security;
++import 'package:fluffychat/pages/settings_style/settings_style.dart' deferred as settings_style;
+ import 'package:fluffychat/pages/sign_in/sign_in_page.dart';
+ import 'package:fluffychat/widgets/config_viewer.dart';
+ import 'package:fluffychat/widgets/layouts/empty_page.dart';
+@@ -40,6 +41,7 @@ import 'package:fluffychat/widgets/log_view.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
+ import 'package:flutter/material.dart';
++import 'package:fluffychat/widgets/deferred_widget.dart';
+ import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+@@ -232,7 +234,16 @@ abstract class AppRoutes {
+                       pageBuilder: (context, state) => defaultPageBuilder(
+                         context,
+                         state,
+-                        const SettingsNotifications(),
++                        DeferredWidget(libraryLoader: settings_notifications.loadLibrary, createWidget: () => settings_notifications.SettingsNotifications()),
++                      ),
++                      redirect: loggedOutRedirect,
++                    ),
 +                    GoRoute(
 +                      path: 'patches',
 +                      pageBuilder: (context, state) => defaultPageBuilder(
 +                        context,
 +                        state,
-+                        const SettingsPatches(),
-+                      ),
-+                      redirect: loggedOutRedirect,
-+                    ),
-                     GoRoute(
-                       path: 'style',
++                        DeferredWidget(libraryLoader: patches.loadLibrary, createWidget: () => patches.SettingsPatches()),
+                       ),
+                       redirect: loggedOutRedirect,
+                     ),
+@@ -241,7 +252,7 @@ abstract class AppRoutes {
                        pageBuilder: (context, state) => defaultPageBuilder(
+                         context,
+                         state,
+-                        const SettingsStyle(),
++                        DeferredWidget(libraryLoader: settings_style.loadLibrary, createWidget: () => settings_style.SettingsStyle()),
+                       ),
+                       redirect: loggedOutRedirect,
+                     ),
+@@ -259,7 +270,7 @@ abstract class AppRoutes {
+                       pageBuilder: (context, state) => defaultPageBuilder(
+                         context,
+                         state,
+-                        const SettingsChat(),
++                        DeferredWidget(libraryLoader: settings_chat.loadLibrary, createWidget: () => settings_chat.SettingsChat()),
+                       ),
+                       routes: [
+                         GoRoute(
+@@ -319,7 +330,7 @@ abstract class AppRoutes {
+                         return defaultPageBuilder(
+                           context,
+                           state,
+-                          const SettingsHomeserver(),
++                          DeferredWidget(libraryLoader: settings_homeserver.loadLibrary, createWidget: () => settings_homeserver.SettingsHomeserver()),
+                         );
+                       },
+                       redirect: loggedOutRedirect,
+@@ -330,7 +341,7 @@ abstract class AppRoutes {
+                       pageBuilder: (context, state) => defaultPageBuilder(
+                         context,
+                         state,
+-                        const SettingsSecurity(),
++                        DeferredWidget(libraryLoader: settings_security.loadLibrary, createWidget: () => settings_security.SettingsSecurity()),
+                       ),
+                       routes: [
+                         GoRoute(
+@@ -339,7 +350,7 @@ abstract class AppRoutes {
+                             return defaultPageBuilder(
+                               context,
+                               state,
+-                              const SettingsPassword(),
++                              DeferredWidget(libraryLoader: settings_password.loadLibrary, createWidget: () => settings_password.SettingsPassword()),
+                             );
+                           },
+                           redirect: loggedOutRedirect,
+@@ -362,7 +373,7 @@ abstract class AppRoutes {
+                           pageBuilder: (context, state) => defaultPageBuilder(
+                             context,
+                             state,
+-                            const Settings3Pid(),
++                            DeferredWidget(libraryLoader: settings_3pid.loadLibrary, createWidget: () => settings_3pid.Settings3Pid()),
+                           ),
+                           redirect: loggedOutRedirect,
+                         ),
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
 index 0000000..d2bfaac
@@ -177,6 +260,28 @@ index 0000000..d2bfaac
 +    }
 +  }
 +}
+diff --git a/lib/main.dart b/lib/main.dart
+index 10f0246..4df35be 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -114,10 +114,14 @@ Future<void> startGui(List<Client> clients, SharedPreferences store) async {
+     }
+   }
+ 
+-  // Preload first client
++  // Preload first client data in parallel (both are independent)
+   final firstClient = clients.firstOrNull;
+-  await firstClient?.roomsLoading;
+-  await firstClient?.accountDataLoading;
++  if (firstClient != null) {
++    await Future.wait([
++      firstClient.roomsLoading ?? Future.value(),
++      firstClient.accountDataLoading ?? Future.value(),
++    ]);
++  }
+ 
+   runApp(
+     FluffyChatApp(
 diff --git a/lib/pages/bootstrap/view_model/bootstrap_view_model.dart b/lib/pages/bootstrap/view_model/bootstrap_view_model.dart
 index 161f83d..b757431 100644
 --- a/lib/pages/bootstrap/view_model/bootstrap_view_model.dart
@@ -219,7 +324,7 @@ index 161f83d..b757431 100644
      ScaffoldMessenger.of(context).showSnackBar(
        SnackBar(
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..77b99f4 100644
+index 7470749..66cdeca 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -21,6 +21,7 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
@@ -230,7 +335,98 @@ index 7470749..77b99f4 100644
  import 'package:fluffychat/utils/error_reporter.dart';
  import 'package:fluffychat/utils/file_selector.dart';
  import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
-@@ -552,11 +553,36 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -194,15 +195,21 @@ class ChatController extends State<ChatPageWithRoom>
+         ?.eventId;
+   }
+ 
+-  void enterThread(String eventId) => setState(() {
+-    activeThreadId = eventId;
+-    selectedEvents.clear();
+-  });
++  void enterThread(String eventId) {
++    _invalidateTimelineCache();
++    setState(() {
++      activeThreadId = eventId;
++      selectedEvents.clear();
++    });
++  }
+ 
+-  void closeThread() => setState(() {
+-    activeThreadId = null;
+-    selectedEvents.clear();
+-  });
++  void closeThread() {
++    _invalidateTimelineCache();
++    setState(() {
++      activeThreadId = null;
++      selectedEvents.clear();
++    });
++  }
+ 
+   Future<void> recreateChat() async {
+     final room = this.room;
+@@ -508,10 +515,60 @@ class ChatController extends State<ChatPageWithRoom>
+ 
+   void updateView() {
+     if (!mounted) return;
++    _invalidateTimelineCache();
+     setReadMarker();
+     setState(() {});
+   }
+ 
++  List<Event>? _cachedFilteredEvents;
++  Map<String, int>? _cachedEventsKeyMap;
++
++  List<Event> get filteredEvents {
++    if (_cachedFilteredEvents != null) return _cachedFilteredEvents!;
++    final tl = timeline;
++    if (tl == null) return [];
++    _cachedFilteredEvents = tl.events.filterByVisibleInGui(threadId: activeThreadId);
++    
++    _cachedEventsKeyMap = <String, int>{};
++    for (var i = 0; i < _cachedFilteredEvents!.length; i++) {
++      _cachedEventsKeyMap![_cachedFilteredEvents![i].eventId] = i;
++    }
++    return _cachedFilteredEvents!;
++  }
++  
++  Map<String, int> get eventsKeyMap {
++    if (_cachedEventsKeyMap == null) {
++      final _ = filteredEvents;
++    }
++    return _cachedEventsKeyMap ?? <String, int>{};
++  }
++
++  void _invalidateTimelineCache() {
++    _cachedFilteredEvents = null;
++    _cachedEventsKeyMap = null;
++    _cachedReactionsMap = null;
++  }
++
++  Map<String, List<Event>>? _cachedReactionsMap;
++
++  Map<String, List<Event>> get reactionsMap {
++    if (_cachedReactionsMap != null) return _cachedReactionsMap!;
++    _cachedReactionsMap = {};
++    final tl = timeline;
++    if (tl != null) {
++      for (final e in tl.events) {
++        if (e.relationshipType == RelationshipTypes.reaction) {
++          final targetId = e.relationshipEventId;
++          if (targetId != null) {
++            _cachedReactionsMap![targetId] ??= [];
++            _cachedReactionsMap![targetId]!.add(e);
++          }
++        }
++      }
++    }
++    return _cachedReactionsMap!;
++  }
++
+   Future<void>? loadTimelineFuture;
+ 
+   Future<void> _getTimeline({String? eventContextId}) async {
+@@ -552,11 +609,36 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -268,7 +464,7 @@ index 7470749..77b99f4 100644
      if (eventId?.isValidMatrixIdStrict() == false) return;
      if (_setReadMarkerFuture != null) return;
      if (_scrolledUp) return;
-@@ -590,6 +616,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -590,6 +672,7 @@ class ChatController extends State<ChatPageWithRoom>
  
    @override
    void dispose() {
@@ -477,10 +673,29 @@ index 76cf1aa..e9d9468 100644
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..515fe3a 100644
+index 0022f82..73f9836 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -97,7 +97,7 @@ class ChatEventList extends StatelessWidget {
+@@ -41,16 +41,8 @@ class ChatEventList extends StatelessWidget {
+ 
+     final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
+ 
+-    final events = timeline.events.filterByVisibleInGui(
+-      threadId: controller.activeThreadId,
+-    );
+-
+-    // create a map of eventId --> index to greatly improve performance of
+-    // ListView's findChildIndexCallback
+-    final thisEventsKeyMap = <String, int>{};
+-    for (var i = 0; i < events.length; i++) {
+-      thisEventsKeyMap[events[i].eventId] = i;
+-    }
++    final events = controller.filteredEvents;
++    final thisEventsKeyMap = controller.eventsKeyMap;
+ 
+     final hasWallpaper =
+         controller.room.client.applicationAccountConfig.wallpaperUrl != null;
+@@ -97,7 +89,7 @@ class ChatEventList extends StatelessWidget {
                    children: [
                      if (events.isNotEmpty) SeenByRow(event: events.first),
                      TypingIndicators(controller),
@@ -797,11 +1012,101 @@ index 731cc94..7c330e1 100644
            ListTile(
              leading: Avatar(
                mxContent: event.senderFromMemoryOrFallback.avatarUrl,
+diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
+index 9dd1bde..5bee6fa 100644
+--- a/lib/pages/chat/events/html_message.dart
++++ b/lib/pages/chat/events/html_message.dart
+@@ -582,9 +582,26 @@ class HtmlMessage extends StatelessWidget {
+     }
+   }
+ 
++  static final Map<String, dom.Element> _parseCache = {};
++  static final List<String> _parseCacheKeys = [];
++  static const int _maxCacheSize = 300;
++
++  dom.Element _parseHtml(String htmlString) {
++    if (_parseCache.containsKey(htmlString)) {
++      return _parseCache[htmlString]!;
++    }
++    final element = parser.parse(htmlString).body ?? dom.Element.html('');
++    _parseCache[htmlString] = element;
++    _parseCacheKeys.add(htmlString);
++    if (_parseCacheKeys.length > _maxCacheSize) {
++      _parseCache.remove(_parseCacheKeys.removeAt(0));
++    }
++    return element;
++  }
++
+   @override
+   Widget build(BuildContext context) {
+-    final element = parser.parse(html).body ?? dom.Element.html('');
++    final element = _parseHtml(html);
+     final configuredMaxLines = AppSettings.messagePreviewMaxLines.value;
+     final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
+     final span = _renderHtml(element, context);
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..faed57c 100644
+index 930de3b..58569b2 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
-@@ -89,6 +89,7 @@ class Message extends StatelessWidget {
+@@ -28,7 +28,7 @@ import 'message_reactions.dart';
+ import 'reply_content.dart';
+ import 'state_message.dart';
+ 
+-class Message extends StatelessWidget {
++class Message extends StatefulWidget {
+   final Event event;
+   final Event? nextEvent;
+   final Event? previousEvent;
+@@ -52,6 +52,7 @@ class Message extends StatelessWidget {
+   final void Function()? onExpand;
+   final bool isCollapsed;
+   final Set<String> bigEmojis;
++  final List<Event>? cachedReactions;
+ 
+   const Message(
+     this.event, {
+@@ -77,9 +78,40 @@ class Message extends StatelessWidget {
+     this.onExpand,
+     required this.enterThread,
+     this.isCollapsed = false,
++    this.cachedReactions,
+     super.key,
+   });
+ 
++  @override
++  State<Message> createState() => _MessageState();
++}
++
++class _MessageState extends State<Message> {
++    final event = widget.event;
++    final nextEvent = widget.nextEvent;
++    final previousEvent = widget.previousEvent;
++    final displayReadMarker = widget.displayReadMarker;
++    final onSelect = widget.onSelect;
++    final onInfoTab = widget.onInfoTab;
++    final scrollToEventId = widget.scrollToEventId;
++    final onSwipe = widget.onSwipe;
++    final onMention = widget.onMention;
++    final onEdit = widget.onEdit;
++    final enterThread = widget.enterThread;
++    final longPressSelect = widget.longPressSelect;
++    final selected = widget.selected;
++    final singleSelected = widget.singleSelected;
++    final timeline = widget.timeline;
++    final highlightMarker = widget.highlightMarker;
++    final animateIn = widget.animateIn;
++    final wallpaperMode = widget.wallpaperMode;
++    final scrollController = widget.scrollController;
++    final colors = widget.colors;
++    final onExpand = widget.onExpand;
++    final isCollapsed = widget.isCollapsed;
++    final bigEmojis = widget.bigEmojis;
++    final cachedReactions = widget.cachedReactions;
++
+   @override
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
+@@ -89,6 +121,7 @@ class Message extends StatelessWidget {
        EventTypes.Sticker,
        EventTypes.CallInvite,
        PollEventContent.startType,
@@ -809,6 +1114,78 @@ index 930de3b..faed57c 100644
      }.contains(event.type)) {
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
+@@ -217,7 +250,8 @@ class Message extends StatelessWidget {
+           ];
+     final eventStateTextColor = theme.colorScheme.onSurface;
+ 
+-    return Center(
++    return RepaintBoundary(
++      child: Center(
+       child: Swipeable(
+         key: ValueKey(event.transactionId ?? event.eventId),
+         background: const Padding(
+@@ -293,25 +327,19 @@ class Message extends StatelessWidget {
+                       else if (nextEventSameSender || ownMessage)
+                         SizedBox(width: avatarSize)
+                       else
+-                        FutureBuilder<User?>(
+-                          future: event.fetchSenderUser(),
+-                          builder: (context, snapshot) {
+-                            final user = snapshot.data ?? sender;
+-                            return Avatar(
+-                              mxContent: user.avatarUrl,
+-                              name: user.calcDisplayname(),
+-                              onTap: () => showMemberActionsPopupMenu(
+-                                context: context,
+-                                user: user,
+-                                onMention: onMention,
+-                              ),
+-                              size: avatarSize,
+-                              presenceUserId: user.stateKey,
+-                              presenceBackgroundColor: wallpaperMode
+-                                  ? Colors.transparent
+-                                  : null,
+-                            );
+-                          },
++                        Avatar(
++                          mxContent: sender.avatarUrl,
++                          name: sender.calcDisplayname(),
++                          onTap: () => showMemberActionsPopupMenu(
++                            context: context,
++                            user: sender,
++                            onMention: onMention,
++                          ),
++                          size: avatarSize,
++                          presenceUserId: sender.stateKey,
++                          presenceBackgroundColor: wallpaperMode
++                              ? Colors.transparent
++                              : null,
+                         ),
+                       Expanded(
+                         child: Column(
+@@ -521,7 +549,11 @@ class Message extends StatelessWidget {
+                                         left: 8.0,
+                                         right: ownMessage ? 0 : 12.0,
+                                       ),
+-                                      child: MessageReactions(event, timeline),
++                                      child: MessageReactions(
++                                        event,
++                                        timeline,
++                                        cachedReactions: cachedReactions,
++                                      ),
+                                     ),
+                             ),
+                             Row(
+@@ -861,7 +893,8 @@ class Message extends StatelessWidget {
+           ),
+         ),
+       ),
+-    );
++    ),
++  );
+   }
+ }
+ 
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
 index 91fffa0..029cd9f 100644
 --- a/lib/pages/chat/events/message_content.dart
@@ -959,6 +1336,61 @@ index 91fffa0..029cd9f 100644
            case MessageTypes.Text:
            case MessageTypes.Notice:
            case MessageTypes.Emote:
+diff --git a/lib/pages/chat/events/message_reactions.dart b/lib/pages/chat/events/message_reactions.dart
+index 8d40694..f400c07 100644
+--- a/lib/pages/chat/events/message_reactions.dart
++++ b/lib/pages/chat/events/message_reactions.dart
+@@ -15,12 +15,13 @@ import 'package:matrix/matrix.dart';
+ class MessageReactions extends StatelessWidget {
+   final Event event;
+   final Timeline timeline;
++  final List<Event>? cachedReactions;
+ 
+-  const MessageReactions(this.event, this.timeline, {super.key});
++  const MessageReactions(this.event, this.timeline, {this.cachedReactions, super.key});
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final allReactionEvents = event.aggregatedEvents(
++    final allReactionEvents = cachedReactions ?? event.aggregatedEvents(
+       timeline,
+       RelationshipTypes.reaction,
+     );
+diff --git a/lib/pages/chat/seen_by_row.dart b/lib/pages/chat/seen_by_row.dart
+index 975ee1b..67e348a 100644
+--- a/lib/pages/chat/seen_by_row.dart
++++ b/lib/pages/chat/seen_by_row.dart
+@@ -4,6 +4,7 @@
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ import 'package:fluffychat/config/themes.dart';
++import 'package:fluffychat/utils/stream_extension.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:flutter/material.dart';
+@@ -19,13 +20,15 @@ class SeenByRow extends StatelessWidget {
+ 
+     const maxAvatars = 7;
+     return StreamBuilder(
+-      stream: event.room.client.onSync.stream.where(
+-        (syncUpdate) =>
+-            syncUpdate.rooms?.join?[event.room.id]?.ephemeral?.any(
+-              (ephemeral) => ephemeral.type == 'm.receipt',
+-            ) ??
+-            false,
+-      ),
++      stream: event.room.client.onSync.stream
++          .where(
++            (syncUpdate) =>
++                syncUpdate.rooms?.join?[event.room.id]?.ephemeral?.any(
++                  (ephemeral) => ephemeral.type == 'm.receipt',
++                ) ??
++                false,
++          )
++          .rateLimit(const Duration(seconds: 1)),
+       builder: (context, asyncSnapshot) {
+         final seenByUsers = event.receipts
+             .map((r) => r.user)
 diff --git a/lib/pages/chat/sticker_picker_dialog.dart b/lib/pages/chat/sticker_picker_dialog.dart
 index 1ef4962..fd455e2 100644
 --- a/lib/pages/chat/sticker_picker_dialog.dart
@@ -978,6 +1410,41 @@ index 1ef4962..fd455e2 100644
                scrolledUnderElevation: 0,
                backgroundColor: Colors.transparent,
                automaticallyImplyLeading: false,
+diff --git a/lib/pages/chat/typing_indicators.dart b/lib/pages/chat/typing_indicators.dart
+index 9fa19a7..b8a29f3 100644
+--- a/lib/pages/chat/typing_indicators.dart
++++ b/lib/pages/chat/typing_indicators.dart
+@@ -8,6 +8,7 @@ import 'dart:async';
+ import 'package:fluffychat/config/app_config.dart';
+ import 'package:fluffychat/config/themes.dart';
+ import 'package:fluffychat/pages/chat/chat.dart';
++import 'package:fluffychat/utils/stream_extension.dart';
+ import 'package:fluffychat/widgets/avatar.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:flutter/material.dart';
+@@ -23,13 +24,15 @@ class TypingIndicators extends StatelessWidget {
+     const avatarSize = Avatar.defaultSize / 2;
+ 
+     return StreamBuilder<Object>(
+-      stream: controller.room.client.onSync.stream.where(
+-        (syncUpdate) =>
+-            syncUpdate.rooms?.join?[controller.room.id]?.ephemeral?.any(
+-              (ephemeral) => ephemeral.type == 'm.typing',
+-            ) ??
+-            false,
+-      ),
++      stream: controller.room.client.onSync.stream
++          .where(
++            (syncUpdate) =>
++                syncUpdate.rooms?.join?[controller.room.id]?.ephemeral?.any(
++                  (ephemeral) => ephemeral.type == 'm.typing',
++                ) ??
++                false,
++          )
++          .rateLimit(const Duration(seconds: 1)),
+       builder: (context, _) {
+         final typingUsers = controller.room.typingUsers
+           ..removeWhere((u) => u.stateKey == Matrix.of(context).client.userID);
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
 index 4cda41c..9d64854 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
@@ -1711,7 +2178,7 @@ index 6ceba8b..613f334 100644
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92..942d6fb 100644
+index 8610b92..00e96d1 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -1996,7 +2463,24 @@ index 8610b92..942d6fb 100644
                              children: [
                                DummyChatListItem(opacity: 0.5, animate: false),
                                DummyChatListItem(opacity: 0.3, animate: false),
-@@ -245,10 +349,10 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,9 +339,13 @@ class ChatListViewBody extends StatelessWidget {
+             if (client.prevBatch != null)
+               SliverSafeArea(
+                 top: false,
+-                sliver: SliverList.builder(
+-                  itemCount: rooms.length,
+-                  itemBuilder: (BuildContext context, int i) {
++                sliver: SliverPrototypeExtentList(
++                  prototypeItem: const DummyChatListItem(
++                    opacity: 0,
++                    animate: false,
++                  ),
++                  delegate: SliverChildBuilderDelegate(
++                    (BuildContext context, int i) {
+                     final room = rooms[i];
+                     final space = spaceDelegateCandidates[room.id];
+                     return ChatListItem(
+@@ -245,12 +353,13 @@ class ChatListViewBody extends StatelessWidget {
                        space: space,
                        key: Key('chat_list_item_${room.id}'),
                        filter: filter,
@@ -2009,12 +2493,15 @@ index 8610b92..942d6fb 100644
 +                      activeChat: widget.controller.activeChat == room.id,
                      );
                    },
++                  childCount: rooms.length,
                  ),
+               ),
+           ],
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e..002de85 100644
+index 55d1d7e..fd3f469 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,473 @@
+@@ -1,410 +1,475 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -2564,9 +3051,10 @@ index 55d1d7e..002de85 100644
 +    final space = isBeeperFakeDM ? null : widget.space;
 +    final mxContent = beeperData.avatarUrl;
 +
-+    return Padding(
-+      padding: const EdgeInsets.symmetric(horizontal: 8),
-+      child: Material(
++    return RepaintBoundary(
++      child: Padding(
++        padding: const EdgeInsets.symmetric(horizontal: 8),
++        child: Material(
 +        borderRadius: BorderRadius.circular(AppConfig.borderRadius),
 +        clipBehavior: Clip.hardEdge,
 +        color: backgroundColor,
@@ -2895,7 +3383,8 @@ index 55d1d7e..002de85 100644
 +          ),
 +        ),
 +      ),
-+    );
++    ),
++  );
 +  }
 +}
 diff --git a/lib/pages/chat_list/label_editor_dialog.dart b/lib/pages/chat_list/label_editor_dialog.dart
@@ -3067,7 +3556,7 @@ index 0000000..20a0df4
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..e401db6 100644
+index a649171..c116f23 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -3100,7 +3589,7 @@ index a649171..e401db6 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,9 +33,300 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,9 +33,303 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -3109,6 +3598,9 @@ index a649171..e401db6 100644
 +}
 +
 +class _SpacesNavigationRailState extends State<SpacesNavigationRail> {
++  List<_CombinedRailItem>? _cachedCombinedItems;
++  String _lastCombinedHash = '';
++
 +  void _showNetworkMenu(
 +    BuildContext context,
 +    BeeperNetwork net,
@@ -3401,117 +3893,130 @@ index a649171..e401db6 100644
      final coloredMode = !FluffyThemes.isColumnMode(context);
      final theme = Theme.of(context);
      return Material(
-@@ -43,9 +339,108 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -42,9 +341,119 @@ class SpacesNavigationRail extends StatelessWidget {
+               .where((s) => s.hasRoomUpdate)
                .rateLimit(const Duration(seconds: 1)),
            builder: (context, _) {
-             final allSpaces = client.rooms
+-            final allSpaces = client.rooms
 -                .where((room) => room.isSpace)
-+                .where((room) {
-+                  if (!room.isSpace) return false;
-+                  if (BeeperBridgeUtils.isBeeperBot(room.directChatMatrixID ?? '')) return false;
-+                  final members = room.states['m.room.member'];
-+                  if (members == null) return true;
-+                  return !members.keys.any((mxid) => BeeperBridgeUtils.isBeeperBot(mxid));
-+                })
-                 .toList();
- 
-+            final hiddenNets = BeeperBridgeUtils.getHiddenNetworks(client);
-+
-+            // Read real Beeper labels from account data (com.beeper.labels)
-+            final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
-+            final beeperLabelItems = <_CombinedRailItem>[];
-+            final roomsInVisibleLabels = <String>{};
-+            final labelTitlesLower = <String>{};
-+
-+            for (final entry in beeperLabels.entries) {
-+              if (entry.key == '_hidden_networks') continue;
-+              final val = entry.value;
-+              if (val is! Map) continue;
-+              final title = val['title']?.toString() ?? '';
-+              if (title.isEmpty) continue;
-+
-+              final isHidden = hiddenNets.contains(entry.key) ||
-+                  hiddenNets.contains(title) ||
-+                  hiddenNets.contains(title.toLowerCase()) ||
-+                  hiddenNets.any((hn) {
-+                    final hnl = hn.toLowerCase();
-+                    final tl = title.toLowerCase();
-+                    return tl.contains(hnl) || hnl.contains(tl);
-+                  });
-+              if (isHidden) continue;
-+
-+              final rooms = (val['rooms'] as List?)?.cast<String>() ?? [];
-+              final isSelected = widget.activeSpaceId == 'virtual_beeper_label_${entry.key}';
-+              if (rooms.isEmpty && !isSelected) continue;
-+
-+              roomsInVisibleLabels.addAll(rooms);
-+              labelTitlesLower.add(title.toLowerCase());
-+
-+              final emoji = val['emoji']?.toString();
-+              beeperLabelItems.add(_CombinedRailItem.beeperLabel(entry.key, title, emoji: emoji));
-+            }
-+
-+            // Extract unique Beeper networks and custom tags from client rooms
-+            final beeperNetworks = <String, BeeperNetwork>{};
-+            final customTags = <String>{};
+-                .toList();
++            final storeOrder = store.getStringList('beeper_networks_order')?.join(',') ?? '';
++            final accountDataHash = '${client.rooms.length}_${client.accountData['im.ponies.user_emotes']?.content.hashCode}_$storeOrder';
++            
++            var roomsTagHash = 0;
 +            for (final r in client.rooms) {
-+              final net = BeeperBridgeUtils.getRoomNetwork(r);
-+              if (net != null) {
-+                final baseKey = BeeperBridgeUtils.getBaseNetworkKey(net.key);
-+                final netNameLower = net.name.toLowerCase();
-+                final isHidden = hiddenNets.contains(baseKey) ||
-+                    hiddenNets.contains(net.key) ||
-+                    hiddenNets.contains(netNameLower) ||
-+                    hiddenNets.any((hn) {
-+                      final hnl = hn.toLowerCase();
-+                      return netNameLower.contains(hnl) || hnl.contains(netNameLower) || baseKey.contains(hnl);
-+                    });
++              roomsTagHash ^= r.tags.length;
++              roomsTagHash ^= r.isSpace ? 1 : 0;
++            }
++            final totalHash = '${accountDataHash}_$roomsTagHash';
++            
++            if (_cachedCombinedItems != null && _lastCombinedHash == totalHash) {
++              // Usa los elementos cacheados sin volver a recalcular todo
++            } else {
++              _lastCombinedHash = totalHash;
++              final allSpaces = client.rooms
++                  .where((room) {
++                    if (!room.isSpace) return false;
++                    if (BeeperBridgeUtils.isBeeperBot(room.directChatMatrixID ?? '')) return false;
++                    final members = room.states['m.room.member'];
++                    if (members == null) return true;
++                    return !members.keys.any((mxid) => BeeperBridgeUtils.isBeeperBot(mxid));
++                  })
++                  .toList();
 +
-+                final coveredByLabel = labelTitlesLower.any(
-+                      (t) => t.contains(baseKey) || t.contains(netNameLower) || netNameLower.contains(t),
-+                    ) ||
-+                    roomsInVisibleLabels.contains(r.id);
++              final hiddenNets = BeeperBridgeUtils.getHiddenNetworks(client);
 +
-+                if (!isHidden && !coveredByLabel) {
-+                  beeperNetworks[baseKey] = BeeperNetwork(net.name, net.colorHex, baseKey);
++              // Read real Beeper labels from account data (com.beeper.labels)
++              final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
++              final beeperLabelItems = <_CombinedRailItem>[];
++              final roomsInVisibleLabels = <String>{};
++              final labelTitlesLower = <String>{};
++
++              for (final entry in beeperLabels.entries) {
++                if (entry.key == '_hidden_networks') continue;
++                final val = entry.value;
++                if (val is! Map) continue;
++                final title = val['title']?.toString() ?? '';
++                if (title.isEmpty) continue;
++
++                final isHidden = val['isShownInInbox'] == false;
++                if (!isHidden) {
++                  final rooms = List<String>.from(val['rooms'] ?? []);
++                  roomsInVisibleLabels.addAll(rooms);
++                  labelTitlesLower.add(title.toLowerCase());
++                }
++                beeperLabelItems.add(_CombinedRailItem.beeperLabel(entry.key, val));
++              }
++
++              beeperLabelItems.sort((a, b) {
++                final cA = a.beeperLabelData!['createdAt'] ?? 0;
++                final cB = b.beeperLabelData!['createdAt'] ?? 0;
++                return cB.compareTo(cA); // Newer first
++              });
++
++              final beeperNetworks = <String, BeeperNetwork>{};
++              final customTags = <String>{};
++              for (final r in client.rooms) {
++                final net = BeeperBridgeUtils.getRoomNetwork(r);
++                if (net != null) {
++                  final baseKey = BeeperBridgeUtils.getBaseNetworkKey(net.key);
++                  final netNameLower = net.name.toLowerCase();
++                  final isHidden = hiddenNets.contains(baseKey) ||
++                      hiddenNets.contains(net.key) ||
++                      hiddenNets.contains(netNameLower) ||
++                      hiddenNets.any((hn) {
++                        final hnl = hn.toLowerCase();
++                        return netNameLower.contains(hnl) || hnl.contains(netNameLower) || baseKey.contains(hnl);
++                      });
++
++                  final coveredByLabel = labelTitlesLower.any(
++                        (t) => t.contains(baseKey) || t.contains(netNameLower) || netNameLower.contains(t),
++                      ) ||
++                      roomsInVisibleLabels.contains(r.id);
++
++                  if (!isHidden && !coveredByLabel) {
++                    beeperNetworks[baseKey] = BeeperNetwork(net.name, net.colorHex, baseKey);
++                  }
++                }
++                for (final tag in r.tags.keys) {
++                  if (tag.startsWith('u.')) customTags.add(tag);
 +                }
 +              }
-+              for (final tag in r.tags.keys) {
-+                if (tag.startsWith('u.')) customTags.add(tag);
++
++              final visibleNetworks = beeperNetworks.values.toList();
++              final tagsList = customTags.toList()..sort();
++
++              final order = store.getStringList('beeper_networks_order') ?? [];
++              visibleNetworks.sort((a, b) {
++                final idxA = order.indexOf(a.key);
++                final idxB = order.indexOf(b.key);
++                if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
++                if (idxA != -1) return -1;
++                if (idxB != -1) return 1;
++                return a.name.compareTo(b.name);
++              });
++
++              final combinedItems = <_CombinedRailItem>[];
++              for (final space in allSpaces) {
++                combinedItems.add(_CombinedRailItem.space(space));
 +              }
++              for (final net in visibleNetworks) {
++                combinedItems.add(_CombinedRailItem.network(net));
++              }
++              for (final labelItem in beeperLabelItems) {
++                combinedItems.add(labelItem);
++              }
++              for (final tag in tagsList) {
++                combinedItems.add(_CombinedRailItem.tag(tag));
++              }
++              _cachedCombinedItems = combinedItems;
 +            }
-+
-+            final visibleNetworks = beeperNetworks.values.toList();
-+            final tagsList = customTags.toList()..sort();
-+
-+            final order = store.getStringList('beeper_networks_order') ?? [];
-+            visibleNetworks.sort((a, b) {
-+              final idxA = order.indexOf(a.key);
-+              final idxB = order.indexOf(b.key);
-+              if (idxA != -1 && idxB != -1) return idxA.compareTo(idxB);
-+              if (idxA != -1) return -1;
-+              if (idxB != -1) return 1;
-+              return a.name.compareTo(b.name);
-+            });
-+
-+            final combinedItems = <_CombinedRailItem>[];
-+            for (final space in allSpaces) {
-+              combinedItems.add(_CombinedRailItem.space(space));
-+            }
-+            for (final net in visibleNetworks) {
-+              combinedItems.add(_CombinedRailItem.network(net));
-+            }
-+            for (final labelItem in beeperLabelItems) {
-+              combinedItems.add(labelItem);
-+            }
-+            for (final tag in tagsList) {
-+              combinedItems.add(_CombinedRailItem.tag(tag));
-+            }
-+
++            
++            final combinedItems = _cachedCombinedItems!;
+ 
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
-                   ? FluffyThemes.navRailWidth
-@@ -54,14 +449,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +463,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -3530,7 +4035,7 @@ index a649171..e401db6 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -75,49 +470,209 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -75,49 +484,209 @@ class SpacesNavigationRail extends StatelessWidget {
                            );
                          }
                          i--;
@@ -3774,7 +4279,7 @@ index a649171..e401db6 100644
                        },
                      ),
                    ),
-@@ -135,3 +690,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +704,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -4842,10 +5347,10 @@ index 5ead47d..7e7aa4a 100644
  
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..8a972ca
+index 0000000..051a8f1
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,747 @@
+@@ -0,0 +1,761 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -4943,9 +5448,12 @@ index 0000000..8a972ca
 +  }
 +
 +  /// Caché de timestamp del último mensaje real (en milisegundos desde epoch)
++  static final Map<String, int> _pendingTimestamps = {};
++
 +  static void saveLastTimestamp(String roomId, int milliseconds) {
 +    if (prefs == null) return;
-+    prefs!.setInt('beeper_ts_$roomId', milliseconds); // siempre sobreescribir
++    _pendingTimestamps[roomId] = milliseconds;
++    _scheduleDiskFlush();
 +  }
 +
 +  static int? getCachedLastTimestamp(String roomId) {
@@ -5002,19 +5510,30 @@ index 0000000..8a972ca
 +
 +  static Future<void> _flushToDisk() async {
 +    _diskFlushScheduled = false;
-+    if (prefs == null || _pendingDiskWrites.isEmpty) return;
++    if (prefs == null) return;
++    
++    if (_pendingDiskWrites.isNotEmpty) {
++      final batch = Map<String, BeeperRoomData>.from(_pendingDiskWrites);
++      _pendingDiskWrites.clear();
 +
-+    final batch = Map<String, BeeperRoomData>.from(_pendingDiskWrites);
-+    _pendingDiskWrites.clear();
-+
-+    for (final entry in batch.entries) {
-+      final roomId = entry.key;
-+      final d = entry.value;
-+      if (d.contactId != null) saveContactId(roomId, d.contactId!);
-+      saveIsFakeDM(roomId, d.isFakeDM);
-+      if (d.networkKey != null) saveRoomNetwork(roomId, d.networkKey!);
-+      if (d.displayName != null) saveName(roomId, d.displayName!);
-+      if (d.avatarUrl != null) saveAvatar(roomId, d.avatarUrl.toString());
++      for (final entry in batch.entries) {
++        final roomId = entry.key;
++        final d = entry.value;
++        if (d.contactId != null) saveContactId(roomId, d.contactId!);
++        saveIsFakeDM(roomId, d.isFakeDM);
++        if (d.networkKey != null) saveRoomNetwork(roomId, d.networkKey!);
++        if (d.displayName != null) saveName(roomId, d.displayName!);
++        if (d.avatarUrl != null) saveAvatar(roomId, d.avatarUrl.toString());
++      }
++    }
++    
++    if (_pendingTimestamps.isNotEmpty) {
++      final batchTs = Map<String, int>.from(_pendingTimestamps);
++      _pendingTimestamps.clear();
++      
++      for (final entry in batchTs.entries) {
++        prefs!.setInt('beeper_ts_${entry.key}', entry.value);
++      }
 +    }
 +  }
 +
@@ -6023,10 +6542,10 @@ index 8ef1126..589b320 100644
          mxContent == null ||
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000..a2b049d
+index 0000000..feac688
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,236 @@
+@@ -0,0 +1,239 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -6089,6 +6608,7 @@ index 0000000..a2b049d
 +      }
 +
 +      final locals = MatrixLocals(L10n.of(context));
++      final throttleTimer = Stopwatch()..start();
 +
 +      // 3. Process rooms in parallel batches of 5
 +      const batchSize = 5;
@@ -6099,9 +6619,11 @@ index 0000000..a2b049d
 +        await Future.wait(batch.map((room) async {
 +          try {
 +            final roomName = room.getBeeperDisplayname(locals);
-+            if (mounted) {
++            if (mounted && throttleTimer.elapsedMilliseconds > 100) {
++              throttleTimer.reset();
 +              setState(() {
 +                _currentRoomName = roomName;
++                _processedRooms = i; // Approximate since it's concurrent
 +              });
 +            }
 +            await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
@@ -6111,10 +6633,10 @@ index 0000000..a2b049d
 +          } catch (_) {}
 +        }));
 +
-+        if (mounted) {
-+          setState(() {
-+            _processedRooms += batch.length;
-+          });
++        _processedRooms = i + batch.length;
++        if (mounted && (throttleTimer.elapsedMilliseconds > 100 || i + batchSize >= rooms.length)) {
++          throttleTimer.reset();
++          setState(() {});
 +        }
 +
 +        // Once we process at least 30 rooms (or all of them if less),
@@ -6263,8 +6785,58 @@ index 0000000..a2b049d
 +    );
 +  }
 +}
+diff --git a/lib/widgets/deferred_widget.dart b/lib/widgets/deferred_widget.dart
+new file mode 100644
+index 0000000..1096b84
+--- /dev/null
++++ b/lib/widgets/deferred_widget.dart
+@@ -0,0 +1,44 @@
++import 'package:flutter/material.dart';
++
++typedef LibraryLoader = Future<void> Function();
++typedef DeferredWidgetBuilder = Widget Function();
++
++class DeferredWidget extends StatefulWidget {
++  final LibraryLoader libraryLoader;
++  final DeferredWidgetBuilder createWidget;
++  final Widget? placeholder;
++
++  const DeferredWidget({
++    Key? key,
++    required this.libraryLoader,
++    required this.createWidget,
++    this.placeholder,
++  }) : super(key: key);
++
++  @override
++  State<DeferredWidget> createState() => _DeferredWidgetState();
++}
++
++class _DeferredWidgetState extends State<DeferredWidget> {
++  Widget? _loadedChild;
++
++  @override
++  void initState() {
++    super.initState();
++    _loadLibrary();
++  }
++
++  Future<void> _loadLibrary() async {
++    await widget.libraryLoader();
++    if (mounted) {
++      setState(() {
++        _loadedChild = widget.createWidget();
++      });
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return _loadedChild ?? widget.placeholder ?? const Scaffold(body: Center(child: CircularProgressIndicator.adaptive()));
++  }
++}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..5670e2a 100644
+index 934de68..c5fe82a 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -35,6 +35,9 @@ import '../pages/key_verification/key_verification_dialog.dart';
@@ -6277,7 +6849,47 @@ index 934de68..5670e2a 100644
  
  class Matrix extends StatefulWidget {
    final Widget? child;
-@@ -205,9 +208,25 @@ class MatrixState extends State<Matrix> {
+@@ -105,7 +108,14 @@ class MatrixState extends State<Matrix> {
+     return bundles.values.first;
+   }
+ 
++  Map<String?, List<Client?>>? _cachedAccountBundles;
++  int _lastClientsLength = -1;
++
+   Map<String?, List<Client?>> get accountBundles {
++    if (_cachedAccountBundles != null && _lastClientsLength == widget.clients.length) {
++      return _cachedAccountBundles!;
++    }
++    
+     final resBundles =
+         <String?, List<({Client? client, AccountBundle? bundle})>>{};
+     for (var i = 0; i < widget.clients.length; i++) {
+@@ -130,12 +140,22 @@ class MatrixState extends State<Matrix> {
+             : a.bundle!.priority!.compareTo(b.bundle!.priority!),
+       );
+     }
+-    return resBundles.map(
++    _lastClientsLength = widget.clients.length;
++    _cachedAccountBundles = resBundles.map(
+       (k, v) => MapEntry(k, v.map((vv) => vv.client).toList()),
+     );
++    return _cachedAccountBundles!;
+   }
+ 
+-  bool get hasComplexBundles => accountBundles.values.any((v) => v.length > 1);
++  bool? _cachedHasComplexBundles;
++
++  bool get hasComplexBundles {
++    if (_cachedHasComplexBundles != null && _lastClientsLength == widget.clients.length) {
++      return _cachedHasComplexBundles!;
++    }
++    _cachedHasComplexBundles = accountBundles.values.any((v) => v.length > 1);
++    return _cachedHasComplexBundles!;
++  }
+ 
+   Client? _loginClientCandidate;
+ 
+@@ -205,9 +225,25 @@ class MatrixState extends State<Matrix> {
    void initState() {
      super.initState();
      _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
@@ -6303,7 +6915,7 @@ index 934de68..5670e2a 100644
    AppLifecycleListener? _listener;
  
    void _registerSubs(String name) {
-@@ -375,6 +394,11 @@ class MatrixState extends State<Matrix> {
+@@ -375,6 +411,11 @@ class MatrixState extends State<Matrix> {
          Logs().v('Set background sync to', foreground);
        }
      }
@@ -6315,7 +6927,7 @@ index 934de68..5670e2a 100644
    }
  
    @override
-@@ -409,7 +433,12 @@ class MatrixState extends State<Matrix> {
+@@ -409,7 +450,12 @@ class MatrixState extends State<Matrix> {
  
    @override
    Widget build(BuildContext context) {
@@ -6330,7 +6942,7 @@ index 934de68..5670e2a 100644
  
    Future<void> dehydrateAction(BuildContext context) async {
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..0baa01d 100644
+index f9b2df0..56b6ff6 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
 @@ -32,8 +32,17 @@ class MxcImage extends StatefulWidget {
@@ -6352,34 +6964,32 @@ index f9b2df0..0baa01d 100644
  
    const MxcImage({
      this.uri,
-@@ -59,23 +68,71 @@ class MxcImage extends StatefulWidget {
+@@ -59,23 +68,68 @@ class MxcImage extends StatefulWidget {
    State<MxcImage> createState() => _MxcImageState();
  }
  
 +class _LruMemoryCache {
 +  final Map<String, Uint8List> _map = {};
-+  final List<String> _keysOrder = [];
 +  int _currentSizeBytes = 0;
 +  static const int _maxSizeBytes = 30 * 1024 * 1024; // 30 MB
 +
 +  Uint8List? get(String key) {
 +    if (!_map.containsKey(key)) return null;
-+    _keysOrder.remove(key);
-+    _keysOrder.add(key);
-+    return _map[key];
++    final val = _map.remove(key)!;
++    _map[key] = val;
++    return val;
 +  }
 +
 +  void put(String key, Uint8List val) {
 +    if (_map.containsKey(key)) {
 +      _currentSizeBytes -= _map[key]!.length;
-+      _keysOrder.remove(key);
++      _map.remove(key);
 +    }
 +    _map[key] = val;
-+    _keysOrder.add(key);
 +    _currentSizeBytes += val.length;
 +
-+    while (_currentSizeBytes > _maxSizeBytes && _keysOrder.isNotEmpty) {
-+      final oldestKey = _keysOrder.removeAt(0);
++    while (_currentSizeBytes > _maxSizeBytes && _map.isNotEmpty) {
++      final oldestKey = _map.keys.first;
 +      final removedVal = _map.remove(oldestKey);
 +      if (removedVal != null) {
 +        _currentSizeBytes -= removedVal.length;
@@ -6389,7 +6999,6 @@ index f9b2df0..0baa01d 100644
 +
 +  void clear() {
 +    _map.clear();
-+    _keysOrder.clear();
 +    _currentSizeBytes = 0;
 +  }
 +}
@@ -6434,7 +7043,27 @@ index f9b2df0..0baa01d 100644
    }
  
    Future<void> _load() async {
-@@ -141,10 +198,30 @@ class _MxcImageState extends State<MxcImage> {
+@@ -128,23 +182,49 @@ class _MxcImageState extends State<MxcImage> {
+     }
+   }
+ 
++  int _retryCount = 0;
++
+   Future<void> _tryLoad() async {
+-    if (_imageData != null) {
++    if (_imageData != null || !mounted) {
+       return;
+     }
+     try {
+       await _load();
++      _retryCount = 0;
+     } on IOException catch (_) {
+       if (!mounted) return;
+-      await Future.delayed(widget.retryDuration);
++      _retryCount++;
++      final delaySeconds = min(60, pow(2, _retryCount)).toInt();
++      await Future.delayed(Duration(seconds: delaySeconds));
+       _tryLoad();
      }
    }
  
@@ -6461,6 +7090,7 @@ index f9b2df0..0baa01d 100644
 +        widget.cacheKey != oldWidget.cacheKey ||
 +        widget.event != oldWidget.event) {
 +      _localImageData = null;
++      _retryCount = 0;
 +      if (_imageData == null) {
 +        _tryLoad();
 +      }
@@ -6468,7 +7098,7 @@ index f9b2df0..0baa01d 100644
    }
  
    @override
-@@ -152,49 +229,40 @@ class _MxcImageState extends State<MxcImage> {
+@@ -152,49 +232,40 @@ class _MxcImageState extends State<MxcImage> {
      final data = _imageData;
      final hasData = data != null && data.isNotEmpty;
  
@@ -6548,3 +7178,95 @@ index f9b2df0..0baa01d 100644
      );
    }
  }
+diff --git a/lib/widgets/presence_builder.dart b/lib/widgets/presence_builder.dart
+index bfafea2..196b156 100644
+--- a/lib/widgets/presence_builder.dart
++++ b/lib/widgets/presence_builder.dart
+@@ -29,8 +29,15 @@ class _PresenceBuilderState extends State<PresenceBuilder> {
+   CachedPresence? _presence;
+   StreamSubscription<CachedPresence>? _sub;
+ 
++  static final Map<String, CachedPresence> _presenceCache = {};
++  static final Map<String, DateTime> _presenceCacheTime = {};
++
+   void _updatePresence(CachedPresence? presence) {
+     if (!mounted) return;
++    if (presence != null && widget.userId != null) {
++      _presenceCache[widget.userId!] = presence;
++      _presenceCacheTime[widget.userId!] = DateTime.now();
++    }
+     setState(() {
+       _presence = presence;
+     });
+@@ -42,7 +49,17 @@ class _PresenceBuilderState extends State<PresenceBuilder> {
+     final client = widget.client ?? Matrix.of(context).client;
+     final userId = widget.userId;
+     if (userId != null) {
+-      client.fetchCurrentPresence(userId).then(_updatePresence);
++      final cached = _presenceCache[userId];
++      final cacheTime = _presenceCacheTime[userId];
++      
++      if (cached != null) {
++        _presence = cached;
++      }
++      
++      if (cached == null || cacheTime == null || DateTime.now().difference(cacheTime).inMinutes > 5) {
++        client.fetchCurrentPresence(userId).then(_updatePresence);
++      }
++      
+       _sub = client.onPresenceChanged.stream
+           .where((presence) => presence.userid == userId)
+           .listen(_updatePresence);
+diff --git a/update_routes.py b/update_routes.py
+new file mode 100644
+index 0000000..6363b09
+--- /dev/null
++++ b/update_routes.py
+@@ -0,0 +1,47 @@
++import re
++
++file_path = 'lib/config/routes.dart'
++with open(file_path, 'r', encoding='utf-8') as f:
++    content = f.read()
++
++if 'deferred_widget.dart' not in content:
++    content = content.replace(
++        "import 'package:flutter/material.dart';",
++        "import 'package:flutter/material.dart';\nimport 'package:fluffychat/widgets/deferred_widget.dart';"
++    )
++
++pages_to_defer = {
++    'settings/patches_settings.dart': ('patches', 'SettingsPatches'),
++    'settings_3pid/settings_3pid.dart': ('settings_3pid', 'Settings3Pid'),
++    'settings_chat/settings_chat.dart': ('settings_chat', 'SettingsChat'),
++    'settings_emotes/settings_emotes.dart': ('settings_emotes', 'SettingsEmotes'),
++    'settings_homeserver/settings_homeserver.dart': ('settings_homeserver', 'SettingsHomeserver'),
++    'settings_ignore_list/settings_ignore_list.dart': ('settings_ignore_list', 'SettingsIgnoreList'),
++    'settings_notifications/settings_notifications.dart': ('settings_notifications', 'SettingsNotifications'),
++    'settings_password/settings_password.dart': ('settings_password', 'SettingsPassword'),
++    'settings_security/settings_security.dart': ('settings_security', 'SettingsSecurity'),
++    'settings_style/settings_style.dart': ('settings_style', 'SettingsStyle'),
++}
++
++for path, (prefix, class_name) in pages_to_defer.items():
++    content = re.sub(
++        r"import 'package:fluffychat/pages/" + re.escape(path) + r"';",
++        f"import 'package:fluffychat/pages/{path}' deferred as {prefix};",
++        content
++    )
++    
++    content = re.sub(
++        r"const " + class_name + r"\(\)",
++        f"DeferredWidget(libraryLoader: {prefix}.loadLibrary, createWidget: () => {prefix}.{class_name}())",
++        content
++    )
++    content = re.sub(
++        r"(?<!\.)" + class_name + r"\(\)",
++        f"DeferredWidget(libraryLoader: {prefix}.loadLibrary, createWidget: () => {prefix}.{class_name}())",
++        content
++    )
++
++with open(file_path, 'w', encoding='utf-8') as f:
++    f.write(content)
++
++print('Updated routes.dart')
