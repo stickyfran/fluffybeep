@@ -7898,7 +7898,7 @@ index 0000000..6f499d6
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc..a22064b 100644
+index f056efc..d1aa89c 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
 @@ -15,6 +15,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7932,13 +7932,18 @@ index f056efc..a22064b 100644
  @pragma('vm:entry-point')
  Future<void> notificationTapBackground(
    NotificationResponse notificationResponse,
-@@ -150,10 +156,30 @@ Future<void> notificationTap(
+@@ -150,10 +156,35 @@ Future<void> notificationTap(
              .waitForRoomInSync(roomId)
              .timeout(const Duration(seconds: 30));
        }
 +      final room = client.getRoomById(roomId);
 +      if (room != null && payload.eventId != null) {
-+        final event = room.getEventById(payload.eventId!) ?? room.lastEvent;
++        Event? event;
++        try {
++          event = await room.getEventById(payload.eventId!);
++        } catch (_) {
++          event = room.lastEvent;
++        }
 +        if (event != null && event.type == EventTypes.Encrypted) {
 +          final network = BeeperBridgeUtils.getRoomNetwork(room);
 +          if (network?.key == 'instagram') {
@@ -7965,12 +7970,17 @@ index f056efc..a22064b 100644
        );
      case NotificationResponseType.selectedNotificationAction:
        final actionType = FluffyChatNotificationActions.values.singleWhereOrNull(
-@@ -198,10 +224,29 @@ Future<void> notificationTap(
+@@ -198,10 +229,34 @@ Future<void> notificationTap(
          case FluffyChatNotificationActions.mute:
            await room.setPushRuleState(PushRuleState.mentionsOnly);
          case FluffyChatNotificationActions.open:
 +          if (payload.eventId != null) {
-+            final event = room.getEventById(payload.eventId!) ?? room.lastEvent;
++            Event? event;
++            try {
++              event = await room.getEventById(payload.eventId!);
++            } catch (_) {
++              event = room.lastEvent;
++            }
 +            if (event != null && event.type == EventTypes.Encrypted) {
 +              final network = BeeperBridgeUtils.getRoomNetwork(room);
 +              if (network?.key == 'instagram') {
