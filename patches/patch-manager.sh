@@ -13,9 +13,14 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-FLUFFYCHAT_DIR="$ROOT_DIR/fluffychat_src"
-NEW_FILES_DIR="$ROOT_DIR/patches/NEW_FILES"
-PATCHES_DIR="$ROOT_DIR/patches"
+PATCHES_DIR="$SCRIPT_DIR"
+
+if [ -d "$ROOT_DIR/fluffychat_src" ]; then
+    FLUFFYCHAT_DIR="$ROOT_DIR/fluffychat_src"
+else
+    FLUFFYCHAT_DIR="$ROOT_DIR"
+fi
+NEW_FILES_DIR="$PATCHES_DIR/NEW_FILES"
 UPSTREAM_BASE="259bc72fb897e99303058712fcdfaee033bd4d33"
 
 # Colors for output
@@ -52,11 +57,7 @@ apply_patches() {
         
         # Try git apply first (more robust with new files and line endings)
         # --whitespace=warn tolerates trailing whitespace without failing
-        if [ "$FLUFFYCHAT_DIR" = "." ]; then
-            git apply --whitespace=warn "$patch_file"
-        else
-            git apply --whitespace=warn --directory="$FLUFFYCHAT_DIR" "$patch_file"
-        fi || {
+        (cd "$FLUFFYCHAT_DIR" && git apply --whitespace=warn "$patch_file") || {
             log_warn "git apply failed, falling back to patch utility..."
             cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
                 log_error "Failed to apply patch $patch_file"
@@ -83,11 +84,7 @@ reverse_patches() {
     local patch_file="$PATCHES_DIR/0000-unified-fluffybeep.patch"
     if [ -f "$patch_file" ]; then
         log_info "Reversing $patch_file"
-        if [ "$FLUFFYCHAT_DIR" = "." ]; then
-            git apply -R --whitespace=warn "$patch_file"
-        else
-            git apply -R --whitespace=warn --directory="$FLUFFYCHAT_DIR" "$patch_file"
-        fi || {
+        (cd "$FLUFFYCHAT_DIR" && git apply -R --whitespace=warn "$patch_file") || {
             cat "$patch_file" | tr -d '\r' | patch -p1 -R -d "$FLUFFYCHAT_DIR" || true
         }
     else
@@ -133,18 +130,18 @@ validate_patch() {
     local abs_patch_file
     abs_patch_file="$(realpath "$patch_file")"
     local test_dir="/tmp/fluffybeep_patch_test_$$"
-    git worktree add "$test_dir" "$UPSTREAM_BASE" 2>/dev/null
+    (cd "$FLUFFYCHAT_DIR" && git worktree add "$test_dir" "$UPSTREAM_BASE" 2>/dev/null)
     
     if (cd "$test_dir" && git apply --check --whitespace=warn "$abs_patch_file" 2>&1); then
         log_info "✅ Patch validates successfully against upstream base."
     else
         log_error "❌ Patch does NOT apply cleanly to upstream base $UPSTREAM_BASE"
         log_error "The patch was likely generated incorrectly. Use 'regenerate' command."
-        git worktree remove "$test_dir" --force 2>/dev/null || true
+        (cd "$FLUFFYCHAT_DIR" && git worktree remove "$test_dir" --force 2>/dev/null || true)
         exit 1
     fi
     
-    git worktree remove "$test_dir" --force 2>/dev/null || true
+    (cd "$FLUFFYCHAT_DIR" && git worktree remove "$test_dir" --force 2>/dev/null || true)
     log_info "Validation complete."
 }
 
