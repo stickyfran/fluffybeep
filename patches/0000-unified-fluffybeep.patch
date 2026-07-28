@@ -325390,10 +325390,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..efebf7de68cf6f92cd5160c965150b7c8c043f3e 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3c015bb7aa1b03e9568c07cb21a7274e2f387c4d 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1291 @@
+@@ -1,1041 +1,1289 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -326600,8 +326600,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..efebf7de68cf6f92cd5160c965150b7c
 +      if (type == 'm.room.message' ||
 +          type == 'm.room.encrypted' ||
 +          type == 'm.sticker' ||
-+          type == 'm.room.bridged_message' ||
-+          event.isRoomMessage) {
++          type == 'm.room.bridged_message') {
 +        final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
 +        if (cached == null || event.originServerTs.isAfter(cached)) {
 +          BeeperBridgeUtils.setLastMessageTime(room.id, event.originServerTs);
@@ -326660,8 +326659,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..efebf7de68cf6f92cd5160c965150b7c
 +          if (t == 'm.room.message' ||
 +              t == 'm.room.encrypted' ||
 +              t == 'm.sticker' ||
-+              t == 'm.room.bridged_message' ||
-+              ev.isRoomMessage) {
++              t == 'm.room.bridged_message') {
 +            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
 +            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
 +            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
