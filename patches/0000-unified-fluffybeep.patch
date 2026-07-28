@@ -363436,7 +363436,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..fc5acf9dc57b7554f55ffa9267a9896dc7a35645 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..c4966bdc20bd5d69d55256af739a86ef361c2a23 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,483 +1,601 @@
@@ -364250,7 +364250,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..fc5acf9dc57b7554f55ffa9267a9896d
 +      final rooms = val['rooms'];
 +      if (rooms is List && rooms.contains(event.room.id)) {
 +        labelId = entry.key;
-+        labelName = val['name'] as String?;
++        labelName = (val['title'] ?? val['name']) as String?;
 +        final sound = store.getString('beeper_sound_${entry.key}');
 +        if (sound != null && sound != 'default') {
 +          targetSound = sound;
