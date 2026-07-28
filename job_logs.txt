@@ -1,0 +1,849 @@
+﻿2026-07-25T07:42:27.4919333Z Current runner version: '2.336.0'
+2026-07-25T07:42:27.4955013Z ##[group]Runner Image Provisioner
+2026-07-25T07:42:27.4956316Z Hosted Compute Agent
+2026-07-25T07:42:27.4957221Z Version: 20260707.563
+2026-07-25T07:42:27.4958223Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-25T07:42:27.4959678Z Build Date: 2026-07-07T19:33:50Z
+2026-07-25T07:42:27.4960814Z Worker ID: {c0940fb3-7652-4b4d-a365-aef05020f214}
+2026-07-25T07:42:27.4962561Z Azure Region: northcentralus
+2026-07-25T07:42:27.4963657Z ##[endgroup]
+2026-07-25T07:42:27.4965669Z ##[group]Operating System
+2026-07-25T07:42:27.4966719Z Ubuntu
+2026-07-25T07:42:27.4967535Z 24.04.4
+2026-07-25T07:42:27.4968284Z LTS
+2026-07-25T07:42:27.4969442Z ##[endgroup]
+2026-07-25T07:42:27.4970298Z ##[group]Runner Image
+2026-07-25T07:42:27.4971428Z Image: ubuntu-24.04
+2026-07-25T07:42:27.4972342Z Version: 20260720.247.2
+2026-07-25T07:42:27.4974201Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260720.247/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-25T07:42:27.4976965Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260720.247
+2026-07-25T07:42:27.4978522Z ##[endgroup]
+2026-07-25T07:42:27.4980948Z ##[group]GITHUB_TOKEN Permissions
+2026-07-25T07:42:27.4983762Z Contents: write
+2026-07-25T07:42:27.4984906Z Metadata: read
+2026-07-25T07:42:27.4985760Z ##[endgroup]
+2026-07-25T07:42:27.4989277Z Secret source: Actions
+2026-07-25T07:42:27.4991357Z Prepare workflow directory
+2026-07-25T07:42:27.5408752Z Prepare all required actions
+2026-07-25T07:42:27.5470432Z Getting action download info
+2026-07-25T07:42:27.7774905Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-07-25T07:42:28.0814165Z Download action repository 'actions/setup-java@v3' (SHA:17f84c3641ba7b8f6deff6309fc4c864478f5d62)
+2026-07-25T07:42:28.4718759Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-07-25T07:42:28.6618436Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-07-25T07:42:28.7861788Z Download action repository 'softprops/action-gh-release@v2' (SHA:3bb12739c298aeb8a4eeaf626c5b8d85266b0e65)
+2026-07-25T07:42:29.1326812Z Getting action download info
+2026-07-25T07:42:29.2063743Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-07-25T07:42:29.4620912Z Complete job name: build
+2026-07-25T07:42:29.5745647Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:42:29.5757060Z ##[group]Run actions/checkout@v4
+2026-07-25T07:42:29.5758278Z with:
+2026-07-25T07:42:29.5759325Z   fetch-depth: 0
+2026-07-25T07:42:29.5760259Z   repository: stickyfran/fluffybeep
+2026-07-25T07:42:29.5768375Z   token: ***
+2026-07-25T07:42:29.5769335Z   ssh-strict: true
+2026-07-25T07:42:29.5770215Z   ssh-user: git
+2026-07-25T07:42:29.5771132Z   persist-credentials: true
+2026-07-25T07:42:29.5772122Z   clean: true
+2026-07-25T07:42:29.5773015Z   sparse-checkout-cone-mode: true
+2026-07-25T07:42:29.5774057Z   fetch-tags: false
+2026-07-25T07:42:29.5774943Z   show-progress: true
+2026-07-25T07:42:29.5775837Z   lfs: false
+2026-07-25T07:42:29.5776717Z   submodules: false
+2026-07-25T07:42:29.5777624Z   set-safe-directory: true
+2026-07-25T07:42:29.5778628Z   allow-unsafe-pr-checkout: false
+2026-07-25T07:42:29.5780379Z ##[endgroup]
+2026-07-25T07:42:29.6824192Z Syncing repository: stickyfran/fluffybeep
+2026-07-25T07:42:29.6826874Z ##[group]Getting Git version info
+2026-07-25T07:42:29.6828207Z Working directory is '/home/runner/work/fluffybeep/fluffybeep'
+2026-07-25T07:42:29.6830468Z [command]/usr/bin/git version
+2026-07-25T07:42:29.6856498Z git version 2.54.0
+2026-07-25T07:42:29.6879949Z ##[endgroup]
+2026-07-25T07:42:29.6897205Z Temporarily overriding HOME='/home/runner/work/_temp/7bc5b3ad-29c7-43fd-bd70-48b8a60f6023' before making global git config changes
+2026-07-25T07:42:29.6901673Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-25T07:42:29.6905175Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffybeep/fluffybeep
+2026-07-25T07:42:29.6954295Z Deleting the contents of '/home/runner/work/fluffybeep/fluffybeep'
+2026-07-25T07:42:29.6959484Z ##[group]Initializing the repository
+2026-07-25T07:42:29.6965461Z [command]/usr/bin/git init /home/runner/work/fluffybeep/fluffybeep
+2026-07-25T07:42:29.7038665Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-25T07:42:29.7041719Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-25T07:42:29.7044422Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-25T07:42:29.7046905Z hint: call:
+2026-07-25T07:42:29.7047824Z hint:
+2026-07-25T07:42:29.7048821Z hint: 	git config --global init.defaultBranch <name>
+2026-07-25T07:42:29.7050426Z hint:
+2026-07-25T07:42:29.7051755Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-25T07:42:29.7054062Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-25T07:42:29.7055496Z hint:
+2026-07-25T07:42:29.7056313Z hint: 	git branch -m <name>
+2026-07-25T07:42:29.7057255Z hint:
+2026-07-25T07:42:29.7058482Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-25T07:42:29.7066310Z Initialized empty Git repository in /home/runner/work/fluffybeep/fluffybeep/.git/
+2026-07-25T07:42:29.7071404Z [command]/usr/bin/git remote add origin https://github.com/stickyfran/fluffybeep
+2026-07-25T07:42:29.7099505Z ##[endgroup]
+2026-07-25T07:42:29.7101211Z ##[group]Disabling automatic garbage collection
+2026-07-25T07:42:29.7102936Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-25T07:42:29.7141958Z ##[endgroup]
+2026-07-25T07:42:29.7147974Z ##[group]Setting up auth
+2026-07-25T07:42:29.7150610Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-25T07:42:29.7190614Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-25T07:42:29.7541923Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-25T07:42:29.7582882Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-25T07:42:29.7853346Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-25T07:42:29.7893407Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-25T07:42:29.8136580Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-25T07:42:29.8177819Z ##[endgroup]
+2026-07-25T07:42:29.8179620Z ##[group]Fetching the repository
+2026-07-25T07:42:29.8190757Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-07-25T07:42:30.3104016Z From https://github.com/stickyfran/fluffybeep
+2026-07-25T07:42:30.3105905Z  * [new branch]      main       -> origin/main
+2026-07-25T07:42:30.3107402Z  * [new tag]         v1.0.10    -> v1.0.10
+2026-07-25T07:42:30.3108790Z  * [new tag]         v1.0.101   -> v1.0.101
+2026-07-25T07:42:30.3111935Z  * [new tag]         v1.0.106   -> v1.0.106
+2026-07-25T07:42:30.3113375Z  * [new tag]         v1.0.116   -> v1.0.116
+2026-07-25T07:42:30.3114691Z  * [new tag]         v1.0.118   -> v1.0.118
+2026-07-25T07:42:30.3116046Z  * [new tag]         v1.0.119   -> v1.0.119
+2026-07-25T07:42:30.3117809Z  * [new tag]         v1.0.120   -> v1.0.120
+2026-07-25T07:42:30.3119344Z  * [new tag]         v1.0.121   -> v1.0.121
+2026-07-25T07:42:30.3120717Z  * [new tag]         v1.0.122   -> v1.0.122
+2026-07-25T07:42:30.3121842Z  * [new tag]         v1.0.123   -> v1.0.123
+2026-07-25T07:42:30.3123212Z  * [new tag]         v1.0.124   -> v1.0.124
+2026-07-25T07:42:30.3124486Z  * [new tag]         v1.0.125   -> v1.0.125
+2026-07-25T07:42:30.3125779Z  * [new tag]         v1.0.129   -> v1.0.129
+2026-07-25T07:42:30.3126962Z  * [new tag]         v1.0.130   -> v1.0.130
+2026-07-25T07:42:30.3128079Z  * [new tag]         v1.0.133   -> v1.0.133
+2026-07-25T07:42:30.3129344Z  * [new tag]         v1.0.135   -> v1.0.135
+2026-07-25T07:42:30.3130286Z  * [new tag]         v1.0.137   -> v1.0.137
+2026-07-25T07:42:30.3131085Z  * [new tag]         v1.0.14    -> v1.0.14
+2026-07-25T07:42:30.3131883Z  * [new tag]         v1.0.15    -> v1.0.15
+2026-07-25T07:42:30.3132675Z  * [new tag]         v1.0.24    -> v1.0.24
+2026-07-25T07:42:30.3133468Z  * [new tag]         v1.0.25    -> v1.0.25
+2026-07-25T07:42:30.3134259Z  * [new tag]         v1.0.26    -> v1.0.26
+2026-07-25T07:42:30.3135044Z  * [new tag]         v1.0.33    -> v1.0.33
+2026-07-25T07:42:30.3135921Z  * [new tag]         v1.0.34    -> v1.0.34
+2026-07-25T07:42:30.3136733Z  * [new tag]         v1.0.35    -> v1.0.35
+2026-07-25T07:42:30.3137532Z  * [new tag]         v1.0.36    -> v1.0.36
+2026-07-25T07:42:30.3138377Z  * [new tag]         v1.0.37    -> v1.0.37
+2026-07-25T07:42:30.3139499Z  * [new tag]         v1.0.46    -> v1.0.46
+2026-07-25T07:42:30.3140290Z  * [new tag]         v1.0.51    -> v1.0.51
+2026-07-25T07:42:30.3141066Z  * [new tag]         v1.0.54    -> v1.0.54
+2026-07-25T07:42:30.3141847Z  * [new tag]         v1.0.56    -> v1.0.56
+2026-07-25T07:42:30.3142625Z  * [new tag]         v1.0.59    -> v1.0.59
+2026-07-25T07:42:30.3143407Z  * [new tag]         v1.0.62    -> v1.0.62
+2026-07-25T07:42:30.3144181Z  * [new tag]         v1.0.63    -> v1.0.63
+2026-07-25T07:42:30.3144968Z  * [new tag]         v1.0.64    -> v1.0.64
+2026-07-25T07:42:30.3145759Z  * [new tag]         v1.0.65    -> v1.0.65
+2026-07-25T07:42:30.3146549Z  * [new tag]         v1.0.66    -> v1.0.66
+2026-07-25T07:42:30.3147327Z  * [new tag]         v1.0.68    -> v1.0.68
+2026-07-25T07:42:30.3148107Z  * [new tag]         v1.0.70    -> v1.0.70
+2026-07-25T07:42:30.3149188Z  * [new tag]         v1.0.71    -> v1.0.71
+2026-07-25T07:42:30.3150223Z  * [new tag]         v1.0.72    -> v1.0.72
+2026-07-25T07:42:30.3151011Z  * [new tag]         v1.0.73    -> v1.0.73
+2026-07-25T07:42:30.3151892Z  * [new tag]         v1.0.74    -> v1.0.74
+2026-07-25T07:42:30.3152682Z  * [new tag]         v1.0.76    -> v1.0.76
+2026-07-25T07:42:30.3153469Z  * [new tag]         v1.0.77    -> v1.0.77
+2026-07-25T07:42:30.3154255Z  * [new tag]         v1.0.80    -> v1.0.80
+2026-07-25T07:42:30.3155031Z  * [new tag]         v1.0.83    -> v1.0.83
+2026-07-25T07:42:30.3155808Z  * [new tag]         v1.0.85    -> v1.0.85
+2026-07-25T07:42:30.3156580Z  * [new tag]         v1.0.86    -> v1.0.86
+2026-07-25T07:42:30.3157374Z  * [new tag]         v1.0.87    -> v1.0.87
+2026-07-25T07:42:30.3158158Z  * [new tag]         v1.0.89    -> v1.0.89
+2026-07-25T07:42:30.3159127Z  * [new tag]         v1.0.91    -> v1.0.91
+2026-07-25T07:42:30.3160024Z  * [new tag]         v1.0.92    -> v1.0.92
+2026-07-25T07:42:30.3160814Z  * [new tag]         v1.0.93    -> v1.0.93
+2026-07-25T07:42:30.3161600Z  * [new tag]         v1.0.94    -> v1.0.94
+2026-07-25T07:42:30.3162382Z  * [new tag]         v1.0.96    -> v1.0.96
+2026-07-25T07:42:30.3245788Z [command]/usr/bin/git branch --list --remote origin/main
+2026-07-25T07:42:30.3270723Z   origin/main
+2026-07-25T07:42:30.3280143Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+2026-07-25T07:42:30.3309031Z 4adf40d8e13cf4f808160a19f624310b4bd6c9fd
+2026-07-25T07:42:30.3313731Z ##[endgroup]
+2026-07-25T07:42:30.3315085Z ##[group]Determining the checkout info
+2026-07-25T07:42:30.3316580Z ##[endgroup]
+2026-07-25T07:42:30.3320112Z [command]/usr/bin/git sparse-checkout disable
+2026-07-25T07:42:30.3368393Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-25T07:42:30.3401498Z ##[group]Checking out the ref
+2026-07-25T07:42:30.3404230Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-25T07:42:30.3519639Z Switched to a new branch 'main'
+2026-07-25T07:42:30.3522484Z branch 'main' set up to track 'origin/main'.
+2026-07-25T07:42:30.3530850Z ##[endgroup]
+2026-07-25T07:42:30.3576799Z [command]/usr/bin/git log -1 --format=%H
+2026-07-25T07:42:30.3607712Z 4adf40d8e13cf4f808160a19f624310b4bd6c9fd
+2026-07-25T07:42:30.3915065Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:42:30.3917319Z ##[group]Run actions/checkout@v4
+2026-07-25T07:42:30.3918066Z with:
+2026-07-25T07:42:30.3918765Z   repository: krille-chan/fluffychat
+2026-07-25T07:42:30.3919732Z   ref: 259bc72fb897e99303058712fcdfaee033bd4d33
+2026-07-25T07:42:30.3920510Z   submodules: recursive
+2026-07-25T07:42:30.3921196Z   path: fluffychat
+2026-07-25T07:42:30.3924398Z   token: ***
+2026-07-25T07:42:30.3925070Z   ssh-strict: true
+2026-07-25T07:42:30.3925745Z   ssh-user: git
+2026-07-25T07:42:30.3926452Z   persist-credentials: true
+2026-07-25T07:42:30.3927154Z   clean: true
+2026-07-25T07:42:30.3927856Z   sparse-checkout-cone-mode: true
+2026-07-25T07:42:30.3928634Z   fetch-depth: 1
+2026-07-25T07:42:30.3929427Z   fetch-tags: false
+2026-07-25T07:42:30.3930132Z   show-progress: true
+2026-07-25T07:42:30.3930805Z   lfs: false
+2026-07-25T07:42:30.3931476Z   set-safe-directory: true
+2026-07-25T07:42:30.3932222Z   allow-unsafe-pr-checkout: false
+2026-07-25T07:42:30.3932954Z ##[endgroup]
+2026-07-25T07:42:30.4869172Z Syncing repository: krille-chan/fluffychat
+2026-07-25T07:42:30.4875344Z ##[group]Getting Git version info
+2026-07-25T07:42:30.4876664Z Working directory is '/home/runner/work/fluffybeep/fluffybeep/fluffychat'
+2026-07-25T07:42:30.4915330Z [command]/usr/bin/git version
+2026-07-25T07:42:30.4960022Z git version 2.54.0
+2026-07-25T07:42:30.4982779Z ##[endgroup]
+2026-07-25T07:42:30.4996849Z Temporarily overriding HOME='/home/runner/work/_temp/aada588a-bab1-4ad9-86fe-c1a92b0812f2' before making global git config changes
+2026-07-25T07:42:30.4998461Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-25T07:42:30.5002859Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffybeep/fluffybeep/fluffychat
+2026-07-25T07:42:30.5043598Z ##[group]Initializing the repository
+2026-07-25T07:42:30.5051597Z [command]/usr/bin/git init /home/runner/work/fluffybeep/fluffybeep/fluffychat
+2026-07-25T07:42:30.5108732Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-25T07:42:30.5124288Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-07-25T07:42:30.5132602Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-07-25T07:42:30.5134211Z hint: call:
+2026-07-25T07:42:30.5135291Z hint:
+2026-07-25T07:42:30.5136549Z hint: 	git config --global init.defaultBranch <name>
+2026-07-25T07:42:30.5137862Z hint:
+2026-07-25T07:42:30.5139398Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-25T07:42:30.5141163Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-25T07:42:30.5142657Z hint:
+2026-07-25T07:42:30.5143819Z hint: 	git branch -m <name>
+2026-07-25T07:42:30.5145060Z hint:
+2026-07-25T07:42:30.5146556Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-07-25T07:42:30.5149087Z Initialized empty Git repository in /home/runner/work/fluffybeep/fluffybeep/fluffychat/.git/
+2026-07-25T07:42:30.5153077Z [command]/usr/bin/git remote add origin https://github.com/krille-chan/fluffychat
+2026-07-25T07:42:30.5187901Z ##[endgroup]
+2026-07-25T07:42:30.5190123Z ##[group]Disabling automatic garbage collection
+2026-07-25T07:42:30.5192987Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-25T07:42:30.5240390Z ##[endgroup]
+2026-07-25T07:42:30.5242117Z ##[group]Setting up auth
+2026-07-25T07:42:30.5249514Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-25T07:42:30.5300337Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-25T07:42:30.5635848Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-25T07:42:30.5676892Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-25T07:42:30.5968132Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-25T07:42:30.6012717Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-25T07:42:30.6284109Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-25T07:42:30.6328350Z ##[endgroup]
+2026-07-25T07:42:30.6329781Z ##[group]Fetching the repository
+2026-07-25T07:42:30.6337900Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 259bc72fb897e99303058712fcdfaee033bd4d33
+2026-07-25T07:42:31.4061860Z From https://github.com/krille-chan/fluffychat
+2026-07-25T07:42:31.4062691Z  * branch            259bc72fb897e99303058712fcdfaee033bd4d33 -> FETCH_HEAD
+2026-07-25T07:42:31.4090914Z ##[endgroup]
+2026-07-25T07:42:31.4091579Z ##[group]Determining the checkout info
+2026-07-25T07:42:31.4093532Z ##[endgroup]
+2026-07-25T07:42:31.4100579Z [command]/usr/bin/git sparse-checkout disable
+2026-07-25T07:42:31.4146516Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-25T07:42:31.4181802Z ##[group]Checking out the ref
+2026-07-25T07:42:31.4186138Z [command]/usr/bin/git checkout --progress --force 259bc72fb897e99303058712fcdfaee033bd4d33
+2026-07-25T07:42:31.4762266Z Note: switching to '259bc72fb897e99303058712fcdfaee033bd4d33'.
+2026-07-25T07:42:31.4763319Z 
+2026-07-25T07:42:31.4764021Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-07-25T07:42:31.4765057Z changes and commit them, and you can discard any commits you make in this
+2026-07-25T07:42:31.4765992Z state without impacting any branches by switching back to a branch.
+2026-07-25T07:42:31.4766618Z 
+2026-07-25T07:42:31.4767146Z If you want to create a new branch to retain commits you create, you may
+2026-07-25T07:42:31.4768005Z do so (now or later) by using -c with the switch command. Example:
+2026-07-25T07:42:31.4768502Z 
+2026-07-25T07:42:31.4768779Z   git switch -c <new-branch-name>
+2026-07-25T07:42:31.4769374Z 
+2026-07-25T07:42:31.4769548Z Or undo this operation with:
+2026-07-25T07:42:31.4769811Z 
+2026-07-25T07:42:31.4769950Z   git switch -
+2026-07-25T07:42:31.4770201Z 
+2026-07-25T07:42:31.4770556Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-07-25T07:42:31.4771020Z 
+2026-07-25T07:42:31.4802169Z HEAD is now at 259bc72 Merge pull request #3266 from krille-chan/krille/go-to-rooms-after-session-restore
+2026-07-25T07:42:31.4804191Z ##[endgroup]
+2026-07-25T07:42:31.4804926Z ##[group]Setting up auth for fetching submodules
+2026-07-25T07:42:31.4806026Z [command]/usr/bin/git config --global http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-25T07:42:31.4845921Z [command]/usr/bin/git config --global --unset-all url.https://github.com/.insteadOf
+2026-07-25T07:42:31.4880632Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf git@github.com:
+2026-07-25T07:42:31.4916965Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf org-14187051@github.com:
+2026-07-25T07:42:31.4949498Z ##[endgroup]
+2026-07-25T07:42:31.4950076Z ##[group]Fetching submodules
+2026-07-25T07:42:31.4954017Z [command]/usr/bin/git submodule sync --recursive
+2026-07-25T07:42:31.5197356Z [command]/usr/bin/git -c protocol.version=2 submodule update --init --force --depth=1 --recursive
+2026-07-25T07:42:31.5444743Z [command]/usr/bin/git submodule foreach --recursive git config --local gc.auto 0
+2026-07-25T07:42:31.5684111Z ##[endgroup]
+2026-07-25T07:42:31.5685160Z ##[group]Persisting credentials for submodules
+2026-07-25T07:42:31.5691282Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :"
+2026-07-25T07:42:31.5940678Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-25T07:42:31.6183789Z [command]/usr/bin/git submodule foreach --recursive git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'
+2026-07-25T07:42:31.6426528Z [command]/usr/bin/git submodule foreach --recursive git config --local --add 'url.https://github.com/.insteadOf' 'org-14187051@github.com:'
+2026-07-25T07:42:31.6666893Z ##[endgroup]
+2026-07-25T07:42:31.6712535Z [command]/usr/bin/git log -1 --format=%H
+2026-07-25T07:42:31.6742479Z 259bc72fb897e99303058712fcdfaee033bd4d33
+2026-07-25T07:42:31.6994528Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:42:31.6995713Z ##[group]Run actions/setup-java@v3
+2026-07-25T07:42:31.6995991Z with:
+2026-07-25T07:42:31.6996189Z   distribution: zulu
+2026-07-25T07:42:31.6996417Z   java-version: 17
+2026-07-25T07:42:31.6996629Z   java-package: jdk
+2026-07-25T07:42:31.6996845Z   check-latest: false
+2026-07-25T07:42:31.6997060Z   server-id: github
+2026-07-25T07:42:31.6997275Z   server-username: GITHUB_ACTOR
+2026-07-25T07:42:31.6997535Z   server-password: GITHUB_TOKEN
+2026-07-25T07:42:31.6997780Z   overwrite-settings: true
+2026-07-25T07:42:31.6998015Z   job-status: success
+2026-07-25T07:42:31.7000752Z   token: ***
+2026-07-25T07:42:31.7000966Z ##[endgroup]
+2026-07-25T07:42:31.8580443Z ##[group]Installed distributions
+2026-07-25T07:42:31.8623004Z Trying to resolve the latest version from remote
+2026-07-25T07:42:31.8727980Z (node:2559) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-25T07:42:31.8729663Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-25T07:42:31.9265546Z Resolved latest version as 17.0.20+8
+2026-07-25T07:42:31.9266432Z Trying to download...
+2026-07-25T07:42:31.9267680Z Downloading Java 17.0.20+8 (Zulu) from https://cdn.azul.com/zulu/bin/zulu17.68.17-ca-jdk17.0.20-linux_x64.tar.gz ...
+2026-07-25T07:42:34.1349704Z Extracting Java archive...
+2026-07-25T07:42:34.1481112Z [command]/usr/bin/tar xz --warning=no-unknown-keyword -C /home/runner/work/_temp/78e1c502-7a73-41fb-a7e0-805d4e4eac61 -f /home/runner/work/_temp/a19aecc6-1926-481b-9806-a03801ef6b2a
+2026-07-25T07:42:37.1645283Z Java 17.0.20+8 was downloaded
+2026-07-25T07:42:37.1645877Z Setting Java 17.0.20+8 as the default
+2026-07-25T07:42:37.1656565Z Creating toolchains.xml for JDK version 17 from zulu
+2026-07-25T07:42:37.1723374Z Writing to /home/runner/.m2/toolchains.xml
+2026-07-25T07:42:37.1724012Z 
+2026-07-25T07:42:37.1724156Z Java configuration:
+2026-07-25T07:42:37.1724492Z   Distribution: zulu
+2026-07-25T07:42:37.1724809Z   Version: 17.0.20+8
+2026-07-25T07:42:37.1725208Z   Path: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.1725919Z 
+2026-07-25T07:42:37.1726409Z ##[endgroup]
+2026-07-25T07:42:37.1743546Z Creating settings.xml with server-id: github
+2026-07-25T07:42:37.1744078Z Writing to /home/runner/.m2/settings.xml
+2026-07-25T07:42:37.2047847Z ##[group]Run subosito/flutter-action@v2
+2026-07-25T07:42:37.2048143Z with:
+2026-07-25T07:42:37.2048342Z   channel: stable
+2026-07-25T07:42:37.2048549Z   cache: true
+2026-07-25T07:42:37.2048817Z   cache-key: flutter-:os:-:channel:-:version:-:arch:-:hash:
+2026-07-25T07:42:37.2049403Z   architecture: X64
+2026-07-25T07:42:37.2049632Z   pub-cache-path: default
+2026-07-25T07:42:37.2049865Z   dry-run: false
+2026-07-25T07:42:37.2050134Z   git-source: https://github.com/flutter/flutter.git
+2026-07-25T07:42:37.2050452Z env:
+2026-07-25T07:42:37.2050715Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2051114Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2051468Z ##[endgroup]
+2026-07-25T07:42:37.2151800Z ##[group]Run chmod +x "$GITHUB_ACTION_PATH/setup.sh"
+2026-07-25T07:42:37.2152238Z [36;1mchmod +x "$GITHUB_ACTION_PATH/setup.sh"[0m
+2026-07-25T07:42:37.2206542Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-25T07:42:37.2206901Z env:
+2026-07-25T07:42:37.2207180Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2207596Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2207928Z ##[endgroup]
+2026-07-25T07:42:37.2370494Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh -p \
+2026-07-25T07:42:37.2370901Z [36;1m$GITHUB_ACTION_PATH/setup.sh -p \[0m
+2026-07-25T07:42:37.2371193Z [36;1m  -n '' \[0m
+2026-07-25T07:42:37.2371405Z [36;1m  -f '' \[0m
+2026-07-25T07:42:37.2371606Z [36;1m  -a 'X64' \[0m
+2026-07-25T07:42:37.2371927Z [36;1m  -k 'flutter-:os:-:channel:-:version:-:arch:-:hash:' \[0m
+2026-07-25T07:42:37.2372257Z [36;1m  -c '' \[0m
+2026-07-25T07:42:37.2372451Z [36;1m  -l '' \[0m
+2026-07-25T07:42:37.2372677Z [36;1m  -d 'default' \[0m
+2026-07-25T07:42:37.2372993Z [36;1m  -g 'https://github.com/flutter/flutter.git' \[0m
+2026-07-25T07:42:37.2373331Z [36;1m  stable[0m
+2026-07-25T07:42:37.2419308Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-25T07:42:37.2419655Z env:
+2026-07-25T07:42:37.2419930Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2420355Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.2420693Z ##[endgroup]
+2026-07-25T07:42:37.4609217Z ##[group]Run actions/cache@v5
+2026-07-25T07:42:37.4609585Z with:
+2026-07-25T07:42:37.4609953Z   path: /opt/hostedtoolcache/flutter/stable-3.44.8-x64
+2026-07-25T07:42:37.4610601Z   key: flutter-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6
+2026-07-25T07:42:37.4611051Z   enableCrossOsArchive: false
+2026-07-25T07:42:37.4611309Z   fail-on-cache-miss: false
+2026-07-25T07:42:37.4611551Z   lookup-only: false
+2026-07-25T07:42:37.4611795Z   save-always: false
+2026-07-25T07:42:37.4612002Z env:
+2026-07-25T07:42:37.4612257Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.4612665Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:37.4613019Z ##[endgroup]
+2026-07-25T07:42:37.6813307Z Cache hit for: flutter-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6
+2026-07-25T07:42:38.8130653Z Received 130023424 of 1691923562 (7.7%), 124.0 MBs/sec
+2026-07-25T07:42:39.8093408Z Received 268435456 of 1691923562 (15.9%), 127.9 MBs/sec
+2026-07-25T07:42:40.8099327Z Received 486539264 of 1691923562 (28.8%), 154.6 MBs/sec
+2026-07-25T07:42:41.8104204Z Received 700448768 of 1691923562 (41.4%), 166.9 MBs/sec
+2026-07-25T07:42:42.8130552Z Received 918552576 of 1691923562 (54.3%), 175.1 MBs/sec
+2026-07-25T07:42:43.8124071Z Received 1119879168 of 1691923562 (66.2%), 177.9 MBs/sec
+2026-07-25T07:42:44.8132751Z Received 1337982976 of 1691923562 (79.1%), 182.2 MBs/sec
+2026-07-25T07:42:45.8147219Z Received 1484783616 of 1691923562 (87.8%), 176.8 MBs/sec
+2026-07-25T07:42:46.8171106Z Received 1687729258 of 1691923562 (99.8%), 178.7 MBs/sec
+2026-07-25T07:42:46.9541918Z Received 1691923562 of 1691923562 (100.0%), 176.4 MBs/sec
+2026-07-25T07:42:46.9545772Z Cache Size: ~1614 MB (1691923562 B)
+2026-07-25T07:42:46.9590171Z [command]/usr/bin/tar -xf /home/runner/work/_temp/a109db83-caf3-40b5-bdcd-21b86329da59/cache.tzst -P -C /home/runner/work/fluffybeep/fluffybeep --use-compress-program unzstd
+2026-07-25T07:42:51.7612345Z Cache restored successfully
+2026-07-25T07:42:51.8465091Z Cache restored from key: flutter-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6
+2026-07-25T07:42:52.0010513Z ##[group]Run actions/cache@v5
+2026-07-25T07:42:52.0010784Z with:
+2026-07-25T07:42:52.0011006Z   path: /home/runner/.pub-cache
+2026-07-25T07:42:52.0011737Z   key: flutter-pub-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6-0ef4ba60c1cc5de7a96b89bacbe1cff8f2d61295383bce9d92621412e5466441
+2026-07-25T07:42:52.0012499Z   enableCrossOsArchive: false
+2026-07-25T07:42:52.0012761Z   fail-on-cache-miss: false
+2026-07-25T07:42:52.0013012Z   lookup-only: false
+2026-07-25T07:42:52.0013236Z   save-always: false
+2026-07-25T07:42:52.0013445Z env:
+2026-07-25T07:42:52.0013720Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:52.0014135Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:52.0014477Z ##[endgroup]
+2026-07-25T07:42:52.2340504Z Cache hit for: flutter-pub-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6-0ef4ba60c1cc5de7a96b89bacbe1cff8f2d61295383bce9d92621412e5466441
+2026-07-25T07:42:53.3539773Z Received 130023424 of 175164236 (74.2%), 124.0 MBs/sec
+2026-07-25T07:42:53.7287420Z Received 175164236 of 175164236 (100.0%), 121.5 MBs/sec
+2026-07-25T07:42:53.7289536Z Cache Size: ~167 MB (175164236 B)
+2026-07-25T07:42:53.7330328Z [command]/usr/bin/tar -xf /home/runner/work/_temp/67eb05aa-e3ad-400f-827c-b17e705a1287/cache.tzst -P -C /home/runner/work/fluffybeep/fluffybeep --use-compress-program unzstd
+2026-07-25T07:42:55.8191832Z Cache restored successfully
+2026-07-25T07:42:55.8357568Z Cache restored from key: flutter-pub-linux-stable-3.44.8-x64-058e0af2c2b57e369d905a03ac9748b0ebf543c6-0ef4ba60c1cc5de7a96b89bacbe1cff8f2d61295383bce9d92621412e5466441
+2026-07-25T07:42:55.8499920Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh \
+2026-07-25T07:42:55.8500298Z [36;1m$GITHUB_ACTION_PATH/setup.sh \[0m
+2026-07-25T07:42:55.8500595Z [36;1m  -n '3.44.8' \[0m
+2026-07-25T07:42:55.8500847Z [36;1m  -a 'x64' \[0m
+2026-07-25T07:42:55.8501173Z [36;1m  -c '/opt/hostedtoolcache/flutter/stable-3.44.8-x64' \[0m
+2026-07-25T07:42:55.8501548Z [36;1m  -d '/home/runner/.pub-cache' \[0m
+2026-07-25T07:42:55.8501834Z [36;1m  stable[0m
+2026-07-25T07:42:55.8549488Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-25T07:42:55.8549847Z env:
+2026-07-25T07:42:55.8550153Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:55.8550610Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:55.8550956Z ##[endgroup]
+2026-07-25T07:42:56.0078480Z ##[group]Run cp -r patches fluffychat/patches
+2026-07-25T07:42:56.0079163Z [36;1mcp -r patches fluffychat/patches[0m
+2026-07-25T07:42:56.0079589Z [36;1mcd fluffychat[0m
+2026-07-25T07:42:56.0079874Z [36;1mchmod +x ./patches/patch-manager.sh[0m
+2026-07-25T07:42:56.0080222Z [36;1m./patches/patch-manager.sh patch-only[0m
+2026-07-25T07:42:56.0129516Z shell: /usr/bin/bash -e {0}
+2026-07-25T07:42:56.0129804Z env:
+2026-07-25T07:42:56.0130115Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:56.0130556Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:56.0131005Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.44.8-x64/flutter
+2026-07-25T07:42:56.0131396Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-25T07:42:56.0131785Z ##[endgroup]
+2026-07-25T07:42:56.0255401Z [0;32m[INFO][0m Applying patches...
+2026-07-25T07:42:56.0256300Z [0;32m[INFO][0m Processing ./patches/0000-unified-fluffybeep.patch
+2026-07-25T07:42:56.0278636Z ./patches/0000-unified-fluffybeep.patch:1390: trailing whitespace.
+2026-07-25T07:42:56.0279429Z     
+2026-07-25T07:42:56.0279913Z ./patches/0000-unified-fluffybeep.patch:1397: trailing whitespace.
+2026-07-25T07:42:56.0280516Z   
+2026-07-25T07:42:56.0280984Z ./patches/0000-unified-fluffybeep.patch:1444: trailing whitespace.
+2026-07-25T07:42:56.0281562Z     
+2026-07-25T07:42:56.0282025Z ./patches/0000-unified-fluffybeep.patch:1448: trailing whitespace.
+2026-07-25T07:42:56.0282584Z     
+2026-07-25T07:42:56.0283009Z ./patches/0000-unified-fluffybeep.patch:2743: trailing whitespace.
+2026-07-25T07:42:56.0283558Z     
+2026-07-25T07:42:56.0358086Z warning: squelched 504 whitespace errors
+2026-07-25T07:42:56.0358606Z warning: 509 lines add whitespace errors.
+2026-07-25T07:42:56.0362755Z [0;32m[INFO][0m Copying new files from ./patches/NEW_FILES...
+2026-07-25T07:42:56.0381781Z [0;32m[INFO][0m Patching completed.
+2026-07-25T07:42:56.0413452Z ##[group]Run cd fluffychat
+2026-07-25T07:42:56.0413768Z [36;1mcd fluffychat[0m
+2026-07-25T07:42:56.0414019Z [36;1mflutter pub get[0m
+2026-07-25T07:42:56.0462355Z shell: /usr/bin/bash -e {0}
+2026-07-25T07:42:56.0462622Z env:
+2026-07-25T07:42:56.0462924Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:56.0463367Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:42:56.0463816Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.44.8-x64/flutter
+2026-07-25T07:42:56.0464206Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-25T07:42:56.0464468Z ##[endgroup]
+2026-07-25T07:42:56.3192170Z Resolving dependencies...
+2026-07-25T07:42:56.8247762Z Downloading packages...
+2026-07-25T07:42:56.9581724Z   _fe_analyzer_shared 93.0.0 (105.0.0 available)
+2026-07-25T07:42:56.9582318Z   analysis_server_plugin 0.3.7 (0.3.20 available)
+2026-07-25T07:42:56.9582842Z   analyzer 10.0.1 (14.1.0 available)
+2026-07-25T07:42:56.9583376Z   analyzer_plugin 0.14.1 (0.14.14 available)
+2026-07-25T07:42:56.9583821Z   audio_session 0.2.3 (0.2.4 available)
+2026-07-25T07:42:56.9584238Z   barbecue 0.4.0 (0.5.0 available)
+2026-07-25T07:42:56.9584638Z   cli_util 0.4.2 (0.5.2 available)
+2026-07-25T07:42:56.9585005Z   code_assets 1.0.0 (1.2.1 available)
+2026-07-25T07:42:56.9585278Z   coverage 1.15.0 (1.15.1 available)
+2026-07-25T07:42:56.9585564Z   cross_file 0.3.5+2 (0.3.5+4 available)
+2026-07-25T07:42:56.9586032Z   dart_code_linter 4.1.6 (4.1.8 available)
+2026-07-25T07:42:56.9586461Z   dart_style 3.1.7 (3.1.12 available)
+2026-07-25T07:42:56.9586861Z   dbus 0.7.12 (0.7.14 available)
+2026-07-25T07:42:56.9587159Z   emoji_picker_flutter 4.4.0 (4.5.2 available)
+2026-07-25T07:42:56.9587489Z   file_selector_android 0.5.2+6 (0.5.2+9 available)
+2026-07-25T07:42:56.9587811Z   file_selector_web 0.9.4+2 (0.9.5 available)
+2026-07-25T07:42:56.9588117Z + flutter_displaymode 0.6.0 (0.7.0 available)
+2026-07-25T07:42:56.9588426Z   flutter_foreground_task 9.2.2 (10.0.0 available)
+2026-07-25T07:42:56.9588792Z   flutter_local_notifications 22.0.1 (22.1.0 available)
+2026-07-25T07:42:56.9589470Z   flutter_local_notifications_platform_interface 12.0.0 (12.0.1 available)
+2026-07-25T07:42:56.9589879Z   flutter_new_badger 1.1.1 (2.0.0 available)
+2026-07-25T07:42:56.9590226Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-07-25T07:42:56.9590578Z   flutter_rust_bridge 2.11.1 (2.12.0 available)
+2026-07-25T07:42:56.9590921Z   flutter_secure_storage_darwin 0.3.2 (0.4.0 available)
+2026-07-25T07:42:56.9591244Z   flutter_vodozemac 0.5.0 (0.6.0 available)
+2026-07-25T07:42:56.9591575Z   geolocator_platform_interface 4.2.6 (4.2.8 available)
+2026-07-25T07:42:56.9591893Z   hooks 1.0.3 (2.1.0 available)
+2026-07-25T07:42:56.9592142Z   image 4.8.0 (4.9.1 available)
+2026-07-25T07:42:56.9592444Z   image_picker_android 0.8.13+17 (0.8.13+19 available)
+2026-07-25T07:42:56.9592753Z   intl 0.20.2 (0.20.3 available)
+2026-07-25T07:42:56.9593004Z   js 0.6.7 (0.7.2 available)
+2026-07-25T07:42:56.9593911Z   matcher 0.12.19 (0.12.20 available)
+2026-07-25T07:42:56.9594186Z   meta 1.18.0 (1.19.0 available)
+2026-07-25T07:42:56.9594457Z   native_toolchain_c 0.17.6 (0.19.3 available)
+2026-07-25T07:42:56.9594769Z   native_toolchain_cmake 0.2.5 (0.3.0 available)
+2026-07-25T07:42:56.9595072Z   objective_c 9.3.0 (9.4.1 available)
+2026-07-25T07:42:56.9595356Z   package_config 2.2.0 (3.0.0 available)
+2026-07-25T07:42:56.9595658Z   package_info_plus 10.2.0 (10.2.1 available)
+2026-07-25T07:42:56.9595955Z   pana 0.23.12 (0.23.14 available)
+2026-07-25T07:42:56.9596247Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-07-25T07:42:56.9596587Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-07-25T07:42:56.9596914Z   posix 6.5.0 (6.5.1 available)
+2026-07-25T07:42:56.9597170Z   qr 3.0.2 (4.0.0 available)
+2026-07-25T07:42:56.9597458Z   receive_sharing_intent 1.8.1 (1.9.0 available)
+2026-07-25T07:42:56.9597761Z   record_linux 2.1.0 (2.1.1 available)
+2026-07-25T07:42:56.9598379Z   record_use 0.6.0 (1.0.0 available)
+2026-07-25T07:42:56.9598821Z   record_windows 2.2.0 (2.2.2 available)
+2026-07-25T07:42:56.9599415Z   screen_retriever 0.2.0 (0.2.2 available)
+2026-07-25T07:42:56.9599734Z   screen_retriever_linux 0.2.0 (0.2.2 available)
+2026-07-25T07:42:56.9600058Z   screen_retriever_macos 0.2.0 (0.2.2 available)
+2026-07-25T07:42:56.9600411Z   screen_retriever_platform_interface 0.2.0 (0.2.2 available)
+2026-07-25T07:42:56.9600780Z   screen_retriever_windows 0.2.0 (0.2.2 available)
+2026-07-25T07:42:56.9601083Z   share_plus 13.2.0 (13.3.0 available)
+2026-07-25T07:42:56.9601406Z   share_plus_platform_interface 7.1.0 (7.2.0 available)
+2026-07-25T07:42:56.9601791Z   shared_preferences_android 2.4.23 (2.4.27 available)
+2026-07-25T07:42:56.9602109Z   sqflite_common 2.5.8 (2.5.11 available)
+2026-07-25T07:42:56.9602420Z   sqflite_common_ffi 2.3.7+1 (2.4.2 available)
+2026-07-25T07:42:56.9602749Z   sqlcipher_flutter_libs 0.6.8 (0.7.0+eol available)
+2026-07-25T07:42:56.9603061Z   sqlite3 2.9.4 (3.5.0 available)
+2026-07-25T07:42:56.9603365Z   string_validator 0.3.0 (1.2.0 available)
+2026-07-25T07:42:56.9603653Z   synchronized 3.4.0+1 (3.4.1+1 available)
+2026-07-25T07:42:56.9603928Z   test 1.31.0 (1.31.2 available)
+2026-07-25T07:42:56.9604184Z   test_api 0.7.11 (0.7.13 available)
+2026-07-25T07:42:56.9604462Z   test_core 0.6.17 (0.6.19 available)
+2026-07-25T07:42:56.9604723Z   timezone 0.11.0 (0.11.1 available)
+2026-07-25T07:42:56.9605002Z   url_launcher_android 6.3.30 (6.3.32 available)
+2026-07-25T07:42:56.9605305Z   uuid 4.5.3 (4.6.0 available)
+2026-07-25T07:42:56.9605557Z   vector_math 2.2.0 (2.4.1 available)
+2026-07-25T07:42:56.9605840Z   video_player_android 2.11.0 (2.12.0 available)
+2026-07-25T07:42:56.9606137Z   wakelock_plus 1.6.1 (1.7.0 available)
+2026-07-25T07:42:56.9606473Z   wakelock_plus_platform_interface 1.5.1 (1.6.0 available)
+2026-07-25T07:42:56.9606808Z   window_manager 0.5.1 (0.5.2 available)
+2026-07-25T07:42:56.9607089Z   window_to_front 0.0.3 (1.0.0 available)
+2026-07-25T07:42:56.9607375Z   xml 6.6.1 (7.0.1 available)
+2026-07-25T07:42:56.9607659Z Changed 1 dependency!
+2026-07-25T07:42:56.9608008Z 74 packages have newer versions incompatible with dependency constraints.
+2026-07-25T07:42:56.9608441Z Try `flutter pub outdated` for more information.
+2026-07-25T07:42:57.7293682Z "ar": 214 untranslated message(s).
+2026-07-25T07:42:57.7294235Z "az": 739 untranslated message(s).
+2026-07-25T07:42:57.7294673Z "be": 64 untranslated message(s).
+2026-07-25T07:42:57.7295092Z "bn": 719 untranslated message(s).
+2026-07-25T07:42:57.7295516Z "bo": 747 untranslated message(s).
+2026-07-25T07:42:57.7295933Z "ca": 68 untranslated message(s).
+2026-07-25T07:42:57.7296327Z "cs": 144 untranslated message(s).
+2026-07-25T07:42:57.7296731Z "da": 718 untranslated message(s).
+2026-07-25T07:42:57.7297146Z "de": 10 untranslated message(s).
+2026-07-25T07:42:57.7297546Z "el": 671 untranslated message(s).
+2026-07-25T07:42:57.7297955Z "eo": 467 untranslated message(s).
+2026-07-25T07:42:57.7298378Z "es": 48 untranslated message(s).
+2026-07-25T07:42:57.7299476Z "eu": 42 untranslated message(s).
+2026-07-25T07:42:57.7299869Z "fa": 69 untranslated message(s).
+2026-07-25T07:42:57.7300276Z "fi": 115 untranslated message(s).
+2026-07-25T07:42:57.7300680Z "fil": 581 untranslated message(s).
+2026-07-25T07:42:57.7301111Z "he": 546 untranslated message(s).
+2026-07-25T07:42:57.7301499Z "hi": 730 untranslated message(s).
+2026-07-25T07:42:57.7301909Z "hr": 92 untranslated message(s).
+2026-07-25T07:42:57.7302306Z "hu": 142 untranslated message(s).
+2026-07-25T07:42:57.7302708Z "ia": 733 untranslated message(s).
+2026-07-25T07:42:57.7303122Z "id": 19 untranslated message(s).
+2026-07-25T07:42:57.7303511Z "ie": 573 untranslated message(s).
+2026-07-25T07:42:57.7303895Z "it": 132 untranslated message(s).
+2026-07-25T07:42:57.7304291Z "ja": 248 untranslated message(s).
+2026-07-25T07:42:57.7304703Z "ka": 616 untranslated message(s).
+2026-07-25T07:42:57.7305104Z "kab": 218 untranslated message(s).
+2026-07-25T07:42:57.7305511Z "ko": 174 untranslated message(s).
+2026-07-25T07:42:57.7306125Z "lt": 372 untranslated message(s).
+2026-07-25T07:42:57.7306529Z "lv": 15 untranslated message(s).
+2026-07-25T07:42:57.7306925Z "nb": 64 untranslated message(s).
+2026-07-25T07:42:57.7307347Z "pt": 725 untranslated message(s).
+2026-07-25T07:42:57.7307768Z "pt_BR": 101 untranslated message(s).
+2026-07-25T07:42:57.7308206Z "pt_PT": 384 untranslated message(s).
+2026-07-25T07:42:57.7308620Z "ro": 380 untranslated message(s).
+2026-07-25T07:42:57.7309185Z "ru": 11 untranslated message(s).
+2026-07-25T07:42:57.7309577Z "sk": 552 untranslated message(s).
+2026-07-25T07:42:57.7309968Z "sl": 657 untranslated message(s).
+2026-07-25T07:42:57.7310364Z "sq": 747 untranslated message(s).
+2026-07-25T07:42:57.7310750Z "sr": 482 untranslated message(s).
+2026-07-25T07:42:57.7311146Z "sv": 163 untranslated message(s).
+2026-07-25T07:42:57.7311555Z "ta": 73 untranslated message(s).
+2026-07-25T07:42:57.7311952Z "te": 744 untranslated message(s).
+2026-07-25T07:42:57.7312348Z "th": 700 untranslated message(s).
+2026-07-25T07:42:57.7312758Z "tr": 212 untranslated message(s).
+2026-07-25T07:42:57.7313170Z "uk": 49 untranslated message(s).
+2026-07-25T07:42:57.7313577Z "uz": 92 untranslated message(s).
+2026-07-25T07:42:57.7313963Z "vi": 613 untranslated message(s).
+2026-07-25T07:42:57.7314369Z "yue": 691 untranslated message(s).
+2026-07-25T07:42:57.7314789Z "zh_Hant": 144 untranslated message(s).
+2026-07-25T07:42:57.7315340Z To see a detailed report, use the untranslated-messages-file 
+2026-07-25T07:42:57.7315971Z option in the l10n.yaml file:
+2026-07-25T07:42:57.7316430Z untranslated-messages-file: desiredFileName.txt
+2026-07-25T07:42:57.7316897Z <other option>: <other selection> 
+2026-07-25T07:42:57.7317091Z 
+2026-07-25T07:42:57.7317096Z 
+2026-07-25T07:42:57.7317295Z This will generate a JSON format file containing all messages that 
+2026-07-25T07:42:57.7317678Z need to be translated.
+2026-07-25T07:43:00.2146748Z ##[group]Run cp patches/release.keystore fluffychat/android/app/dummy.keystore
+2026-07-25T07:43:00.2147401Z [36;1mcp patches/release.keystore fluffychat/android/app/dummy.keystore[0m
+2026-07-25T07:43:00.2195768Z shell: /usr/bin/bash -e {0}
+2026-07-25T07:43:00.2196035Z env:
+2026-07-25T07:43:00.2196324Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:43:00.2196861Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:43:00.2197434Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.44.8-x64/flutter
+2026-07-25T07:43:00.2197936Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-25T07:43:00.2198456Z ##[endgroup]
+2026-07-25T07:43:00.2335157Z ##[group]Run cd fluffychat
+2026-07-25T07:43:00.2335460Z [36;1mcd fluffychat[0m
+2026-07-25T07:43:00.2335728Z [36;1mflutter build apk --release[0m
+2026-07-25T07:43:00.2381125Z shell: /usr/bin/bash -e {0}
+2026-07-25T07:43:00.2381397Z env:
+2026-07-25T07:43:00.2381694Z   JAVA_HOME: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:43:00.2382126Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Zulu_jdk/17.0.20-8/x64
+2026-07-25T07:43:00.2382771Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.44.8-x64/flutter
+2026-07-25T07:43:00.2383145Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-25T07:43:00.2383419Z ##[endgroup]
+2026-07-25T07:43:00.4580538Z Resolving dependencies...
+2026-07-25T07:43:00.7881149Z Downloading packages...
+2026-07-25T07:43:00.9016070Z   _fe_analyzer_shared 93.0.0 (105.0.0 available)
+2026-07-25T07:43:00.9016669Z   analysis_server_plugin 0.3.7 (0.3.20 available)
+2026-07-25T07:43:00.9017164Z   analyzer 10.0.1 (14.1.0 available)
+2026-07-25T07:43:00.9017677Z   analyzer_plugin 0.14.1 (0.14.14 available)
+2026-07-25T07:43:00.9018123Z   audio_session 0.2.3 (0.2.4 available)
+2026-07-25T07:43:00.9018539Z   barbecue 0.4.0 (0.5.0 available)
+2026-07-25T07:43:00.9019125Z   cli_util 0.4.2 (0.5.2 available)
+2026-07-25T07:43:00.9019530Z   code_assets 1.0.0 (1.2.1 available)
+2026-07-25T07:43:00.9019939Z   coverage 1.15.0 (1.15.1 available)
+2026-07-25T07:43:00.9020348Z   cross_file 0.3.5+2 (0.3.5+4 available)
+2026-07-25T07:43:00.9020803Z   dart_code_linter 4.1.6 (4.1.8 available)
+2026-07-25T07:43:00.9021231Z   dart_style 3.1.7 (3.1.12 available)
+2026-07-25T07:43:00.9021635Z   dbus 0.7.12 (0.7.14 available)
+2026-07-25T07:43:00.9022059Z   emoji_picker_flutter 4.4.0 (4.5.2 available)
+2026-07-25T07:43:00.9022561Z   file_selector_android 0.5.2+6 (0.5.2+9 available)
+2026-07-25T07:43:00.9023054Z   file_selector_web 0.9.4+2 (0.9.5 available)
+2026-07-25T07:43:00.9023527Z   flutter_displaymode 0.6.0 (0.7.0 available)
+2026-07-25T07:43:00.9024017Z   flutter_foreground_task 9.2.2 (10.0.0 available)
+2026-07-25T07:43:00.9024547Z   flutter_local_notifications 22.0.1 (22.1.0 available)
+2026-07-25T07:43:00.9025207Z   flutter_local_notifications_platform_interface 12.0.0 (12.0.1 available)
+2026-07-25T07:43:00.9025845Z   flutter_new_badger 1.1.1 (2.0.0 available)
+2026-07-25T07:43:00.9026376Z   flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+2026-07-25T07:43:00.9026927Z   flutter_rust_bridge 2.11.1 (2.12.0 available)
+2026-07-25T07:43:00.9027414Z   flutter_secure_storage_darwin 0.3.2 (0.4.0 available)
+2026-07-25T07:43:00.9027738Z   flutter_vodozemac 0.5.0 (0.6.0 available)
+2026-07-25T07:43:00.9028059Z   geolocator_platform_interface 4.2.6 (4.2.8 available)
+2026-07-25T07:43:00.9028374Z   hooks 1.0.3 (2.1.0 available)
+2026-07-25T07:43:00.9028624Z   image 4.8.0 (4.9.1 available)
+2026-07-25T07:43:00.9029030Z   image_picker_android 0.8.13+17 (0.8.13+19 available)
+2026-07-25T07:43:00.9029334Z   intl 0.20.2 (0.20.3 available)
+2026-07-25T07:43:00.9029595Z   js 0.6.7 (0.7.2 available)
+2026-07-25T07:43:00.9029845Z   matcher 0.12.19 (0.12.20 available)
+2026-07-25T07:43:00.9030110Z   meta 1.18.0 (1.19.0 available)
+2026-07-25T07:43:00.9030552Z   native_toolchain_c 0.17.6 (0.19.3 available)
+2026-07-25T07:43:00.9031031Z   native_toolchain_cmake 0.2.5 (0.3.0 available)
+2026-07-25T07:43:00.9031496Z   objective_c 9.3.0 (9.4.1 available)
+2026-07-25T07:43:00.9031791Z   package_config 2.2.0 (3.0.0 available)
+2026-07-25T07:43:00.9032098Z   package_info_plus 10.2.0 (10.2.1 available)
+2026-07-25T07:43:00.9032404Z   pana 0.23.12 (0.23.14 available)
+2026-07-25T07:43:00.9032698Z   path_provider_linux 2.2.1 (2.2.2 available)
+2026-07-25T07:43:00.9033055Z   path_provider_platform_interface 2.1.2 (2.1.3 available)
+2026-07-25T07:43:00.9033386Z   posix 6.5.0 (6.5.1 available)
+2026-07-25T07:43:00.9033640Z   qr 3.0.2 (4.0.0 available)
+2026-07-25T07:43:00.9033915Z   receive_sharing_intent 1.8.1 (1.9.0 available)
+2026-07-25T07:43:00.9034249Z   record_linux 2.1.0 (2.1.1 available)
+2026-07-25T07:43:00.9034856Z   record_use 0.6.0 (1.0.0 available)
+2026-07-25T07:43:00.9035132Z   record_windows 2.2.0 (2.2.2 available)
+2026-07-25T07:43:00.9035416Z   screen_retriever 0.2.0 (0.2.2 available)
+2026-07-25T07:43:00.9035730Z   screen_retriever_linux 0.2.0 (0.2.2 available)
+2026-07-25T07:43:00.9036039Z   screen_retriever_macos 0.2.0 (0.2.2 available)
+2026-07-25T07:43:00.9036388Z   screen_retriever_platform_interface 0.2.0 (0.2.2 available)
+2026-07-25T07:43:00.9036763Z   screen_retriever_windows 0.2.0 (0.2.2 available)
+2026-07-25T07:43:00.9037231Z   share_plus 13.2.0 (13.3.0 available)
+2026-07-25T07:43:00.9037543Z   share_plus_platform_interface 7.1.0 (7.2.0 available)
+2026-07-25T07:43:00.9037921Z   shared_preferences_android 2.4.23 (2.4.27 available)
+2026-07-25T07:43:00.9038231Z   sqflite_common 2.5.8 (2.5.11 available)
+2026-07-25T07:43:00.9038528Z   sqflite_common_ffi 2.3.7+1 (2.4.2 available)
+2026-07-25T07:43:00.9038995Z   sqlcipher_flutter_libs 0.6.8 (0.7.0+eol available)
+2026-07-25T07:43:00.9039314Z   sqlite3 2.9.4 (3.5.0 available)
+2026-07-25T07:43:00.9039589Z   string_validator 0.3.0 (1.2.0 available)
+2026-07-25T07:43:00.9039871Z   synchronized 3.4.0+1 (3.4.1+1 available)
+2026-07-25T07:43:00.9040142Z   test 1.31.0 (1.31.2 available)
+2026-07-25T07:43:00.9040394Z   test_api 0.7.11 (0.7.13 available)
+2026-07-25T07:43:00.9040659Z   test_core 0.6.17 (0.6.19 available)
+2026-07-25T07:43:00.9040934Z   timezone 0.11.0 (0.11.1 available)
+2026-07-25T07:43:00.9041221Z   url_launcher_android 6.3.30 (6.3.32 available)
+2026-07-25T07:43:00.9041518Z   uuid 4.5.3 (4.6.0 available)
+2026-07-25T07:43:00.9041766Z   vector_math 2.2.0 (2.4.1 available)
+2026-07-25T07:43:00.9042054Z   video_player_android 2.11.0 (2.12.0 available)
+2026-07-25T07:43:00.9042364Z   wakelock_plus 1.6.1 (1.7.0 available)
+2026-07-25T07:43:00.9042690Z   wakelock_plus_platform_interface 1.5.1 (1.6.0 available)
+2026-07-25T07:43:00.9043036Z   window_manager 0.5.1 (0.5.2 available)
+2026-07-25T07:43:00.9043318Z   window_to_front 0.0.3 (1.0.0 available)
+2026-07-25T07:43:00.9043601Z   xml 6.6.1 (7.0.1 available)
+2026-07-25T07:43:00.9043849Z Got dependencies!
+2026-07-25T07:43:00.9044191Z 74 packages have newer versions incompatible with dependency constraints.
+2026-07-25T07:43:00.9044622Z Try `flutter pub outdated` for more information.
+2026-07-25T07:44:07.9238519Z Running Gradle task 'assembleRelease'...                        
+2026-07-25T07:44:07.9270497Z Warning: Flutter support for your project's Gradle version (8.11.1) will soon be dropped. Please upgrade your Gradle version to a version of at least 8.14.0 soon.
+2026-07-25T07:44:07.9289924Z Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+2026-07-25T07:44:07.9290610Z 
+2026-07-25T07:44:07.9291807Z Potential fix: Your project's gradle version is typically defined in the gradle wrapper file. By default, this can be found at /home/runner/work/fluffybeep/fluffybeep/fluffychat/android/gradle/wrapper/gradle-wrapper.properties. 
+2026-07-25T07:44:07.9293649Z For more information, see https://docs.gradle.org/current/userguide/gradle_wrapper.html.
+2026-07-25T07:44:07.9294246Z 
+2026-07-25T07:44:07.9295514Z Warning: Flutter support for your project's Android Gradle Plugin version (Android Gradle Plugin version 8.9.1) will soon be dropped. Please upgrade your Android Gradle Plugin version to a version of at least Android Gradle Plugin version 8.11.1 soon.
+2026-07-25T07:44:07.9297401Z Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+2026-07-25T07:44:07.9298051Z 
+2026-07-25T07:44:07.9299549Z Potential fix: Your project's AGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/settings.gradle), by a plugin with the id of com.android.application. 
+2026-07-25T07:44:07.9303283Z If you don't see a plugins block, your project was likely created with an older template version. In this case it is most likely defined in the top-level build.gradle file (/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/build.gradle) by the following line in the dependencies block of the buildscript: "classpath 'com.android.tools.build:gradle:<version>'".
+2026-07-25T07:44:07.9305333Z 
+2026-07-25T07:44:07.9343283Z Warning: Flutter support for your project's Kotlin version (2.1.0) will soon be dropped. Please upgrade your Kotlin version to a version of at least 2.2.20 soon.
+2026-07-25T07:44:07.9360318Z Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+2026-07-25T07:44:07.9379716Z 
+2026-07-25T07:44:07.9401215Z Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
+2026-07-25T07:44:07.9440003Z If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/build.gradle) by the ext.kotlin_version property.
+2026-07-25T07:44:07.9469258Z 
+2026-07-25T07:46:59.4072902Z Checking the license for package NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/licenses
+2026-07-25T07:46:59.4074437Z License for package NDK (Side by side) 27.0.12077973 accepted.
+2026-07-25T07:46:59.4078573Z Preparing "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973".
+2026-07-25T07:47:14.9064716Z "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" ready.
+2026-07-25T07:47:14.9065816Z Installing NDK (Side by side) 27.0.12077973 in /usr/local/lib/android/sdk/ndk/27.0.12077973
+2026-07-25T07:47:14.9066716Z "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" complete.
+2026-07-25T07:47:15.1080503Z "Install NDK (Side by side) 27.0.12077973 v.27.0.12077973" finished.
+2026-07-25T07:47:52.6061041Z Checking the license for package Android SDK Platform 33 in /usr/local/lib/android/sdk/licenses
+2026-07-25T07:47:52.6061669Z License for package Android SDK Platform 33 accepted.
+2026-07-25T07:47:52.6062086Z Preparing "Install Android SDK Platform 33 (revision 3)".
+2026-07-25T07:47:55.5066960Z "Install Android SDK Platform 33 (revision 3)" ready.
+2026-07-25T07:47:55.5067836Z Installing Android SDK Platform 33 in /usr/local/lib/android/sdk/platforms/android-33
+2026-07-25T07:47:55.5068676Z "Install Android SDK Platform 33 (revision 3)" complete.
+2026-07-25T07:47:55.5069567Z "Install Android SDK Platform 33 (revision 3)" finished.
+2026-07-25T07:47:55.6061338Z Checking the license for package Android SDK Platform 31 in /usr/local/lib/android/sdk/licenses
+2026-07-25T07:47:55.6062390Z License for package Android SDK Platform 31 accepted.
+2026-07-25T07:47:55.6063109Z Preparing "Install Android SDK Platform 31 (revision 1)".
+2026-07-25T07:47:57.9061129Z "Install Android SDK Platform 31 (revision 1)" ready.
+2026-07-25T07:47:57.9062147Z Installing Android SDK Platform 31 in /usr/local/lib/android/sdk/platforms/android-31
+2026-07-25T07:47:57.9062769Z "Install Android SDK Platform 31 (revision 1)" complete.
+2026-07-25T07:47:57.9063191Z "Install Android SDK Platform 31 (revision 1)" finished.
+2026-07-25T07:47:58.8067936Z Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
+2026-07-25T07:47:58.8069540Z License for package CMake 3.22.1 accepted.
+2026-07-25T07:47:58.8070736Z Preparing "Install CMake 3.22.1 v.3.22.1".
+2026-07-25T07:47:59.7061145Z "Install CMake 3.22.1 v.3.22.1" ready.
+2026-07-25T07:47:59.7062168Z Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
+2026-07-25T07:47:59.7063061Z "Install CMake 3.22.1 v.3.22.1" complete.
+2026-07-25T07:47:59.7063714Z "Install CMake 3.22.1 v.3.22.1" finished.
+2026-07-25T07:48:12.8070182Z "ar": 214 untranslated message(s).
+2026-07-25T07:48:12.8090091Z "az": 739 untranslated message(s).
+2026-07-25T07:48:12.8115545Z "be": 64 untranslated message(s).
+2026-07-25T07:48:12.8133795Z "bn": 719 untranslated message(s).
+2026-07-25T07:48:12.8163280Z "bo": 747 untranslated message(s).
+2026-07-25T07:48:12.8167121Z "ca": 68 untranslated message(s).
+2026-07-25T07:48:12.8170228Z "cs": 144 untranslated message(s).
+2026-07-25T07:48:12.8174317Z "da": 718 untranslated message(s).
+2026-07-25T07:48:12.8178066Z "de": 10 untranslated message(s).
+2026-07-25T07:48:12.8179077Z "el": 671 untranslated message(s).
+2026-07-25T07:48:12.8179804Z "eo": 467 untranslated message(s).
+2026-07-25T07:48:12.8180326Z "es": 48 untranslated message(s).
+2026-07-25T07:48:12.8181211Z "eu": 42 untranslated message(s).
+2026-07-25T07:48:12.8181717Z "fa": 69 untranslated message(s).
+2026-07-25T07:48:12.8187421Z "fi": 115 untranslated message(s).
+2026-07-25T07:48:12.8188001Z "fil": 581 untranslated message(s).
+2026-07-25T07:48:12.8188464Z "he": 546 untranslated message(s).
+2026-07-25T07:48:12.8189086Z "hi": 730 untranslated message(s).
+2026-07-25T07:48:12.8189500Z "hr": 92 untranslated message(s).
+2026-07-25T07:48:12.8189904Z "hu": 142 untranslated message(s).
+2026-07-25T07:48:12.8190293Z "ia": 733 untranslated message(s).
+2026-07-25T07:48:12.8190690Z "id": 19 untranslated message(s).
+2026-07-25T07:48:12.8191109Z "ie": 573 untranslated message(s).
+2026-07-25T07:48:12.8191520Z "it": 132 untranslated message(s).
+2026-07-25T07:48:12.8191925Z "ja": 248 untranslated message(s).
+2026-07-25T07:48:12.8192336Z "ka": 616 untranslated message(s).
+2026-07-25T07:48:12.8192749Z "kab": 218 untranslated message(s).
+2026-07-25T07:48:12.8193175Z "ko": 174 untranslated message(s).
+2026-07-25T07:48:12.8193594Z "lt": 372 untranslated message(s).
+2026-07-25T07:48:12.8194015Z "lv": 15 untranslated message(s).
+2026-07-25T07:48:12.8194426Z "nb": 64 untranslated message(s).
+2026-07-25T07:48:12.8194837Z "pt": 725 untranslated message(s).
+2026-07-25T07:48:12.8195265Z "pt_BR": 101 untranslated message(s).
+2026-07-25T07:48:12.8195703Z "pt_PT": 384 untranslated message(s).
+2026-07-25T07:48:12.8196127Z "ro": 380 untranslated message(s).
+2026-07-25T07:48:12.8196536Z "ru": 11 untranslated message(s).
+2026-07-25T07:48:12.8196951Z "sk": 552 untranslated message(s).
+2026-07-25T07:48:12.8197429Z "sl": 657 untranslated message(s).
+2026-07-25T07:48:12.8197875Z "sq": 747 untranslated message(s).
+2026-07-25T07:48:12.8198330Z "sr": 482 untranslated message(s).
+2026-07-25T07:48:12.8198709Z "sv": 163 untranslated message(s).
+2026-07-25T07:48:12.8199269Z "ta": 73 untranslated message(s).
+2026-07-25T07:48:12.8199677Z "te": 744 untranslated message(s).
+2026-07-25T07:48:12.8200101Z "th": 700 untranslated message(s).
+2026-07-25T07:48:12.8200518Z "tr": 212 untranslated message(s).
+2026-07-25T07:48:12.8200935Z "uk": 49 untranslated message(s).
+2026-07-25T07:48:12.8201350Z "uz": 92 untranslated message(s).
+2026-07-25T07:48:12.8201756Z "vi": 613 untranslated message(s).
+2026-07-25T07:48:12.8202167Z "yue": 691 untranslated message(s).
+2026-07-25T07:48:12.8202611Z "zh_Hant": 144 untranslated message(s).
+2026-07-25T07:48:12.8203196Z To see a detailed report, use the untranslated-messages-file 
+2026-07-25T07:48:12.8203776Z option in the l10n.yaml file:
+2026-07-25T07:48:12.8204255Z untranslated-messages-file: desiredFileName.txt
+2026-07-25T07:48:12.8204776Z <other option>: <other selection> 
+2026-07-25T07:48:12.8205046Z 
+2026-07-25T07:48:12.8205052Z 
+2026-07-25T07:48:12.8205329Z This will generate a JSON format file containing all messages that 
+2026-07-25T07:48:12.8205916Z need to be translated.
+2026-07-25T07:48:22.8074141Z lib/utils/notification_background_handler.dart:162:36: Error: The getter 'type' isn't defined for the type 'Object'.
+2026-07-25T07:48:22.8083595Z  - 'Object' is from 'dart:core'.
+2026-07-25T07:48:22.8084632Z Try correcting the name to the name of an existing getter, or defining a getter or field named 'type'.
+2026-07-25T07:48:22.8085659Z         if (event != null && event.type == EventTypes.Encrypted) {
+2026-07-25T07:48:22.8086329Z                                    ^^^^
+2026-07-25T07:48:22.8087217Z lib/utils/notification_background_handler.dart:229:40: Error: The getter 'type' isn't defined for the type 'Object'.
+2026-07-25T07:48:22.8088165Z  - 'Object' is from 'dart:core'.
+2026-07-25T07:48:22.8089633Z Try correcting the name to the name of an existing getter, or defining a getter or field named 'type'.
+2026-07-25T07:48:22.8090654Z             if (event != null && event.type == EventTypes.Encrypted) {
+2026-07-25T07:48:22.8091329Z                                        ^^^^
+2026-07-25T07:50:58.5061322Z Target kernel_snapshot_program failed: Exception
+2026-07-25T07:50:58.5061881Z 
+2026-07-25T07:50:58.7092771Z 
+2026-07-25T07:50:58.7100344Z FAILURE: Build failed with an exception.
+2026-07-25T07:50:58.7129729Z 
+2026-07-25T07:50:58.7160128Z * What went wrong:
+2026-07-25T07:50:58.7180239Z Execution failed for task ':app:compileFlutterBuildRelease'.
+2026-07-25T07:50:58.7181621Z > Process 'command '/opt/hostedtoolcache/flutter/stable-3.44.8-x64/flutter/bin/flutter'' finished with non-zero exit value 1
+2026-07-25T07:50:58.7182629Z 
+2026-07-25T07:50:58.7182923Z * Try:
+2026-07-25T07:50:58.7183495Z > Run with --stacktrace option to get the stack trace.
+2026-07-25T07:50:58.7184356Z > Run with --info or --debug option to get more log output.
+2026-07-25T07:50:58.7185161Z > Run with --scan to get full insights.
+2026-07-25T07:50:58.7185805Z > Get more help at https://help.gradle.org.
+2026-07-25T07:50:58.7186306Z 
+2026-07-25T07:50:58.7186604Z BUILD FAILED in 7m 56s
+2026-07-25T07:50:59.2414764Z Running Gradle task 'assembleRelease'...                          477.6s
+2026-07-25T07:50:59.2503017Z Gradle task assembleRelease failed with exit code 1
+2026-07-25T07:50:59.2577093Z ##[error]Process completed with exit code 1.
+2026-07-25T07:50:59.2754159Z Post job cleanup.
+2026-07-25T07:50:59.2843809Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:50:59.2844959Z Post job cleanup.
+2026-07-25T07:50:59.4221424Z (node:5610) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-25T07:50:59.4222591Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-25T07:50:59.4412022Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:50:59.4413206Z Post job cleanup.
+2026-07-25T07:50:59.5354972Z [command]/usr/bin/git version
+2026-07-25T07:50:59.5398391Z git version 2.54.0
+2026-07-25T07:50:59.5467685Z Temporarily overriding HOME='/home/runner/work/_temp/909df4d4-b90b-4565-8caf-bfc5706d89d5' before making global git config changes
+2026-07-25T07:50:59.5469096Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-25T07:50:59.5489892Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffybeep/fluffybeep/fluffychat
+2026-07-25T07:50:59.5511324Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-25T07:50:59.5550659Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-25T07:50:59.5831974Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-25T07:50:59.5860195Z http.https://github.com/.extraheader
+2026-07-25T07:50:59.5872952Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-25T07:50:59.5911425Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-25T07:50:59.6197173Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-25T07:50:59.6238307Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-25T07:50:59.6689667Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-25T07:50:59.6691959Z Post job cleanup.
+2026-07-25T07:50:59.7612971Z [command]/usr/bin/git version
+2026-07-25T07:50:59.7662412Z git version 2.54.0
+2026-07-25T07:50:59.7713737Z Temporarily overriding HOME='/home/runner/work/_temp/fe021af0-ea95-4fd7-9e4f-3a98ebbfca00' before making global git config changes
+2026-07-25T07:50:59.7715427Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-25T07:50:59.7716718Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/fluffybeep/fluffybeep
+2026-07-25T07:50:59.7719024Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-25T07:50:59.7782903Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-25T07:50:59.8056140Z fatal: No url found for submodule path 'fluffychat_src' in .gitmodules
+2026-07-25T07:50:59.8112697Z ##[warning]The process '/usr/bin/git' failed with exit code 128
+2026-07-25T07:50:59.8248233Z Cleaning up orphan processes
+2026-07-25T07:50:59.8569860Z Terminate orphan process: pid (2955) (java)
+2026-07-25T07:50:59.8630175Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

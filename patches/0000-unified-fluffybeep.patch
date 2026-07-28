@@ -355967,10 +355967,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..073a4e1f4d336fb036084c9e35dcf0080a97b142 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..af85f222d6b163ade615192f2a87cad2162a5c8d 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,547 @@
+@@ -1,471 +1,555 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -356795,6 +356795,14 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..073a4e1f4d336fb036084c9e35dcf008
 +        }
 +        await setupFirebase(client);
 +      }
++    }
++
++    if (clients.isNotEmpty) {
++      await syncAndroidNotificationChannels(
++        client: clients.first,
++        flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
++        l10n: l10n,
++      );
 +    }
 +
 +    // ignore: unawaited_futures
@@ -363436,10 +363444,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..c4966bdc20bd5d69d55256af739a86ef361c2a23 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b10855d812 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,601 @@
+@@ -1,483 +1,665 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -364275,32 +364283,18 @@ index e90e6496197667270aaa2a060f18babb76b524bf..c4966bdc20bd5d69d55256af739a86ef
 +
 +  final isDirectChat = event.room.isDirectChat || event.room.isBeeperFakeDM;
 +  
-+  final notificationGroupId = labelId != null ? 'group_$labelId' : 'group_other';
-+  final groupName = labelName ?? l10n.incomingMessages;
-+
-+  final channelSuffix = isDirectChat ? 'direct' : 'group';
-+  final channelIdBase = labelId != null ? 'chan_${labelId}_$channelSuffix' : 'chan_other_$channelSuffix';
++  final channelIdBase = labelId != null ? 'chan_$labelId' : (isDirectChat ? 'chan_direct' : 'chan_group');
 +  final channelId = targetSound != null ? '${channelIdBase}_$targetSound' : channelIdBase;
-+  final channelName = isDirectChat ? l10n.directChats : l10n.groups;
++  final channelName = labelName ?? (isDirectChat ? l10n.directChats : l10n.groups);
 +
-+  final messageRooms = AndroidNotificationChannelGroup(
-+    notificationGroupId,
-+    groupName,
-+  );
 +  final roomsChannel = AndroidNotificationChannel(
 +    channelId,
 +    channelName,
-+    groupId: notificationGroupId,
 +    sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
 +    playSound: true,
 +    importance: Importance.high,
 +  );
 +
-+  await flutterLocalNotificationsPlugin
-+      .resolvePlatformSpecificImplementation<
-+        AndroidFlutterLocalNotificationsPlugin
-+      >()
-+      ?.createNotificationChannelGroup(messageRooms);
 +  await flutterLocalNotificationsPlugin
 +      .resolvePlatformSpecificImplementation<
 +        AndroidFlutterLocalNotificationsPlugin
@@ -364460,6 +364454,84 @@ index e90e6496197667270aaa2a060f18babb76b524bf..c4966bdc20bd5d69d55256af739a86ef
 +      ),
 +    ),
 +  );
++}
++
++Future<void> syncAndroidNotificationChannels({
++  required Client client,
++  required FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin,
++  L10n? l10n,
++}) async {
++  if (!PlatformInfos.isAndroid) return;
++  final store = await AppSettings.init();
++  final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
++
++  final androidPlugin = flutterLocalNotificationsPlugin
++      .resolvePlatformSpecificImplementation<
++        AndroidFlutterLocalNotificationsPlugin
++      >();
++  if (androidPlugin == null) return;
++
++  // 1. Pre-create channels for all custom Beeper labels
++  for (final entry in beeperLabels.entries) {
++    if (entry.key == '_hidden_networks') continue;
++    final val = entry.value;
++    if (val is Map) {
++      final labelId = entry.key;
++      final labelName = (val['title'] ?? val['name']) as String?;
++      if (labelName == null || labelName.isEmpty) continue;
++
++      final sound = store.getString('beeper_sound_$labelId');
++      final targetSound = (sound != null && sound != 'default') ? sound : null;
++      final channelIdBase = 'chan_$labelId';
++      final channelId = targetSound != null ? '${channelIdBase}_$targetSound' : channelIdBase;
++
++      final channel = AndroidNotificationChannel(
++        channelId,
++        labelName,
++        sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
++        playSound: true,
++        importance: Importance.high,
++      );
++
++      await androidPlugin.createNotificationChannel(channel);
++    }
++  }
++
++  // 2. Pre-create channels for network bridges
++  for (final netKey in BeeperBridgeUtils.networkMap.keys) {
++    final baseKey = BeeperBridgeUtils.getBaseNetworkKey(netKey);
++    final spec = BeeperBridgeUtils.networkMap[baseKey];
++    final netName = spec?.name ?? baseKey;
++
++    final sound = store.getString('beeper_sound_$baseKey');
++    final targetSound = (sound != null && sound != 'default') ? sound : null;
++    final channelIdBase = 'chan_$baseKey';
++    final channelId = targetSound != null ? '${channelIdBase}_$targetSound' : channelIdBase;
++
++    final channel = AndroidNotificationChannel(
++      channelId,
++      netName,
++      sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
++      playSound: true,
++      importance: Importance.high,
++    );
++
++    await androidPlugin.createNotificationChannel(channel);
++  }
++
++  // 3. Pre-create default fallback channels
++  final defaultDirectChannel = AndroidNotificationChannel(
++    'chan_direct',
++    l10n?.directChats ?? 'Chat directo',
++    importance: Importance.high,
++  );
++  final defaultGroupChannel = AndroidNotificationChannel(
++    'chan_group',
++    l10n?.groups ?? 'Grupos',
++    importance: Importance.high,
++  );
++  await androidPlugin.createNotificationChannel(defaultDirectChannel);
++  await androidPlugin.createNotificationChannel(defaultGroupChannel);
 +}
 +
 +class FluffyChatPushPayload {
