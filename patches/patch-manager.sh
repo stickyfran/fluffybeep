@@ -11,9 +11,11 @@
 set -e
 
 # Configuration
-FLUFFYCHAT_DIR="."
-NEW_FILES_DIR="./patches/NEW_FILES"
-PATCHES_DIR="./patches"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+FLUFFYCHAT_DIR="$ROOT_DIR/fluffychat_src"
+NEW_FILES_DIR="$ROOT_DIR/patches/NEW_FILES"
+PATCHES_DIR="$ROOT_DIR/patches"
 UPSTREAM_BASE="259bc72fb897e99303058712fcdfaee033bd4d33"
 
 # Colors for output
@@ -110,7 +112,7 @@ regenerate_patch() {
     fi
     
     # Generate the patch from upstream base to HEAD
-    git diff "$UPSTREAM_BASE" HEAD > "$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    git diff --full-index "$UPSTREAM_BASE" HEAD > "$PATCHES_DIR/0000-unified-fluffybeep.patch"
     log_info "Patch written to $PATCHES_DIR/0000-unified-fluffybeep.patch"
     log_info "Patch size: $(wc -c < "$PATCHES_DIR/0000-unified-fluffybeep.patch") bytes"
     
@@ -128,21 +130,18 @@ validate_patch() {
         exit 1
     fi
     
+    local abs_patch_file
+    abs_patch_file="$(realpath "$patch_file")"
     local test_dir="/tmp/fluffybeep_patch_test_$$"
     git worktree add "$test_dir" "$UPSTREAM_BASE" 2>/dev/null
     
-    if git apply --check --whitespace=warn "$patch_file" 2>&1; then
+    if (cd "$test_dir" && git apply --check --whitespace=warn "$abs_patch_file" 2>&1); then
         log_info "✅ Patch validates successfully against upstream base."
     else
-        # Test against the clean worktree instead
-        if (cd "$test_dir" && git apply --check --whitespace=warn "$(pwd)/../../../$patch_file" 2>&1); then
-            log_info "✅ Patch validates successfully against upstream base."
-        else
-            log_error "❌ Patch does NOT apply cleanly to upstream base $UPSTREAM_BASE"
-            log_error "The patch was likely generated incorrectly. Use 'regenerate' command."
-            git worktree remove "$test_dir" --force 2>/dev/null || true
-            exit 1
-        fi
+        log_error "❌ Patch does NOT apply cleanly to upstream base $UPSTREAM_BASE"
+        log_error "The patch was likely generated incorrectly. Use 'regenerate' command."
+        git worktree remove "$test_dir" --force 2>/dev/null || true
+        exit 1
     fi
     
     git worktree remove "$test_dir" --force 2>/dev/null || true
