@@ -355967,7 +355967,7 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..af85f222d6b163ade615192f2a87cad2162a5c8d 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..aa7a30548296c63fd8bbca5fb5172fc4cc608116 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -1,471 +1,555 @@
@@ -356776,7 +356776,7 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..af85f222d6b163ade615192f2a87cad2
 +            client: client,
 +            gatewayUrl: endpoint,
 +            token: savedEndpoint,
-+            useDeviceSpecificAppId: true,
++            useDeviceSpecificAppId: false,
 +          );
 +        }
 +      }
@@ -356914,7 +356914,7 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..af85f222d6b163ade615192f2a87cad2
 +        client: client,
 +        gatewayUrl: endpoint,
 +        token: newEndpoint,
-+        useDeviceSpecificAppId: true,
++        useDeviceSpecificAppId: false,
 +      );
 +    }
 +    await AppSettings.unifiedPushEndpoint.setItem(newEndpoint);
