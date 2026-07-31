@@ -314956,10 +314956,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..98a18427d1e85b7b6f45eb2e6c76498de262798c 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..fc49661a20ab5120f9a780bfc6e3581939884375 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,459 @@
+@@ -1,324 +1,462 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315593,7 +315593,10 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..98a18427d1e85b7b6f45eb2e6c76498d
 +                ? event.formattedText
 +                : event.body.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 +            if (event.body.contains('Incoming call. Use the WhatsApp app to answer.')) {
-+              html = '<a href="whatsapp://">$html</a>';
++              final phoneMatch = RegExp(r'^@whatsapp_(\d+):').firstMatch(event.senderId);
++              final phone = phoneMatch?.group(1);
++              final targetUrl = phone != null ? 'https://wa.me/$phone' : 'whatsapp://';
++              html = '<a href="$targetUrl">$html</a>';
 +            }
 +            if (event.messageType == MessageTypes.Emote) {
 +              html = '* $html';
@@ -366241,10 +366244,10 @@ index 3b99cce0ab5300b080e150d6ac85daaa40327163..84affe890ba121cf28b9986f508e2b45
 +  String toString() => reason;
 +}
 diff --git a/lib/utils/url_launcher.dart b/lib/utils/url_launcher.dart
-index 727db5fd37ee8f16c70a15e166311f128586d27a..ac94bdbf3d7e6ec1f9470e0efd95dc1cbbb04661 100644
+index 727db5fd37ee8f16c70a15e166311f128586d27a..08a6790ca34e596fa716a7a980575a4d7d753306 100644
 --- a/lib/utils/url_launcher.dart
 +++ b/lib/utils/url_launcher.dart
-@@ -1,253 +1,253 @@
+@@ -1,253 +1,258 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -366546,6 +366549,11 @@ index 727db5fd37ee8f16c70a15e166311f128586d27a..ac94bdbf3d7e6ec1f9470e0efd95dc1c
 +      scaffoldMessenger.showSnackBar(
 +        SnackBar(content: Text(l10n.cantOpenUri(url!))),
 +      );
++      return;
++    }
++
++    if (uri.scheme == 'whatsapp' || uri.host == 'wa.me' || uri.host == 'api.whatsapp.com') {
++      launchUrlString(url!, mode: LaunchMode.externalApplication);
 +      return;
 +    }
 +
