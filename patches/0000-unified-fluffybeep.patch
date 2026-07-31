@@ -302317,7 +302317,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..e19c62056f07e5f3947dff26f3a0f0b343b95b5d 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..8ab06dff4a9be28b4d2c2e9d9cd6aba8ef12efc3 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -1,1643 +1,1736 @@
@@ -304905,7 +304905,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..e19c62056f07e5f3947dff26f3a0f0b3
 +    if (effectiveMimeType == 'audio/ogg' ||
 +        (fileName.endsWith('.ogg') &&
 +            (effectiveMimeType == null || effectiveMimeType == 'audio/ogg'))) {
-+      effectiveMimeType = 'audio/ogg; codecs=opus';
++      effectiveMimeType = 'audio/ogg';
 +    }
 +    final extension = mimeType == null ? null : extensionFromMime(mimeType);
 +    if (extension != null) {
@@ -314956,10 +314956,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..568870d754e0e4c0a369a9fc53a54e54b3095f2d 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..98a18427d1e85b7b6f45eb2e6c76498de262798c 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,456 @@
+@@ -1,324 +1,459 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315592,6 +315592,9 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..568870d754e0e4c0a369a9fc53a54e54
 +            var html = AppSettings.renderHtml.value && event.isRichMessage
 +                ? event.formattedText
 +                : event.body.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
++            if (event.body.contains('Incoming call. Use the WhatsApp app to answer.')) {
++              html = '<a href="whatsapp://">$html</a>';
++            }
 +            if (event.messageType == MessageTypes.Emote) {
 +              html = '* $html';
 +            }
@@ -362686,10 +362689,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..ea1f7477f084ae60d1bc5873a07c65568f4b7a78 100644
+index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..1326fd1287ea8d224436e3e17150fcbf7a626138 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,265 @@
+@@ -1,210 +1,272 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -363045,6 +363048,13 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..ea1f7477f084ae60d1bc5873a07c6556
 +    case NotificationResponseType.selectedNotification:
 +      final roomId = payload.roomId;
 +      if (roomId == null) return;
++      if (payload.isWhatsAppCall) {
++        try {
++          launchUrl(Uri.parse('whatsapp://'), mode: LaunchMode.externalApplication);
++        } catch (e, s) {
++          Logs().e('Failed to launch whatsapp:// scheme', e, s);
++        }
++      }
 +
 +      if (router == null) {
 +        Logs().v('Ignore select notification action in background mode');
@@ -363444,10 +363454,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b10855d812 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..558313fc15dfd681f1afcef40006b581a7c3783e 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,665 @@
+@@ -1,483 +1,682 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -363939,6 +363949,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b1
 +import 'dart:async';
 +import 'dart:convert';
 +import 'dart:io';
++import 'dart:typed_data';
 +import 'dart:ui';
 +
 +import 'package:collection/collection.dart';
@@ -364207,6 +364218,8 @@ index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b1
 +          removeMarkdown: true,
 +        );
 +
++  final isWhatsAppCall = body.contains('Incoming call. Use the WhatsApp app to answer.');
++
 +  // The person object for the android message style notification
 +  final avatar = event.room.avatar;
 +  final senderAvatar = event.room.isDirectChat
@@ -364305,7 +364318,8 @@ index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b1
 +    roomsChannel.id,
 +    roomsChannel.name,
 +    number: notification.counts?.unread,
-+    category: AndroidNotificationCategory.message,
++    category: isWhatsAppCall ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
++    vibrationPattern: isWhatsAppCall ? Int64List.fromList([0, 1000, 1000, 1000, 1000, 1000, 1000, 1000]) : null,
 +    shortcutId: event.room.id,
 +    groupAlertBehavior: GroupAlertBehavior.children,
 +    styleInformation:
@@ -364383,6 +364397,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b1
 +      client.clientName,
 +      event.room.id,
 +      event.eventId,
++      isWhatsAppCall: isWhatsAppCall,
 +    ).toString(),
 +  );
 +
@@ -364536,19 +364551,31 @@ index e90e6496197667270aaa2a060f18babb76b524bf..b7640812be871e0b394374d8a75665b1
 +
 +class FluffyChatPushPayload {
 +  final String? clientName, roomId, eventId;
++  final bool isWhatsAppCall;
 +
-+  FluffyChatPushPayload(this.clientName, this.roomId, this.eventId);
++  FluffyChatPushPayload(
++    this.clientName,
++    this.roomId,
++    this.eventId, {
++    this.isWhatsAppCall = false,
++  });
 +
 +  factory FluffyChatPushPayload.fromString(String payload) {
 +    final parts = payload.split('|');
-+    if (parts.length != 3) {
++    if (parts.length < 3) {
 +      return FluffyChatPushPayload(null, null, null);
 +    }
-+    return FluffyChatPushPayload(parts.first, parts[1], parts[2]);
++    final isWhatsAppCall = parts.length >= 4 && parts[3] == '1';
++    return FluffyChatPushPayload(
++      parts.first,
++      parts[1],
++      parts[2],
++      isWhatsAppCall: isWhatsAppCall,
++    );
 +  }
 +
 +  @override
-+  String toString() => '$clientName|$roomId|$eventId';
++  String toString() => '$clientName|$roomId|$eventId|${isWhatsAppCall ? 1 : 0}';
 +}
 +
 +/// Creates a shortcut for Android platform but does not block displaying the
