@@ -14116,10 +14116,10 @@ index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..4c1e5a2cfec51e0766f4a09b70898438
 +    source = "../.."
 +}
 diff --git a/android/app/proguard-rules.pro b/android/app/proguard-rules.pro
-index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..8f799a5437c7ad1e69541600efa5e21ed2da4102 100644
+index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..e7455e7a4a86a9a5642cf418a64ba49e44b2995c 100644
 --- a/android/app/proguard-rules.pro
 +++ b/android/app/proguard-rules.pro
-@@ -1 +1,5 @@
+@@ -1 +1,7 @@
 --keep class net.sqlcipher.** { *; }
 \ No newline at end of file
 +-keep class net.sqlcipher.** { *; }
@@ -14127,6 +14127,8 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..8f799a5437c7ad1e69541600efa5e21e
 +-dontwarn org.webrtc.**
 +-keep class uniffi.** { *; }
 +-dontwarn uniffi.**
++-keep class org.matrix.** { *; }
++-dontwarn org.matrix.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
 index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..bb1f4444e3dc1841f3ffd82c156bc4dcb133492b 100644
@@ -33859,15 +33861,16 @@ index 17594b67e42a624f4354cf9fcfec6fa18d3f5ad2..cff6d0bb13e73139bd2c7771be13f404
 +}
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e04896136409621314e4d4a1a1150f9f7908d760
+index 0000000000000000000000000000000000000000..beff3589cc932cc0efa511b449bdab2b420dc158
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,132 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
 +import 'package:fluffychat/widgets/cache_refresh_overlay.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +
 +class BeeperReinitController {
@@ -33975,7 +33978,7 @@ index 0000000000000000000000000000000000000000..e04896136409621314e4d4a1a1150f9f
 +        Overlay.of(context).insert(refreshOverlayEntry);
 +      }
 +    } catch (e) {
-+      overlay.remove();
++      if (overlay.mounted) overlay.remove();
 +      if (context.mounted) {
 +        showDialog(
 +          context: context,
@@ -358649,7 +358652,7 @@ index bc94bf844e11afd9650fbbbf306b61be8f83619d..d4b3098357376ccda342b4e6241c9f47
 +      );
  }
 diff --git a/lib/utils/custom_image_resizer.dart b/lib/utils/custom_image_resizer.dart
-index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..51ed81255fee2f5168d2835885450509a3072e4e 100644
+index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..6b90f14301570517d0746dc8c6ee4b5f9001e068 100644
 --- a/lib/utils/custom_image_resizer.dart
 +++ b/lib/utils/custom_image_resizer.dart
 @@ -1,109 +1,121 @@
@@ -358806,7 +358809,7 @@ index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..51ed81255fee2f5168d2835885450509
 +      targetHeight: maxDim > 0 ? maxDim : null,
 +    );
 +    late final int frameCount;
-+    late final native.Image nativeImg;
++    late native.Image nativeImg;
 +    try {
 +      frameCount = dartCodec.frameCount;
 +      final dartFrame = await dartCodec.getNextFrame();
@@ -359307,10 +359310,10 @@ index b7e14ed983608a54f846e997c31ca74d6be4d34b..cd7fd71c559e4a27a134b1d89704702f
 +}
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..29ac21106a3f6688357da4edec07ca8e5a471893
+index 0000000000000000000000000000000000000000..5437c86bd9a36d3424362a73b7814161db63f96e
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,96 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
@@ -359356,6 +359359,9 @@ index 0000000000000000000000000000000000000000..29ac21106a3f6688357da4edec07ca8e
 +      _timer = null;
 +      return;
 +    }
++
++    // Schedule fallback periodic check every 15 minutes while disconnected
++    _timer ??= Timer.periodic(const Duration(minutes: 15), (_) => _checkHealth());
 +    
 +    if (state.initialized && !state.connected) {
 +      // Try to auto-restore using secure storage
@@ -363448,10 +363454,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..f2c5b86b211a536a2dc8df67dc1717c4164243f7 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..c159976a7fd566b1216e6a5d26dd0a9a7d8824a9 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,623 @@
+@@ -1,483 +1,626 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -364046,349 +364052,352 @@ index e90e6496197667270aaa2a060f18babb76b524bf..f2c5b86b211a536a2dc8df67dc1717c4
 +  );
 +  final store = await AppSettings.init();
 +
-+  final client = clientName == null
-+      ? (clients?.first ??
-+            (await ClientManager.getClients(
-+              initialize: false,
-+              store: store,
-+            )).first)
-+      : (clients?.firstWhereOrNull(
-+              (client) => client.clientName == clientName,
-+            ) ??
-+            await ClientManager.createClient(clientName, store));
-+
-+  lastReceivedPushNotification[client.clientName] = DateTime.now();
-+
-+  final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
-+        AppConfig.mainIsolatePortName,
-+      ) != null;
-+
-+  final safeNotification = PushNotification(
-+    content: null,
-+    counts: notification.counts,
-+    devices: notification.devices,
-+    eventId: notification.eventId,
-+    prio: notification.prio,
-+    roomAlias: notification.roomAlias,
-+    roomId: notification.roomId,
-+    roomName: notification.roomName,
-+    sender: notification.sender,
-+    senderDisplayName: notification.senderDisplayName,
-+    type: notification.type,
-+  );
-+
-+  Event? event;
++  Client? client;
 +  try {
-+    event = await client.getEventByPushNotification(
-+      safeNotification,
-+      storeInDatabase: true,
++    client = clientName == null
++        ? (clients?.first ??
++              (await ClientManager.getClients(
++                initialize: false,
++                store: store,
++              )).first)
++        : (clients?.firstWhereOrNull(
++                (client) => client.clientName == clientName,
++              ) ??
++              await ClientManager.createClient(clientName, store));
++
++    lastReceivedPushNotification[client.clientName] = DateTime.now();
++
++    final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
++          AppConfig.mainIsolatePortName,
++        ) != null;
++
++    final safeNotification = PushNotification(
++      content: null,
++      counts: notification.counts,
++      devices: notification.devices,
++      eventId: notification.eventId,
++      prio: notification.prio,
++      roomAlias: notification.roomAlias,
++      roomId: notification.roomId,
++      roomName: notification.roomName,
++      sender: notification.sender,
++      senderDisplayName: notification.senderDisplayName,
++      type: notification.type,
 +    );
-+  } catch (e, s) {
-+    Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
-+  }
 +
-+  if (event == null || event.type == EventTypes.Encrypted) {
-+    Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
-+    await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
-+      Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
-+    });
-+
++    Event? event;
 +    try {
 +      event = await client.getEventByPushNotification(
 +        safeNotification,
 +        storeInDatabase: true,
 +      );
 +    } catch (e, s) {
-+      Logs().w('[PushCrypto] Second getEventByPushNotification failed', e, s);
++      Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
 +    }
-+  }
 +
-+  var retries = 1;
-+  while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
-+    Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1s for keys... (Retries left: $retries)');
-+    await Future.delayed(const Duration(milliseconds: 1000));
-+    try {
-+      event = await client.getEventByPushNotification(
-+        safeNotification,
-+        storeInDatabase: true,
-+      );
-+    } catch (e, s) {
-+      Logs().w('[PushCrypto] Retry getEventByPushNotification failed', e, s);
-+    }
-+    retries--;
-+  }
++    if (event == null || event.type == EventTypes.Encrypted) {
++      Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
++      await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
++        Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
++      });
 +
-+  final awaitingOneShotSync = Future.value();
-+  l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
-+
-+  updateAppBadge(notification.counts?.unread ?? 0);
-+
-+  if (event == null) {
-+    Logs().v('Notification is a clearing indicator.');
-+    if (clients?.length == 1 && (notification.counts?.unread == 0)) {
-+      await flutterLocalNotificationsPlugin.cancelAll();
-+    } else {
-+      // Make sure client is fully loaded and synced before dismiss notifications:
-+      await client.roomsLoading;
-+      await awaitingOneShotSync;
-+      final activeNotifications = await flutterLocalNotificationsPlugin
-+          .getActiveNotifications();
-+      for (final activeNotification in activeNotifications) {
-+        final room = client.rooms.singleWhereOrNull(
-+          (room) =>
-+              '${client.clientName}_${room.id}'.hashCode ==
-+              activeNotification.id,
++      try {
++        event = await client.getEventByPushNotification(
++          safeNotification,
++          storeInDatabase: true,
 +        );
-+        if (room != null && !room.isUnreadOrInvited) {
-+          flutterLocalNotificationsPlugin.cancel(id: activeNotification.id!);
++      } catch (e, s) {
++        Logs().w('[PushCrypto] Second getEventByPushNotification failed', e, s);
++      }
++    }
++
++    var retries = 1;
++    while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
++      Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1s for keys... (Retries left: $retries)');
++      await Future.delayed(const Duration(milliseconds: 1000));
++      try {
++        event = await client.getEventByPushNotification(
++          safeNotification,
++          storeInDatabase: true,
++        );
++      } catch (e, s) {
++        Logs().w('[PushCrypto] Retry getEventByPushNotification failed', e, s);
++      }
++      retries--;
++    }
++
++    final awaitingOneShotSync = Future.value();
++    l10n ??= await L10n.delegate.load(PlatformDispatcher.instance.locale);
++
++    updateAppBadge(notification.counts?.unread ?? 0);
++
++    if (event == null) {
++      Logs().v('Notification is a clearing indicator.');
++      if (clients?.length == 1 && (notification.counts?.unread == 0)) {
++        await flutterLocalNotificationsPlugin.cancelAll();
++      } else {
++        // Make sure client is fully loaded and synced before dismiss notifications:
++        await client.roomsLoading;
++        await awaitingOneShotSync;
++        final activeNotifications = await flutterLocalNotificationsPlugin
++            .getActiveNotifications();
++        for (final activeNotification in activeNotifications) {
++          final room = client.rooms.singleWhereOrNull(
++            (room) =>
++                '${client.clientName}_${room.id}'.hashCode ==
++                activeNotification.id,
++          );
++          if (room != null && !room.isUnreadOrInvited) {
++            flutterLocalNotificationsPlugin.cancel(id: activeNotification.id!);
++          }
++        }
++      }
++      return;
++    }
++    Logs().v('Push helper got notification event of type ${event.type}.');
++
++    final isMuted = event.room.pushRuleState == PushRuleState.dontNotify;
++    final isBeeperMessage = event.room.isBeeperFakeDM ||
++        event.type == EventTypes.Message ||
++        event.type == EventTypes.Encrypted ||
++        event.type == EventTypes.Sticker;
++
++    if (isMuted) {
++      Logs().i('Push helper: room is muted, skipping notification.');
++      return;
++    }
++
++    if (!isBeeperMessage && !client.pushruleEvaluator.match(event).notify) {
++      Logs().i('Push helper: filtered by client-side push rules.');
++      return;
++    }
++
++    if (event.type.startsWith('m.call')) {
++      // make sure bg sync is on (needed to update hold, unhold events)
++      // prevent over write from app life cycle change
++      client.backgroundSync = true;
++    }
++
++    if (event.type == EventTypes.CallHangup) {
++      client.backgroundSync = false;
++    }
++
++    if (event.type.startsWith('m.call') && event.type != EventTypes.CallInvite) {
++      Logs().v('Push message is a m.call but not invite. Do not display.');
++      return;
++    }
++
++    if ((event.type.startsWith('m.call') &&
++            event.type != EventTypes.CallInvite) ||
++        event.type == 'org.matrix.call.sdp_stream_metadata_changed') {
++      Logs().v('Push message was for a call, but not call invite.');
++      return;
++    }
++
++    final matrixLocals = MatrixLocals(l10n);
++
++    // Calculate the body
++    final body = event.type == EventTypes.Encrypted
++        ? l10n.newMessageInFluffyChat
++        : await event.calcLocalizedBody(
++            matrixLocals,
++            plaintextBody: true,
++            withSenderNamePrefix: false,
++            hideReply: true,
++            hideEdit: true,
++            removeMarkdown: true,
++          );
++
++    final isWhatsAppCall = body.contains('Incoming call. Use the WhatsApp app to answer.');
++
++    // The person object for the android message style notification
++    final avatar = event.room.avatar;
++    final senderAvatar = event.room.isDirectChat
++        ? avatar
++        : event.senderFromMemoryOrFallback.avatarUrl;
++
++    final ownUser = event.room.unsafeGetUserFromMemoryOrFallback(client.userID!);
++
++    final userAvatarFile = await client.tryDownloadNotificationAvatar(
++      ownUser.avatarUrl,
++    );
++    final roomAvatarFile = await client.tryDownloadNotificationAvatar(avatar);
++    final senderAvatarFile = await client.tryDownloadNotificationAvatar(
++      senderAvatar,
++    );
++
++    final id = '${client.clientName}_${notification.roomId}'.hashCode;
++
++    final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
++    // Show notification
++
++    final newMessage = Message(
++      body,
++      event.originServerTs,
++      Person(
++        bot: event.messageType == MessageTypes.Notice,
++        key: event.senderId,
++        name: senderName,
++        icon: senderAvatarFile == null
++            ? null
++            : ByteArrayAndroidIcon(senderAvatarFile),
++      ),
++    );
++
++    final messagingStyleInformation = PlatformInfos.isAndroid
++        ? await AndroidFlutterLocalNotificationsPlugin()
++              .getActiveNotificationMessagingStyle(id: id)
++        : null;
++    messagingStyleInformation?.messages?.add(newMessage);
++
++    String? targetSound;
++    String? labelId;
++    String? labelName;
++    final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
++    for (final entry in beeperLabels.entries) {
++      if (entry.key == '_hidden_networks') continue;
++      final val = entry.value;
++      if (val is Map) {
++        final rooms = val['rooms'];
++        if (rooms is List && rooms.contains(event.room.id)) {
++          labelId = entry.key;
++          labelName = (val['title'] ?? val['name']) as String?;
++          final sound = store.getString('beeper_sound_${entry.key}');
++          if (sound != null && sound != 'default') {
++            targetSound = sound;
++          }
++          break;
 +        }
 +      }
 +    }
-+    return;
-+  }
-+  Logs().v('Push helper got notification event of type ${event.type}.');
-+
-+  final isMuted = event.room.pushRuleState == PushRuleState.dontNotify;
-+  final isBeeperMessage = event.room.isBeeperFakeDM ||
-+      event.type == EventTypes.Message ||
-+      event.type == EventTypes.Encrypted ||
-+      event.type == EventTypes.Sticker;
-+
-+  if (isMuted) {
-+    Logs().i('Push helper: room is muted, skipping notification.');
-+    return;
-+  }
-+
-+  if (!isBeeperMessage && !client.pushruleEvaluator.match(event).notify) {
-+    Logs().i('Push helper: filtered by client-side push rules.');
-+    return;
-+  }
-+
-+  if (event.type.startsWith('m.call')) {
-+    // make sure bg sync is on (needed to update hold, unhold events)
-+    // prevent over write from app life cycle change
-+    client.backgroundSync = true;
-+  }
-+
-+  if (event.type == EventTypes.CallHangup) {
-+    client.backgroundSync = false;
-+  }
-+
-+  if (event.type.startsWith('m.call') && event.type != EventTypes.CallInvite) {
-+    Logs().v('Push message is a m.call but not invite. Do not display.');
-+    return;
-+  }
-+
-+  if ((event.type.startsWith('m.call') &&
-+          event.type != EventTypes.CallInvite) ||
-+      event.type == 'org.matrix.call.sdp_stream_metadata_changed') {
-+    Logs().v('Push message was for a call, but not call invite.');
-+    return;
-+  }
-+
-+  final matrixLocals = MatrixLocals(l10n);
-+
-+  // Calculate the body
-+  final body = event.type == EventTypes.Encrypted
-+      ? l10n.newMessageInFluffyChat
-+      : await event.calcLocalizedBody(
-+          matrixLocals,
-+          plaintextBody: true,
-+          withSenderNamePrefix: false,
-+          hideReply: true,
-+          hideEdit: true,
-+          removeMarkdown: true,
-+        );
-+
-+  final isWhatsAppCall = body.contains('Incoming call. Use the WhatsApp app to answer.');
-+
-+  // The person object for the android message style notification
-+  final avatar = event.room.avatar;
-+  final senderAvatar = event.room.isDirectChat
-+      ? avatar
-+      : event.senderFromMemoryOrFallback.avatarUrl;
-+
-+  final ownUser = event.room.unsafeGetUserFromMemoryOrFallback(client.userID!);
-+
-+  final userAvatarFile = await client.tryDownloadNotificationAvatar(
-+    ownUser.avatarUrl,
-+  );
-+  final roomAvatarFile = await client.tryDownloadNotificationAvatar(avatar);
-+  final senderAvatarFile = await client.tryDownloadNotificationAvatar(
-+    senderAvatar,
-+  );
-+
-+  final id = '${client.clientName}_${notification.roomId}'.hashCode;
-+
-+  final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
-+  // Show notification
-+
-+  final newMessage = Message(
-+    body,
-+    event.originServerTs,
-+    Person(
-+      bot: event.messageType == MessageTypes.Notice,
-+      key: event.senderId,
-+      name: senderName,
-+      icon: senderAvatarFile == null
-+          ? null
-+          : ByteArrayAndroidIcon(senderAvatarFile),
-+    ),
-+  );
-+
-+  final messagingStyleInformation = PlatformInfos.isAndroid
-+      ? await AndroidFlutterLocalNotificationsPlugin()
-+            .getActiveNotificationMessagingStyle(id: id)
-+      : null;
-+  messagingStyleInformation?.messages?.add(newMessage);
-+
-+  String? targetSound;
-+  String? labelId;
-+  String? labelName;
-+  final beeperLabels = BeeperBridgeUtils.getBeeperLabels(client);
-+  for (final entry in beeperLabels.entries) {
-+    if (entry.key == '_hidden_networks') continue;
-+    final val = entry.value;
-+    if (val is Map) {
-+      final rooms = val['rooms'];
-+      if (rooms is List && rooms.contains(event.room.id)) {
-+        labelId = entry.key;
-+        labelName = (val['title'] ?? val['name']) as String?;
-+        final sound = store.getString('beeper_sound_${entry.key}');
++    if (labelId == null) {
++      final net = BeeperBridgeUtils.getRoomNetwork(event.room);
++      if (net != null) {
++        labelId = BeeperBridgeUtils.getBaseNetworkKey(net.key);
++        labelName = net.name;
++        final sound = store.getString('beeper_sound_$labelId');
 +        if (sound != null && sound != 'default') {
 +          targetSound = sound;
 +        }
-+        break;
 +      }
 +    }
-+  }
-+  if (labelId == null) {
-+    final net = BeeperBridgeUtils.getRoomNetwork(event.room);
-+    if (net != null) {
-+      labelId = BeeperBridgeUtils.getBaseNetworkKey(net.key);
-+      labelName = net.name;
-+      final sound = store.getString('beeper_sound_$labelId');
-+      if (sound != null && sound != 'default') {
-+        targetSound = sound;
-+      }
++
++    final roomName = event.room.getBeeperDisplayname(MatrixLocals(l10n));
++
++    final isDirectChat = event.room.isDirectChat || event.room.isBeeperFakeDM;
++    
++    final channelIdBase = labelId != null ? 'chan_$labelId' : (isDirectChat ? 'chan_direct' : 'chan_group');
++    final channelId = targetSound != null ? '${channelIdBase}_$targetSound' : channelIdBase;
++    final channelName = labelName ?? (isDirectChat ? l10n.directChats : l10n.groups);
++
++    final roomsChannel = AndroidNotificationChannel(
++      channelId,
++      channelName,
++      sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
++      playSound: true,
++      importance: Importance.high,
++    );
++
++    if (!_createdChannelIds.contains(channelId)) {
++      _createdChannelIds.add(channelId);
++      await flutterLocalNotificationsPlugin
++          .resolvePlatformSpecificImplementation<
++            AndroidFlutterLocalNotificationsPlugin
++          >()
++          ?.createNotificationChannel(roomsChannel);
 +    }
-+  }
 +
-+  final roomName = event.room.getBeeperDisplayname(MatrixLocals(l10n));
-+
-+  final isDirectChat = event.room.isDirectChat || event.room.isBeeperFakeDM;
-+  
-+  final channelIdBase = labelId != null ? 'chan_$labelId' : (isDirectChat ? 'chan_direct' : 'chan_group');
-+  final channelId = targetSound != null ? '${channelIdBase}_$targetSound' : channelIdBase;
-+  final channelName = labelName ?? (isDirectChat ? l10n.directChats : l10n.groups);
-+
-+  final roomsChannel = AndroidNotificationChannel(
-+    channelId,
-+    channelName,
-+    sound: targetSound != null ? RawResourceAndroidNotificationSound(targetSound) : null,
-+    playSound: true,
-+    importance: Importance.high,
-+  );
-+
-+  if (!_createdChannelIds.contains(channelId)) {
-+    _createdChannelIds.add(channelId);
-+    await flutterLocalNotificationsPlugin
-+        .resolvePlatformSpecificImplementation<
-+          AndroidFlutterLocalNotificationsPlugin
-+        >()
-+        ?.createNotificationChannel(roomsChannel);
-+  }
-+
-+  final androidPlatformChannelSpecifics = AndroidNotificationDetails(
-+    roomsChannel.id,
-+    roomsChannel.name,
-+    number: notification.counts?.unread,
-+    category: isWhatsAppCall ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
-+    vibrationPattern: isWhatsAppCall ? Int64List.fromList([0, 1000, 1000, 1000, 1000, 1000, 1000, 1000]) : null,
-+    shortcutId: event.room.id,
-+    styleInformation:
-+        messagingStyleInformation ??
-+        MessagingStyleInformation(
-+          Person(
-+            name: ownUser.calcDisplayname(),
-+            icon: userAvatarFile == null
-+                ? null
-+                : ByteArrayAndroidIcon(userAvatarFile),
-+            key: event.room.client.userID,
++    final androidPlatformChannelSpecifics = AndroidNotificationDetails(
++      roomsChannel.id,
++      roomsChannel.name,
++      number: notification.counts?.unread,
++      category: isWhatsAppCall ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
++      vibrationPattern: isWhatsAppCall ? Int64List.fromList([0, 1000, 1000, 1000, 1000, 1000, 1000, 1000]) : null,
++      shortcutId: event.room.id,
++      styleInformation:
++          messagingStyleInformation ??
++          MessagingStyleInformation(
++            Person(
++              name: ownUser.calcDisplayname(),
++              icon: userAvatarFile == null
++                  ? null
++                  : ByteArrayAndroidIcon(userAvatarFile),
++              key: event.room.client.userID,
++            ),
++            conversationTitle: isDirectChat ? null : roomName,
++            groupConversation: !isDirectChat,
++            messages: [newMessage],
 +          ),
-+          conversationTitle: isDirectChat ? null : roomName,
-+          groupConversation: !isDirectChat,
-+          messages: [newMessage],
-+        ),
-+    ticker: event.calcLocalizedBodyFallback(
-+      matrixLocals,
-+      plaintextBody: true,
-+      withSenderNamePrefix: !isDirectChat,
-+      hideReply: true,
-+      hideEdit: true,
-+      removeMarkdown: true,
-+    ),
-+    importance: Importance.high,
-+    priority: Priority.max,
-+    actions: event.type == EventTypes.RoomMember || !useNotificationActions
-+        ? null
-+        : <AndroidNotificationAction>[
-+            AndroidNotificationAction(
-+              FluffyChatNotificationActions.reply.name,
-+              l10n.reply,
-+              inputs: [
-+                AndroidNotificationActionInput(label: l10n.writeAMessage),
-+              ],
-+              allowGeneratedReplies: true,
-+              semanticAction: SemanticAction.reply,
-+            ),
-+            AndroidNotificationAction(
-+              FluffyChatNotificationActions.markAsRead.name,
-+              l10n.markAsRead,
-+              semanticAction: SemanticAction.markAsRead,
-+            ),
-+            AndroidNotificationAction(
-+              FluffyChatNotificationActions.mute.name,
-+              l10n.mute,
-+              semanticAction: SemanticAction.mute,
-+            ),
-+          ],
-+  );
-+  final iOSPlatformChannelSpecifics = DarwinNotificationDetails(
-+    threadIdentifier: event.room.id,
-+    sound: targetSound != null ? '$targetSound.wav' : null,
-+  );
-+  final platformChannelSpecifics = NotificationDetails(
-+    android: androidPlatformChannelSpecifics,
-+    iOS: iOSPlatformChannelSpecifics,
-+  );
++      ticker: event.calcLocalizedBodyFallback(
++        matrixLocals,
++        plaintextBody: true,
++        withSenderNamePrefix: !isDirectChat,
++        hideReply: true,
++        hideEdit: true,
++        removeMarkdown: true,
++      ),
++      importance: Importance.high,
++      priority: Priority.max,
++      actions: event.type == EventTypes.RoomMember || !useNotificationActions
++          ? null
++          : <AndroidNotificationAction>[
++              AndroidNotificationAction(
++                FluffyChatNotificationActions.reply.name,
++                l10n.reply,
++                inputs: [
++                  AndroidNotificationActionInput(label: l10n.writeAMessage),
++                ],
++                allowGeneratedReplies: true,
++                semanticAction: SemanticAction.reply,
++              ),
++              AndroidNotificationAction(
++                FluffyChatNotificationActions.markAsRead.name,
++                l10n.markAsRead,
++                semanticAction: SemanticAction.markAsRead,
++              ),
++              AndroidNotificationAction(
++                FluffyChatNotificationActions.mute.name,
++                l10n.mute,
++                semanticAction: SemanticAction.mute,
++              ),
++            ],
++    );
++    final iOSPlatformChannelSpecifics = DarwinNotificationDetails(
++      threadIdentifier: event.room.id,
++      sound: targetSound != null ? '$targetSound.wav' : null,
++    );
++    final platformChannelSpecifics = NotificationDetails(
++      android: androidPlatformChannelSpecifics,
++      iOS: iOSPlatformChannelSpecifics,
++    );
 +
-+  final title = event.room.getBeeperDisplayname(MatrixLocals(l10n));
++    final title = event.room.getBeeperDisplayname(MatrixLocals(l10n));
 +
-+  if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
-+    await _setShortcut(event, l10n, title, roomAvatarFile);
-+  }
++    if (PlatformInfos.isAndroid && messagingStyleInformation == null) {
++      await _setShortcut(event, l10n, title, roomAvatarFile);
++    }
 +
-+  final needsTitleAndBody = !PlatformInfos.isAndroid;
++    final needsTitleAndBody = !PlatformInfos.isAndroid;
 +
-+  await flutterLocalNotificationsPlugin.show(
-+    id: id,
-+    title: needsTitleAndBody ? title : null,
-+    body: needsTitleAndBody ? body : null,
-+    notificationDetails: platformChannelSpecifics,
-+    payload: FluffyChatPushPayload(
-+      client.clientName,
-+      event.room.id,
-+      event.eventId,
-+      isWhatsAppCall: isWhatsAppCall,
-+    ).toString(),
-+  );
++    await flutterLocalNotificationsPlugin.show(
++      id: id,
++      title: needsTitleAndBody ? title : null,
++      body: needsTitleAndBody ? body : null,
++      notificationDetails: platformChannelSpecifics,
++      payload: FluffyChatPushPayload(
++        client.clientName,
++        event.room.id,
++        event.eventId,
++        isWhatsAppCall: isWhatsAppCall,
++      ).toString(),
++    );
 +
-+  Logs().v('[PushCrypto] Decryption attempt finished. Event is encrypted: ${event.type == EventTypes.Encrypted}');
-+
-+  if (isBackgroundMessage) {
-+    Logs().v('[PushCrypto] Background message: disposing client and closing database to flush WAL...');
-+    await client.dispose(closeDatabase: true);
++    Logs().v('[PushCrypto] Decryption attempt finished. Event is encrypted: ${event.type == EventTypes.Encrypted}');
++  } finally {
++    if (isBackgroundMessage && client != null) {
++      Logs().v('[PushCrypto] Background message: disposing client and closing database to flush WAL...');
++      await client.dispose(closeDatabase: true);
++    }
 +  }
 +
 +  Logs().v('Push helper has been completed!');
