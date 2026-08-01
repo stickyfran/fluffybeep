@@ -363389,10 +363389,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..4d2c50c4f90be23856cf186236e2e910c2afb154 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca15708580 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,620 @@
+@@ -1,483 +1,619 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -364083,7 +364083,6 @@ index e90e6496197667270aaa2a060f18babb76b524bf..4d2c50c4f90be23856cf186236e2e910
 +          flutterLocalNotificationsPlugin.cancel(id: activeNotification.id!);
 +        }
 +      }
-+    }
 +    }
 +    return;
 +  }
