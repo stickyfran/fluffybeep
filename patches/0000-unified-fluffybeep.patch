@@ -314979,10 +314979,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..fc49661a20ab5120f9a780bfc6e3581939884375 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..1cd0421ac534177ffd697391a1a0f9e657570728 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,462 @@
+@@ -1,324 +1,450 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315666,37 +315666,25 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..fc49661a20ab5120f9a780bfc6e35819
 +          linkColor: linkColor,
 +        );
 +      case EventTypes.CallInvite:
-+        return FutureBuilder<User?>(
-+          future: event.fetchSenderUser(),
-+          builder: (context, snapshot) {
-+            return _ButtonContent(
-+              label: L10n.of(context).startedACall(
-+                snapshot.data?.calcDisplayname() ??
-+                    event.senderFromMemoryOrFallback.calcDisplayname(),
-+              ),
-+              icon: '📞',
-+              textColor: buttonTextColor,
-+              onPressed: () => onInfoTab!(event),
-+              fontSize: fontSize,
-+            );
-+          },
++        final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
++        return _ButtonContent(
++          label: L10n.of(context).startedACall(senderName),
++          icon: '📞',
++          textColor: buttonTextColor,
++          onPressed: () => onInfoTab!(event),
++          fontSize: fontSize,
 +        );
 +      default:
-+        return FutureBuilder<User?>(
-+          future: event.fetchSenderUser(),
-+          builder: (context, snapshot) {
-+            return _ButtonContent(
-+              label: L10n.of(context).userSentUnknownEvent(
-+                snapshot.data?.calcDisplayname() ??
-+                    event.senderFromMemoryOrFallback.calcDisplayname(),
-+                event.type,
-+              ),
-+              icon: 'ℹ️',
-+              textColor: buttonTextColor,
-+              onPressed: () => onInfoTab!(event),
-+              fontSize: fontSize,
-+            );
-+          },
++        final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
++        return _ButtonContent(
++          label: L10n.of(context).userSentUnknownEvent(
++            senderName,
++            event.type,
++          ),
++          icon: 'ℹ️',
++          textColor: buttonTextColor,
++          onPressed: () => onInfoTab!(event),
++          fontSize: fontSize,
 +        );
 +    }
 +  }
@@ -327754,10 +327742,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3c015bb7aa1b03e9568c07cb21a7274e
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..3fa53565396236688f22748a737b719af99d6706 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..5a2e91bcc12a538e0ac2f6fdcf0358414d9b9c51 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,448 @@
+@@ -1,338 +1,450 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328444,21 +328432,23 @@ index 8610b92531be84898e03439fa07f16145a6d552c..3fa53565396236688f22748a737b719a
 +                  ),
 +                  delegate: SliverChildBuilderDelegate(
 +                    (BuildContext context, int i) {
-+                    final room = rooms[i];
-+                    final space = spaceDelegateCandidates[room.id];
-+                    return ChatListItem(
-+                      room,
-+                      space: space,
-+                      key: Key('chat_list_item_${room.id}'),
-+                      filter: filter,
-+                      onTap: () => widget.controller.onChatTap(room),
-+                      onLongPress: (context) =>
-+                          widget.controller.chatContextAction(room, context, space),
-+                      activeChat: widget.controller.activeChat == room.id,
-+                    );
-+                  },
-+                  childCount: rooms.length,
-+                ),
++                      final room = rooms[i];
++                      final space = spaceDelegateCandidates[room.id];
++                      return ChatListItem(
++                        room,
++                        space: space,
++                        key: Key('chat_list_item_${room.id}'),
++                        filter: filter,
++                        onTap: () => widget.controller.onChatTap(room),
++                        onLongPress: (context) =>
++                            widget.controller.chatContextAction(room, context, space),
++                        activeChat: widget.controller.activeChat == room.id,
++                      );
++                    },
++                    childCount: rooms.length,
++                    addAutomaticKeepAlives: true,
++                    addRepaintBoundaries: true,
++                  ),
 +              ),
 +            ),
 +          ],
@@ -330621,7 +330611,7 @@ index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..3f33b40d4133120035103685339808e4
 +}
 diff --git a/lib/pages/chat_list/label_editor_dialog.dart b/lib/pages/chat_list/label_editor_dialog.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..20a0df476a8c492593697ecc56c0964b99d3a876
+index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df3a920f89
 --- /dev/null
 +++ b/lib/pages/chat_list/label_editor_dialog.dart
 @@ -0,0 +1,162 @@
@@ -330770,7 +330760,7 @@ index 0000000000000000000000000000000000000000..20a0df476a8c492593697ecc56c0964b
 +                  },
 +                  config: Config(
 +                    height: 256,
-+                    checkPlatformCompatibility: true,
++                    checkPlatformCompatibility: false,
 +                    emojiViewConfig: EmojiViewConfig(
 +                      emojiSizeMax: 28 *
 +                          (foundation.defaultTargetPlatform ==
@@ -331002,10 +330992,10 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..5b94df516b0885e115072ef81f1fc0f2
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..297471fcaaef4dde5748d12f5cde079ba5a8e5e9 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5685467e91b5d179d65039b5f6cb06be18c6f159 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -1,137 +1,819 @@
+@@ -1,137 +1,820 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -331747,8 +331737,9 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..297471fcaaef4dde5748d12f5cde079b
 +                          final spaceChildrenIds = space.spaceChildren
 +                              .map((c) => c.roomId)
 +                              .toSet();
-+                           return NaviRailItem(
-+                            toolTip: displayname,
++                           return RepaintBoundary(
++                             child: NaviRailItem(
++                              toolTip: displayname,
 +                            isSelected: widget.activeSpaceId == space.id,
 +                            onTap: () => widget.onGoToSpaceId(space.id),
 +                            onLongPress: () => _showSpaceMenu(context, space, client),
@@ -331770,7 +331761,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..297471fcaaef4dde5748d12f5cde079b
 +                                AppConfig.spaceBorderRadius,
 +                              ),
 +                            ),
-+                          );
++                           );
 +                        } else if (item.isNetwork) {
 +                          final net = item.network!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
