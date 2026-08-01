@@ -386952,7 +386952,7 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..9f76ad465ba13ad9aeb7456245adf312c1ac0756 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..2c67de862c54336172b7a6e4becc9ffd5a7db732 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
 @@ -1,130 +1,131 @@
@@ -387139,7 +387139,7 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..9f76ad465ba13ad9aeb7456245adf312
 +  http: ^1.6.0
 +  image: ^4.7.2
 +  image_picker: ^1.2.3
-+  intl: ^0.19.0
++  intl: ^0.20.2
 +  just_audio: ^0.10.6
 +  latlong2: ^0.10.1
 +  local_auth: ^3.0.2
