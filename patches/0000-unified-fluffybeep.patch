@@ -13921,7 +13921,7 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..81e6180f116a2f1fad3c11740e7c06cda788b4d7 100644
+index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..4c1e5a2cfec51e0766f4a09b708984383c058067 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
 @@ -1,95 +1,95 @@
@@ -14098,7 +14098,7 @@ index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..81e6180f116a2f1fad3c11740e7c06cd
 +        versionCode = flutter.versionCode
 +        versionName = flutter.versionName
 +        ndk { // Workaround for https://github.com/flutter/flutter/issues/162153#issuecomment-2612443642
-+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
++            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
 +        }
 +    }
 +
@@ -14115,6 +14115,19 @@ index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..81e6180f116a2f1fad3c11740e7c06cd
 +flutter {
 +    source = "../.."
 +}
+diff --git a/android/app/proguard-rules.pro b/android/app/proguard-rules.pro
+index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..8f799a5437c7ad1e69541600efa5e21ed2da4102 100644
+--- a/android/app/proguard-rules.pro
++++ b/android/app/proguard-rules.pro
+@@ -1 +1,5 @@
+--keep class net.sqlcipher.** { *; }
+\ No newline at end of file
++-keep class net.sqlcipher.** { *; }
++-keep class org.webrtc.** { *; }
++-dontwarn org.webrtc.**
++-keep class uniffi.** { *; }
++-dontwarn uniffi.**
+\ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
 index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..bb1f4444e3dc1841f3ffd82c156bc4dcb133492b 100644
 --- a/android/app/src/main/AndroidManifest.xml
@@ -15417,10 +15430,10 @@ index 96f7a8a63b4850a3ed1e14244465a97f0253eb68..931881cfc1f58b214d4a0214af5b8d22
 +  </testsuite>
 +</testsuites>
 diff --git a/android/gradle.properties b/android/gradle.properties
-index d68b5abd8871df7a851ceaca7a94cceea914d955..e430041dfb871a1e75c6faa9e6c94f2805ec3a92 100644
+index d68b5abd8871df7a851ceaca7a94cceea914d955..af4283ebec00734630070473460e5918f21284ab 100644
 --- a/android/gradle.properties
 +++ b/android/gradle.properties
-@@ -1,8 +1,8 @@
+@@ -1,8 +1,11 @@
 -org.gradle.jvmargs=-Xmx4608m
 -android.useAndroidX=true
 -android.enableJetifier=true
@@ -15430,8 +15443,11 @@ index d68b5abd8871df7a851ceaca7a94cceea914d955..e430041dfb871a1e75c6faa9e6c94f28
 -# This newDsl flag was added automatically by Flutter migrator
 -android.newDsl=false
 +org.gradle.jvmargs=-Xmx4608m
++org.gradle.parallel=true
++org.gradle.caching=true
++org.gradle.vfs.watch=true
 +android.useAndroidX=true
-+android.enableJetifier=true
++android.enableJetifier=false
 +kotlin.jvm.target.validation.mode=IGNORE
 +# This builtInKotlin flag was added automatically by Flutter migrator
 +android.builtInKotlin=false
@@ -33843,10 +33859,10 @@ index 17594b67e42a624f4354cf9fcfec6fa18d3f5ad2..cff6d0bb13e73139bd2c7771be13f404
 +}
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..7560b88a39e38df3144401a4231b75f24437b1bc
+index 0000000000000000000000000000000000000000..e04896136409621314e4d4a1a1150f9f7908d760
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,131 @@
 +import 'dart:io';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
@@ -33864,8 +33880,7 @@ index 0000000000000000000000000000000000000000..7560b88a39e38df3144401a4231b75f2
 +  /// restarting the sync loop — preventing any database corruption.
 +  Future<void> reinitCache(BuildContext context) async {
 +    try {
-+      // Use the official SDK method: it stops sync, clears the cache,
-+      // and restarts the sync loop in a safe, atomic sequence.
++      BeeperBridgeUtils.invalidateAllRoomCaches();
 +      await client.clearCache();
 +    } catch (e) {
 +      debugPrint('Error during Beeper cache reinitialization: $e');
@@ -299982,10 +299997,10 @@ index aa51259e072ea5d172b70d8f7eb7dd5ad6c6ea49..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..c01a57bab4ffb8384c3dff1e2e94dfa67acffe17 100644
+index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..39814d9f1515300336e22eaaee7f429fca2b186a 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,157 +1,171 @@
+@@ -1,157 +1,169 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300176,6 +300191,7 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..c01a57bab4ffb8384c3dff1e2e94dfa6
 +bool isIntegrationTest = false;
 +
 +void main(List<String> args) async {
++  WidgetsFlutterBinding.ensureInitialized();
 +  isIntegrationTest = args.singleOrNull == 'integration_test';
 +  if (PlatformInfos.isAndroid) {
 +    final port = mainIsolateReceivePort = ReceivePort();
@@ -300195,11 +300211,6 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..c01a57bab4ffb8384c3dff1e2e94dfa6
 +    }
 +  }
 +
-+  // Our background push shared isolate accesses flutter-internal things very early in the startup proccess
-+  // To make sure that the parts of flutter needed are started up already, we need to ensure that the
-+  // widget bindings are initialized already.
-+  WidgetsFlutterBinding.ensureInitialized();
-+
 +  if (PlatformInfos.isAndroid) {
 +    try {
 +      await FlutterDisplayMode.setHighRefreshRate();
@@ -300208,8 +300219,10 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..c01a57bab4ffb8384c3dff1e2e94dfa6
 +    }
 +  }
 +
-+  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024; // 100 MB
-+  PaintingBinding.instance.imageCache.maximumSize = 500; // 500 images
++  PaintingBinding.instance.imageCache.maximumSizeBytes = PlatformInfos.isMobile
++      ? 40 * 1024 * 1024  // 40 MB for mobile
++      : 80 * 1024 * 1024; // 80 MB for desktop/web
++  PaintingBinding.instance.imageCache.maximumSize = 300;
 +
 +  final store = await AppSettings.init();
 +  Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
@@ -302317,10 +302330,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..8ab06dff4a9be28b4d2c2e9d9cd6aba8ef12efc3 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..b65e52bcaec2ae39498850af12095eb095f2870d 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1736 @@
+@@ -1,1643 +1,1743 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304479,11 +304492,18 @@ index 74707498c32bda411d06d6c9c086f390f3401135..8ab06dff4a9be28b4d2c2e9d9cd6aba8
 +    if (animateInEventId == eventId) animateInEventId = null;
 +  }
 +
++  bool _updateViewScheduled = false;
++
 +  void updateView() {
-+    if (!mounted) return;
-+    _invalidateTimelineCache();
-+    setReadMarker();
-+    setState(() {});
++    if (!mounted || _updateViewScheduled) return;
++    _updateViewScheduled = true;
++    SchedulerBinding.instance.addPostFrameCallback((_) {
++      _updateViewScheduled = false;
++      if (!mounted) return;
++      _invalidateTimelineCache();
++      setReadMarker();
++      setState(() {});
++    });
 +  }
 +
 +  List<Event>? _cachedFilteredEvents;
@@ -328819,10 +328839,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..fd3f46955c2e942904142a7fc3588de25ee53136 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..8ef5c9add5a947284da207d275360ca1c7bced0d 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,475 @@
+@@ -1,410 +1,480 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329277,9 +329297,13 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..fd3f46955c2e942904142a7fc3588de2
 +  State<ChatListItem> createState() => _ChatListItemState();
 +}
 +
-+class _ChatListItemState extends State<ChatListItem> {
++class _ChatListItemState extends State<ChatListItem>
++    with AutomaticKeepAliveClientMixin {
 +  Future<void>? _loadHeroUsersFuture;
 +  Future<String>? _calcLocalizedBodyFuture;
++
++  @override
++  bool get wantKeepAlive => true;
 +
 +  @override
 +  void initState() {
@@ -329345,6 +329369,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..fd3f46955c2e942904142a7fc3588de2
 +
 +  @override
 +  Widget build(BuildContext context) {
++    super.build(context);
 +    final theme = Theme.of(context);
 +
 +    // Retrieve and cache bridge data once for the build cycle
@@ -357072,10 +357097,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..9307c638207bd3c421876dacced063bce1b5baee
+index 0000000000000000000000000000000000000000..9fe6d161ee46ef57759e2f25f224e6508356b210
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,765 @@
+@@ -0,0 +1,767 @@
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -357287,6 +357312,8 @@ index 0000000000000000000000000000000000000000..9307c638207bd3c421876dacced063bc
 +  static void invalidateAllRoomCaches() {
 +    _roomDataCache.clear();
 +    _roomDataSignatures.clear();
++    lastRealMessageCache.clear();
++    _lastMessageTimeCache.clear();
 +  }
 +
 +  static BeeperRoomData _computeRoomData(Room room) {
@@ -357842,10 +357869,10 @@ index 0000000000000000000000000000000000000000..9307c638207bd3c421876dacced063bc
 +  }
 +}
 diff --git a/lib/utils/client_download_content_extension.dart b/lib/utils/client_download_content_extension.dart
-index d4f2c2e7a178698b43b157951e78d7d75a3536b6..988b1d9b49e273dd86eacc51d13a4fdce6da252d 100644
+index d4f2c2e7a178698b43b157951e78d7d75a3536b6..945da2b32a36ea9cc079e52fce0fcd6e938a020b 100644
 --- a/lib/utils/client_download_content_extension.dart
 +++ b/lib/utils/client_download_content_extension.dart
-@@ -1,109 +1,109 @@
+@@ -1,109 +1,123 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -358030,42 +358057,56 @@ index d4f2c2e7a178698b43b157951e78d7d75a3536b6..988b1d9b49e273dd86eacc51d13a4fdc
 +  int size,
 +) async {
 +  final codec = await instantiateImageCodec(imageBytes);
-+  final frame = await codec.getNextFrame();
-+  final originalImage = frame.image;
++  try {
++    final frame = await codec.getNextFrame();
++    final originalImage = frame.image;
++    try {
++      final recorder = PictureRecorder();
++      final canvas = Canvas(recorder);
 +
-+  final recorder = PictureRecorder();
-+  final canvas = Canvas(recorder);
++      final paint = Paint();
++      final rect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
 +
-+  final paint = Paint();
-+  final rect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
++      final clipPath = Path()
++        ..addOval(
++          Rect.fromCircle(center: Offset(size / 2, size / 2), radius: size / 2),
++        );
 +
-+  final clipPath = Path()
-+    ..addOval(
-+      Rect.fromCircle(center: Offset(size / 2, size / 2), radius: size / 2),
-+    );
++      canvas.clipPath(clipPath);
 +
-+  canvas.clipPath(clipPath);
++      canvas.drawImageRect(
++        originalImage,
++        Rect.fromLTWH(
++          0,
++          0,
++          originalImage.width.toDouble(),
++          originalImage.height.toDouble(),
++        ),
++        rect,
++        paint,
++      );
 +
-+  canvas.drawImageRect(
-+    originalImage,
-+    Rect.fromLTWH(
-+      0,
-+      0,
-+      originalImage.width.toDouble(),
-+      originalImage.height.toDouble(),
-+    ),
-+    rect,
-+    paint,
-+  );
-+
-+  final picture = recorder.endRecording();
-+  final circularImage = await picture.toImage(size, size);
-+
-+  final byteData = await circularImage.toByteData(format: ImageByteFormat.png);
-+  return byteData!.buffer.asUint8List();
++      final picture = recorder.endRecording();
++      try {
++        final circularImage = await picture.toImage(size, size);
++        try {
++          final byteData = await circularImage.toByteData(format: ImageByteFormat.png);
++          return byteData!.buffer.asUint8List();
++        } finally {
++          circularImage.dispose();
++        }
++      } finally {
++        picture.dispose();
++      }
++    } finally {
++      originalImage.dispose();
++    }
++  } finally {
++    codec.dispose();
++  }
 +}
 diff --git a/lib/utils/client_manager.dart b/lib/utils/client_manager.dart
-index cb6510be720b66f975c534e980eb8c015f95e1f3..b4a0e2827d118bc3c08310dcda047b9984ccfa32 100644
+index cb6510be720b66f975c534e980eb8c015f95e1f3..71ed7b95114db85ed035fa58db5dfd8a87380777 100644
 --- a/lib/utils/client_manager.dart
 +++ b/lib/utils/client_manager.dart
 @@ -1,182 +1,182 @@
@@ -358388,7 +358429,7 @@ index cb6510be720b66f975c534e980eb8c015f95e1f3..b4a0e2827d118bc3c08310dcda047b99
 +        AuthenticationTypes.sso,
 +      },
 +      nativeImplementations: nativeImplementations,
-+      defaultNetworkRequestTimeout: const Duration(minutes: 30),
++      defaultNetworkRequestTimeout: const Duration(seconds: 60),
 +      enableDehydratedDevices: true,
 +      shareKeysWith:
 +          ShareKeysWith.values.singleWhereOrNull(
@@ -358608,10 +358649,10 @@ index bc94bf844e11afd9650fbbbf306b61be8f83619d..d4b3098357376ccda342b4e6241c9f47
 +      );
  }
 diff --git a/lib/utils/custom_image_resizer.dart b/lib/utils/custom_image_resizer.dart
-index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..8077cb6397a6204b1255e1c4312053f9bd263ad3 100644
+index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..51ed81255fee2f5168d2835885450509a3072e4e 100644
 --- a/lib/utils/custom_image_resizer.dart
 +++ b/lib/utils/custom_image_resizer.dart
-@@ -1,109 +1,109 @@
+@@ -1,109 +1,121 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -358758,26 +358799,38 @@ index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..8077cb6397a6204b1255e1c4312053f9
 +
 +  try {
 +    // for the other platforms
-+    final dartCodec = await instantiateImageCodec(arguments.bytes);
-+    final frameCount = dartCodec.frameCount;
-+    final dartFrame = await dartCodec.getNextFrame();
-+    final rgbaData = await dartFrame.image.toByteData();
-+    if (rgbaData == null) {
-+      return null;
-+    }
-+    final rgba = Uint8List.view(
-+      rgbaData.buffer,
-+      rgbaData.offsetInBytes,
-+      rgbaData.lengthInBytes,
++    final maxDim = arguments.maxDimension;
++    final dartCodec = await instantiateImageCodec(
++      arguments.bytes,
++      targetWidth: maxDim > 0 ? maxDim : null,
++      targetHeight: maxDim > 0 ? maxDim : null,
 +    );
++    late final int frameCount;
++    late final native.Image nativeImg;
++    try {
++      frameCount = dartCodec.frameCount;
++      final dartFrame = await dartCodec.getNextFrame();
++      try {
++        final rgbaData = await dartFrame.image.toByteData();
++        if (rgbaData == null) {
++          return null;
++        }
++        final rgba = Uint8List.view(
++          rgbaData.buffer,
++          rgbaData.offsetInBytes,
++          rgbaData.lengthInBytes,
++        );
 +
-+    width = originalWidth = dartFrame.image.width;
-+    height = originalHeight = dartFrame.image.height;
++        width = originalWidth = dartFrame.image.width;
++        height = originalHeight = dartFrame.image.height;
 +
-+    var nativeImg = native.Image.fromRGBA(width, height, rgba);
-+
-+    dartFrame.image.dispose();
-+    dartCodec.dispose();
++        nativeImg = native.Image.fromRGBA(width, height, rgba);
++      } finally {
++        dartFrame.image.dispose();
++      }
++    } finally {
++      dartCodec.dispose();
++    }
 +
 +    if (arguments.calcBlurhash) {
 +      // scale down image for blurhashing to speed it up
@@ -359254,10 +359307,10 @@ index b7e14ed983608a54f846e997c31ca74d6be4d34b..cd7fd71c559e4a27a134b1d89704702f
 +}
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..b342485f470d2648a9b40ef83695d13ad931493f
+index 0000000000000000000000000000000000000000..29ac21106a3f6688357da4edec07ca8e5a471893
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,93 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
@@ -359275,14 +359328,14 @@ index 0000000000000000000000000000000000000000..b342485f470d2648a9b40ef83695d13a
 +  Client? _client;
 +  BuildContext? _context;
 +  bool _isPrompting = false;
++  String? _cachedRecoveryKey;
 +
 +  void start(Client client, BuildContext context) {
 +    _client = client;
 +    _context = context;
 +    _timer?.cancel();
-+    // Check every 5 minutes
-+    _timer = Timer.periodic(const Duration(minutes: 5), (_) => _checkHealth());
-+    _checkHealth(); // Initial check
++    // Run initial check and schedule fallback check every 15 minutes only if disconnected
++    _checkHealth();
 +  }
 +
 +  void stop() {
@@ -359290,25 +359343,35 @@ index 0000000000000000000000000000000000000000..b342485f470d2648a9b40ef83695d13a
 +    _timer = null;
 +    _client = null;
 +    _context = null;
++    _cachedRecoveryKey = null;
 +  }
 +
 +  Future<void> _checkHealth() async {
 +    if (_client == null || _context == null || !_context!.mounted || _isPrompting) return;
 +    final state = await _client!.getCryptoIdentityState();
++
++    if (state.connected) {
++      // Identity is connected and healthy; cancel timer to conserve battery
++      _timer?.cancel();
++      _timer = null;
++      return;
++    }
 +    
 +    if (state.initialized && !state.connected) {
 +      // Try to auto-restore using secure storage
 +      final supportsSecureStorage = PlatformInfos.isMobile || PlatformInfos.isDesktop;
 +      if (supportsSecureStorage) {
 +        try {
-+          final keyFromSecureStorage = await const FlutterSecureStorage().read(
++          _cachedRecoveryKey ??= await const FlutterSecureStorage().read(
 +            key: 'ssss_recovery_key_${_client!.userID}',
 +          );
-+          if (keyFromSecureStorage != null) {
-+            await _client!.restoreCryptoIdentity(keyFromSecureStorage);
++          if (_cachedRecoveryKey != null) {
++            await _client!.restoreCryptoIdentity(_cachedRecoveryKey!);
 +            final newState = await _client!.getCryptoIdentityState();
 +            if (newState.connected) {
 +              Logs().i('EncryptionHealthMonitor: Successfully auto-restored crypto identity from secure storage.');
++              _timer?.cancel();
++              _timer = null;
 +              return;
 +            }
 +          }
@@ -362630,10 +362693,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..4cd32c05d25e0363a7858735a6929ff70d82d7e8 100644
+index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..1517f8a09360e5d2b027cb1ac8cb71183f1a2965 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,266 @@
+@@ -1,210 +1,262 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -362895,13 +362958,9 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..4cd32c05d25e0363a7858735a6929ff7
 +}
 +
 +Future<void> waitForPushIsolateDone() async {
-+  int attempts = 0;
-+  while (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) !=
-+          null &&
-+      attempts < 30) {
-+    Logs().i('Wait for Push Isolate to be done... attempt $attempts');
-+    await Future.delayed(const Duration(milliseconds: 200));
-+    attempts++;
++  if (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) != null) {
++    Logs().i('Waiting for Push Isolate to finish execution...');
++    await Future.delayed(const Duration(milliseconds: 1000));
 +  }
 +}
 +
@@ -363389,10 +363448,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca15708580 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..f2c5b86b211a536a2dc8df67dc1717c4164243f7 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,619 @@
+@@ -1,483 +1,623 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -363907,6 +363966,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca
 +
 +const notificationAvatarDimension = 128;
 +final Map<String, DateTime> lastReceivedPushNotification = {};
++final Set<String> _createdChannelIds = {};
 +
 +Future<void> pushHelper(
 +  PushNotification notification, {
@@ -364029,7 +364089,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca
 +
 +  if (event == null || event.type == EventTypes.Encrypted) {
 +    Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
-+    await client.oneShotSync().timeout(const Duration(seconds: 20)).catchError((e, s) {
++    await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
 +      Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
 +    });
 +
@@ -364043,10 +364103,10 @@ index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca
 +    }
 +  }
 +
-+  var retries = 3;
++  var retries = 1;
 +  while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
-+    Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1.5s for keys... (Retries left: $retries)');
-+    await Future.delayed(const Duration(milliseconds: 1500));
++    Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1s for keys... (Retries left: $retries)');
++    await Future.delayed(const Duration(milliseconds: 1000));
 +    try {
 +      event = await client.getEventByPushNotification(
 +        safeNotification,
@@ -364230,11 +364290,14 @@ index e90e6496197667270aaa2a060f18babb76b524bf..cf18655ea8630f1a26c1f831e4e627ca
 +    importance: Importance.high,
 +  );
 +
-+  await flutterLocalNotificationsPlugin
-+      .resolvePlatformSpecificImplementation<
-+        AndroidFlutterLocalNotificationsPlugin
-+      >()
-+      ?.createNotificationChannel(roomsChannel);
++  if (!_createdChannelIds.contains(channelId)) {
++    _createdChannelIds.add(channelId);
++    await flutterLocalNotificationsPlugin
++        .resolvePlatformSpecificImplementation<
++          AndroidFlutterLocalNotificationsPlugin
++        >()
++        ?.createNotificationChannel(roomsChannel);
++  }
 +
 +  final androidPlatformChannelSpecifics = AndroidNotificationDetails(
 +    roomsChannel.id,
@@ -370496,10 +370559,10 @@ index ada498221b72bbbe08212fa5d836dcd654f65313..e43b304e11af5bb50a98689eaa4df894
 +}
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791e5ebb916
+index 0000000000000000000000000000000000000000..50787486ff22e7ff201c8372afcf89ae4ec1a854
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,247 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -370540,6 +370603,12 @@ index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791
 +    _startPrewarming();
 +  }
 +
++  @override
++  void dispose() {
++    WakelockPlus.disable().catchError((_) {});
++    super.dispose();
++  }
++
 +  Future<void> _startPrewarming() async {
 +    try {
 +      // 1. Wait for the initial sync to finish
@@ -370547,7 +370616,7 @@ index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791
 +        (s) => widget.client.prevBatch != null,
 +      );
 +
-+      // 2. Fetch and sort rooms by last message (latest first)
++      // 2. Fetch and sort rooms by last message (latest first), capping at top 30 recent rooms
 +      final rooms = List<Room>.from(widget.client.rooms);
 +      rooms.sort((a, b) {
 +        final aTime = a.lastEvent?.originServerTs ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -370555,9 +370624,11 @@ index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791
 +        return bTime.compareTo(aTime);
 +      });
 +
++      final targetRooms = rooms.length > 30 ? rooms.sublist(0, 30) : rooms;
++
 +      if (mounted) {
 +        setState(() {
-+          _totalRooms = rooms.length;
++          _totalRooms = targetRooms.length;
 +        });
 +      }
 +
@@ -370566,14 +370637,14 @@ index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791
 +
 +      // 3. Process rooms in parallel batches of 5
 +      const batchSize = 5;
-+      for (var i = 0; i < rooms.length; i += batchSize) {
++      for (var i = 0; i < targetRooms.length; i += batchSize) {
 +        if (!mounted) break;
-+        final batch = rooms.sublist(i, (i + batchSize).clamp(0, rooms.length));
++        final batch = targetRooms.sublist(i, (i + batchSize).clamp(0, targetRooms.length));
 +        
 +        await Future.wait(batch.map((room) async {
 +          try {
 +            final roomName = room.getBeeperDisplayname(locals);
-+            if (mounted && throttleTimer.elapsedMilliseconds > 100) {
++            if (mounted && throttleTimer.elapsedMilliseconds > 200) {
 +              throttleTimer.reset();
 +              setState(() {
 +                _currentRoomName = roomName;
@@ -370588,14 +370659,14 @@ index 0000000000000000000000000000000000000000..feac688a1f114f74773b06747ec0c791
 +        }));
 +
 +        _processedRooms = i + batch.length;
-+        if (mounted && (throttleTimer.elapsedMilliseconds > 100 || i + batchSize >= rooms.length)) {
++        if (mounted && (throttleTimer.elapsedMilliseconds > 200 || i + batchSize >= targetRooms.length)) {
 +          throttleTimer.reset();
 +          setState(() {});
 +        }
 +
-+        // Once we process at least 30 rooms (or all of them if less),
++        // Once we process at least 15 rooms (or all of them if less),
 +        // dismiss the fullscreen overlay and enable the wakelock to prevent suspension.
-+        if (!_fullscreenDismissed && (_processedRooms >= 30 || _processedRooms >= rooms.length)) {
++        if (!_fullscreenDismissed && (_processedRooms >= 15 || _processedRooms >= targetRooms.length)) {
 +          WakelockPlus.enable().catchError((_) {});
 +          if (mounted) {
 +            setState(() {
@@ -373614,7 +373685,7 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..049407e5ad94a7c285689b0537121a1096a8ab06 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..cb4665c6acae705c990e7cc425d73f74bf8c667f 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -1,443 +1,489 @@
@@ -374513,7 +374584,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..049407e5ad94a7c285689b0537121a10
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    final child = Provider(create: (_) => this, child: widget.child ?? const SizedBox.shrink());
++    final child = Provider.value(value: this, child: widget.child ?? const SizedBox.shrink());
 +
 +    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
 +      return CacheRefreshOverlay(client: client, store: widget.store, child: child);
@@ -386881,7 +386952,7 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..6880c5c9602e5e65203b6b38b86f36354dedc46b 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..9f76ad465ba13ad9aeb7456245adf312c1ac0756 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
 @@ -1,130 +1,131 @@
@@ -387068,7 +387139,7 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..6880c5c9602e5e65203b6b38b86f3635
 +  http: ^1.6.0
 +  image: ^4.7.2
 +  image_picker: ^1.2.3
-+  intl: any
++  intl: ^0.19.0
 +  just_audio: ^0.10.6
 +  latlong2: ^0.10.1
 +  local_auth: ^3.0.2
