@@ -363447,10 +363447,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0b0f12ce2 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..ad183854dae989e1f19d12b87bca7de302ea017a 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,626 @@
+@@ -1,483 +1,627 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -364058,7 +364058,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0
 +              ) ??
 +              await ClientManager.createClient(clientName, store));
 +
-+    lastReceivedPushNotification[client.clientName] = DateTime.now();
++    lastReceivedPushNotification[client!.clientName] = DateTime.now();
 +
 +    final isMainIsolateAlive = IsolateNameServer.lookupPortByName(
 +          AppConfig.mainIsolatePortName,
@@ -364129,15 +364129,16 @@ index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0
 +      if (clients?.length == 1 && (notification.counts?.unread == 0)) {
 +        await flutterLocalNotificationsPlugin.cancelAll();
 +      } else if (client != null) {
++        final currentClient = client;
 +        // Make sure client is fully loaded and synced before dismiss notifications:
-+        await client.roomsLoading;
++        await currentClient.roomsLoading;
 +        await awaitingOneShotSync;
 +        final activeNotifications = await flutterLocalNotificationsPlugin
 +            .getActiveNotifications();
 +        for (final activeNotification in activeNotifications) {
-+          final room = client.rooms.singleWhereOrNull(
++          final room = currentClient.rooms.singleWhereOrNull(
 +            (room) =>
-+                '${client.clientName}_${room.id}'.hashCode ==
++                '${currentClient.clientName}_${room.id}'.hashCode ==
 +                activeNotification.id,
 +          );
 +          if (room != null && !room.isUnreadOrInvited) {
@@ -364209,17 +364210,17 @@ index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0
 +        ? avatar
 +        : event.senderFromMemoryOrFallback.avatarUrl;
 +
-+    final ownUser = event.room.unsafeGetUserFromMemoryOrFallback(client.userID!);
++    final ownUser = event.room.unsafeGetUserFromMemoryOrFallback(client!.userID!);
 +
-+    final userAvatarFile = await client.tryDownloadNotificationAvatar(
++    final userAvatarFile = await client!.tryDownloadNotificationAvatar(
 +      ownUser.avatarUrl,
 +    );
-+    final roomAvatarFile = await client.tryDownloadNotificationAvatar(avatar);
-+    final senderAvatarFile = await client.tryDownloadNotificationAvatar(
++    final roomAvatarFile = await client!.tryDownloadNotificationAvatar(avatar);
++    final senderAvatarFile = await client!.tryDownloadNotificationAvatar(
 +      senderAvatar,
 +    );
 +
-+    final id = '${client.clientName}_${notification.roomId}'.hashCode;
++    final id = '${client!.clientName}_${notification.roomId}'.hashCode;
 +
 +    final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
 +    // Show notification
@@ -364378,7 +364379,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0
 +      body: needsTitleAndBody ? body : null,
 +      notificationDetails: platformChannelSpecifics,
 +      payload: FluffyChatPushPayload(
-+        client.clientName,
++        client!.clientName,
 +        event.room.id,
 +        event.eventId,
 +        isWhatsAppCall: isWhatsAppCall,
