@@ -302333,10 +302333,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..b65e52bcaec2ae39498850af12095eb095f2870d 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..6d29c91c982657f6673b19f953b7baa4fe2a1368 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1743 @@
+@@ -1,1643 +1,1744 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -303987,6 +303987,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..b65e52bcaec2ae39498850af12095eb0
 +
 +import 'dart:async';
 +import 'dart:io';
++import 'package:flutter/scheduler.dart';
 +
 +import 'package:collection/collection.dart';
 +import 'package:desktop_drop/desktop_drop.dart';
@@ -330992,7 +330993,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..5b94df516b0885e115072ef81f1fc0f2
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5685467e91b5d179d65039b5f6cb06be18c6f159 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..93bc7d3cfd93ab99ab2b6048d5a997b99fb8fdf5 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -1,137 +1,820 @@
@@ -331761,7 +331762,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5685467e91b5d179d65039b5f6cb06be
 +                                AppConfig.spaceBorderRadius,
 +                              ),
 +                            ),
-+                           );
++                          );
 +                        } else if (item.isNetwork) {
 +                          final net = item.network!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
@@ -363445,7 +363446,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..c159976a7fd566b1216e6a5d26dd0a9a7d8824a9 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..674b3d9ea3a5264c15c32e2cd6f091e0b0f12ce2 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,483 +1,626 @@
@@ -364126,7 +364127,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..c159976a7fd566b1216e6a5d26dd0a9a
 +      Logs().v('Notification is a clearing indicator.');
 +      if (clients?.length == 1 && (notification.counts?.unread == 0)) {
 +        await flutterLocalNotificationsPlugin.cancelAll();
-+      } else {
++      } else if (client != null) {
 +        // Make sure client is fully loaded and synced before dismiss notifications:
 +        await client.roomsLoading;
 +        await awaitingOneShotSync;
