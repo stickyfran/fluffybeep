@@ -330993,10 +330993,10 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..5b94df516b0885e115072ef81f1fc0f2
 +  }
 +}
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..93bc7d3cfd93ab99ab2b6048d5a997b99fb8fdf5 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..4282e151fa4754729129db0be68156cf11d3832a 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -1,137 +1,820 @@
+@@ -1,137 +1,821 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -331762,7 +331762,8 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..93bc7d3cfd93ab99ab2b6048d5a997b9
 +                                AppConfig.spaceBorderRadius,
 +                              ),
 +                            ),
-+                          );
++                          ),
++                        );
 +                        } else if (item.isNetwork) {
 +                          final net = item.network!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_space_${net.key}';
