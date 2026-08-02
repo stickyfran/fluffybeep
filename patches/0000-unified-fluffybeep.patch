@@ -306875,10 +306875,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..7604f16369b2771f3255c033e54b9972
 +  }
 +}
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..424e3b5958bb60777e45f98a5f552e0d6d4d954f 100644
+index 879717fa9889be421184b768e20bad7417f95114..494f9a29ae41b2129aa2af5b467cf4e2b46721c8 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
-@@ -1,452 +1,463 @@
+@@ -1,452 +1,484 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307735,10 +307735,31 @@ index 879717fa9889be421184b768e20bad7417f95114..424e3b5958bb60777e45f98a5f552e0d
 +  }
 +}
 +
-+class _ChatAccountPicker extends StatelessWidget {
++class _ChatAccountPicker extends StatefulWidget {
 +  final ChatController controller;
 +
 +  const _ChatAccountPicker(this.controller);
++
++  @override
++  State<_ChatAccountPicker> createState() => _ChatAccountPickerState();
++}
++
++class _ChatAccountPickerState extends State<_ChatAccountPicker> {
++  late Future<Profile> _profileFuture;
++
++  @override
++  void initState() {
++    super.initState();
++    _profileFuture = widget.controller.sendingClient.fetchOwnProfile();
++  }
++
++  @override
++  void didUpdateWidget(covariant _ChatAccountPicker oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (widget.controller.sendingClient != oldWidget.controller.sendingClient) {
++      _profileFuture = widget.controller.sendingClient.fetchOwnProfile();
++    }
++  }
 +
 +  void _popupMenuButtonSelected(String mxid, BuildContext context) {
 +    final client = Matrix.of(
@@ -307748,16 +307769,16 @@ index 879717fa9889be421184b768e20bad7417f95114..424e3b5958bb60777e45f98a5f552e0d
 +      Logs().w('Attempted to switch to a non-existing client $mxid');
 +      return;
 +    }
-+    controller.setSendingClient(client);
++    widget.controller.setSendingClient(client);
 +  }
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    final clients = controller.currentRoomBundle;
++    final clients = widget.controller.currentRoomBundle;
 +    return Padding(
 +      padding: const EdgeInsets.all(8.0),
 +      child: FutureBuilder<Profile>(
-+        future: controller.sendingClient.fetchOwnProfile(),
++        future: _profileFuture,
 +        builder: (context, snapshot) => PopupMenuButton<String>(
 +          useRootNavigator: true,
 +          onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
@@ -310459,10 +310480,10 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..98b353f789315a339cbc92d457a8135c
 +      '${inMinutes.toString().padLeft(2, '0')}:${(inSeconds % 60).toString().padLeft(2, '0')}';
 +}
 diff --git a/lib/pages/chat/events/cute_events.dart b/lib/pages/chat/events/cute_events.dart
-index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..15a5a53a05fb50e86f0b995d5485a2d33102986c 100644
+index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..2096440d061103ddd1fca7df756ffd6e29c35f4c 100644
 --- a/lib/pages/chat/events/cute_events.dart
 +++ b/lib/pages/chat/events/cute_events.dart
-@@ -1,195 +1,195 @@
+@@ -1,195 +1,190 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -310692,23 +310713,18 @@ index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..15a5a53a05fb50e86f0b995d5485a2d3
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    return FutureBuilder<User?>(
-+      future: widget.event.fetchSenderUser(),
-+      builder: (context, snapshot) {
-+        final label = generateLabel(snapshot.data);
++    final label = generateLabel(widget.event.senderFromMemoryOrFallback);
 +
-+        return GestureDetector(
-+          onTap: addOverlay,
-+          child: Column(
-+            mainAxisSize: .min,
-+            mainAxisAlignment: .center,
-+            children: [
-+              Text(widget.event.text, style: const TextStyle(fontSize: 150)),
-+              if (label != null) Text(label),
-+            ],
-+          ),
-+        );
-+      },
++    return GestureDetector(
++      onTap: addOverlay,
++      child: Column(
++        mainAxisSize: .min,
++        mainAxisAlignment: .center,
++        children: [
++          Text(widget.event.text, style: const TextStyle(fontSize: 150)),
++          if (label != null) Text(label),
++        ],
++      ),
 +    );
 +  }
 +
@@ -313007,10 +313023,10 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb94815207302924d 100644
+index 930de3b285d3ff17843ed7075749aaf3943de5a8..5ad7dfb611357783f5f003ef9a8debf566bc51ec 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
-@@ -1,968 +1,1000 @@
+@@ -1,968 +1,1017 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -314068,6 +314084,30 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +}
 +
 +class _MessageState extends State<Message> {
++  Future<Event?>? _replyEventFuture;
++
++  @override
++  void initState() {
++    super.initState();
++    if (widget.event.inReplyToEventId(includingFallback: false) != null) {
++      _replyEventFuture = widget.event.getReplyEvent(widget.timeline);
++    }
++  }
++
++  @override
++  void didUpdateWidget(Message oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (widget.event.eventId != oldWidget.event.eventId ||
++        widget.event.inReplyToEventId(includingFallback: false) !=
++            oldWidget.event.inReplyToEventId(includingFallback: false)) {
++      if (widget.event.inReplyToEventId(includingFallback: false) != null) {
++        _replyEventFuture = widget.event.getReplyEvent(widget.timeline);
++      } else {
++        _replyEventFuture = null;
++      }
++    }
++  }
++
 +  @override
 +  Widget build(BuildContext context) {
 +    final event = widget.event;
@@ -314352,12 +314392,9 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +                                      ),
 +                                    ),
 +                                  if ((!nextEventSameSender) && !ownMessage)
-+                                    FutureBuilder<User?>(
-+                                      future: event.fetchSenderUser(),
-+                                      builder: (context, snapshot) {
-+                                        final displayname =
-+                                            snapshot.data?.calcDisplayname() ??
-+                                            sender.calcDisplayname();
++                                    Builder(
++                                      builder: (context) {
++                                        final displayname = sender.calcDisplayname();
 +                                        return ConstrainedBox(
 +                                          constraints: BoxConstraints(
 +                                            maxWidth: 200,
@@ -314436,9 +314473,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +                                                ) !=
 +                                                null)
 +                                              FutureBuilder<Event?>(
-+                                                future: event.getReplyEvent(
-+                                                  timeline,
-+                                                ),
++                                                future: _replyEventFuture,
 +                                                builder: (BuildContext context, snapshot) {
 +                                                  final replyEvent =
 +                                                      snapshot.hasData
@@ -314636,22 +314671,20 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +                                                  (emoji) => IconButton(
 +                                                    padding: EdgeInsets.zero,
 +                                                    icon: Center(
-+                                                      child: Opacity(
-+                                                        opacity:
-+                                                            sentReactions
-+                                                                .contains(emoji)
-+                                                            ? 0.33
-+                                                            : 1,
-+                                                        child: Text(
-+                                                          emoji,
-+                                                          style:
-+                                                              const TextStyle(
-+                                                                fontSize: 20,
++                                                      child: sentReactions.contains(emoji)
++                                                          ? Opacity(
++                                                              opacity: 0.33,
++                                                              child: Text(
++                                                                emoji,
++                                                                style: const TextStyle(fontSize: 20),
++                                                                textAlign: TextAlign.center,
 +                                                              ),
-+                                                          textAlign:
-+                                                              TextAlign.center,
-+                                                        ),
-+                                                      ),
++                                                            )
++                                                          : Text(
++                                                              emoji,
++                                                              style: const TextStyle(fontSize: 20),
++                                                              textAlign: TextAlign.center,
++                                                            ),
 +                                                    ),
 +                                                    onPressed:
 +                                                        sentReactions.contains(
@@ -314980,10 +315013,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..0e9a49467440140d83c27cfcb9481520
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..1cd0421ac534177ffd697391a1a0f9e657570728 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c85f9af2d 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,450 @@
+@@ -1,324 +1,445 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315707,24 +315740,19 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..1cd0421ac534177ffd697391a1a0f9e6
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    return FutureBuilder<User?>(
-+      future: event.redactedBecause?.fetchSenderUser(),
-+      builder: (context, snapshot) {
-+        final reason = event.redactedBecause?.content.tryGet<String>('reason');
-+        final redactedBy =
-+            snapshot.data?.calcDisplayname() ??
-+            event.redactedBecause?.senderId.localpart ??
-+            L10n.of(context).user;
-+        return _ButtonContent(
-+          label: reason == null
-+              ? L10n.of(context).redactedBy(redactedBy)
-+              : L10n.of(context).redactedByBecause(redactedBy, reason),
-+          icon: '🗑️',
-+          textColor: buttonTextColor.withAlpha(128),
-+          onPressed: () => onInfoTab!(event),
-+          fontSize: fontSize,
-+        );
-+      },
++    final reason = event.redactedBecause?.content.tryGet<String>('reason');
++    final redactedBy =
++        event.redactedBecause?.senderFromMemoryOrFallback.calcDisplayname() ??
++        event.redactedBecause?.senderId.localpart ??
++        L10n.of(context).user;
++    return _ButtonContent(
++      label: reason == null
++          ? L10n.of(context).redactedBy(redactedBy)
++          : L10n.of(context).redactedByBecause(redactedBy, reason),
++      icon: '🗑️',
++      textColor: buttonTextColor.withAlpha(128),
++      onPressed: () => onInfoTab!(event),
++      fontSize: fontSize,
 +    );
 +  }
 +}
@@ -316919,10 +316947,10 @@ index 03f75372e8d89053d508c124302b38d6f1b02181..8b7e047a1179ed3a03f32beae8c641f0
 +  }
 +}
 diff --git a/lib/pages/chat/events/reply_content.dart b/lib/pages/chat/events/reply_content.dart
-index 6f9ce424eed633437971e74ecdfa8267a9d64da8..d31d3d1c583e73a220ea9da03c3e84b68cbeed3e 100644
+index 6f9ce424eed633437971e74ecdfa8267a9d64da8..553a1b0b766955de426c585eb4313adde044e782 100644
 --- a/lib/pages/chat/events/reply_content.dart
 +++ b/lib/pages/chat/events/reply_content.dart
-@@ -1,110 +1,110 @@
+@@ -1,110 +1,104 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -317097,21 +317125,15 @@ index 6f9ce424eed633437971e74ecdfa8267a9d64da8..d31d3d1c583e73a220ea9da03c3e84b6
 +              crossAxisAlignment: .start,
 +              mainAxisAlignment: .center,
 +              children: <Widget>[
-+                FutureBuilder<User?>(
-+                  initialData: displayEvent.senderFromMemoryOrFallback,
-+                  future: displayEvent.fetchSenderUser(),
-+                  builder: (context, snapshot) {
-+                    return Text(
-+                      '${snapshot.data?.calcDisplayname() ?? displayEvent.senderFromMemoryOrFallback.calcDisplayname()}:',
-+                      maxLines: 1,
-+                      overflow: TextOverflow.ellipsis,
-+                      style: TextStyle(
-+                        fontWeight: FontWeight.bold,
-+                        color: color,
-+                        fontSize: fontSize,
-+                      ),
-+                    );
-+                  },
++                Text(
++                  '${displayEvent.senderFromMemoryOrFallback.calcDisplayname()}:',
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: TextStyle(
++                    fontWeight: FontWeight.bold,
++                    color: color,
++                    fontSize: fontSize,
++                  ),
 +                ),
 +                Text(
 +                  displayEvent
@@ -317726,10 +317748,10 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1ee257123b58d93e6c70894ad23ed63c
 +  }
 +}
 diff --git a/lib/pages/chat/input_bar.dart b/lib/pages/chat/input_bar.dart
-index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..ffdb6c80de1a9a4b958e5eec6a2e303a9ca4c2cc 100644
+index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..4d4d7562ba009a518ac2e10c4f3a708d2a60bb68 100644
 --- a/lib/pages/chat/input_bar.dart
 +++ b/lib/pages/chat/input_bar.dart
-@@ -1,474 +1,472 @@
+@@ -1,474 +1,482 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -318489,19 +318511,29 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..ffdb6c80de1a9a4b958e5eec6a2e303a
 +            Expanded(
 +              child: Align(
 +                alignment: Alignment.centerRight,
-+                child: Opacity(
-+                  opacity: suggestion['pack_avatar_url'] != null ? 0.8 : 0.5,
-+                  child: suggestion['pack_avatar_url'] != null
-+                      ? Avatar(
++                child: suggestion['pack_avatar_url'] != null
++                    ? Opacity(
++                        opacity: 0.8,
++                        child: Avatar(
 +                          mxContent: Uri.tryParse(
 +                            suggestion.tryGet<String>('pack_avatar_url') ?? '',
 +                          ),
 +                          name: suggestion.tryGet<String>('pack_display_name'),
 +                          size: size * 0.9,
 +                          client: client,
-+                        )
-+                      : Text(suggestion['pack_display_name']!),
-+                ),
++                        ),
++                      )
++                    : Text(
++                        suggestion['pack_display_name']!,
++                        style: TextStyle(
++                          color: Theme.of(context)
++                              .textTheme
++                              .bodyMedium
++                              ?.color
++                              ?.withAlpha(128) ??
++                              Colors.black54,
++                        ),
++                      ),
 +              ),
 +            ),
 +          ],
@@ -319109,10 +319141,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eda518d040d712b74d3ba1a9f7aa68ac956591ac 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..c0f9ea3114aa177631a1cb907913c6b8360e654a 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,222 @@
+@@ -1,222 +1,242 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -319367,8 +319399,27 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eda518d040d712b74d3ba1a9f7aa68ac
 +  RecordingViewModelState createState() => RecordingViewModelState();
 +}
 +
-+class RecordingViewModelState extends State<RecordingViewModel> {
++class RecordingViewModelState extends State<RecordingViewModel>
++    with WidgetsBindingObserver {
 +  Timer? _recorderSubscription;
++
++  @override
++  void initState() {
++    super.initState();
++    WidgetsBinding.instance.addObserver(this);
++  }
++
++  @override
++  void didChangeAppLifecycleState(AppLifecycleState state) {
++    if (state == AppLifecycleState.paused) {
++      if (isRecording) {
++        cancel();
++      }
++      WakelockPlus.disable();
++    }
++    super.didChangeAppLifecycleState(state);
++  }
++
 +  Duration duration = Duration.zero;
 +
 +  bool get isRecording => _audioRecorder != null;
@@ -319456,6 +319507,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eda518d040d712b74d3ba1a9f7aa68ac
 +
 +  @override
 +  void dispose() {
++    WidgetsBinding.instance.removeObserver(this);
 +    _reset();
 +    super.dispose();
 +  }
@@ -322106,10 +322158,10 @@ index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b
 +
 +enum _Action { allow, deny, verification }
 diff --git a/lib/pages/chat/typing_indicators.dart b/lib/pages/chat/typing_indicators.dart
-index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..36ed1157ae3e6eba9950579339e279b3c9320268 100644
+index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149a7364072 100644
 --- a/lib/pages/chat/typing_indicators.dart
 +++ b/lib/pages/chat/typing_indicators.dart
-@@ -1,165 +1,168 @@
+@@ -1,165 +1,172 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -322390,29 +322442,33 @@ index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..36ed1157ae3e6eba9950579339e279b3
 +  State<_TypingDots> createState() => __TypingDotsState();
 +}
 +
-+class __TypingDotsState extends State<_TypingDots> {
++class __TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin {
 +  int _tick = 0;
 +
-+  late final Timer _timer;
++  late final AnimationController _controller;
 +
 +  static const Duration animationDuration = Duration(milliseconds: 300);
 +
 +  @override
 +  void initState() {
-+    _timer = Timer.periodic(animationDuration, (_) {
-+      if (!mounted) {
-+        return;
-+      }
-+      setState(() {
-+        _tick = (_tick + 1) % 4;
-+      });
-+    });
 +    super.initState();
++    _controller = AnimationController(
++      vsync: this,
++      duration: animationDuration,
++    )..addStatusListener((status) {
++        if (status == AnimationStatus.completed) {
++          setState(() {
++            _tick = (_tick + 1) % 4;
++          });
++          _controller.forward(from: 0.0);
++        }
++      });
++    _controller.forward();
 +  }
 +
 +  @override
 +  void dispose() {
-+    _timer.cancel();
++    _controller.dispose();
 +    super.dispose();
 +  }
 +
@@ -324451,10 +324507,10 @@ index 4cda41ca99e87671737299ec8bf160b9a432fae1..9d64854aaebc6c3cfb3e0892a8ad4eca
                                    TextButton.icon(
                                      onPressed: () => room.isDirectChat
 diff --git a/lib/pages/chat_details/participant_list_item.dart b/lib/pages/chat_details/participant_list_item.dart
-index ba380a879fa8f88a5421a789a182e9900984dd52..8a756e8eea9a0d7f5ba3835e07583df8d08432b9 100644
+index ba380a879fa8f88a5421a789a182e9900984dd52..da2aaf8d60b50b344f0ac8d910b285f540404cf2 100644
 --- a/lib/pages/chat_details/participant_list_item.dart
 +++ b/lib/pages/chat_details/participant_list_item.dart
-@@ -1,104 +1,104 @@
+@@ -1,104 +1,110 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -324652,14 +324708,20 @@ index ba380a879fa8f88a5421a789a182e9900984dd52..8a756e8eea9a0d7f5ba3835e07583df8
 +        ],
 +      ),
 +      subtitle: Text(user.id, maxLines: 1, overflow: TextOverflow.ellipsis),
-+      leading: Opacity(
-+        opacity: user.membership == Membership.join ? 1 : 0.5,
-+        child: Avatar(
-+          mxContent: user.avatarUrl,
-+          name: user.calcDisplayname(),
-+          presenceUserId: user.stateKey,
-+        ),
-+      ),
++      leading: user.membership == Membership.join
++          ? Avatar(
++              mxContent: user.avatarUrl,
++              name: user.calcDisplayname(),
++              presenceUserId: user.stateKey,
++            )
++          : Opacity(
++              opacity: 0.5,
++              child: Avatar(
++                mxContent: user.avatarUrl,
++                name: user.calcDisplayname(),
++                presenceUserId: user.stateKey,
++              ),
++            ),
 +    );
 +  }
 +}
@@ -325408,10 +325470,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3c015bb7aa1b03e9568c07cb21a7274e2f387c4d 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..9ca6a3d6ac3be2bf5988bca44b994584315962ad 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1289 @@
+@@ -1,1041 +1,1293 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -326681,6 +326743,9 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3c015bb7aa1b03e9568c07cb21a7274e
 +            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
 +            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
 +            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
++            if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
++              BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
++            }
 +            anyUpdated = true;
 +            break;
 +          }
@@ -327002,6 +327067,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3c015bb7aa1b03e9568c07cb21a7274e
 +
 +  @override
 +  void dispose() {
++    _batchTimestampTimer?.cancel();
 +    _intentDataStreamSubscription?.cancel();
 +    _intentFileStreamSubscription?.cancel();
 +    _onRoomTagUpdate?.cancel();
@@ -330452,10 +330518,10 @@ index de6594cafcae179af67e078dd5ad2071a19f5d18..233b8ca72c60970067000a84a9d1d436
 +  archive,
 +}
 diff --git a/lib/pages/chat_list/dummy_chat_list_item.dart b/lib/pages/chat_list/dummy_chat_list_item.dart
-index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..3f33b40d4133120035103685339808e4ee646b89 100644
+index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..bd68e8e87063c91010bf39820e250dd59afd67ac 100644
 --- a/lib/pages/chat_list/dummy_chat_list_item.dart
 +++ b/lib/pages/chat_list/dummy_chat_list_item.dart
-@@ -1,77 +1,77 @@
+@@ -1,77 +1,79 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -330555,58 +330621,60 @@ index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..3f33b40d4133120035103685339808e4
 +    final theme = Theme.of(context);
 +    final titleColor = theme.textTheme.bodyLarge!.color!.withAlpha(100);
 +    final subtitleColor = theme.textTheme.bodyLarge!.color!.withAlpha(50);
++    final tile = ListTile(
++      leading: CircleAvatar(
++        backgroundColor: titleColor,
++        child: animate
++            ? CircularProgressIndicator(
++                strokeWidth: 1,
++                color: theme.textTheme.bodyLarge!.color,
++              )
++            : const SizedBox.shrink(),
++      ),
++      title: Row(
++        children: [
++          Expanded(
++            child: Container(
++              height: 14,
++              decoration: BoxDecoration(
++                color: titleColor,
++                borderRadius: BorderRadius.circular(3),
++              ),
++            ),
++          ),
++          const SizedBox(width: 36),
++          Container(
++            height: 14,
++            width: 14,
++            decoration: BoxDecoration(
++              color: subtitleColor,
++              borderRadius: BorderRadius.circular(14),
++            ),
++          ),
++          const SizedBox(width: 12),
++          Container(
++            height: 14,
++            width: 14,
++            decoration: BoxDecoration(
++              color: subtitleColor,
++              borderRadius: BorderRadius.circular(14),
++            ),
++          ),
++        ],
++      ),
++      subtitle: Container(
++        decoration: BoxDecoration(
++          color: subtitleColor,
++          borderRadius: BorderRadius.circular(3),
++        ),
++        height: 12,
++        margin: const EdgeInsets.only(right: 22),
++      ),
++    );
++    if (opacity == 1.0) return tile;
 +    return Opacity(
 +      opacity: opacity,
-+      child: ListTile(
-+        leading: CircleAvatar(
-+          backgroundColor: titleColor,
-+          child: animate
-+              ? CircularProgressIndicator(
-+                  strokeWidth: 1,
-+                  color: theme.textTheme.bodyLarge!.color,
-+                )
-+              : const SizedBox.shrink(),
-+        ),
-+        title: Row(
-+          children: [
-+            Expanded(
-+              child: Container(
-+                height: 14,
-+                decoration: BoxDecoration(
-+                  color: titleColor,
-+                  borderRadius: BorderRadius.circular(3),
-+                ),
-+              ),
-+            ),
-+            const SizedBox(width: 36),
-+            Container(
-+              height: 14,
-+              width: 14,
-+              decoration: BoxDecoration(
-+                color: subtitleColor,
-+                borderRadius: BorderRadius.circular(14),
-+              ),
-+            ),
-+            const SizedBox(width: 12),
-+            Container(
-+              height: 14,
-+              width: 14,
-+              decoration: BoxDecoration(
-+                color: subtitleColor,
-+                borderRadius: BorderRadius.circular(14),
-+              ),
-+            ),
-+          ],
-+        ),
-+        subtitle: Container(
-+          decoration: BoxDecoration(
-+            color: subtitleColor,
-+            borderRadius: BorderRadius.circular(3),
-+          ),
-+          height: 12,
-+          margin: const EdgeInsets.only(right: 22),
-+        ),
-+      ),
++      child: tile,
 +    );
 +  }
 +}
@@ -332103,10 +332171,10 @@ index 13d6fe73c0bd33a8ca518f476ecbe5d0397dcf7d..d88172fd98a80acd1ec461a4746644b9
 +  }
 +}
 diff --git a/lib/pages/chat_list/space_view.dart b/lib/pages/chat_list/space_view.dart
-index 70c44860979421b1ee3206c936f170bcd29dcef9..b26037fca34be25f3eaa61b5df6e9eedaa4bfb78 100644
+index 70c44860979421b1ee3206c936f170bcd29dcef9..a31db28b8a6a593ddec68ab45c8a25c6d178acd2 100644
 --- a/lib/pages/chat_list/space_view.dart
 +++ b/lib/pages/chat_list/space_view.dart
-@@ -1,687 +1,687 @@
+@@ -1,687 +1,693 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -333439,14 +333507,20 @@ index 70c44860979421b1ee3206c936f170bcd29dcef9..b26037fca34be25f3eaa61b5df6e9eed
 +                                title: Row(
 +                                  children: [
 +                                    Expanded(
-+                                      child: Opacity(
-+                                        opacity: joinedRoom == null ? 0.5 : 1,
-+                                        child: Text(
-+                                          displayname,
-+                                          maxLines: 1,
-+                                          overflow: TextOverflow.ellipsis,
-+                                        ),
-+                                      ),
++                                      child: joinedRoom == null
++                                          ? Opacity(
++                                              opacity: 0.5,
++                                              child: Text(
++                                                displayname,
++                                                maxLines: 1,
++                                                overflow: TextOverflow.ellipsis,
++                                              ),
++                                            )
++                                          : Text(
++                                              displayname,
++                                              maxLines: 1,
++                                              overflow: TextOverflow.ellipsis,
++                                            ),
 +                                    ),
 +                                    if (joinedRoom != null &&
 +                                        joinedRoom.pushRuleState !=
@@ -357093,10 +357167,11 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..9fe6d161ee46ef57759e2f25f224e6508356b210
+index 0000000000000000000000000000000000000000..3f5ed9916a41689bd1fbcffe1e8dbc2f2e46d721
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,767 @@
+@@ -0,0 +1,783 @@
++import 'dart:collection';
 +import 'dart:typed_data';
 +
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -357225,14 +357300,22 @@ index 0000000000000000000000000000000000000000..9fe6d161ee46ef57759e2f25f224e650
 +          fromCache: true,
 +        );
 +        _roomDataSignatures[roomId] = -1; // Special hash value for preloaded entries
++        if (_roomDataCache.length > maxCacheSize) {
++          _roomDataCache.remove(_roomDataCache.keys.first);
++        }
++        if (_roomDataSignatures.length > maxCacheSize) {
++          _roomDataSignatures.remove(_roomDataSignatures.keys.first);
++        }
 +      }
 +    }
 +  }
 +  // --- FIN SISTEMA DE CACHÉ PERSISTENTE ---
 +
++  static const int maxCacheSize = 100;
++
 +  /// Caché en RAM — O(1) lookup, invalidada por sync
-+  static final Map<String, BeeperRoomData> _roomDataCache = {};
-+  static final Map<String, int> _roomDataSignatures = {};
++  static final Map<String, BeeperRoomData> _roomDataCache = LinkedHashMap<String, BeeperRoomData>();
++  static final Map<String, int> _roomDataSignatures = LinkedHashMap<String, int>();
 +
 +  static int _getRoomSignature(Room room) {
 +    final lastEventId = room.lastEvent?.eventId?.hashCode ?? 0;
@@ -357295,6 +357378,13 @@ index 0000000000000000000000000000000000000000..9fe6d161ee46ef57759e2f25f224e650
 +    final data = _computeRoomData(room);
 +    _roomDataCache[room.id] = data;
 +    _roomDataSignatures[room.id] = sig;
++
++    if (_roomDataCache.length > maxCacheSize) {
++      _roomDataCache.remove(_roomDataCache.keys.first);
++    }
++    if (_roomDataSignatures.length > maxCacheSize) {
++      _roomDataSignatures.remove(_roomDataSignatures.keys.first);
++    }
 +
 +    // Solo persistir si los datos son frescos (no leídos ya de la caché)
 +    if (!data.fromCache) {
@@ -357447,7 +357537,7 @@ index 0000000000000000000000000000000000000000..9fe6d161ee46ef57759e2f25f224e650
 +    );
 +  }
 +
-+  static final Map<String, Event> lastRealMessageCache = {};
++  static final Map<String, Event> lastRealMessageCache = LinkedHashMap<String, Event>();
 +
 +  static bool isBeeperBot(String userId) {
 +    final localpart = userId.split(':').first.toLowerCase();
@@ -358645,10 +358735,10 @@ index bc94bf844e11afd9650fbbbf306b61be8f83619d..d4b3098357376ccda342b4e6241c9f47
 +      );
  }
 diff --git a/lib/utils/custom_image_resizer.dart b/lib/utils/custom_image_resizer.dart
-index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..6b90f14301570517d0746dc8c6ee4b5f9001e068 100644
+index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..f24931306af6c66f6ee19e757b94c1f8dfc30039 100644
 --- a/lib/utils/custom_image_resizer.dart
 +++ b/lib/utils/custom_image_resizer.dart
-@@ -1,109 +1,121 @@
+@@ -1,109 +1,130 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -358838,9 +358928,11 @@ index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..6b90f14301570517d0746dc8c6ee4b5f
 +        native.Transform.bilinear,
 +      );
 +
-+      blurhash = blurhashImg.toBlurhash(3, 3);
-+
-+      blurhashImg.free();
++      try {
++        blurhash = blurhashImg.toBlurhash(3, 3);
++      } finally {
++        blurhashImg.free();
++      }
 +    }
 +
 +    if (frameCount > 1) {
@@ -358851,18 +358943,25 @@ index a938f7e58fe8f511f2a3b51d7b8e8468b4e692c5..6b90f14301570517d0746dc8c6ee4b5f
 +      if (width > max || height > max) {
 +        (width, height) = _scaleToBox(width, height, boxSize: max);
 +
-+        final scaledImg = nativeImg.resample(
-+          width,
-+          height,
-+          native.Transform.lanczos,
-+        );
-+        nativeImg.free();
++        final native.Image scaledImg;
++        try {
++          scaledImg = nativeImg.resample(
++            width,
++            height,
++            native.Transform.lanczos,
++          );
++        } finally {
++          nativeImg.free();
++        }
 +        nativeImg = scaledImg;
 +      }
 +
-+      imageBytes = await nativeImg.toJpeg(75);
-+      mimeType = 'image/jpeg';
-+      nativeImg.free();
++      try {
++        imageBytes = await nativeImg.toJpeg(75);
++        mimeType = 'image/jpeg';
++      } finally {
++        nativeImg.free();
++      }
 +    }
 +  } catch (e, s) {
 +    Logs().e('Could not generate preview', e, s);
@@ -362692,10 +362791,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..1517f8a09360e5d2b027cb1ac8cb71183f1a2965 100644
+index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..429d766b8399a3c40bfda2d4a66fc860e591a4aa 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,262 @@
+@@ -1,210 +1,266 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -362959,7 +363058,11 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..1517f8a09360e5d2b027cb1ac8cb7118
 +Future<void> waitForPushIsolateDone() async {
 +  if (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) != null) {
 +    Logs().i('Waiting for Push Isolate to finish execution...');
-+    await Future.delayed(const Duration(milliseconds: 1000));
++    int retries = 20;
++    while (IsolateNameServer.lookupPortByName(AppConfig.pushIsolatePortName) != null && retries > 0) {
++      await Future.delayed(const Duration(milliseconds: 100));
++      retries--;
++    }
 +  }
 +}
 +
@@ -370814,10 +370917,10 @@ index 0000000000000000000000000000000000000000..50787486ff22e7ff201c8372afcf89ae
 +  }
 +}
 diff --git a/lib/widgets/chat_settings_popup_menu.dart b/lib/widgets/chat_settings_popup_menu.dart
-index dc48a12af611f49cd15e54889bce9224071c9261..0d2d4df3834301232781531e06ad832df4b9986f 100644
+index dc48a12af611f49cd15e54889bce9224071c9261..d9802d64e2a6243d3d5935eb2ef3d369ccf90401 100644
 --- a/lib/widgets/chat_settings_popup_menu.dart
 +++ b/lib/widgets/chat_settings_popup_menu.dart
-@@ -1,204 +1,204 @@
+@@ -1,204 +1,209 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -371062,6 +371165,20 @@ index dc48a12af611f49cd15e54889bce9224071c9261..0d2d4df3834301232781531e06ad832d
 +  StreamSubscription? notificationChangeSub;
 +
 +  @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    notificationChangeSub ??= Matrix.of(context).client.onSync.stream
++        .where(
++          (syncUpdate) =>
++              syncUpdate.accountData?.any(
++                (accountData) => accountData.type == 'm.push_rules',
++              ) ??
++              false,
++        )
++        .listen((u) => setState(() {}));
++  }
++
++  @override
 +  void dispose() {
 +    notificationChangeSub?.cancel();
 +    super.dispose();
@@ -371072,15 +371189,6 @@ index dc48a12af611f49cd15e54889bce9224071c9261..0d2d4df3834301232781531e06ad832d
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    notificationChangeSub ??= Matrix.of(context).client.onSync.stream
-+        .where(
-+          (syncUpdate) =>
-+              syncUpdate.accountData?.any(
-+                (accountData) => accountData.type == 'm.push_rules',
-+              ) ??
-+              false,
-+        )
-+        .listen((u) => setState(() {}));
 +    return Stack(
 +      alignment: Alignment.center,
 +      children: [
@@ -372724,7 +372832,7 @@ index 3a7aa1b34cf7e7164b5eed1bea0f5cf034c46683..9700b286d2e06b35e0bd87cfa8f53f77
 +  }
 +}
 diff --git a/lib/widgets/layouts/two_column_layout.dart b/lib/widgets/layouts/two_column_layout.dart
-index 40ae50f0d14e34f851c07c660fb2a8af99cb11fc..b4b8e65cd6e29e238bf11cdca09eecbaab4bbcfa 100644
+index 40ae50f0d14e34f851c07c660fb2a8af99cb11fc..6fbae7b343445a99dbc3056158dfeb11808631da 100644
 --- a/lib/widgets/layouts/two_column_layout.dart
 +++ b/lib/widgets/layouts/two_column_layout.dart
 @@ -1,43 +1,43 @@
@@ -372807,7 +372915,7 @@ index 40ae50f0d14e34f851c07c660fb2a8af99cb11fc..b4b8e65cd6e29e238bf11cdca09eecba
 +              child: mainView,
 +            ),
 +            Container(width: 1.0, color: theme.dividerColor),
-+            Expanded(child: ClipRRect(child: sideView)),
++            Expanded(child: sideView),
 +          ],
 +        ),
 +      ),
@@ -376696,10 +376804,10 @@ index f773b6f98fdae014dc2023439368ac118422087a..6b8ab8dfcdf6de94dc537a3a7e7702ba
 +  }
 +}
 diff --git a/lib/widgets/share_scaffold_dialog.dart b/lib/widgets/share_scaffold_dialog.dart
-index 6523d42ac219218f5d126aac16a09a611d102e93..d1eb5fa361d8b513341a0ef7e101afb04b81704b 100644
+index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a97aff9534 100644
 --- a/lib/widgets/share_scaffold_dialog.dart
 +++ b/lib/widgets/share_scaffold_dialog.dart
-@@ -1,215 +1,215 @@
+@@ -1,215 +1,214 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -377063,46 +377171,45 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..d1eb5fa361d8b513341a0ef7e101afb0
 +              if (!value && filterOut) {
 +                return const SizedBox.shrink();
 +              }
-+              return Padding(
-+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-+                child: Opacity(
-+                  opacity: filterOut ? 0.5 : 1,
-+                  child: FutureBuilder(
-+                    future: room.loadHeroUsers(),
-+                    builder: (context, _) => CheckboxListTile.adaptive(
-+                      checkboxShape: RoundedRectangleBorder(
-+                        borderRadius: BorderRadius.circular(90),
-+                      ),
-+                      controlAffinity: ListTileControlAffinity.trailing,
-+                      shape: RoundedRectangleBorder(
-+                        borderRadius: BorderRadius.circular(
-+                          AppConfig.borderRadius,
-+                        ),
-+                      ),
-+                      secondary: Avatar(
-+                        mxContent: room.avatar,
-+                        name: displayname,
-+                        size: Avatar.defaultSize * 0.75,
-+                      ),
-+                      title: Text(
-+                        displayname,
-+                        maxLines: 1,
-+                        overflow: TextOverflow.ellipsis,
-+                      ),
-+                      subtitle: Text(
-+                        room.directChatMatrixID ??
-+                            L10n.of(context).countParticipants(
-+                              (room.summary.mJoinedMemberCount ?? 0) +
-+                                  (room.summary.mInvitedMemberCount ?? 0),
-+                            ),
-+                        maxLines: 1,
-+                        overflow: TextOverflow.ellipsis,
-+                      ),
-+                      value: selectedRoomId == room.id,
-+                      onChanged: (_) => _toggleRoom(room.id),
++              final tile = FutureBuilder(
++                future: room.loadHeroUsers(),
++                builder: (context, _) => CheckboxListTile.adaptive(
++                  checkboxShape: RoundedRectangleBorder(
++                    borderRadius: BorderRadius.circular(90),
++                  ),
++                  controlAffinity: ListTileControlAffinity.trailing,
++                  shape: RoundedRectangleBorder(
++                    borderRadius: BorderRadius.circular(
++                      AppConfig.borderRadius,
 +                    ),
 +                  ),
++                  secondary: Avatar(
++                    mxContent: room.avatar,
++                    name: displayname,
++                    size: Avatar.defaultSize * 0.75,
++                  ),
++                  title: Text(
++                    displayname,
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                  ),
++                  subtitle: Text(
++                    room.directChatMatrixID ??
++                        L10n.of(context).countParticipants(
++                          (room.summary.mJoinedMemberCount ?? 0) +
++                              (room.summary.mInvitedMemberCount ?? 0),
++                        ),
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                  ),
++                  value: value,
++                  onChanged: (_) => _toggleRoom(room.id),
 +                ),
++              );
++
++              return Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 16.0),
++                child: filterOut ? Opacity(opacity: 0.5, child: tile) : tile,
 +              );
 +            },
 +          ),
