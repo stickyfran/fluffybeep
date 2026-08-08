@@ -363339,15 +363339,16 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c357210a81f4eea93cbc7c15a16c940056da12c
+index 0000000000000000000000000000000000000000..f663e6cb7511b8c3bdc8fb2577d4ba394adafc9f
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,103 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
 +import 'dart:ui';
 +import 'package:flutter/foundation.dart';
++import 'package:flutter/gestures.dart';
 +import 'package:flutter/widgets.dart';
 +import 'file_logger.dart';
 +
@@ -363396,7 +363397,22 @@ index 0000000000000000000000000000000000000000..5c357210a81f4eea93cbc7c15a16c940
 +        }
 +      }
 +    });
++
++    // 4. Capture Global Touch / User Interaction events
++    GestureBinding.instance.pointerRouter.addGlobalRoute((PointerEvent event) {
++      if (event is PointerDownEvent) {
++        final now = DateTime.now();
++        if (_lastTouchLog == null || now.difference(_lastTouchLog!).inMilliseconds > 250) {
++          _lastTouchLog = now;
++          FileLogger.log(
++            '[USER_ACTION] Touch Down at (${event.position.dx.toStringAsFixed(0)}, ${event.position.dy.toStringAsFixed(0)})',
++          );
++        }
++      }
++    });
 +  }
++
++  static DateTime? _lastTouchLog;
 +
 +  static void logAction(String action) {
 +    FileLogger.log('[USER_ACTION] $action');
@@ -363404,30 +363420,31 @@ index 0000000000000000000000000000000000000000..5c357210a81f4eea93cbc7c15a16c940
 +}
 +
 +class PerformanceLoggerObserver extends NavigatorObserver {
++  String _getRouteName(Route<dynamic> route) {
++    return route.settings.name ?? route.runtimeType.toString();
++  }
++
 +  @override
 +  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
 +    super.didPush(route, previousRoute);
-+    if (route.settings.name != null) {
-+      PerformanceLogger.logAction('Screen Pushed: ${route.settings.name}');
-+    }
++    PerformanceLogger.logAction('Screen Pushed: ${_getRouteName(route)}');
 +  }
 +
 +  @override
 +  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
 +    super.didPop(route, previousRoute);
-+    if (route.settings.name != null) {
-+      PerformanceLogger.logAction('Screen Popped: ${route.settings.name}');
-+    }
++    PerformanceLogger.logAction('Screen Popped: ${_getRouteName(route)}');
 +  }
 +
 +  @override
 +  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
 +    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-+    if (newRoute?.settings.name != null) {
-+      PerformanceLogger.logAction('Screen Replaced: ${newRoute?.settings.name}');
++    if (newRoute != null) {
++      PerformanceLogger.logAction('Screen Replaced: ${_getRouteName(newRoute)}');
 +    }
 +  }
 +}
++
 +
 diff --git a/lib/utils/platform_infos.dart b/lib/utils/platform_infos.dart
 index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160750774f9 100644
