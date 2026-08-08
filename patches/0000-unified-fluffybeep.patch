@@ -300000,10 +300000,10 @@ index aa51259e072ea5d172b70d8f7eb7dd5ad6c6ea49..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..39814d9f1515300336e22eaaee7f429fca2b186a 100644
+index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..fc1760449eec7b72ff06de60d76f52b65066d06e 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,157 +1,169 @@
+@@ -1,157 +1,171 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300185,6 +300185,7 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..39814d9f1515300336e22eaaee7f429f
 +
 +import 'config/setting_keys.dart';
 +import 'utils/background_push.dart';
++import 'utils/performance_logger.dart';
 +import 'widgets/fluffy_chat_app.dart';
 +
 +ReceivePort? mainIsolateReceivePort;
@@ -300195,6 +300196,7 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..39814d9f1515300336e22eaaee7f429f
 +
 +void main(List<String> args) async {
 +  WidgetsFlutterBinding.ensureInitialized();
++  PerformanceLogger.init();
 +  isIntegrationTest = args.singleOrNull == 'integration_test';
 +  if (PlatformInfos.isAndroid) {
 +    final port = mainIsolateReceivePort = ReceivePort();
@@ -363328,6 +363330,67 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +}
 +
 +class OtherPartyCanNotReceiveMessages implements Exception {}
+diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..da8f33caed3a0bccf5c9b5d2140f189e5bab60fe
+--- /dev/null
++++ b/lib/utils/performance_logger.dart
+@@ -0,0 +1,55 @@
++// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:ui';
++import 'package:flutter/foundation.dart';
++import 'package:flutter/widgets.dart';
++import 'file_logger.dart';
++
++class PerformanceLogger {
++  static bool _initialized = false;
++
++  static void init() {
++    if (_initialized) return;
++    _initialized = true;
++
++    FileLogger.log('[PERF_INIT] Performance & Error Logger initialized.');
++
++    // 1. Capture Flutter framework errors
++    final originalOnError = FlutterError.onError;
++    FlutterError.onError = (FlutterErrorDetails details) {
++      FileLogger.log(
++        '[CRASH/FLUTTER_ERROR] ${details.exceptionAsString()}\n'
++        'Stack: ${details.stack}',
++      );
++      if (originalOnError != null) {
++        originalOnError(details);
++      }
++    };
++
++    // 2. Capture Async Platform/Dart errors
++    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
++      FileLogger.log(
++        '[CRASH/ASYNC_ERROR] $error\nStack: $stack',
++      );
++      return false; // Allow standard error dispatching to continue
++    };
++
++    // 3. Monitor Frame Timings (Jank / UI freeze detection)
++    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
++      for (final timing in timings) {
++        final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
++        final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
++        final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
++
++        // Log if total frame time exceeds 32ms (~30 FPS or lower, noticeable stutter)
++        if (totalMs > 32.0) {
++          FileLogger.log(
++            '[PERF/JANK] Slow frame detected: Total=${totalMs.toStringAsFixed(1)}ms '
++            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
++          );
++        }
++      }
++    });
++  }
++}
 diff --git a/lib/utils/platform_infos.dart b/lib/utils/platform_infos.dart
 index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160750774f9 100644
 --- a/lib/utils/platform_infos.dart
