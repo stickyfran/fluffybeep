@@ -364671,7 +364671,7 @@ index f331edc..267e252 100644
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..2d6b091 100644
+index e90e649..d318022 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,483 +1,628 @@
@@ -365312,8 +365312,8 @@ index e90e649..2d6b091 100644
 +      Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
 +    }
 +
-+    final isSyncing = client.syncStatus == SyncStatus.syncing;
-+    if ((event == null || event.type == EventTypes.Encrypted) && !isSyncing) {
++    final isForeground = clients != null;
++    if ((event == null || event.type == EventTypes.Encrypted) && !isForeground) {
 +      Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
 +      await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
 +        Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
@@ -365329,7 +365329,7 @@ index e90e649..2d6b091 100644
 +      }
 +    }
 +
-+    var retries = isSyncing ? 0 : 1;
++    var retries = isForeground ? 0 : 1;
 +    while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
 +      Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1s for keys... (Retries left: $retries)');
 +      await Future.delayed(const Duration(milliseconds: 1000));
