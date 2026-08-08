@@ -357039,10 +357039,10 @@ index 398e13b..6f30258 100644
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..aa7a305 100644
+index 5ead47d..d8b0247 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,555 @@
+@@ -1,471 +1,565 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -358024,15 +358024,25 @@ index 5ead47d..aa7a305 100644
 +      // UP may strip the devices list
 +      data['devices'] ??= [];
 +      await FileLogger.log('[UnifiedPush] Starting pushHelper sync...');
-+      await pushHelper(
-+        PushNotification.fromJson(data),
-+        clients: clients,
-+        l10n: l10n,
-+        activeRoomId: matrix?.activeRoomId,
-+        flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
-+        useNotificationActions:
-+            false, // Buggy with UP: https://codeberg.org/UnifiedPush/flutter-connector/issues/34
-+      );
++      if (clients != null) {
++        unawaited(pushHelper(
++          PushNotification.fromJson(data),
++          clients: clients,
++          l10n: l10n,
++          activeRoomId: matrix?.activeRoomId,
++          flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
++          useNotificationActions: false,
++        ));
++      } else {
++        await pushHelper(
++          PushNotification.fromJson(data),
++          clients: clients,
++          l10n: l10n,
++          activeRoomId: matrix?.activeRoomId,
++          flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
++          useNotificationActions: false,
++        );
++      }
 +      await FileLogger.log('[UnifiedPush] Finished pushHelper sync successfully');
 +    } catch (e, s) {
 +      await FileLogger.log('[UnifiedPush] CRITICAL ERROR in _onUpMessage: $e\nStacktrace:\n$s');
@@ -364661,10 +364671,10 @@ index f331edc..267e252 100644
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..ad18385 100644
+index e90e649..2d6b091 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,627 @@
+@@ -1,483 +1,628 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -365302,7 +365312,8 @@ index e90e649..ad18385 100644
 +      Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
 +    }
 +
-+    if (event == null || event.type == EventTypes.Encrypted) {
++    final isSyncing = client.syncStatus == SyncStatus.syncing;
++    if ((event == null || event.type == EventTypes.Encrypted) && !isSyncing) {
 +      Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
 +      await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
 +        Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
@@ -365318,7 +365329,7 @@ index e90e649..ad18385 100644
 +      }
 +    }
 +
-+    var retries = 1;
++    var retries = isSyncing ? 0 : 1;
 +    while ((event == null || event.type == EventTypes.Encrypted) && retries > 0) {
 +      Logs().v('[PushCrypto] Event still encrypted or null. Waiting 1s for keys... (Retries left: $retries)');
 +      await Future.delayed(const Duration(milliseconds: 1000));
