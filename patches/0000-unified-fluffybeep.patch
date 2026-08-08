@@ -376485,10 +376485,10 @@ index 460cd78..cad75f8 100644
 +  report,
 +}
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0..a7d18b6 100644
+index f9b2df0..4797189 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
-@@ -1,223 +1,304 @@
+@@ -1,223 +1,310 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -376883,15 +376883,19 @@ index f9b2df0..a7d18b6 100644
 +          }.contains(event.messageType)) {
 +        throw Exception('Event of type ${event.messageType} has no thumbnail!');
 +      }
-+      final data = await event.downloadAndDecryptAttachment(
-+        getThumbnail: useThumbnail,
-+      );
-+      if (data.detectFileType is MatrixImageFile) {
-+        if (!mounted) return;
-+        setState(() {
-+          _imageData = data.bytes;
-+        });
-+        return;
++      try {
++        final data = await event.downloadAndDecryptAttachment(
++          getThumbnail: useThumbnail,
++        );
++        if (data.detectFileType is MatrixImageFile) {
++          if (!mounted) return;
++          setState(() {
++            _imageData = data.bytes;
++          });
++          return;
++        }
++      } catch (e, s) {
++        Logs().w('Failed to load MxcImage attachment for event ${event.eventId}', e, s);
 +      }
 +    }
 +  }
@@ -376911,6 +376915,8 @@ index f9b2df0..a7d18b6 100644
 +      final delaySeconds = min(60, pow(2, _retryCount)).toInt();
 +      await Future.delayed(Duration(seconds: delaySeconds));
 +      _tryLoad();
++    } catch (e, s) {
++      Logs().w('Failed to tryLoad MxcImage', e, s);
 +    }
 +  }
 +
