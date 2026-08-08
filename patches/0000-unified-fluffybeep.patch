@@ -325301,7 +325301,7 @@ index f4142a6..195386c 100644
 +  Widget build(BuildContext context) => ChatDetailsView(this);
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index 4cda41c..9d64854 100644
+index 4cda41c..6e5e878 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
@@ -325312,7 +325312,51 @@ index 4cda41c..9d64854 100644
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
  import 'package:fluffychat/widgets/layouts/max_width_body.dart';
-@@ -40,8 +41,11 @@ class ChatDetailsView extends StatelessWidget {
+@@ -21,16 +22,41 @@ import '../../utils/url_launcher.dart';
+ import '../../widgets/mxc_image_viewer.dart';
+ import '../../widgets/qr_code_viewer.dart';
+ 
+-class ChatDetailsView extends StatelessWidget {
++class ChatDetailsView extends StatefulWidget {
+   final ChatDetailsController controller;
+ 
+   const ChatDetailsView(this.controller, {super.key});
+ 
++  @override
++  State<ChatDetailsView> createState() => _ChatDetailsViewState();
++}
++
++class _ChatDetailsViewState extends State<ChatDetailsView> {
++  ChatDetailsController get controller => widget.controller;
++
++  List<User>? _cachedMembers;
++  String? _cachedRoomId;
++
++  List<User> _getMembers(Room room) {
++    if (_cachedMembers != null && _cachedRoomId == room.id) {
++      return _cachedMembers!;
++    }
++    _cachedRoomId = room.id;
++    final members = room.getParticipants().toList()
++      ..sort((b, a) => a.powerLevel.level.compareTo(b.powerLevel.level));
++    _cachedMembers = members.take(10).toList();
++    return _cachedMembers!;
++  }
++
++  void _invalidateMembers() {
++    _cachedMembers = null;
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
+ 
+-    final room = Matrix.of(context).client.getRoomById(controller.roomId!);
++    final room = Matrix.of(context).client.getRoomById(widget.controller.roomId!);
+     if (room == null) {
+       return Scaffold(
+         appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
+@@ -40,25 +66,26 @@ class ChatDetailsView extends StatelessWidget {
        );
      }
  
@@ -325325,7 +325369,18 @@ index 4cda41c..9d64854 100644
  
      return StreamBuilder(
        stream: room.client.onRoomState.stream.where(
-@@ -56,9 +60,6 @@ class ChatDetailsView extends StatelessWidget {
+         (update) => update.roomId == room.id,
+       ),
+       builder: (context, snapshot) {
+-        var members = room.getParticipants().toList()
+-          ..sort((b, a) => a.powerLevel.level.compareTo(b.powerLevel.level));
+-        members = members.take(10).toList();
++        if (snapshot.hasData) {
++          _invalidateMembers();
++        }
++        final members = _getMembers(room);
+         final actualMembersCount =
+             (room.summary.mInvitedMemberCount ?? 0) +
              (room.summary.mJoinedMemberCount ?? 0);
          final canRequestMoreMembers = members.length < actualMembersCount;
          final iconColor = theme.textTheme.bodyLarge!.color;
@@ -325335,7 +325390,7 @@ index 4cda41c..9d64854 100644
          return Scaffold(
            appBar: AppBar(
              leading:
-@@ -77,8 +78,10 @@ class ChatDetailsView extends StatelessWidget {
+@@ -77,8 +104,10 @@ class ChatDetailsView extends StatelessWidget {
                  IconButton(
                    tooltip: L10n.of(context).share,
                    icon: const Icon(Icons.qr_code_rounded),
@@ -325348,7 +325403,7 @@ index 4cda41c..9d64854 100644
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -93,7 +96,7 @@ class ChatDetailsView extends StatelessWidget {
+@@ -93,7 +122,7 @@ class ChatDetailsView extends StatelessWidget {
                itemCount: members.length + 1 + (canRequestMoreMembers ? 1 : 0),
                itemBuilder: (BuildContext context, int i) => i == 0
                    ? Column(
@@ -325357,7 +325412,7 @@ index 4cda41c..9d64854 100644
                        children: <Widget>[
                          Row(
                            children: [
-@@ -104,11 +107,11 @@ class ChatDetailsView extends StatelessWidget {
+@@ -104,11 +133,11 @@ class ChatDetailsView extends StatelessWidget {
                                    Hero(
                                      tag:
                                          controller.widget.embeddedCloseButton !=
@@ -325373,7 +325428,7 @@ index 4cda41c..9d64854 100644
                                        name: displayname,
                                        size: Avatar.defaultSize * 2.5,
                                        onTap: roomAvatar != null
-@@ -140,8 +143,8 @@ class ChatDetailsView extends StatelessWidget {
+@@ -140,8 +169,8 @@ class ChatDetailsView extends StatelessWidget {
                              ),
                              Expanded(
                                child: Column(
@@ -364217,7 +364272,7 @@ index 2efc33f..f2d3514 100644
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000..1a2c5c1
+index 0000000..d97f8bd
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
 @@ -0,0 +1,107 @@
@@ -364266,8 +364321,8 @@ index 0000000..1a2c5c1
 +        final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
 +        final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
 +
-+        // Log if total frame time exceeds 16.6ms (drops 60 FPS or misses 120Hz frame budget)
-+        if (totalMs > 16.6) {
++        // Log if total frame time exceeds 8.33ms (misses 120 FPS frame budget on 120Hz displays)
++        if (totalMs > 8.33) {
 +          FileLogger.log(
 +            '[PERF/JANK] Slow frame detected: Total=${totalMs.toStringAsFixed(1)}ms '
 +            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
