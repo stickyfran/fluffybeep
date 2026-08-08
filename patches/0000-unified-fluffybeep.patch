@@ -358138,10 +358138,10 @@ index 58d44e4..b5c22b0 100644
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000..3f5ed99
+index 0000000..5063fe2
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,783 @@
+@@ -0,0 +1,810 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -358371,6 +358371,7 @@ index 0000000..3f5ed99
 +    _roomDataSignatures.clear();
 +    lastRealMessageCache.clear();
 +    _lastMessageTimeCache.clear();
++    invalidateHiddenInboxCache();
 +  }
 +
 +  static BeeperRoomData _computeRoomData(Room room) {
@@ -358701,6 +358702,7 @@ index 0000000..3f5ed99
 +
 +  /// Save Beeper labels map to Account Data.
 +  static Future<void> setBeeperLabels(Client client, Map<String, dynamic> labels) async {
++    invalidateHiddenInboxCache();
 +    try {
 +      await client.setAccountData(
 +        client.userID!,
@@ -358712,16 +358714,41 @@ index 0000000..3f5ed99
 +    }
 +  }
 +
-+  /// Check if a room is hidden from the main inbox due to a label with isShownInInbox = false.
-+  static bool isRoomHiddenInInbox(Client client, String roomId) {
++  static Set<String>? _cachedHiddenRoomIds;
++  static dynamic _lastLabelsAccountDataRef;
++
++  /// Cached set of room IDs hidden from inbox for O(1) checks.
++  static Set<String> getHiddenInboxRoomIds(Client client) {
++    final accountDataEvent = client.accountData['com.beeper.labels'];
++    final contentRef = accountDataEvent?.content;
++    if (_cachedHiddenRoomIds != null && _lastLabelsAccountDataRef == contentRef) {
++      return _cachedHiddenRoomIds!;
++    }
++    _lastLabelsAccountDataRef = contentRef;
++    final hiddenSet = <String>{};
 +    final labels = getBeeperLabels(client);
 +    for (final entry in labels.values) {
 +      if (entry is Map && entry['isShownInInbox'] == false) {
 +        final rooms = entry['rooms'];
-+        if (rooms is List && rooms.contains(roomId)) return true;
++        if (rooms is List) {
++          for (final r in rooms) {
++            if (r is String) hiddenSet.add(r);
++          }
++        }
 +      }
 +    }
-+    return false;
++    _cachedHiddenRoomIds = hiddenSet;
++    return hiddenSet;
++  }
++
++  static void invalidateHiddenInboxCache() {
++    _cachedHiddenRoomIds = null;
++    _lastLabelsAccountDataRef = null;
++  }
++
++  /// Check if a room is hidden from the main inbox due to a label with isShownInInbox = false.
++  static bool isRoomHiddenInInbox(Client client, String roomId) {
++    return getHiddenInboxRoomIds(client).contains(roomId);
 +  }
 +
 +  /// Helper to get hidden networks using a special '_hidden_networks' key in Beeper labels.
