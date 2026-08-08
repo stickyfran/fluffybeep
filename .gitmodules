@@ -1,0 +1,3 @@
+[submodule "fluffychat_src"]
+	path = fluffychat_src
+	url = https://github.com/krille-chan/fluffychat.git
