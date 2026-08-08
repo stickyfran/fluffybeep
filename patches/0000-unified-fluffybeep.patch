@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..6fdd69d 100644
+index 7470749..df4472a 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1750 @@
+@@ -1,1643 +1,1748 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304964,7 +304964,11 @@ index 7470749..6fdd69d 100644
 +
 +  String? activeThreadId;
 +
-+  late final Set<String> bigEmojis;
++  static Set<String>? _cachedBigEmojis;
++  Set<String> get bigEmojis => _cachedBigEmojis ??= {
++        for (final category in defaultEmojiSet)
++          for (final emoji in category.emoji) emoji.emoji,
++      };
 +
 +  late final String readMarkerEventId;
 +
@@ -305251,13 +305255,7 @@ index 7470749..6fdd69d 100644
 +      AppSettings.displayChatDetailsColumn.value,
 +    );
 +
-+    bigEmojis = defaultEmojiSet.fold(
-+      <String>{},
-+      (emojis, category) => {
-+        ...emojis,
-+        ...(category.emoji.map((emoji) => emoji.emoji)),
-+      },
-+    );
++
 +
 +    sendingClient = Matrix.of(context).client;
 +    final lastEventThreadId =
