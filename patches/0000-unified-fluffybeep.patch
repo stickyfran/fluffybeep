@@ -364333,10 +364333,10 @@ index 2efc33f..f2d3514 100644
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000..d97f8bd
+index 0000000..c0ab311
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,109 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -364382,8 +364382,10 @@ index 0000000..d97f8bd
 +        final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
 +        final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
 +
-+        // Log if total frame time exceeds 8.33ms (misses 120 FPS frame budget on 120Hz displays)
-+        if (totalMs > 8.33) {
++        // Log if actual rendering time (Build + Raster) exceeds 8.33ms budget (120 FPS target)
++        // This avoids false-positives caused by idle gaps in timing.totalSpan when no frames are being requested.
++        final renderMs = buildMs + rasterMs;
++        if (renderMs > 8.33) {
 +          FileLogger.log(
 +            '[PERF/JANK] Slow frame detected: Total=${totalMs.toStringAsFixed(1)}ms '
 +            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
