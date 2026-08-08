@@ -326403,10 +326403,10 @@ index f454d68..d3882ee 100644
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..9ca6a3d 100644
+index 6ceba8b..706f3de 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1293 @@
+@@ -1,1041 +1,1307 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328103,13 +328103,13 @@ index 6ceba8b..9ca6a3d 100644
 +              mainAxisSize: .min,
 +              children: [
 +                Icon(
-+                  room.markedUnread
++                  room.isUnread
 +                      ? Icons.mark_as_unread
 +                      : Icons.mark_as_unread_outlined,
 +                ),
 +                const SizedBox(width: 12),
 +                Text(
-+                  room.markedUnread
++                  room.isUnread
 +                      ? L10n.of(context).markAsRead
 +                      : L10n.of(context).markAsUnread,
 +                ),
@@ -328293,7 +328293,21 @@ index 6ceba8b..9ca6a3d 100644
 +      case ChatContextAction.markUnread:
 +        await showFutureLoadingDialog(
 +          context: context,
-+          future: () => room.markUnread(!room.markedUnread),
++          future: () async {
++            if (room.isUnread) {
++              if (room.markedUnread) {
++                await room.markUnread(false);
++              }
++              final lastEventId = room.lastEvent?.eventId;
++              await room.setReadMarker(
++                lastEventId,
++                mRead: lastEventId,
++                public: AppSettings.sendPublicReadReceipts.value,
++              );
++            } else {
++              await room.markUnread(true);
++            }
++          },
 +        );
 +        return;
 +      case ChatContextAction.mute:
@@ -333104,10 +333118,10 @@ index 13d6fe7..d88172f 100644
 +  }
 +}
 diff --git a/lib/pages/chat_list/space_view.dart b/lib/pages/chat_list/space_view.dart
-index 70c4486..a31db28 100644
+index 70c4486..92dcadd 100644
 --- a/lib/pages/chat_list/space_view.dart
 +++ b/lib/pages/chat_list/space_view.dart
-@@ -1,687 +1,693 @@
+@@ -1,687 +1,703 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -334159,7 +334173,17 @@ index 70c4486..a31db28 100644
 +      case SpaceChildAction.markAsRead:
 +        await showFutureLoadingDialog(
 +          context: context,
-+          future: () => room!.markUnread(false),
++          future: () async {
++            if (room!.markedUnread) {
++              await room!.markUnread(false);
++            }
++            final lastEventId = room!.lastEvent?.eventId;
++            await room!.setReadMarker(
++              lastEventId,
++              mRead: lastEventId,
++              public: AppSettings.sendPublicReadReceipts.value,
++            );
++          },
 +        );
 +      case SpaceChildAction.leave:
 +        await showFutureLoadingDialog(
@@ -346255,10 +346279,10 @@ index 4f740d3..e68ed26 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..5321ba6
+index 0000000..6226a3d
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,685 @@
+@@ -0,0 +1,689 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -346309,7 +346333,11 @@ index 0000000..5321ba6
 +    if (!_didLoadPushers) {
 +      _didLoadPushers = true;
 +      final client = Matrix.of(context).client;
-+      _loadPushers(client);
++      WidgetsBinding.instance.addPostFrameCallback((_) {
++        if (mounted) {
++          _loadPushers(client);
++        }
++      });
 +    }
 +  }
 +
@@ -346945,10 +346973,10 @@ index 0000000..5321ba6
 +  }
 +}
 diff --git a/lib/pages/settings/settings.dart b/lib/pages/settings/settings.dart
-index c8909ee..37197c0 100644
+index c8909ee..3340461 100644
 --- a/lib/pages/settings/settings.dart
 +++ b/lib/pages/settings/settings.dart
-@@ -1,221 +1,221 @@
+@@ -1,221 +1,224 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -347382,20 +347410,23 @@ index c8909ee..37197c0 100644
 +    checkBootstrap();
 +  }
 +
++  Future<AuthenticationMetadata?>? authMetadataFuture;
++
 +  @override
 +  Widget build(BuildContext context) {
 +    final client = Matrix.of(context).client;
 +    profileFuture ??= client.getProfileFromUserId(client.userID!);
++    authMetadataFuture ??= client.getAuthMetadata();
 +    return SettingsView(this);
 +  }
 +}
 +
 +enum AvatarAction { camera, file, remove }
 diff --git a/lib/pages/settings/settings_view.dart b/lib/pages/settings/settings_view.dart
-index 029e7bc..1357f84 100644
+index 029e7bc..9737f08 100644
 --- a/lib/pages/settings/settings_view.dart
 +++ b/lib/pages/settings/settings_view.dart
-@@ -1,229 +1,247 @@
+@@ -1,229 +1,245 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -347749,10 +347780,8 @@ index 029e7bc..1357f84 100644
 +                );
 +              },
 +            ),
-+            FutureBuilder(
-+              future: Result.capture(
-+                Matrix.of(context).client.getAuthMetadata(),
-+              ).then((result) => result.asValue?.value),
++            FutureBuilder<AuthenticationMetadata?>(
++              future: controller.authMetadataFuture,
 +              builder: (context, snapshot) {
 +                final accountManageUrl = snapshot.data?.accountManagementUri;
 +                if (accountManageUrl == null) {
