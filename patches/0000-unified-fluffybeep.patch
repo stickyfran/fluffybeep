@@ -302335,10 +302335,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..6d29c91c982657f6673b19f953b7baa4fe2a1368 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..9106084c775fa71c6c8266984038482b26f1220e 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1744 @@
+@@ -1,1643 +1,1745 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304951,6 +304951,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..6d29c91c982657f6673b19f953b7baa4
 +        inReplyTo: replyEvent,
 +        threadRootEventId: activeThreadId,
 +        extraContent: {
++          'filename': file.name,
 +          'info': {
 +            ...file.info,
 +            'duration': duration,
@@ -313025,7 +313026,7 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b285d3ff17843ed7075749aaf3943de5a8..5ad7dfb611357783f5f003ef9a8debf566bc51ec 100644
+index 930de3b285d3ff17843ed7075749aaf3943de5a8..25093d21df0b4a9723d38ff9d0dcfae81047bd48 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -1,968 +1,1017 @@
@@ -314019,7 +314020,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..5ad7dfb611357783f5f003ef9a8debf5
 +import 'package:flutter/material.dart';
 +import 'package:flutter/services.dart';
 +import 'package:matrix/matrix.dart';
-+import 'package:swipe_to_action/swipe_to_action.dart';
++import '../../../widgets/swipe_to_action/swipe_to_action.dart';
 +
 +import '../../../config/app_config.dart';
 +import 'message_content.dart';
@@ -319985,10 +319986,10 @@ index 975ee1b0f79f1689118b34da2ef7485fd9b2411f..6f1a83d708ca7a63c1580e649dbd26fc
 +  }
 +}
 diff --git a/lib/pages/chat/send_file_dialog.dart b/lib/pages/chat/send_file_dialog.dart
-index 13fee984bbf2e044d1ddd70265d10ae466cf7d37..eb0d405bc34fbb85b3042d40adbb1e474b847db5 100644
+index 13fee984bbf2e044d1ddd70265d10ae466cf7d37..6ceed4b60865341e4096bf5b25edf7b0c4b56c5b 100644
 --- a/lib/pages/chat/send_file_dialog.dart
 +++ b/lib/pages/chat/send_file_dialog.dart
-@@ -1,419 +1,419 @@
+@@ -1,419 +1,425 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320523,7 +320524,10 @@ index 13fee984bbf2e044d1ddd70265d10ae466cf7d37..eb0d405bc34fbb85b3042d40adbb1e47
 +            file,
 +            thumbnail: thumbnail,
 +            shrinkImageMaxDimension: compress ? 1600 : null,
-+            extraContent: label.isEmpty ? null : {'body': label},
++            extraContent: {
++              'filename': file.name,
++              if (label.isNotEmpty) 'body': label,
++            },
 +            threadRootEventId: widget.threadRootEventId,
 +            threadLastEventId: widget.threadLastEventId,
 +          );
@@ -320543,7 +320547,10 @@ index 13fee984bbf2e044d1ddd70265d10ae466cf7d37..eb0d405bc34fbb85b3042d40adbb1e47
 +            file,
 +            thumbnail: thumbnail,
 +            shrinkImageMaxDimension: compress ? 1600 : null,
-+            extraContent: label.isEmpty ? null : {'body': label},
++            extraContent: {
++              'filename': file.name,
++              if (label.isNotEmpty) 'body': label,
++            },
 +          );
 +        }
 +        sentFiles++;
@@ -363332,10 +363339,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..da8f33caed3a0bccf5c9b5d2140f189e5bab60fe
+index 0000000000000000000000000000000000000000..5c357210a81f4eea93cbc7c15a16c940056da12c
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,86 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -363390,7 +363397,38 @@ index 0000000000000000000000000000000000000000..da8f33caed3a0bccf5c9b5d2140f189e
 +      }
 +    });
 +  }
++
++  static void logAction(String action) {
++    FileLogger.log('[USER_ACTION] $action');
++  }
 +}
++
++class PerformanceLoggerObserver extends NavigatorObserver {
++  @override
++  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
++    super.didPush(route, previousRoute);
++    if (route.settings.name != null) {
++      PerformanceLogger.logAction('Screen Pushed: ${route.settings.name}');
++    }
++  }
++
++  @override
++  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
++    super.didPop(route, previousRoute);
++    if (route.settings.name != null) {
++      PerformanceLogger.logAction('Screen Popped: ${route.settings.name}');
++    }
++  }
++
++  @override
++  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
++    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
++    if (newRoute?.settings.name != null) {
++      PerformanceLogger.logAction('Screen Replaced: ${newRoute?.settings.name}');
++    }
++  }
++}
++
 diff --git a/lib/utils/platform_infos.dart b/lib/utils/platform_infos.dart
 index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160750774f9 100644
 --- a/lib/utils/platform_infos.dart
@@ -371745,10 +371783,10 @@ index 0000000000000000000000000000000000000000..1096b84f88922661d7a28c92585f03b9
 +  }
 +}
 diff --git a/lib/widgets/fluffy_chat_app.dart b/lib/widgets/fluffy_chat_app.dart
-index 2e2d7b029b3e310fa3a379afaf8207ce98c47598..48373d15867bb6d57c4548f556b927c7a4b23835 100644
+index 2e2d7b029b3e310fa3a379afaf8207ce98c47598..8e5d0983f3e523fbff1e6fc69df6baa48111b15c 100644
 --- a/lib/widgets/fluffy_chat_app.dart
 +++ b/lib/widgets/fluffy_chat_app.dart
-@@ -1,94 +1,95 @@
+@@ -1,94 +1,97 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -371862,6 +371900,7 @@ index 2e2d7b029b3e310fa3a379afaf8207ce98c47598..48373d15867bb6d57c4548f556b927c7
 +import 'package:shared_preferences/shared_preferences.dart';
 +
 +import '../utils/custom_scroll_behaviour.dart';
++import '../utils/performance_logger.dart';
 +import 'matrix.dart';
 +
 +class FluffyChatApp extends StatelessWidget {
@@ -371887,6 +371926,7 @@ index 2e2d7b029b3e310fa3a379afaf8207ce98c47598..48373d15867bb6d57c4548f556b927c7
 +  // the current path.
 +  static final GoRouter router = GoRouter(
 +    routes: AppRoutes.routes,
++    observers: [PerformanceLoggerObserver()],
 +    debugLogDiagnostics: kDebugMode,
 +    redirect: (context, state) {
 +      // Workaround for content sharings passed to go router:
@@ -377300,6 +377340,539 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a9
 +    );
 +  }
 +}
+diff --git a/lib/widgets/swipe_to_action/src/swipeable.dart b/lib/widgets/swipe_to_action/src/swipeable.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..76e52d36a715fb7e0694232684a512e1ad6c3e09
+--- /dev/null
++++ b/lib/widgets/swipe_to_action/src/swipeable.dart
+@@ -0,0 +1,518 @@
++import 'dart:ui';
++import 'package:flutter/gestures.dart';
++import 'package:flutter/material.dart';
++
++const double _kMinFlingVelocity = 700.0;
++const double _kMinFlingVelocityDelta = 400.0;
++const double _kFlingVelocityScale = 1.0 / 300.0;
++const double _kDismissThreshold = 0.4;
++
++/// Signature used by [Swipeable] to indicate that it has been swiped in
++/// the given `direction`.
++///
++/// Used by [Swipeable.onSwipe].
++typedef SwipeDirectionCallback = void Function(SwipeDirection direction);
++
++/// Signature used by [Swipeable] to give the application an opportunity to
++/// confirm or veto a swipe gesture.
++///
++/// Used by [Swipeable.confirmSwipe].
++typedef ConfirmSwipeCallback = Future<bool> Function(SwipeDirection direction);
++
++/// The direction in which a [Swipeable] can be swiped.
++enum SwipeDirection {
++  /// The [Swipeable] can be swiped by dragging either left or right.
++  horizontal,
++
++  /// The [Swipeable] can be swiped by dragging in the reverse of the
++  /// reading direction (e.g., from right to left in left-to-right languages).
++  endToStart,
++
++  /// The [Swipeable] can be swiped by dragging in the reading direction
++  /// (e.g., from left to right in left-to-right languages).
++  startToEnd,
++
++  /// Called instead of null.
++  none,
++}
++
++class Swipeable extends StatefulWidget {
++  /// Creates a widget that calls a function when swiped.
++  ///
++  /// The [key] argument must not be null because [Swipeable]s are commonly
++  /// used in lists and removed from the list when dismissed. Without keys, the
++  /// default behavior is to sync widgets based on their index in the list,
++  /// which means the item after the dismissed item would be synced with the
++  /// state of the dismissed item. Using keys causes the widgets to sync
++  /// according to their keys and avoids this pitfall.
++  const Swipeable({
++    required final Key key,
++    required this.child,
++    required this.onSwipe,
++    this.background,
++    this.secondaryBackground,
++    this.confirmSwipe,
++    this.direction = SwipeDirection.horizontal,
++    this.dismissThresholds = const <SwipeDirection, double>{},
++    this.maxOffset = 0.4,
++    this.movementDuration = const Duration(milliseconds: 200),
++    this.crossAxisEndOffset = 0.0,
++    this.dragStartBehavior = DragStartBehavior.start,
++    this.allowedPointerKinds = const {
++      PointerDeviceKind.invertedStylus,
++      PointerDeviceKind.stylus,
++      PointerDeviceKind.touch,
++    },
++  })  : assert(secondaryBackground == null || background != null),
++        super(key: key);
++
++  /// The widget below this widget in the tree.
++  ///
++  /// {@macro flutter.widgets.child}
++  final Widget child;
++
++  /// A widget that is stacked behind the child. If secondaryBackground is also
++  /// specified then this widget only appears when the child has been dragged
++  /// to the right.
++  final Widget? background;
++
++  /// A widget that is stacked behind the child and is exposed when the child
++  /// has been dragged to the left. It may only be specified when background
++  /// has also been specified.
++  final Widget? secondaryBackground;
++
++  /// Gives the app an opportunity to confirm or veto a pending dismissal.
++  ///
++  /// If the returned Future<bool> completes true, then this widget will be
++  /// dismissed, otherwise it will be moved back to its original location.
++  ///
++  /// If the returned Future<bool> completes to false or null the [onSwipe]
++  /// callback will not run.
++  final ConfirmSwipeCallback? confirmSwipe;
++
++  /// Called when the widget has been dismissed, after finishing resizing.
++  final SwipeDirectionCallback onSwipe;
++
++  /// The direction in which the widget can be dismissed.
++  final SwipeDirection direction;
++
++  /// The offset threshold the item has to be dragged in order to be considered
++  /// dismissed.
++  ///
++  /// Represented as a fraction, e.g. if it is 0.4 (the default), then the item
++  /// has to be dragged at least 40% towards one direction to be considered
++  /// dismissed. Clients can define different thresholds for each dismiss
++  /// direction.
++  ///
++  /// Flinging is treated as being equivalent to dragging almost to 1.0, so
++  /// flinging can dismiss an item past any threshold less than 1.0.
++  ///
++  /// Setting a threshold of 1.0 (or greater) prevents a drag in the given
++  /// [SwipeDirection] even if it would be allowed by the [direction]
++  /// property.
++  ///
++  /// See also:
++  ///
++  ///  * [direction], which controls the directions in which the items can
++  ///    be dismissed.
++  final Map<SwipeDirection, double> dismissThresholds;
++
++  /// The maximum horizontal offset the item can move to/
++  ///
++  /// Represented as a fraction, e.g. if it is 0.4 (the default), then the
++  /// item can be moved at maximum 40% of item's width.
++  final double maxOffset;
++
++  /// Defines the duration for card to dismiss or to come back to original position if not dismissed.
++  final Duration movementDuration;
++
++  /// Defines the end offset across the main axis after the card is dismissed.
++  ///
++  /// If non-zero value is given then widget moves in cross direction depending on whether
++  /// it is positive or negative.
++  final double crossAxisEndOffset;
++
++  /// Defines pointer types which are allowed to trigger swipe gesture.
++  ///
++  /// Defaults to {PointerDeviceKind.touch, PointerDeviceKind.invertedStylus, PointerDeviceKind.stylus}
++  final Set<PointerDeviceKind> allowedPointerKinds;
++
++  /// Determines the way that drag start behavior is handled.
++  ///
++  /// If set to [DragStartBehavior.start], the drag gesture used to dismiss a
++  /// dismissible will begin upon the detection of a drag gesture. If set to
++  /// [DragStartBehavior.down] it will begin when a down event is first detected.
++  ///
++  /// In general, setting this to [DragStartBehavior.start] will make drag
++  /// animation smoother and setting it to [DragStartBehavior.down] will make
++  /// drag behavior feel slightly more reactive.
++  ///
++  /// By default, the drag start behavior is [DragStartBehavior.start].
++  ///
++  /// See also:
++  ///
++  ///  * [DragGestureRecognizer.dragStartBehavior], which gives an example for the different behaviors.
++  final DragStartBehavior dragStartBehavior;
++
++  @override
++  State<Swipeable> createState() => _SwipeableState();
++}
++
++class _SwipeableClipper extends CustomClipper<Rect> {
++  _SwipeableClipper({
++    required this.moveAnimation,
++  }) : super(reclip: moveAnimation);
++
++  final Animation<Offset> moveAnimation;
++
++  @override
++  Rect getClip(final Size size) {
++    final offset = moveAnimation.value.dx * size.width;
++    if (offset < 0) {
++      return Rect.fromLTRB(size.width + offset, 0.0, size.width, size.height);
++    }
++    return Rect.fromLTRB(0.0, 0.0, offset, size.height);
++  }
++
++  @override
++  Rect getApproximateClipRect(final Size size) => getClip(size);
++
++  @override
++  bool shouldReclip(final _SwipeableClipper oldClipper) =>
++      oldClipper.moveAnimation.value != moveAnimation.value;
++}
++
++enum _FlingGestureKind { none, forward, reverse }
++
++class _SwipeableState extends State<Swipeable>
++    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
++  @override
++  void initState() {
++    _moveController =
++        AnimationController(duration: widget.movementDuration, vsync: this)
++          ..addStatusListener(_handleDismissStatusChanged);
++    _updateMoveAnimation();
++
++    super.initState();
++  }
++
++  late AnimationController _moveController;
++  late Animation<Offset> _moveAnimation;
++
++  double _dragExtent = 0.0;
++  bool _dragUnderway = false;
++  Size? _sizePriorToCollapse;
++
++  bool _isTouch = true;
++
++  // Minimum global X where swipe is allowed to start
++  double? _minX;
++  // Maximum global X where swipe is allowed to start
++  double? _maxX;
++  // Screen width reference that helped to compute _minX and _maxX
++  // used to check if insets should be updated or not
++  double? _widthReference;
++
++  @override
++  bool get wantKeepAlive => _moveController.isAnimating == true;
++
++  @override
++  void dispose() {
++    _moveController.dispose();
++    super.dispose();
++  }
++
++  SwipeDirection _extentToDirection(final double extent) {
++    if (extent == 0.0) {
++      return SwipeDirection.none;
++    }
++    switch (Directionality.of(context)) {
++      case TextDirection.rtl:
++        return extent < 0
++            ? SwipeDirection.startToEnd
++            : SwipeDirection.endToStart;
++      case TextDirection.ltr:
++        return extent > 0
++            ? SwipeDirection.startToEnd
++            : SwipeDirection.endToStart;
++    }
++  }
++
++  SwipeDirection get _swipeDirection => _extentToDirection(_dragExtent);
++
++  bool get _isActive => _dragUnderway || _moveController.isAnimating;
++
++  double get _overallDragAxisExtent {
++    final size = context.size;
++    return size?.width ?? 0.0;
++  }
++
++  void _handlePointerDown(final PointerDownEvent event) {
++    final xPos = event.position.dx;
++
++    var validTouch = widget.allowedPointerKinds.contains(event.kind);
++
++    // Check if touch was performed after minX and before maxX to avoid system
++    // gesture insets
++    if (validTouch && _minX != null) {
++      validTouch = xPos > _minX!;
++    }
++
++    if (validTouch && _maxX != null) {
++      validTouch = xPos < _maxX!;
++    }
++
++    setState(() {
++      _isTouch = validTouch;
++    });
++  }
++
++  void _handleDragStart(final DragStartDetails details) {
++    _dragUnderway = true;
++    if (_moveController.isAnimating) {
++      _dragExtent =
++          _moveController.value * _overallDragAxisExtent * _dragExtent.sign;
++      _moveController.stop();
++    } else {
++      _dragExtent = 0.0;
++      _moveController.value = 0.0;
++    }
++    setState(() {
++      _updateMoveAnimation();
++    });
++  }
++
++  void _handleDragUpdate(final DragUpdateDetails details) {
++    if (!_isActive || _moveController.isAnimating) {
++      return;
++    }
++
++    final delta = details.primaryDelta ?? 0.0;
++    final oldDragExtent = _dragExtent;
++    switch (widget.direction) {
++      case SwipeDirection.none:
++        return;
++
++      case SwipeDirection.horizontal:
++        _dragExtent += delta;
++        break;
++
++      case SwipeDirection.endToStart:
++        switch (Directionality.of(context)) {
++          case TextDirection.rtl:
++            if (_dragExtent + delta > 0) {
++              _dragExtent += delta;
++            }
++            break;
++          case TextDirection.ltr:
++            if (_dragExtent + delta < 0) {
++              _dragExtent += delta;
++            }
++            break;
++        }
++        break;
++
++      case SwipeDirection.startToEnd:
++        switch (Directionality.of(context)) {
++          case TextDirection.rtl:
++            if (_dragExtent + delta < 0) {
++              _dragExtent += delta;
++            }
++            break;
++          case TextDirection.ltr:
++            if (_dragExtent + delta > 0) {
++              _dragExtent += delta;
++            }
++            break;
++        }
++        break;
++    }
++    if (oldDragExtent.sign != _dragExtent.sign) {
++      setState(() {
++        _updateMoveAnimation();
++      });
++    }
++    if (!_moveController.isAnimating) {
++      _moveController.value = _dragExtent.abs() / _overallDragAxisExtent;
++    }
++  }
++
++  void _updateMoveAnimation() {
++    final end = _dragExtent.sign;
++    _moveAnimation = _moveController.drive(
++      Tween<Offset>(
++        begin: Offset.zero,
++        end: Offset(widget.maxOffset * end, widget.crossAxisEndOffset),
++      ),
++    );
++  }
++
++  _FlingGestureKind _describeFlingGesture(final Velocity velocity) {
++    if (_dragExtent == 0.0) {
++      // If it was a fling, then it was a fling that was let loose at the exact
++      // middle of the range (i.e. when there's no displacement). In that case,
++      // we assume that the user meant to fling it back to the center, as
++      // opposed to having wanted to drag it out one way, then fling it past the
++      // center and into and out the other side.
++      return _FlingGestureKind.none;
++    }
++    final vx = velocity.pixelsPerSecond.dx;
++    final vy = velocity.pixelsPerSecond.dy;
++    SwipeDirection flingDirection;
++    // Verify that the fling is in the generally right direction and fast enough.
++    if (vx.abs() - vy.abs() < _kMinFlingVelocityDelta ||
++        vx.abs() < _kMinFlingVelocity) {
++      return _FlingGestureKind.none;
++    }
++    assert(vx != 0.0);
++    flingDirection = _extentToDirection(vx);
++
++    if (flingDirection == _swipeDirection) {
++      return _FlingGestureKind.forward;
++    }
++    return _FlingGestureKind.reverse;
++  }
++
++  Future<void> _handleDragEnd(final DragEndDetails details) async {
++    if (!_isActive || _moveController.isAnimating) {
++      return;
++    }
++    _dragUnderway = false;
++    if (_moveController.isCompleted &&
++        await _confirmStartSwipeAnimation() == true) {
++      _startSwipeAnimation();
++      return;
++    }
++    final flingVelocity = details.velocity.pixelsPerSecond.dx;
++    switch (_describeFlingGesture(details.velocity)) {
++      case _FlingGestureKind.forward:
++        assert(_dragExtent != 0.0);
++        assert(!_moveController.isDismissed);
++        if ((widget.dismissThresholds[_swipeDirection] ?? _kDismissThreshold) >=
++            1.0) {
++          await _moveController.reverse();
++          break;
++        }
++        _dragExtent = flingVelocity.sign;
++        await _moveController.fling(
++          velocity: flingVelocity.abs() * _kFlingVelocityScale,
++        );
++        break;
++      case _FlingGestureKind.reverse:
++        assert(_dragExtent != 0.0);
++        assert(!_moveController.isDismissed);
++        _dragExtent = flingVelocity.sign;
++        await _moveController.fling(
++          velocity: -flingVelocity.abs() * _kFlingVelocityScale,
++        );
++        break;
++      case _FlingGestureKind.none:
++        if (!_moveController.isDismissed) {
++          // we already know it's not completed, we check that above
++          if (_moveController.value >
++              (widget.dismissThresholds[_swipeDirection] ??
++                  _kDismissThreshold)) {
++            await _moveController.forward();
++          } else {
++            await _moveController.reverse();
++          }
++        }
++        break;
++    }
++  }
++
++  Future<void> _handleDismissStatusChanged(final AnimationStatus status) async {
++    if (status == AnimationStatus.completed && !_dragUnderway) {
++      if (await _confirmStartSwipeAnimation() == true) {
++        _startSwipeAnimation();
++      } else {
++        await _moveController.reverse();
++      }
++    }
++    updateKeepAlive();
++  }
++
++  Future<bool> _confirmStartSwipeAnimation() async {
++    if (widget.confirmSwipe != null) {
++      final direction = _swipeDirection;
++      return widget.confirmSwipe!(direction);
++    }
++    return true;
++  }
++
++  void _startSwipeAnimation() {
++    assert(_moveController.isCompleted);
++    assert(_sizePriorToCollapse == null);
++
++    final direction = _swipeDirection;
++    widget.onSwipe(direction);
++
++    _moveController.reverse();
++  }
++
++  @override
++  Widget build(final BuildContext context) {
++    super.build(context); // See AutomaticKeepAliveClientMixin.
++
++    assert(debugCheckHasDirectionality(context));
++
++    var background = widget.background;
++    if (widget.secondaryBackground != null) {
++      final direction = _swipeDirection;
++      if (direction == SwipeDirection.endToStart) {
++        background = widget.secondaryBackground;
++      }
++    }
++
++    // Get system screen size and system gesture insets
++    // to avoid starting a swipe in this areas
++    final MediaQueryData? mediaQuery = MediaQuery.maybeOf(context);
++    if (mediaQuery != null) {
++      if (_widthReference == null || _widthReference != mediaQuery.size.width) {
++        WidgetsBinding.instance.addPostFrameCallback((final _) {
++          if (!mounted) return;
++          setState(() {
++            _widthReference = mediaQuery.size.width;
++            _minX = mediaQuery.systemGestureInsets.left;
++            _maxX =
++                mediaQuery.size.width - mediaQuery.systemGestureInsets.right;
++          });
++        });
++      }
++    }
++
++    Widget content = SlideTransition(
++      position: _moveAnimation,
++      child: widget.child,
++    );
++
++    if (background != null) {
++      content = Stack(
++        children: <Widget>[
++          if (!_moveAnimation.isDismissed)
++            Positioned.fill(
++              child: ClipRect(
++                clipper: _SwipeableClipper(
++                  moveAnimation: _moveAnimation,
++                ),
++                child: background,
++              ),
++            ),
++          content,
++        ],
++      );
++    }
++    // We are not swiping but we may be being dragging in widget.direction.
++    return Listener(
++      onPointerDown: _handlePointerDown,
++      child: GestureDetector(
++        onHorizontalDragStart: _isTouch ? _handleDragStart : null,
++        onHorizontalDragUpdate: _isTouch ? _handleDragUpdate : null,
++        onHorizontalDragEnd: _isTouch ? _handleDragEnd : null,
++        behavior: HitTestBehavior.opaque,
++        dragStartBehavior: widget.dragStartBehavior,
++        child: content,
++      ),
++    );
++  }
++}
+diff --git a/lib/widgets/swipe_to_action/swipe_to_action.dart b/lib/widgets/swipe_to_action/swipe_to_action.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..22ac3c36aff554855d041682ce9ab8c4220639ab
+--- /dev/null
++++ b/lib/widgets/swipe_to_action/swipe_to_action.dart
+@@ -0,0 +1,3 @@
++library swipe_to_action;
++
++export 'src/swipeable.dart';
 diff --git a/lib/widgets/theme_builder.dart b/lib/widgets/theme_builder.dart
 index 998e8c1ea29c671c6c4d5bed4d4eec0b3fa4e42e..65049d52c8843e34ca269022117d996f240d1676 100644
 --- a/lib/widgets/theme_builder.dart
@@ -387125,10 +387698,10 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..2c67de862c54336172b7a6e4becc9ffd5a7db732 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..cc30a86d4cb1a6a8822fb63c39a11859e7867036 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -1,130 +1,131 @@
+@@ -1,130 +1,130 @@
 -# SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -#
@@ -387339,7 +387912,6 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..2c67de862c54336172b7a6e4becc9ffd
 +  slugify: ^2.0.0
 +  sqflite_common_ffi: ^2.3.7+1
 +  sqlcipher_flutter_libs: ^0.6.8
-+  swipe_to_action: ^0.3.0
 +  unifiedpush: ^6.2.0
 +  unifiedpush_ui: ^0.2.0
 +  universal_html: ^2.3.0
