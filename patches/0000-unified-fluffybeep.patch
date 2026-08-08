@@ -346973,7 +346973,7 @@ index 0000000..6226a3d
 +  }
 +}
 diff --git a/lib/pages/settings/settings.dart b/lib/pages/settings/settings.dart
-index c8909ee..3340461 100644
+index c8909ee..27243ad 100644
 --- a/lib/pages/settings/settings.dart
 +++ b/lib/pages/settings/settings.dart
 @@ -1,221 +1,224 @@
@@ -347410,7 +347410,7 @@ index c8909ee..3340461 100644
 +    checkBootstrap();
 +  }
 +
-+  Future<AuthenticationMetadata?>? authMetadataFuture;
++  Future<dynamic>? authMetadataFuture;
 +
 +  @override
 +  Widget build(BuildContext context) {
@@ -347423,7 +347423,7 @@ index c8909ee..3340461 100644
 +
 +enum AvatarAction { camera, file, remove }
 diff --git a/lib/pages/settings/settings_view.dart b/lib/pages/settings/settings_view.dart
-index 029e7bc..9737f08 100644
+index 029e7bc..f60714f 100644
 --- a/lib/pages/settings/settings_view.dart
 +++ b/lib/pages/settings/settings_view.dart
 @@ -1,229 +1,245 @@
@@ -347780,7 +347780,7 @@ index 029e7bc..9737f08 100644
 +                );
 +              },
 +            ),
-+            FutureBuilder<AuthenticationMetadata?>(
++            FutureBuilder(
 +              future: controller.authMetadataFuture,
 +              builder: (context, snapshot) {
 +                final accountManageUrl = snapshot.data?.accountManagementUri;
