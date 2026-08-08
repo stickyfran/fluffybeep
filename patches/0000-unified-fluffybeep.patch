@@ -359743,10 +359743,10 @@ index bc94bf8..d4b3098 100644
 +      );
  }
 diff --git a/lib/utils/custom_image_resizer.dart b/lib/utils/custom_image_resizer.dart
-index a938f7e..f249313 100644
+index a938f7e..9543274 100644
 --- a/lib/utils/custom_image_resizer.dart
 +++ b/lib/utils/custom_image_resizer.dart
-@@ -1,109 +1,130 @@
+@@ -1,109 +1,127 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -359893,11 +359893,8 @@ index a938f7e..f249313 100644
 +
 +  try {
 +    // for the other platforms
-+    final maxDim = arguments.maxDimension;
 +    final dartCodec = await instantiateImageCodec(
 +      arguments.bytes,
-+      targetWidth: maxDim > 0 ? maxDim : null,
-+      targetHeight: maxDim > 0 ? maxDim : null,
 +    );
 +    late final int frameCount;
 +    late native.Image nativeImg;
