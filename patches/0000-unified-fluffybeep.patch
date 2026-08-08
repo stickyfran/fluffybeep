@@ -346200,10 +346200,10 @@ index 4f740d3..e68ed26 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..49b9d1c
+index 0000000..5321ba6
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,676 @@
+@@ -0,0 +1,685 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -346355,13 +346355,11 @@ index 0000000..49b9d1c
 +    }
 +  }
 +
-+  @override
-+  Widget build(BuildContext context) {
-+    final client = Matrix.of(context).client;
-+    final store = Matrix.of(context).store;
-+    final theme = Theme.of(context);
++  List<BeeperNetwork>? _networksList;
++  List<String>? _tagsList;
 +
-+    // Extract unique Beeper networks from client rooms
++  void _computeNetworksAndTags(Client client) {
++    if (_networksList != null) return;
 +    final beeperNetworks = <String, BeeperNetwork>{};
 +    final customTags = <String>{};
 +    for (final r in client.rooms) {
@@ -346376,9 +346374,20 @@ index 0000000..49b9d1c
 +      }
 +    }
 +
-+    final networksList = beeperNetworks.values.toList()
++    _networksList = beeperNetworks.values.toList()
 +      ..sort((a, b) => a.name.compareTo(b.name));
-+    final tagsList = customTags.toList()..sort();
++    _tagsList = customTags.toList()..sort();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final client = Matrix.of(context).client;
++    final store = Matrix.of(context).store;
++    final theme = Theme.of(context);
++
++    _computeNetworksAndTags(client);
++    final networksList = _networksList!;
++    final tagsList = _tagsList!;
 +
 +
 +
@@ -364208,7 +364217,7 @@ index 2efc33f..f2d3514 100644
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000..01be55f
+index 0000000..1a2c5c1
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
 @@ -0,0 +1,107 @@
@@ -364257,8 +364266,8 @@ index 0000000..01be55f
 +        final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
 +        final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
 +
-+        // Log if total frame time exceeds 32ms (~30 FPS or lower, noticeable stutter)
-+        if (totalMs > 32.0) {
++        // Log if total frame time exceeds 16.6ms (drops 60 FPS or misses 120Hz frame budget)
++        if (totalMs > 16.6) {
 +          FileLogger.log(
 +            '[PERF/JANK] Slow frame detected: Total=${totalMs.toStringAsFixed(1)}ms '
 +            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
