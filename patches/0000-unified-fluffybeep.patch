@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..18a5cd8 100644
+index 7470749..d269fc1 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1748 @@
+@@ -1,1643 +1,1750 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305302,30 +305302,17 @@ index 7470749..18a5cd8 100644
 +
 +      var readMarkerEventIndex = readMarkerEventId.isEmpty
 +          ? -1
-+          : timeline!.events
-+                .filterByVisibleInGui(
-+                  exceptionEventId: readMarkerEventId,
-+                  threadId: activeThreadId,
-+                )
-+                .indexWhere((e) => e.eventId == readMarkerEventId);
++          : filteredEvents.indexWhere((e) => e.eventId == readMarkerEventId);
 +
 +      // Read marker is existing but not found in first events. Try a single
 +      // requestHistory call before opening timeline on event context:
 +      if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1) {
 +        await timeline?.requestHistory(historyCount: _loadHistoryCount);
-+        readMarkerEventIndex = timeline!.events
-+            .filterByVisibleInGui(
-+              exceptionEventId: readMarkerEventId,
-+              threadId: activeThreadId,
-+            )
-+            .indexWhere((e) => e.eventId == readMarkerEventId);
++        _invalidateTimelineCache();
++        readMarkerEventIndex = filteredEvents.indexWhere((e) => e.eventId == readMarkerEventId);
 +      }
 +
-+      if (readMarkerEventIndex > 1) {
-+        Logs().v('Scroll up to visible event', readMarkerEventId);
-+        scrollToEventId(readMarkerEventId, highlightEvent: false);
-+        return;
-+      } else if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1) {
++      if (readMarkerEventId.isNotEmpty && (readMarkerEventIndex > 1 || readMarkerEventIndex == -1)) {
 +        _showScrollUpMaterialBanner(readMarkerEventId);
 +      }
 +
@@ -305499,7 +305486,7 @@ index 7470749..18a5cd8 100644
 +      return;
 +    }
 +    if (eventId?.isValidMatrixIdStrict() == false) return;
-+    if (_setReadMarkerFuture != null) return;
++    if (!force && _setReadMarkerFuture != null) return;
 +    if (!force && _scrolledUp) return;
 +    if (!force && scrollUpBannerEventId != null) return;
 +
@@ -305510,23 +305497,38 @@ index 7470749..18a5cd8 100644
 +    }
 +
 +    // Do not send read markers when app is not in foreground
-+    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
++    if (!force && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
 +      return;
 +    }
 +
-+    final timeline = this.timeline;
-+    if (timeline == null || timeline.events.isEmpty) return;
++    final targetId = eventId ?? room.lastEvent?.eventId;
 +
-+    Logs().d('Set read marker...', eventId);
-+    // ignore: unawaited_futures
-+    _setReadMarkerFuture = timeline
-+        .setReadMarker(
-+          eventId: eventId,
-+          public: AppSettings.sendPublicReadReceipts.value,
-+        )
++    // Clear local readMarkerEventId immediately so UI button vanishes
++    if (force || eventId != null) {
++      readMarkerEventId = '';
++    }
++
++    final timeline = this.timeline;
++    Logs().d('Set read marker...', targetId);
++
++    _setReadMarkerFuture = (timeline != null
++            ? timeline.setReadMarker(
++                eventId: targetId,
++                public: AppSettings.sendPublicReadReceipts.value,
++              )
++            : room.setReadMarker(targetId, mRead: targetId))
 +        .then((_) {
-+          _setReadMarkerFuture = null;
-+        });
++      _setReadMarkerFuture = null;
++      if (force && targetId != null) {
++        room.setReadMarker(targetId, mRead: targetId);
++      }
++    }).catchError((e) {
++      _setReadMarkerFuture = null;
++    });
++
++    if (force && mounted) {
++      setState(() {});
++    }
 +  }
 +
 +  @override
