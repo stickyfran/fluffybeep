@@ -303199,7 +303199,7 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..df4472a 100644
+index 7470749..18a5cd8 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -1,1643 +1,1748 @@
@@ -305500,8 +305500,8 @@ index 7470749..df4472a 100644
 +    }
 +    if (eventId?.isValidMatrixIdStrict() == false) return;
 +    if (_setReadMarkerFuture != null) return;
-+    if (_scrolledUp) return;
-+    if (scrollUpBannerEventId != null) return;
++    if (!force && _scrolledUp) return;
++    if (!force && scrollUpBannerEventId != null) return;
 +
 +    if (eventId == null &&
 +        !room.hasNewMessages &&
@@ -307246,10 +307246,10 @@ index 76cf1aa..e9d9468 100644
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..7604f16 100644
+index 0022f82..69c0b71 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,241 @@
+@@ -1,253 +1,245 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307714,6 +307714,10 @@ index 0022f82..7604f16 100644
 +                      displayReadMarker:
 +                          i > 0 &&
 +                          controller.readMarkerEventId == event.eventId,
++                      onMarkRead: () => controller.setReadMarker(
++                        eventId: event.eventId,
++                        force: true,
++                      ),
 +                      nextEvent: nextEvent,
 +                      previousEvent: previousEvent,
 +                      wallpaperMode: hasWallpaper,
@@ -313893,10 +313897,10 @@ index dc9ab9a..7af684a 100644
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..25093d2 100644
+index 930de3b..84f45cd 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
-@@ -1,968 +1,1017 @@
+@@ -1,968 +1,1063 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -314900,6 +314904,7 @@ index 930de3b..25093d2 100644
 +  final Event? nextEvent;
 +  final Event? previousEvent;
 +  final bool displayReadMarker;
++  final void Function()? onMarkRead;
 +  final void Function(Event) onSelect;
 +  final void Function(Event) onInfoTab;
 +  final void Function(String) scrollToEventId;
@@ -314926,6 +314931,7 @@ index 930de3b..25093d2 100644
 +    this.nextEvent,
 +    this.previousEvent,
 +    this.displayReadMarker = false,
++    this.onMarkRead,
 +    this.longPressSelect = false,
 +    required this.bigEmojis,
 +    required this.onSelect,
@@ -314984,6 +314990,7 @@ index 930de3b..25093d2 100644
 +    final nextEvent = widget.nextEvent;
 +    final previousEvent = widget.previousEvent;
 +    final displayReadMarker = widget.displayReadMarker;
++    final onMarkRead = widget.onMarkRead;
 +    final onSelect = widget.onSelect;
 +    final onInfoTab = widget.onInfoTab;
 +    final scrollToEventId = widget.scrollToEventId;
@@ -315762,9 +315769,52 @@ index 930de3b..25093d2 100644
 +                      ),
 +                      child: Text(
 +                        L10n.of(context).readUpToHere,
-+                        style: TextStyle(fontSize: 11),
++                        style: const TextStyle(fontSize: 11),
 +                      ),
 +                    ),
++                    if (onMarkRead != null) ...[
++                      const SizedBox(width: 4),
++                      InkWell(
++                        onTap: onMarkRead,
++                        borderRadius: BorderRadius.circular(
++                          AppConfig.borderRadius / 3,
++                        ),
++                        child: Container(
++                          margin: const EdgeInsets.symmetric(
++                            vertical: 16.0,
++                          ),
++                          padding: const EdgeInsets.symmetric(
++                            horizontal: 8,
++                            vertical: 2,
++                          ),
++                          decoration: BoxDecoration(
++                            borderRadius: BorderRadius.circular(
++                              AppConfig.borderRadius / 3,
++                            ),
++                            color: theme.colorScheme.primaryContainer,
++                          ),
++                          child: Row(
++                            mainAxisSize: MainAxisSize.min,
++                            children: [
++                              Icon(
++                                Icons.done_all,
++                                size: 14,
++                                color: theme.colorScheme.onPrimaryContainer,
++                              ),
++                              const SizedBox(width: 4),
++                              Text(
++                                L10n.of(context).markAsRead,
++                                style: TextStyle(
++                                  fontSize: 11,
++                                  fontWeight: FontWeight.w600,
++                                  color: theme.colorScheme.onPrimaryContainer,
++                                ),
++                              ),
++                            ],
++                          ),
++                        ),
++                      ),
++                    ],
 +                    Expanded(
 +                      child: Divider(
 +                        color: theme.colorScheme.surfaceContainerHighest,
@@ -374917,10 +374967,10 @@ index 90aadb6..13d31c0 100644
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..cb4665c 100644
+index 934de68..92c3e23 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,489 @@
+@@ -1,443 +1,487 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -375777,9 +375827,7 @@ index 934de68..cb4665c 100644
 +        Logs().v('Set background sync to', foreground);
 +      }
 +    }
-+    if (state == AppLifecycleState.resumed) {
-+      BeeperBridgeUtils.invalidateAllRoomCaches();
-+    } else if (state == AppLifecycleState.paused) {
++    if (state == AppLifecycleState.paused) {
 +      MxcImage.trimAllCaches();
 +    }
 +  }
