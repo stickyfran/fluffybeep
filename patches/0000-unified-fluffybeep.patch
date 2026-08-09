@@ -302336,10 +302336,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..8a2a3cfa0f61effac8386377f775c6806a69af9a 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..c5c519ae91c9632e4ba806845f0c3a1084b09375 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1863 @@
+@@ -1,1643 +1,1873 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304026,6 +304026,8 @@ index 74707498c32bda411d06d6c9c086f390f3401135..8a2a3cfa0f61effac8386377f775c680
 +import 'package:flutter/foundation.dart';
 +import 'package:flutter/material.dart';
 +import 'package:flutter/services.dart';
++import 'package:flutter_local_notifications/flutter_local_notifications.dart';
++import 'package:fluffychat/utils/push_helper.dart';
 +import 'package:go_router/go_router.dart';
 +import 'package:image_picker/image_picker.dart';
 +import 'package:matrix/matrix.dart';
@@ -304742,6 +304744,14 @@ index 74707498c32bda411d06d6c9c086f390f3401135..8a2a3cfa0f61effac8386377f775c680
 +            // Timeline may not contain targetId if outside loaded window
 +          }
 +        }
++        if (PlatformInfos.isMobile) {
++          final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++          await FlutterLocalNotificationsPlugin().cancel(id: notifId);
++        }
++        final unreadCount = room.client.rooms
++            .where((r) => r.isUnreadOrInvited)
++            .length;
++        updateAppBadge(unreadCount);
 +      } catch (e) {
 +        Logs().w('Failed to set read marker', e);
 +      } finally {
@@ -325662,10 +325672,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..706f3dec5246c2864770ab39d3044ce33835b685 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc446300231cac3 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1307 @@
+@@ -1,1041 +1,1321 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -326734,6 +326744,8 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..706f3dec5246c2864770ab39d3044ce3
 +import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:flutter/services.dart';
++import 'package:flutter_local_notifications/flutter_local_notifications.dart';
++import 'package:fluffychat/utils/push_helper.dart';
 +import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
 +import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart' as sdk;
@@ -327198,6 +327210,9 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..706f3dec5246c2864770ab39d3044ce3
 +  @override
 +  void didChangeDependencies() {
 +    super.didChangeDependencies();
++    if (_initialized) {
++      _invalidateRoomCache();
++    }
 +    if (!_initialized) {
 +      _initialized = true;
 +
@@ -327563,6 +327578,15 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..706f3dec5246c2864770ab39d3044ce3
 +                mRead: lastEventId,
 +                public: AppSettings.sendPublicReadReceipts.value,
 +              );
++              if (PlatformInfos.isMobile) {
++                final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++                await FlutterLocalNotificationsPlugin().cancel(id: notifId);
++              }
++              final unreadCount = room.client.rooms
++                  .where((r) => r.isUnreadOrInvited)
++                  .length;
++              updateAppBadge(unreadCount);
++              _invalidateRoomCache();
 +            } else {
 +              await room.markUnread(true);
 +            }
