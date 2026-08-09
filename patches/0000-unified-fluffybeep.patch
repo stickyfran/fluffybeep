@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..5a52e9d 100644
+index 7470749..c18e821 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1803 @@
+@@ -1,1643 +1,1820 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305846,7 +305846,14 @@ index 7470749..5a52e9d 100644
 +      future: audioFile.readAsBytes,
 +    );
 +    final bytes = bytesResult.result;
-+    if (bytes == null) return;
++    if (bytes == null || bytes.isEmpty) {
++      if (mounted) {
++        scaffoldMessenger.showSnackBar(
++          const SnackBar(content: Text('Error: El archivo de audio grabado está vacío.')),
++        );
++      }
++      return;
++    }
 +
 +    final mimeType = lookupMimeType(fileName, headerBytes: bytes);
 +    var effectiveMimeType = mimeType;
@@ -305854,7 +305861,16 @@ index 7470749..5a52e9d 100644
 +        (fileName.endsWith('.ogg') &&
 +            (effectiveMimeType == null || effectiveMimeType == 'audio/ogg'))) {
 +      effectiveMimeType = 'audio/ogg';
++    } else if (fileName.endsWith('.m4a') || fileName.endsWith('.aac') || effectiveMimeType == 'audio/mp4') {
++      effectiveMimeType = 'audio/mp4';
++    } else if (effectiveMimeType == null) {
++      if (fileName.endsWith('.ogg')) {
++        effectiveMimeType = 'audio/ogg';
++      } else {
++        effectiveMimeType = 'audio/mp4';
++      }
 +    }
++
 +    final extension = mimeType == null ? null : extensionFromMime(mimeType);
 +    if (extension != null) {
 +      fileName =
@@ -305877,6 +305893,7 @@ index 7470749..5a52e9d 100644
 +          'info': {
 +            ...file.info,
 +            'duration': duration,
++            'size': bytes.length,
 +            if (effectiveMimeType != null) 'mimetype': effectiveMimeType,
 +          },
 +          'org.matrix.msc3245.voice': {},
@@ -320063,10 +320080,10 @@ index b4a4126..c59ae08 100644
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886..c0f9ea3 100644
+index 7d9d886..675d0d7 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,242 @@
+@@ -1,222 +1,248 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320494,13 +320511,19 @@ index 7d9d886..c0f9ea3 100644
 +    final path = await _audioRecorder?.stop();
 +
 +    if (path == null) throw ('Recording failed!');
++    
++    // Wait briefly to allow native Android MediaRecorder / AudioRecord thread
++    // to finish writing container headers/footers (MOOV atom or Ogg EOS page) to disk.
++    await Future.delayed(const Duration(milliseconds: 150));
++
 +    const waveCount = AudioPlayerWidget.wavesCount;
 +    final step = amplitudeTimeline.length < waveCount
 +        ? 1
 +        : (amplitudeTimeline.length / waveCount).round();
 +    final waveform = <int>[];
 +    for (var i = 0; i < amplitudeTimeline.length; i += step) {
-+      waveform.add((amplitudeTimeline[i] / 100 * 1024).round());
++      final sample = (amplitudeTimeline[i] / 100 * 1024).round();
++      waveform.add(sample.clamp(0, 1024));
 +    }
 +
 +    onSend(path, duration.inMilliseconds, waveform, fileName!);
