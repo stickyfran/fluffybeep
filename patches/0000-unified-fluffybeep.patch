@@ -346306,10 +346306,10 @@ index 4f740d3..e68ed26 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..7296811
+index 0000000..43f7306
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,687 @@
+@@ -0,0 +1,696 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -346363,6 +346363,15 @@ index 0000000..7296811
 +      _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
 +      _showJumpBanner = prefs.getBool('beeper_show_jump_banner') ?? true;
 +    });
++  }
++
++  Future<void> _loadLogSize() async {
++    final size = await FileLogger.getLogSize();
++    if (mounted) {
++      setState(() {
++        _logSize = size;
++      });
++    }
 +  }
 +
 +  @override
