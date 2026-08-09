@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..c18e821 100644
+index 7470749..7854a44 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1820 @@
+@@ -1,1643 +1,1859 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305403,9 +305403,13 @@ index 7470749..c18e821 100644
 +    _cachedFilteredEvents = null;
 +    _cachedEventsKeyMap = null;
 +    _cachedReactionsMap = null;
++    _cachedEditsSet = null;
++    _cachedThreadsMap = null;
 +  }
 +
 +  Map<String, List<Event>>? _cachedReactionsMap;
++  Set<String>? _cachedEditsSet;
++  Map<String, List<Event>>? _cachedThreadsMap;
 +
 +  Map<String, List<Event>> get reactionsMap {
 +    if (_cachedReactionsMap != null) return _cachedReactionsMap!;
@@ -305423,6 +305427,41 @@ index 7470749..c18e821 100644
 +      }
 +    }
 +    return _cachedReactionsMap!;
++  }
++
++  Set<String> get editsSet {
++    if (_cachedEditsSet != null) return _cachedEditsSet!;
++    _cachedEditsSet = {};
++    final tl = timeline;
++    if (tl != null) {
++      for (final e in tl.events) {
++        if (e.relationshipType == RelationshipTypes.edit) {
++          final targetId = e.relationshipEventId;
++          if (targetId != null) {
++            _cachedEditsSet!.add(targetId);
++          }
++        }
++      }
++    }
++    return _cachedEditsSet!;
++  }
++
++  Map<String, List<Event>> get threadsMap {
++    if (_cachedThreadsMap != null) return _cachedThreadsMap!;
++    _cachedThreadsMap = {};
++    final tl = timeline;
++    if (tl != null) {
++      for (final e in tl.events) {
++        if (e.relationshipType == RelationshipTypes.thread) {
++          final targetId = e.relationshipEventId;
++          if (targetId != null) {
++            _cachedThreadsMap![targetId] ??= [];
++            _cachedThreadsMap![targetId]!.add(e);
++          }
++        }
++      }
++    }
++    return _cachedThreadsMap!;
 +  }
 +
 +  Future<void>? loadTimelineFuture;
@@ -307178,7 +307217,7 @@ index 6305f45..61862a9 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat_emoji_picker.dart b/lib/pages/chat/chat_emoji_picker.dart
-index 76cf1aa..e9d9468 100644
+index 76cf1aa..09288f6 100644
 --- a/lib/pages/chat/chat_emoji_picker.dart
 +++ b/lib/pages/chat/chat_emoji_picker.dart
 @@ -3,9 +3,7 @@
@@ -307199,7 +307238,7 @@ index 76cf1aa..e9d9468 100644
      return AnimatedContainer(
        duration: FluffyThemes.animationDuration,
        curve: FluffyThemes.animationCurve,
-@@ -29,97 +26,28 @@ class ChatEmojiPicker extends StatelessWidget {
+@@ -29,97 +26,32 @@ class ChatEmojiPicker extends StatelessWidget {
            ? MediaQuery.sizeOf(context).height / 2
            : 0,
        child: controller.showEmojiPicker
@@ -307289,9 +307328,13 @@ index 76cf1aa..e9d9468 100644
 +                    'url': sticker.url.toString(),
 +                  },
 +                  type: EventTypes.Sticker,
++                  inReplyTo: controller.replyEvent,
 +                  threadRootEventId: controller.activeThreadId,
 +                  threadLastEventId: controller.threadLastEventId,
 +                );
++                controller.setState(() {
++                  controller.replyEvent = null;
++                });
 +                controller.hideEmojiPicker();
 +              },
              )
@@ -307318,10 +307361,10 @@ index 76cf1aa..e9d9468 100644
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..6c1d605 100644
+index 0022f82..2cd4041 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,243 @@
+@@ -1,253 +1,244 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307797,6 +307840,7 @@ index 0022f82..6c1d605 100644
 +                      enterThread: controller.activeThreadId == null
 +                          ? controller.enterThread
 +                          : null,
++                      cachedReactions: controller.reactionsMap[event.eventId],
 +                      onExpand: canExpand
 +                          ? () => controller.expandEventsFrom(
 +                              event,
@@ -313916,10 +313960,10 @@ index dc9ab9a..7af684a 100644
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b..84f45cd 100644
+index 930de3b..be684a7 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
-@@ -1,968 +1,1063 @@
+@@ -1,968 +1,1065 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315136,10 +315180,12 @@ index 930de3b..84f45cd 100644
 +      );
 +    }
 +
-+    final hasReactions = event.hasAggregatedEvents(
-+      timeline,
-+      RelationshipTypes.reaction,
-+    );
++    final hasReactions = cachedReactions != null
++        ? cachedReactions.isNotEmpty
++        : event.hasAggregatedEvents(
++            timeline,
++            RelationshipTypes.reaction,
++          );
 +
 +    final threadChildren = event.aggregatedEvents(
 +      timeline,
