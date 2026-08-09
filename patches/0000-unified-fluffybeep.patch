@@ -303199,7 +303199,7 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..bed773e 100644
+index 7470749..5a52e9d 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -1,1643 +1,1803 @@
@@ -305518,7 +305518,8 @@ index 7470749..bed773e 100644
 +      return;
 +    }
 +
-+    final targetId = eventId ?? room.lastEvent?.eventId ?? timeline?.events.firstOrNull?.eventId;
++    final currentTimeline = timeline;
++    final targetId = eventId ?? room.lastEvent?.eventId ?? currentTimeline?.events.firstOrNull?.eventId;
 +
 +    if (force || eventId != null) {
 +      scrollUpBannerEventId = null;
@@ -305543,11 +305544,10 @@ index 7470749..bed773e 100644
 +      return;
 +    }
 +
-+    final timeline = this.timeline;
 +    Logs().d('Set read marker...', targetId);
 +
-+    _setReadMarkerFuture = (timeline != null
-+            ? timeline.setReadMarker(
++    _setReadMarkerFuture = (currentTimeline != null
++            ? currentTimeline.setReadMarker(
 +                eventId: targetId,
 +                public: AppSettings.sendPublicReadReceipts.value,
 +              )
@@ -347030,10 +347030,10 @@ index 0000000..43f7306
 +  }
 +}
 diff --git a/lib/pages/settings/settings.dart b/lib/pages/settings/settings.dart
-index c8909ee..534274b 100644
+index c8909ee..499c688 100644
 --- a/lib/pages/settings/settings.dart
 +++ b/lib/pages/settings/settings.dart
-@@ -1,221 +1,235 @@
+@@ -1,221 +1,190 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -347424,60 +347424,15 @@ index c8909ee..534274b 100644
 +
 +  @override
 +  void initState() {
-+    WidgetsBinding.instance.addPostFrameCallback((_) => checkBootstrap());
-+
-+    super.initState();
-+  }
-+
-+  Future<void> checkBootstrap() async {
-+    final client = Matrix.of(context).client;
-+    if (!client.encryptionEnabled) return;
-+    if (!client.isLogged()) return;
-+    await client.accountDataLoading;
-+    await client.userDeviceKeysLoading;
-+    if (client.prevBatch == null) {
-+      await client.onSync.stream.first;
-+    }
-+
-+    final state = await client.getCryptoIdentityState();
-+    if (!mounted) return;
-+    setState(() {
-+      cryptoIdentityConnected = state.initialized && state.connected;
-+    });
-+  }
-+
-+  bool? cryptoIdentityConnected;
-+
-+  Future<void> firstRunBootstrapAction([_]) async {
-+    if (cryptoIdentityConnected == true) {
-+      final action = await showOkCancelAlertDialog(
-+        context: context,
-+        title: L10n.of(context).chatBackup,
-+        message: L10n.of(context).onlineKeyBackupEnabled,
-+        okLabel: L10n.of(context).resetRecoveryKey,
-+        cancelLabel: L10n.of(context).close,
-+        isDestructive: true,
-+      );
-+      if (action != OkCancelResult.ok) return;
-+      if (!mounted) return;
-+      await context.push('/backup?reset=true');
-+      return;
-+    }
-+    await context.push('/backup');
-+    checkBootstrap();
-+  }
-+
-+  @override
-+  void initState() {
 +    super.initState();
 +    WidgetsBinding.instance.addPostFrameCallback((_) {
-+      if (mounted) {
-+        final client = Matrix.of(context).client;
-+        setState(() {
-+          profileFuture = client.getProfileFromUserId(client.userID!);
-+          authMetadataFuture = client.getAuthMetadata();
-+        });
-+      }
++      if (!mounted) return;
++      checkBootstrap();
++      final client = Matrix.of(context).client;
++      setState(() {
++        profileFuture = client.getProfileFromUserId(client.userID!);
++        authMetadataFuture = client.getAuthMetadata();
++      });
 +    });
 +  }
 +
