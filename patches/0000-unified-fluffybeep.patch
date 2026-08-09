@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..d269fc1 100644
+index 7470749..c141baa 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1750 @@
+@@ -1,1643 +1,1780 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304970,7 +304970,7 @@ index 7470749..d269fc1 100644
 +          for (final emoji in category.emoji) emoji.emoji,
 +      };
 +
-+  late final String readMarkerEventId;
++  late String readMarkerEventId;
 +
 +  String get roomId => widget.room.id;
 +
@@ -305356,6 +305356,21 @@ index 7470749..d269fc1 100644
 +      _updateViewScheduled = false;
 +      if (!mounted) return;
 +      _invalidateTimelineCache();
++      // If the newest event is from ourselves (sent from another device),
++      // discard the jump-banner and scroll to bottom so it appears visible.
++      final newestEvent = timeline?.events.firstOrNull;
++      if (newestEvent != null &&
++          newestEvent.senderId == room.client.userID &&
++          scrollUpBannerEventId != null) {
++        scrollUpBannerEventId = null;
++        if (scrollController.hasClients) {
++          scrollController.animateTo(
++            0.0,
++            duration: const Duration(milliseconds: 200),
++            curve: Curves.easeOut,
++          );
++        }
++      }
 +      setReadMarker();
 +      setState(() {});
 +    });
@@ -305504,8 +305519,13 @@ index 7470749..d269fc1 100644
 +    final targetId = eventId ?? room.lastEvent?.eventId;
 +
 +    // Clear local readMarkerEventId immediately so UI button vanishes
-+    if (force || eventId != null) {
-+      readMarkerEventId = '';
++    // Guard: only assign if the field has already been initialized
++    try {
++      if (force || eventId != null) {
++        readMarkerEventId = '';
++      }
++    } catch (_) {
++      // readMarkerEventId not yet initialized — skip
 +    }
 +
 +    final timeline = this.timeline;
@@ -305621,6 +305641,16 @@ index 7470749..d269fc1 100644
 +      replyEvent = null;
 +      editEvent = null;
 +      pendingText = '';
++    });
++    // Scroll to the very bottom so own message is always visible
++    WidgetsBinding.instance.addPostFrameCallback((_) {
++      if (mounted && scrollController.hasClients) {
++        scrollController.animateTo(
++          0.0,
++          duration: const Duration(milliseconds: 200),
++          curve: Curves.easeOut,
++        );
++      }
 +    });
 +  }
 +
@@ -308692,10 +308722,10 @@ index 879717f..494f9a2 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35f..82e231d 100644
+index ae1b35f..da4c2b6 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,518 @@
+@@ -1,464 +1,519 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309473,7 +309503,8 @@ index ae1b35f..82e231d 100644
 +                          ),
 +                        ),
 +                      if (scrollUpBannerEventId != null &&
-+                          activeThreadId == null)
++                          activeThreadId == null &&
++                          (BeeperBridgeUtils.prefs?.getBool('beeper_show_jump_banner') ?? true))
 +                        ChatAppBarListTile(
 +                          leading: IconButton(
 +                            color: theme.colorScheme.onSurfaceVariant,
@@ -309874,17 +309905,18 @@ index e872284..01feb3b 100644
 +  }
 +}
 diff --git a/lib/pages/chat/encrpytion_info.dart b/lib/pages/chat/encrpytion_info.dart
-index c6d2f0b..fece64c 100644
+index c6d2f0b..4fdc2ec 100644
 --- a/lib/pages/chat/encrpytion_info.dart
 +++ b/lib/pages/chat/encrpytion_info.dart
-@@ -5,103 +5,86 @@
+@@ -3,105 +3,26 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
  
- import 'package:fluffychat/config/app_config.dart';
- import 'package:fluffychat/config/themes.dart';
+-import 'package:fluffychat/config/app_config.dart';
+-import 'package:fluffychat/config/themes.dart';
 -import 'package:fluffychat/l10n/l10n.dart';
 -import 'package:flutter/gestures.dart';
 +import 'package:fluffychat/pages/chat/chat.dart';
-+import 'package:fluffychat/utils/beeper_bridge_utils.dart';
  import 'package:flutter/material.dart';
 -import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart';
@@ -309923,14 +309955,11 @@ index c6d2f0b..fece64c 100644
 +  @override
 +  State<EncryptionInfo> createState() => _EncryptionInfoState();
 +}
-+
-+class _EncryptionInfoState extends State<EncryptionInfo> {
-+  bool _markedReadLocal = false;
  
++class _EncryptionInfoState extends State<EncryptionInfo> {
    @override
    Widget build(BuildContext context) {
-+    final manualRead = BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false;
-     final theme = Theme.of(context);
+-    final theme = Theme.of(context);
 -    return AnimatedSize(
 -      duration: FluffyThemes.animationDuration,
 -      curve: FluffyThemes.animationCurve,
@@ -309979,71 +310008,21 @@ index c6d2f0b..fece64c 100644
 -                            text: 'Check',
 -                          ),
 -                        ],
-+
-+    if (manualRead) {
-+      final room = widget.room;
-+      final hasUnread = (room.hasNewMessages || room.notificationCount > 0 || room.markedUnread) && !_markedReadLocal;
-+      if (!hasUnread) return const SizedBox.shrink();
-+
-+      return AnimatedSize(
-+        duration: FluffyThemes.animationDuration,
-+        curve: FluffyThemes.animationCurve,
-+        child: Padding(
-+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-+          child: Center(
-+            child: Material(
-+              color: theme.colorScheme.primaryContainer,
-+              borderRadius: BorderRadius.circular(AppConfig.borderRadius / 3),
-+              child: InkWell(
-+                borderRadius: BorderRadius.circular(AppConfig.borderRadius / 3),
-+                onTap: () async {
-+                  if (widget.controller != null) {
-+                    widget.controller!.setReadMarker(force: true);
-+                  } else {
-+                    final lastEventId = room.lastEvent?.eventId;
-+                    if (lastEventId != null) {
-+                      await room.setReadMarker(lastEventId, mRead: lastEventId);
-+                    }
-+                  }
-+                  if (mounted) {
-+                    setState(() {
-+                      _markedReadLocal = true;
-+                    });
-+                  }
-+                },
-+                child: Padding(
-+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-+                  child: Row(
-+                    mainAxisSize: MainAxisSize.min,
-+                    children: [
-+                      Icon(Icons.done_all, size: 16, color: theme.colorScheme.onPrimaryContainer),
-+                      const SizedBox(width: 6),
-+                      Text(
-+                        'Marcar como leído',
-+                        style: TextStyle(
-+                          fontSize: 12,
-+                          fontWeight: FontWeight.bold,
-+                          color: theme.colorScheme.onPrimaryContainer,
-+                        ),
-                       ),
+-                      ),
 -                      textAlign: TextAlign.center,
 -                      style: TextStyle(fontSize: 11),
 -                    ),
-+                    ],
-                   ),
-                 ),
-               ),
-             ),
+-                  ),
+-                ),
+-              ),
+-            ),
 -          );
 -        },
 -      ),
 -    );
-+          ),
-+        ),
-+      );
-+    }
-+
-+    // Unverified devices warning is intentionally disabled per user request
++    // Unverified devices warning is intentionally disabled per user request.
++    // "Marcar como leído" button is shown inline in the chat message list
++    // (next to "Leer hasta aquí") when beeper_manual_read_receipts is enabled.
 +    return const SizedBox.shrink();
    }
  }
@@ -346329,10 +346308,10 @@ index 4f740d3..e68ed26 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..6226a3d
+index 0000000..ab0d382
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,689 @@
+@@ -0,0 +1,719 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -346364,6 +346343,7 @@ index 0000000..6226a3d
 +  bool _debugLoggingEnabled = false;
 +  bool _forcePublicPushGateway = false;
 +  bool _manualReadReceipts = false;
++  bool _showJumpBanner = true;
 +  List<Pusher>? _pushers;
 +  bool _loadingPushers = false;
 +  bool _didLoadPushers = false;
@@ -346375,6 +346355,7 @@ index 0000000..6226a3d
 +    _loadDebugLoggingToggle();
 +    _loadForcePublicToggle();
 +    _loadManualReadToggle();
++    _loadJumpBannerToggle();
 +  }
 +
 +  @override
@@ -346433,6 +346414,25 @@ index 0000000..6226a3d
 +    if (mounted) {
 +      setState(() {
 +        _manualReadReceipts = value;
++      });
++    }
++  }
++
++  Future<void> _loadJumpBannerToggle() async {
++    final prefs = await SharedPreferences.getInstance();
++    if (mounted) {
++      setState(() {
++        _showJumpBanner = prefs.getBool('beeper_show_jump_banner') ?? true;
++      });
++    }
++  }
++
++  Future<void> _setShowJumpBanner(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_show_jump_banner', value);
++    if (mounted) {
++      setState(() {
++        _showJumpBanner = value;
 +      });
 +    }
 +  }
@@ -346588,6 +346588,15 @@ index 0000000..6226a3d
 +            ),
 +            value: _manualReadReceipts,
 +            onChanged: _setManualReadReceipts,
++          ),
++          SwitchListTile.adaptive(
++            secondary: const Icon(Icons.vertical_align_top_outlined),
++            title: const Text('Mostrar banner "Saltar al último leído"'),
++            subtitle: const Text(
++              'Muestra la barra superior en el chat para ir al último mensaje leído cuando hay mensajes nuevos.',
++            ),
++            value: _showJumpBanner,
++            onChanged: _setShowJumpBanner,
 +          ),
 +          ListTile(
 +            leading: const Icon(Icons.vpn_key_outlined),
