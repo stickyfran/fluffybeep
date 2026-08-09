@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..7854a44 100644
+index 7470749..8a2a3cf 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1859 @@
+@@ -1,1643 +1,1863 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305585,28 +305585,32 @@ index 7470749..7854a44 100644
 +
 +    Logs().d('Set read marker...', targetId);
 +
-+    _setReadMarkerFuture = (currentTimeline != null
-+            ? currentTimeline.setReadMarker(
-+                eventId: targetId,
-+                public: AppSettings.sendPublicReadReceipts.value,
-+              )
-+            : room.setReadMarker(
-+                targetId,
-+                mRead: targetId,
-+                public: AppSettings.sendPublicReadReceipts.value,
-+              ))
-+        .then((_) {
-+      _setReadMarkerFuture = null;
-+      if (force || targetId != null) {
-+        room.setReadMarker(
++    _setReadMarkerFuture = () async {
++      try {
++        if (room.markedUnread) {
++          await room.markUnread(false);
++        }
++        await room.setReadMarker(
 +          targetId,
 +          mRead: targetId,
 +          public: AppSettings.sendPublicReadReceipts.value,
 +        );
++        if (currentTimeline != null) {
++          try {
++            await currentTimeline.setReadMarker(
++              eventId: targetId,
++              public: AppSettings.sendPublicReadReceipts.value,
++            );
++          } catch (_) {
++            // Timeline may not contain targetId if outside loaded window
++          }
++        }
++      } catch (e) {
++        Logs().w('Failed to set read marker', e);
++      } finally {
++        _setReadMarkerFuture = null;
 +      }
-+    }).catchError((e) {
-+      _setReadMarkerFuture = null;
-+    });
++    }();
 +
 +    if (force && mounted) {
 +      setState(() {});
@@ -308804,7 +308808,7 @@ index 879717f..494f9a2 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35f..da4c2b6 100644
+index ae1b35f..eaecf3b 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -1,464 +1,519 @@
@@ -309594,7 +309598,7 @@ index ae1b35f..da4c2b6 100644
 +                            tooltip: L10n.of(context).close,
 +                            onPressed: () {
 +                              controller.discardScrollUpBannerEventId();
-+                              controller.setReadMarker();
++                              controller.setReadMarker(force: true);
 +                            },
 +                          ),
 +                          title: L10n.of(context).jumpToLastReadMessage,
