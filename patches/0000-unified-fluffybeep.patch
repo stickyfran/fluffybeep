@@ -303199,7 +303199,7 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..c141baa 100644
+index 7470749..09fc187 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -1,1643 +1,1780 @@
@@ -305432,9 +305432,9 @@ index 7470749..c141baa 100644
 +    await matrix.client.roomsLoading;
 +    await matrix.client.accountDataLoading;
 +
-+    // OPTIMIZATION: Defer timeline loading slightly to allow the screen transition
-+    // animation to render smoothly without dropping frames due to heavy synchronous build.
-+    await Future.delayed(const Duration(milliseconds: 200));
++    // OPTIMIZATION: Defer timeline loading until after the 300ms screen transition
++    // animation completes smoothly without dropping frames due to heavy synchronous build.
++    await Future.delayed(const Duration(milliseconds: 320));
 +
 +    if (eventContextId != null &&
 +        (!eventContextId.isValidMatrixIdStrict() ||
@@ -307278,10 +307278,10 @@ index 76cf1aa..e9d9468 100644
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..69c0b71 100644
+index 0022f82..6c1d605 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,245 @@
+@@ -1,253 +1,243 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307636,14 +307636,12 @@ index 0022f82..69c0b71 100644
 +                }
 +                return Builder(
 +                  builder: (context) {
-+                    final visibleIndex = timeline.events.lastIndexWhere(
-+                      (event) =>
-+                          !event.isCollapsedState && event.isVisibleInGui,
-+                    );
-+                    if (visibleIndex > timeline.events.length - 50) {
-+                      WidgetsBinding.instance.addPostFrameCallback(
-+                        controller.requestHistory,
-+                      );
++                    if (events.length > 0 && !timeline.isRequestingHistory) {
++                      WidgetsBinding.instance.addPostFrameCallback((_) {
++                        if (timeline.canRequestHistory && !timeline.isRequestingHistory) {
++                          controller.requestHistory();
++                        }
++                      });
 +                    }
 +                    return Center(
 +                      child: TextButton.icon(
@@ -346308,10 +346306,10 @@ index 4f740d3..e68ed26 100644
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000..ab0d382
+index 0000000..7296811
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,719 @@
+@@ -0,0 +1,687 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -346351,11 +346349,20 @@ index 0000000..ab0d382
 +  @override
 +  void initState() {
 +    super.initState();
-+    _loadLogSize();
-+    _loadDebugLoggingToggle();
-+    _loadForcePublicToggle();
-+    _loadManualReadToggle();
-+    _loadJumpBannerToggle();
++    _loadAllSettings();
++  }
++
++  Future<void> _loadAllSettings() async {
++    final prefs = await SharedPreferences.getInstance();
++    final logSize = await FileLogger.getLogSize();
++    if (!mounted) return;
++    setState(() {
++      _logSize = logSize;
++      _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
++      _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
++      _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
++      _showJumpBanner = prefs.getBool('beeper_show_jump_banner') ?? true;
++    });
 +  }
 +
 +  @override
@@ -346364,46 +346371,12 @@ index 0000000..ab0d382
 +    if (!_didLoadPushers) {
 +      _didLoadPushers = true;
 +      final client = Matrix.of(context).client;
-+      WidgetsBinding.instance.addPostFrameCallback((_) {
++      // Defer network operations until screen push transition has completed smoothly
++      Future.delayed(const Duration(milliseconds: 350), () {
 +        if (mounted) {
++          _computeNetworksAndTags(client);
 +          _loadPushers(client);
 +        }
-+      });
-+    }
-+  }
-+
-+  Future<void> _loadLogSize() async {
-+    final size = await FileLogger.getLogSize();
-+    if (mounted) {
-+      setState(() {
-+        _logSize = size;
-+      });
-+    }
-+  }
-+
-+  Future<void> _loadDebugLoggingToggle() async {
-+    final prefs = await SharedPreferences.getInstance();
-+    if (mounted) {
-+      setState(() {
-+        _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
-+      });
-+    }
-+  }
-+
-+  Future<void> _loadForcePublicToggle() async {
-+    final prefs = await SharedPreferences.getInstance();
-+    if (mounted) {
-+      setState(() {
-+        _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
-+      });
-+    }
-+  }
-+
-+  Future<void> _loadManualReadToggle() async {
-+    final prefs = await SharedPreferences.getInstance();
-+    if (mounted) {
-+      setState(() {
-+        _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
 +      });
 +    }
 +  }
@@ -346414,15 +346387,6 @@ index 0000000..ab0d382
 +    if (mounted) {
 +      setState(() {
 +        _manualReadReceipts = value;
-+      });
-+    }
-+  }
-+
-+  Future<void> _loadJumpBannerToggle() async {
-+    final prefs = await SharedPreferences.getInstance();
-+    if (mounted) {
-+      setState(() {
-+        _showJumpBanner = prefs.getBool('beeper_show_jump_banner') ?? true;
 +      });
 +    }
 +  }
@@ -346492,7 +346456,7 @@ index 0000000..ab0d382
 +  List<String>? _tagsList;
 +
 +  void _computeNetworksAndTags(Client client) {
-+    if (_networksList != null) return;
++    if (_networksList != null && _tagsList != null) return;
 +    final beeperNetworks = <String, BeeperNetwork>{};
 +    final customTags = <String>{};
 +    for (final r in client.rooms) {
@@ -346507,20 +346471,22 @@ index 0000000..ab0d382
 +      }
 +    }
 +
-+    _networksList = beeperNetworks.values.toList()
-+      ..sort((a, b) => a.name.compareTo(b.name));
-+    _tagsList = customTags.toList()..sort();
++    if (mounted) {
++      setState(() {
++        _networksList = beeperNetworks.values.toList()
++          ..sort((a, b) => a.name.compareTo(b.name));
++        _tagsList = customTags.toList()..sort();
++      });
++    }
 +  }
 +
 +  @override
 +  Widget build(BuildContext context) {
 +    final client = Matrix.of(context).client;
-+    final store = Matrix.of(context).store;
 +    final theme = Theme.of(context);
 +
-+    _computeNetworksAndTags(client);
-+    final networksList = _networksList!;
-+    final tagsList = _tagsList!;
++    final networksList = _networksList ?? const [];
++    final tagsList = _tagsList ?? const [];
 +
 +
 +
