@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..09fc187 100644
+index 7470749..bed773e 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1780 @@
+@@ -1,1643 +1,1803 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305505,9 +305505,11 @@ index 7470749..09fc187 100644
 +    if (!force && _scrolledUp) return;
 +    if (!force && scrollUpBannerEventId != null) return;
 +
-+    if (eventId == null &&
++    if (!force &&
++        eventId == null &&
 +        !room.hasNewMessages &&
-+        room.notificationCount == 0) {
++        room.notificationCount == 0 &&
++        !room.markedUnread) {
 +      return;
 +    }
 +
@@ -305516,16 +305518,29 @@ index 7470749..09fc187 100644
 +      return;
 +    }
 +
-+    final targetId = eventId ?? room.lastEvent?.eventId;
++    final targetId = eventId ?? room.lastEvent?.eventId ?? timeline?.events.firstOrNull?.eventId;
++
++    if (force || eventId != null) {
++      scrollUpBannerEventId = null;
++      if (room.markedUnread) {
++        room.markUnread(false);
++      }
++      room.notificationCount = 0;
++      room.highlightCount = 0;
++    }
 +
 +    // Clear local readMarkerEventId immediately so UI button vanishes
-+    // Guard: only assign if the field has already been initialized
 +    try {
 +      if (force || eventId != null) {
 +        readMarkerEventId = '';
 +      }
 +    } catch (_) {
 +      // readMarkerEventId not yet initialized — skip
++    }
++
++    if (targetId == null) {
++      if (force && mounted) setState(() {});
++      return;
 +    }
 +
 +    final timeline = this.timeline;
@@ -305536,11 +305551,19 @@ index 7470749..09fc187 100644
 +                eventId: targetId,
 +                public: AppSettings.sendPublicReadReceipts.value,
 +              )
-+            : room.setReadMarker(targetId, mRead: targetId))
++            : room.setReadMarker(
++                targetId,
++                mRead: targetId,
++                public: AppSettings.sendPublicReadReceipts.value,
++              ))
 +        .then((_) {
 +      _setReadMarkerFuture = null;
-+      if (force && targetId != null) {
-+        room.setReadMarker(targetId, mRead: targetId);
++      if (force || targetId != null) {
++        room.setReadMarker(
++          targetId,
++          mRead: targetId,
++          public: AppSettings.sendPublicReadReceipts.value,
++        );
 +      }
 +    }).catchError((e) {
 +      _setReadMarkerFuture = null;
@@ -347007,10 +347030,10 @@ index 0000000..43f7306
 +  }
 +}
 diff --git a/lib/pages/settings/settings.dart b/lib/pages/settings/settings.dart
-index c8909ee..27243ad 100644
+index c8909ee..534274b 100644
 --- a/lib/pages/settings/settings.dart
 +++ b/lib/pages/settings/settings.dart
-@@ -1,221 +1,224 @@
+@@ -1,221 +1,235 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -347444,13 +347467,24 @@ index c8909ee..27243ad 100644
 +    checkBootstrap();
 +  }
 +
++  @override
++  void initState() {
++    super.initState();
++    WidgetsBinding.instance.addPostFrameCallback((_) {
++      if (mounted) {
++        final client = Matrix.of(context).client;
++        setState(() {
++          profileFuture = client.getProfileFromUserId(client.userID!);
++          authMetadataFuture = client.getAuthMetadata();
++        });
++      }
++    });
++  }
++
 +  Future<dynamic>? authMetadataFuture;
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    final client = Matrix.of(context).client;
-+    profileFuture ??= client.getProfileFromUserId(client.userID!);
-+    authMetadataFuture ??= client.getAuthMetadata();
 +    return SettingsView(this);
 +  }
 +}
