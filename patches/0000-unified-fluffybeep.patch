@@ -302336,7 +302336,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..c5c519ae91c9632e4ba806845f0c3a1084b09375 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..b1434b47a796733c3c55bec1067a243009e0d523 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -1,1643 +1,1873 @@
@@ -304697,7 +304697,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..c5c519ae91c9632e4ba806845f0c3a10
 +    }
 +
 +    final currentTimeline = timeline;
-+    final targetId = eventId ?? room.lastEvent?.eventId ?? currentTimeline?.events.firstOrNull?.eventId;
++    final targetId = eventId ?? currentTimeline?.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
 +
 +    if (force || eventId != null) {
 +      scrollUpBannerEventId = null;
@@ -306512,10 +306512,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..a92c641baf6a0f65358eb13cc47c4355eff073b1 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..b5ae8ce3134125bd3e0ddd1abb2266053538a5ca 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,243 @@
+@@ -1,253 +1,264 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -306857,6 +306857,27 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a92c641baf6a0f65358eb13cc47c4355
 +                  children: [
 +                    if (events.isNotEmpty) SeenByRow(event: events.first),
 +                    TypingIndicators(controller),
++                    if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
++                        (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_bottom') ?? true))
++                      Padding(
++                        padding: const EdgeInsets.symmetric(vertical: 8.0),
++                        child: TextButton.icon(
++                          style: TextButton.styleFrom(
++                            backgroundColor: theme.colorScheme.primaryContainer,
++                            foregroundColor: theme.colorScheme.onPrimaryContainer,
++                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++                            shape: RoundedRectangleBorder(
++                              borderRadius: BorderRadius.circular(16),
++                            ),
++                          ),
++                          onPressed: () => controller.setReadMarker(force: true),
++                          icon: const Icon(Icons.done_all, size: 16),
++                          label: Text(
++                            L10n.of(context).markAsRead,
++                            style: const TextStyle(fontWeight: FontWeight.w600),
++                          ),
++                        ),
++                      ),
 +                    EncryptionInfo(room: controller.room, controller: controller),
 +                  ],
 +                );
@@ -307013,10 +307034,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a92c641baf6a0f65358eb13cc47c4355
 +  }
 +}
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..494f9a29ae41b2129aa2af5b467cf4e2b46721c8 100644
+index 879717fa9889be421184b768e20bad7417f95114..ff4e15a1bbfbced9f66e1c4f9fb6021758054ca6 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
-@@ -1,452 +1,484 @@
+@@ -1,452 +1,502 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307812,6 +307833,24 @@ index 879717fa9889be421184b768e20bad7417f95114..494f9a29ae41b2129aa2af5b467cf4e2
 +                      ),
 +                    ),
 +                  ),
++                  if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
++                      (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_input_bar') ?? true))
++                    Padding(
++                      padding: const EdgeInsets.only(right: 4.0),
++                      child: SizedBox(
++                        height: height,
++                        width: height,
++                        child: IconButton(
++                          tooltip: L10n.of(context).markAsRead,
++                          onPressed: () => controller.setReadMarker(force: true),
++                          style: IconButton.styleFrom(
++                            backgroundColor: theme.colorScheme.primaryContainer,
++                            foregroundColor: theme.colorScheme.onPrimaryContainer,
++                          ),
++                          icon: const Icon(Icons.done_all, size: 20),
++                        ),
++                      ),
++                    ),
 +                  Container(
 +                    height: height,
 +                    width: height,
@@ -313110,7 +313149,7 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b285d3ff17843ed7075749aaf3943de5a8..be684a7fdc7436887c322690a5265b1d43945231 100644
+index 930de3b285d3ff17843ed7075749aaf3943de5a8..2be290c6c59c2607a88f677e7d2f1584d94a868e 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -1,968 +1,1065 @@
@@ -314987,7 +315026,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..be684a7fdc7436887c322690a5265b1d
 +                        style: const TextStyle(fontSize: 11),
 +                      ),
 +                    ),
-+                    if (onMarkRead != null) ...[
++                    if (onMarkRead != null && (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_banner') ?? true)) ...[
 +                      const SizedBox(width: 4),
 +                      InkWell(
 +                        onTap: onMarkRead,
@@ -325672,7 +325711,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc446300231cac3 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..70ffdf09e39b5504189a5a90c035f371405107bf 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -1,1041 +1,1321 @@
@@ -327572,7 +327611,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc44630
 +              if (room.markedUnread) {
 +                await room.markUnread(false);
 +              }
-+              final lastEventId = room.lastEvent?.eventId;
++              final lastEventId = room.timeline.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
 +              await room.setReadMarker(
 +                lastEventId,
 +                mRead: lastEventId,
@@ -345576,10 +345615,10 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..43f7306b31c706e5576fb6608f37b6441df2baee
+index 0000000000000000000000000000000000000000..2a1f62a2bc61c2289ac228a48269350d0f031111
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,696 @@
+@@ -0,0 +1,762 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -345611,6 +345650,9 @@ index 0000000000000000000000000000000000000000..43f7306b31c706e5576fb6608f37b644
 +  bool _debugLoggingEnabled = false;
 +  bool _forcePublicPushGateway = false;
 +  bool _manualReadReceipts = false;
++  bool _manualReadShowBanner = true;
++  bool _manualReadShowBottom = true;
++  bool _manualReadShowInputBar = true;
 +  bool _showJumpBanner = true;
 +  List<Pusher>? _pushers;
 +  bool _loadingPushers = false;
@@ -345631,6 +345673,9 @@ index 0000000000000000000000000000000000000000..43f7306b31c706e5576fb6608f37b644
 +      _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
 +      _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
 +      _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
++      _manualReadShowBanner = prefs.getBool('beeper_manual_read_show_banner') ?? true;
++      _manualReadShowBottom = prefs.getBool('beeper_manual_read_show_bottom') ?? true;
++      _manualReadShowInputBar = prefs.getBool('beeper_manual_read_show_input_bar') ?? true;
 +      _showJumpBanner = prefs.getBool('beeper_show_jump_banner') ?? true;
 +    });
 +  }
@@ -345666,6 +345711,36 @@ index 0000000000000000000000000000000000000000..43f7306b31c706e5576fb6608f37b644
 +    if (mounted) {
 +      setState(() {
 +        _manualReadReceipts = value;
++      });
++    }
++  }
++
++  Future<void> _setManualReadShowBanner(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_manual_read_show_banner', value);
++    if (mounted) {
++      setState(() {
++        _manualReadShowBanner = value;
++      });
++    }
++  }
++
++  Future<void> _setManualReadShowBottom(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_manual_read_show_bottom', value);
++    if (mounted) {
++      setState(() {
++        _manualReadShowBottom = value;
++      });
++    }
++  }
++
++  Future<void> _setManualReadShowInputBar(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_manual_read_show_input_bar', value);
++    if (mounted) {
++      setState(() {
++        _manualReadShowInputBar = value;
 +      });
 +    }
 +  }
@@ -345834,6 +345909,36 @@ index 0000000000000000000000000000000000000000..43f7306b31c706e5576fb6608f37b644
 +            value: _manualReadReceipts,
 +            onChanged: _setManualReadReceipts,
 +          ),
++          if (_manualReadReceipts) ...[
++            Padding(
++              padding: const EdgeInsets.only(left: 24.0),
++              child: Column(
++                children: [
++                  SwitchListTile.adaptive(
++                    secondary: const Icon(Icons.short_text_outlined),
++                    title: const Text('En el separador "Leer hasta aquí"'),
++                    subtitle: const Text('Muestra el botón junto al divisor de mensajes no leídos.'),
++                    value: _manualReadShowBanner,
++                    onChanged: _setManualReadShowBanner,
++                  ),
++                  SwitchListTile.adaptive(
++                    secondary: const Icon(Icons.vertical_align_bottom_outlined),
++                    title: const Text('Al fondo del chat'),
++                    subtitle: const Text('Muestra un botón al final de los mensajes del chat.'),
++                    value: _manualReadShowBottom,
++                    onChanged: _setManualReadShowBottom,
++                  ),
++                  SwitchListTile.adaptive(
++                    secondary: const Icon(Icons.mic_none_outlined),
++                    title: const Text('A la izquierda del micrófono'),
++                    subtitle: const Text('Muestra un botón junto al botón de enviar / nota de voz.'),
++                    value: _manualReadShowInputBar,
++                    onChanged: _setManualReadShowInputBar,
++                  ),
++                ],
++              ),
++            ),
++          ],
 +          SwitchListTile.adaptive(
 +            secondary: const Icon(Icons.vertical_align_top_outlined),
 +            title: const Text('Mostrar banner "Saltar al último leído"'),
