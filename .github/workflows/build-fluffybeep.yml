@@ -27,7 +27,6 @@ jobs:
         with:
           repository: 'krille-chan/fluffychat'
           ref: '259bc72fb897e99303058712fcdfaee033bd4d33'
-          submodules: recursive
           path: 'fluffychat'
 
       - name: ⚙️ Setup Java 17
@@ -68,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fluffybeep-release-apk
-          path: fluffychat/build/app/outputs/flutter-apk/app-release.apk
+          path: fluffychat/build/app/outputs/flutter-apk/*.apk
           retention-days: 7
 
       - name: 🧹 Remove Fluffychat Git Context
@@ -90,7 +89,8 @@ jobs:
             - **Room Name Correction**: Fixes bridged direct messages (WhatsApp, Telegram, etc.) showing as "Grupo con [Nombre]" to display only the contact name.
             - **Beeper Re-sync**: Added a cache-clearing button in Settings to purge room metadata, profiles, and avatares safely.
             - **Reproducible Signatures**: Signed with a permanent keystore key to allow updating the app without reinstalling.
-          files: fluffychat/build/app/outputs/flutter-apk/app-release.apk
+          files: fluffychat/build/app/outputs/flutter-apk/*.apk
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
           make_latest: true
