@@ -57,7 +57,7 @@ apply_patches() {
         
         # Try git apply first (more robust with new files and line endings)
         # --whitespace=warn tolerates trailing whitespace without failing
-        (cd "$FLUFFYCHAT_DIR" && git apply --whitespace=warn "$patch_file") || {
+        (cd "$FLUFFYCHAT_DIR" && git apply --ignore-space-change --ignore-whitespace --whitespace=nowarn "$patch_file") || {
             log_warn "git apply failed, falling back to patch utility..."
             cat "$patch_file" | tr -d '\r' | patch -p1 -N -d "$FLUFFYCHAT_DIR" || {
                 log_error "Failed to apply patch $patch_file"
