@@ -32,7 +32,7 @@ jobs:
       - name: ⚙️ Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
       - name: 🐦 Setup Flutter
@@ -40,7 +40,6 @@ jobs:
         with:
           channel: 'stable'
           cache: true
-          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
 
       - name: 🩹 Apply Fluffybeep Patches
         run: |
