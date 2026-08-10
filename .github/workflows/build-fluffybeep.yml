@@ -80,6 +80,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v1.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
           name: "Fluffybeep v1.0.${{ github.run_number }} - Beeper Patches"
           body: |
             ### Initial Release & Beeper Enhancements
