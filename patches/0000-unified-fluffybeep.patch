@@ -340287,10 +340287,10 @@ index defc9a466269fe7558dea21aa6dc278e53560d3a..32c1df4b66c06e3db062c856d5e3e6d4
 +  }
 +}
 diff --git a/lib/pages/image_viewer/video_player.dart b/lib/pages/image_viewer/video_player.dart
-index 33bb42678f600a7503fe47d58fe5b433ec48abac..36b10803b5cec0e71fba15e52e6e967a280b7585 100644
+index 33bb42678f600a7503fe47d58fe5b433ec48abac..45acd482640243637ad1365abf92c27f004aff93 100644
 --- a/lib/pages/image_viewer/video_player.dart
 +++ b/lib/pages/image_viewer/video_player.dart
-@@ -1,190 +1,190 @@
+@@ -1,190 +1,204 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -340535,6 +340535,7 @@ index 33bb42678f600a7503fe47d58fe5b433ec48abac..36b10803b5cec0e71fba15e52e6e967a
 +        onDownloadProgress: fileSize == null
 +            ? null
 +            : (progress) {
++                if (!mounted) return;
 +                final progressPercentage = progress / fileSize;
 +                setState(() {
 +                  _downloadProgress = progressPercentage < 1
@@ -340543,6 +340544,8 @@ index 33bb42678f600a7503fe47d58fe5b433ec48abac..36b10803b5cec0e71fba15e52e6e967a
 +                });
 +              },
 +      );
++
++      if (!mounted) return;
 +
 +      // Dispose the controllers if we already have them.
 +      _disposeControllers();
@@ -340564,9 +340567,20 @@ index 33bb42678f600a7503fe47d58fe5b433ec48abac..36b10803b5cec0e71fba15e52e6e967a
 +        }
 +        videoPlayerController = VideoPlayerController.file(file);
 +      }
++
++      if (!mounted) {
++        await videoPlayerController.dispose();
++        return;
++      }
++
 +      _videoPlayerController = videoPlayerController;
 +
 +      await videoPlayerController.initialize();
++
++      if (!mounted) {
++        _disposeControllers();
++        return;
++      }
 +
 +      // Create a ChewieController on top.
 +      setState(() {
