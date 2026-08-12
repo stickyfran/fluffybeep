@@ -302336,10 +302336,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..63f2798cb8b15edcea5433a6965bbdd123ac18d0 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..e714d1403f673a7f15cb370dca74c33561b09440 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1875 @@
+@@ -1,1643 +1,1874 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304610,9 +304610,8 @@ index 74707498c32bda411d06d6c9c086f390f3401135..63f2798cb8b15edcea5433a6965bbdd1
 +    await matrix.client.roomsLoading;
 +    await matrix.client.accountDataLoading;
 +
-+    // OPTIMIZATION: Defer timeline loading until after the 300ms screen transition
-+    // animation completes smoothly without dropping frames due to heavy synchronous build.
-+    await Future.delayed(const Duration(milliseconds: 320));
++    // Defer timeline loading slightly to ensure screen transition animation completes smoothly.
++    await Future.delayed(const Duration(milliseconds: 60));
 +
 +    if (eventContextId != null &&
 +        (!eventContextId.isValidMatrixIdStrict() ||
