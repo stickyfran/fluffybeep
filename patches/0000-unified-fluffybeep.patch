@@ -315160,10 +315160,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..b9cc17fefc7bb17ca3095d92d803b69b
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c85f9af2d 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..866c55635b27a9ba14d7befcabef20a3af2de0a8 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,445 @@
+@@ -1,324 +1,446 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315661,13 +315661,14 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c
 +                );
 +              });
 +            }
++            final theme = Theme.of(context);
 +            return Container(
 +              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
 +              padding: const EdgeInsets.all(12),
 +              decoration: BoxDecoration(
-+                color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.2),
++                color: theme.colorScheme.errorContainer.withOpacity(0.2),
 +                border: Border.all(
-+                  color: Theme.of(context).colorScheme.error.withOpacity(0.4),
++                  color: theme.colorScheme.error.withOpacity(0.4),
 +                  width: 1,
 +                ),
 +                borderRadius: borderRadius,
@@ -315680,7 +315681,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c
 +                    children: [
 +                      Icon(
 +                        Icons.lock_open_outlined,
-+                        color: Theme.of(context).colorScheme.error,
++                        color: theme.colorScheme.error,
 +                        size: 20,
 +                      ),
 +                      const SizedBox(width: 8),
@@ -315689,7 +315690,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c
 +                          L10n.of(context).couldNotDecryptMessage(''),
 +                          style: TextStyle(
 +                            fontWeight: FontWeight.bold,
-+                            color: Theme.of(context).colorScheme.onErrorContainer,
++                            color: theme.colorScheme.onErrorContainer,
 +                          ),
 +                        ),
 +                      ),
@@ -315700,7 +315701,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a2d856367a97808b37e4e9a95694b99c
 +                    event.body,
 +                    style: TextStyle(
 +                      fontSize: 13,
-+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
++                      color: theme.colorScheme.onSurfaceVariant,
 +                    ),
 +                  ),
 +                  if (hasKeys) ...[
@@ -376261,7 +376262,7 @@ index 460cd78d218503d4369139851257455880ab4afc..cad75f8fcb928cc3c9ba2f70c73bf4de
 +  report,
 +}
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index f9b2df0c708eb9f5b06587e56714428b2e75bc65..479718907d312f728d8e277ea28aaa18c05f299d 100644
+index f9b2df0c708eb9f5b06587e56714428b2e75bc65..196241761fbd65ead70bd3ed9af64c338fdb96a2 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
 @@ -1,223 +1,310 @@
@@ -376714,7 +376715,7 @@ index f9b2df0c708eb9f5b06587e56714428b2e75bc65..479718907d312f728d8e277ea28aaa18
 +    super.didUpdateWidget(oldWidget);
 +    if (widget.uri != oldWidget.uri ||
 +        widget.cacheKey != oldWidget.cacheKey ||
-+        widget.event != oldWidget.event) {
++        widget.event?.eventId != oldWidget.event?.eventId) {
 +      _localImageData = null;
 +      _retryCount = 0;
 +      if (_imageData == null) {
