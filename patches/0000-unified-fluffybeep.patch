@@ -300864,7 +300864,7 @@ index aa51259..85138ca 100644
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index 10f0246..fc17604 100644
+index 10f0246..87d8f95 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
 @@ -1,157 +1,171 @@
@@ -301089,9 +301089,9 @@ index 10f0246..fc17604 100644
 +  }
 +
 +  PaintingBinding.instance.imageCache.maximumSizeBytes = PlatformInfos.isMobile
-+      ? 40 * 1024 * 1024  // 40 MB for mobile
-+      : 80 * 1024 * 1024; // 80 MB for desktop/web
-+  PaintingBinding.instance.imageCache.maximumSize = 300;
++      ? 150 * 1024 * 1024  // 150 MB for mobile
++      : 250 * 1024 * 1024; // 250 MB for desktop/web
++  PaintingBinding.instance.imageCache.maximumSize = 1000;
 +
 +  final store = await AppSettings.init();
 +  Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
@@ -375298,10 +375298,10 @@ index 90aadb6..13d31c0 100644
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68..92c3e23 100644
+index 934de68..670de62 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,487 @@
+@@ -1,443 +1,488 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -376159,7 +376159,8 @@ index 934de68..92c3e23 100644
 +      }
 +    }
 +    if (state == AppLifecycleState.paused) {
-+      MxcImage.trimAllCaches();
++      // Beeper patch: Don't trim cache on background to avoid UI jank on resume
++      // MxcImage.trimAllCaches();
 +    }
 +  }
 +
