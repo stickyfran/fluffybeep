@@ -27,6 +27,7 @@ jobs:
         with:
           repository: 'krille-chan/fluffychat'
           ref: '259bc72fb897e99303058712fcdfaee033bd4d33'
+          fetch-depth: 0
           path: 'fluffychat'
 
       - name: ⚙️ Setup Java 17
