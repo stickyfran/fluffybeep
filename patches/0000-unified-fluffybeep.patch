@@ -303199,10 +303199,10 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..b1434b4 100644
+index 7470749..63f2798 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1873 @@
+@@ -1,1643 +1,1875 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305721,11 +305721,13 @@ index 7470749..b1434b4 100644
 +    // Scroll to the very bottom so own message is always visible
 +    WidgetsBinding.instance.addPostFrameCallback((_) {
 +      if (mounted && scrollController.hasClients) {
-+        scrollController.animateTo(
-+          0.0,
-+          duration: const Duration(milliseconds: 200),
-+          curve: Curves.easeOut,
-+        );
++        if (scrollController.offset > 20.0) {
++          scrollController.animateTo(
++            0.0,
++            duration: const Duration(milliseconds: 150),
++            curve: Curves.easeOut,
++          );
++        }
 +      }
 +    });
 +  }
@@ -307375,10 +307377,10 @@ index 76cf1aa..09288f6 100644
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f82..e6ac0a2 100644
+index 0022f82..bc35104 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,265 @@
+@@ -1,253 +1,269 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307757,7 +307759,11 @@ index 0022f82..e6ac0a2 100644
 +                  builder: (context) {
 +                    if (events.length > 0 && !timeline.isRequestingHistory) {
 +                      WidgetsBinding.instance.addPostFrameCallback((_) {
-+                        if (timeline.canRequestHistory && !timeline.isRequestingHistory) {
++                        if (timeline.canRequestHistory &&
++                            !timeline.isRequestingHistory &&
++                            controller.scrollController.hasClients &&
++                            controller.scrollController.position.pixels >=
++                                controller.scrollController.position.maxScrollExtent - 200) {
 +                          controller.requestHistory();
 +                        }
 +                      });
