@@ -23,10 +23,11 @@ jobs:
           fetch-depth: 0
 
       - name: 🛎️ Checkout Fluffychat (Official Repo)
-        run: |
-          git clone https://github.com/krille-chan/fluffychat.git fluffychat
-          cd fluffychat
-          git checkout 259bc72fb897e99303058712fcdfaee033bd4d33
+        uses: actions/checkout@v4
+        with:
+          repository: 'krille-chan/fluffychat'
+          ref: '259bc72fb897e99303058712fcdfaee033bd4d33'
+          path: 'fluffychat'
 
       - name: ⚙️ Setup Java 17
         uses: actions/setup-java@v4
