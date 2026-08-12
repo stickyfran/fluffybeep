@@ -23,12 +23,10 @@ jobs:
           fetch-depth: 0
 
       - name: 🛎️ Checkout Fluffychat (Official Repo)
-        uses: actions/checkout@v4
-        with:
-          repository: 'krille-chan/fluffychat'
-          ref: '259bc72fb897e99303058712fcdfaee033bd4d33'
-          fetch-depth: 0
-          path: 'fluffychat'
+        run: |
+          git clone https://github.com/krille-chan/fluffychat.git fluffychat
+          cd fluffychat
+          git checkout 259bc72fb897e99303058712fcdfaee033bd4d33
 
       - name: ⚙️ Setup Java 17
         uses: actions/setup-java@v4
@@ -82,9 +80,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: v1.0.${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}.${{ github.run_attempt }}
           target_commitish: main
-          name: "Fluffybeep v1.0.${{ github.run_number }} - Beeper Patches"
+          name: "Fluffybeep v1.0.${{ github.run_number }}.${{ github.run_attempt }} - Beeper Patches"
           body: |
             ### Initial Release & Beeper Enhancements
             This release contains the custom compiled APK for Fluffychat with native Beeper bridge support.
