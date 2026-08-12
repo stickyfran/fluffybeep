@@ -43,6 +43,8 @@ jobs:
 
       - name: 🩹 Apply Fluffybeep Patches
         run: |
+          git config --global user.email "fluffybeep@beeper.local"
+          git config --global user.name "FluffyBeep Bot"
           cp -r patches fluffychat/patches
           cd fluffychat
           chmod +x ./patches/patch-manager.sh
@@ -80,7 +82,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v1.0.${{ github.run_number }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: main
           name: "Fluffybeep v1.0.${{ github.run_number }} - Beeper Patches"
           body: |
             ### Initial Release & Beeper Enhancements
