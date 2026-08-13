@@ -311101,7 +311101,7 @@ index 8be7092de0445a69687123b1a85b914ce30a3797..1a8ea1140e9a39ff1ea6f82319f0046b
 +  }
 +}
 diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
-index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..e938fbc06772c0f6c340604b1ac703b9c4446e96 100644
+index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..a8e6ab1d8702028e73dcc406e49905a17aec1500 100644
 --- a/lib/pages/chat/events/html_message.dart
 +++ b/lib/pages/chat/events/html_message.dart
 @@ -1,743 +1,826 @@
@@ -311903,8 +311903,8 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..e938fbc06772c0f6c340604b1ac703b9
 +  dom.Element? _cachedElement;
 +
 +  void _buildSpan(BuildContext context) {
-+    _cachedElement = widget._parseHtml(widget.html);
-+    _cachedSpan = widget._renderHtml(_cachedElement!, context);
++    _cachedElement = _parseHtml(widget.html);
++    _cachedSpan = _renderHtml(_cachedElement!, context);
 +  }
 +
 +  @override
