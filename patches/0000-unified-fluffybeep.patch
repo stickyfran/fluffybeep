@@ -302346,10 +302346,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..df28ef8489e4f784d722a948aa6fa967816e91f7 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..4b888085fdb43561ecc37e71f8249034ce8285cd 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1883 @@
+@@ -1,1643 +1,1884 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304019,6 +304019,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..df28ef8489e4f784d722a948aa6fa967
 +import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/error_reporter.dart';
++import 'package:fluffychat/utils/file_logger.dart';
 +import 'package:fluffychat/utils/file_selector.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
@@ -306532,10 +306533,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..26a53e14b7834bb2d07df69065c45a2ee96b564c 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..a2eac2bacb1e3c933e3cefeb50c9a3b711336a50 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,272 @@
+@@ -1,253 +1,273 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -306806,6 +306807,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..26a53e14b7834bb2d07df69065c45a2e
 +import 'package:fluffychat/utils/account_config.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
++import 'package:fluffychat/utils/file_logger.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/cupertino.dart';
 +import 'package:flutter/material.dart';
@@ -308022,10 +308024,10 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..17ce138d4754c8dee97d13b6fb046798f6c9879d 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..10829983a5e411571cfe4b81c7c17a36d0aa3f28 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,526 @@
+@@ -1,464 +1,528 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -308510,6 +308512,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..17ce138d4754c8dee97d13b6fb046798
 +import 'package:fluffychat/utils/account_config.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/localized_exception_extension.dart';
++import 'package:fluffychat/utils/file_logger.dart';
++import 'package:fluffychat/utils/performance_logger.dart';
 +import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
@@ -328197,10 +328201,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..dedbb43d6773a1427dadc05991f4919f76369fa1 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..25be1fbe498ca0fbcfad3fb7b97cb4441b104c24 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,450 @@
+@@ -1,338 +1,452 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328556,6 +328560,8 @@ index 8610b92531be84898e03439fa07f16145a6d552c..dedbb43d6773a1427dadc05991f4919f
 +import 'package:fluffychat/pages/chat_list/search_title.dart';
 +import 'package:fluffychat/pages/chat_list/space_view.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/file_logger.dart';
++import 'package:fluffychat/utils/performance_logger.dart';
 +import 'package:fluffychat/utils/stream_extension.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
