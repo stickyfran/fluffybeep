@@ -300009,10 +300009,10 @@ index aa51259e072ea5d172b70d8f7eb7dd5ad6c6ea49..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..87d8f9586027bcfe7990fa4f8f7abccbf0ab90a7 100644
+index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..cb0bb4cf291bc15d3716812715a588afb381edd8 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,157 +1,171 @@
+@@ -1,157 +1,173 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300194,6 +300194,7 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..87d8f9586027bcfe7990fa4f8f7abccb
 +
 +import 'config/setting_keys.dart';
 +import 'utils/background_push.dart';
++import 'utils/file_logger.dart';
 +import 'utils/performance_logger.dart';
 +import 'widgets/fluffy_chat_app.dart';
 +
@@ -300205,6 +300206,7 @@ index 10f0246209fb192fdf9cc76b4e1b34150f6a24a4..87d8f9586027bcfe7990fa4f8f7abccb
 +
 +void main(List<String> args) async {
 +  WidgetsFlutterBinding.ensureInitialized();
++  await FileLogger.checkEnabledAsync();
 +  PerformanceLogger.init();
 +  isIntegrationTest = args.singleOrNull == 'integration_test';
 +  if (PlatformInfos.isAndroid) {
@@ -302344,10 +302346,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..36302b194cddbd411e07e870bd849bcf9a173ecf 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..df28ef8489e4f784d722a948aa6fa967816e91f7 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1881 @@
+@@ -1,1643 +1,1883 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304500,6 +304502,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..36302b194cddbd411e07e870bd849bcf
 +
 +  void updateView() {
 +    if (!mounted || _updateViewScheduled) return;
++    FileLogger.log('[BACKEND_TIMELINE] updateView triggered for room ${room.id} (events=${timeline?.events.length})');
 +    _updateViewScheduled = true;
 +    SchedulerBinding.instance.addPostFrameCallback((_) {
 +      _updateViewScheduled = false;
@@ -305674,6 +305677,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..36302b194cddbd411e07e870bd849bcf
 +  }
 +
 +  void onInputBarChanged(String text) {
++    FileLogger.log('[USER_INPUT_TEXT] Input changed (len=${text.length}): "${text.length > 25 ? '${text.substring(0, 25)}...' : text}"');
 +    if (_inputTextIsEmpty != text.isEmpty) {
 +      setState(() {
 +        _inputTextIsEmpty = text.isEmpty;
@@ -306528,10 +306532,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..3659b7015c41ec96cd5e9979cc59d17b8b714835 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..26a53e14b7834bb2d07df69065c45a2ee96b564c 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,271 @@
+@@ -1,253 +1,272 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -306819,6 +306823,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..3659b7015c41ec96cd5e9979cc59d17b
 +
 +  @override
 +  Widget build(BuildContext context) {
++    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (events=${controller.filteredEvents.length}, room=${controller.room.id})');
 +    final timeline = controller.timeline;
 +
 +    if (timeline == null) {
@@ -308017,10 +308022,10 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..0691ad1b7469882c8f563fa6465ed82876449db4 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..17ce138d4754c8dee97d13b6fb046798f6c9879d 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,525 @@
+@@ -1,464 +1,526 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -308526,6 +308531,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..0691ad1b7469882c8f563fa6465ed828
 +
 +  @override
 +  Widget build(BuildContext context) {
++    FileLogger.log('[FRONTEND_BUILD] ChatView.build (roomId=${controller.room.id}, route=${PerformanceLoggerObserver.currentRoute})');
 +    final theme = Theme.of(context);
 +    if (controller.room.membership == Membership.invite) {
 +      showFutureLoadingDialog(
@@ -328191,10 +328197,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..d5e9396edd14e28cc885f9eb6814b97406bb087c 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..dedbb43d6773a1427dadc05991f4919f76369fa1 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,449 @@
+@@ -1,338 +1,450 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328576,6 +328582,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..d5e9396edd14e28cc885f9eb6814b974
 +  @override
 +  Widget build(BuildContext context) {
 +    super.build(context);
++    FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
 +    final theme = Theme.of(context);
 +
 +    final client = Matrix.of(context).client;
@@ -345738,10 +345745,10 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..706cce28f535797fcc2215722fa4881934975db7
+index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64a1ee86eb
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,757 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -345876,6 +345883,10 @@ index 0000000000000000000000000000000000000000..706cce28f535797fcc2215722fa48819
 +  Future<void> _setDebugLoggingEnabled(bool value) async {
 +    final prefs = await SharedPreferences.getInstance();
 +    await prefs.setBool('beeper_debug_logging_enabled', value);
++    FileLogger.setEnabled(value);
++    if (value) {
++      FileLogger.log('[PERF_LOGGING] Ultra debug logging enabled by user in settings.');
++    }
 +    if (mounted) {
 +      setState(() {
 +        _debugLoggingEnabled = value;
@@ -360446,18 +360457,44 @@ index 68f9067624eb3c1ca2351f4fe83266db784faac0..89cace500ff1317ba173766b45dd0c4b
 +}
 diff --git a/lib/utils/file_logger.dart b/lib/utils/file_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..a18ce97e147a3d812a5db0fce161376b08b400e0
+index 0000000000000000000000000000000000000000..5ae34d34e598b0b59ecb5775d75728de2754e6fb
 --- /dev/null
 +++ b/lib/utils/file_logger.dart
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,131 @@
 +import 'dart:io';
 +import 'dart:async';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:path_provider/path_provider.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +
 +class FileLogger {
 +  static String? _logFilePath;
-+  static Future<void> _lock = Future.value();
++  static bool? _enabledCache;
++  static final List<String> _logQueue = [];
++  static Timer? _flushTimer;
++  static bool _isFlushing = false;
++
++  static bool isEnabled() {
++    if (_enabledCache != null) return _enabledCache!;
++    try {
++      if (BeeperBridgeUtils.prefs != null) {
++        _enabledCache = BeeperBridgeUtils.prefs!.getBool('beeper_debug_logging_enabled') ?? false;
++        return _enabledCache!;
++      }
++    } catch (_) {}
++    return false;
++  }
++
++  static void setEnabled(bool val) {
++    _enabledCache = val;
++  }
++
++  static Future<void> checkEnabledAsync() async {
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      _enabledCache = prefs.getBool('beeper_debug_logging_enabled') ?? false;
++    } catch (_) {}
++  }
 +
 +  static Future<String> _getLogFilePath() async {
 +    if (_logFilePath != null) return _logFilePath!;
@@ -360465,111 +360502,90 @@ index 0000000000000000000000000000000000000000..a18ce97e147a3d812a5db0fce161376b
 +      final directory = await getApplicationDocumentsDirectory();
 +      _logFilePath = '${directory.path}/fluffybeep_debug.txt';
 +    } catch (e) {
-+      // Fallback path in case path_provider is not fully initialized in background isolate
 +      _logFilePath = '/sdcard/Download/fluffybeep_debug.txt';
 +    }
 +    return _logFilePath!;
 +  }
 +
-+  static Future<void> log(String message) async {
-+    // Check debugging flag first before acquiring lock or performing disk I/O.
-+    // If SharedPreferences is not yet initialized or throws, we can print to stderr but bypass file I/O.
-+    bool enabled = false;
-+    try {
-+      final prefs = await SharedPreferences.getInstance();
-+      enabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
-+    } catch (_) {
-+      // SharedPreferences might fail to init in some isolates
++  static void log(String message) {
++    if (!isEnabled()) return;
++
++    final timestamp = DateTime.now().toIso8601String();
++    final formattedMessage = '[$timestamp] $message';
++
++    stderr.writeln(formattedMessage);
++    _logQueue.add(formattedMessage);
++
++    if (_logQueue.length >= 40) {
++      _flushQueue();
++    } else if (_flushTimer == null) {
++      _flushTimer = Timer(const Duration(milliseconds: 250), () {
++        _flushQueue();
++      });
 +    }
++  }
 +
-+    if (!enabled) {
-+      // Print to stderr even if disabled on disk, or just ignore. The prompt says "El logger solo debe escribir si esta variable es true".
-+      // We will only do print to stderr as a fallback or skip entirely. Let's print to stderr as per usual, but skip file write.
-+      stderr.writeln('[${DateTime.now().toIso8601String()}] FileLogger (disabled): $message');
-+      return;
-+    }
++  static Future<void> _flushQueue() async {
++    _flushTimer?.cancel();
++    _flushTimer = null;
 +
-+    final completer = Completer<void>();
-+    final previousLock = _lock;
-+    _lock = completer.future;
++    if (_logQueue.isEmpty || _isFlushing) return;
++    _isFlushing = true;
 +
-+    await previousLock;
++    final batch = List<String>.from(_logQueue);
++    _logQueue.clear();
 +
 +    try {
 +      final path = await _getLogFilePath();
 +      final file = File(path);
-+      
-+      // Auto-truncate log if it exceeds 10MB to protect storage & disk I/O performance
++
 +      if (await file.exists()) {
 +        final length = await file.length();
-+        if (length > 10 * 1024 * 1024) {
++        if (length > 15 * 1024 * 1024) {
 +          try {
 +            final lines = await file.readAsLines();
 +            final keepLines = lines.sublist(lines.length ~/ 2);
 +            await file.writeAsString(
-+              '[LOG_ROTATED] Log size exceeded 10MB. Truncated older entries.\n'
++              '[LOG_ROTATED] Log size exceeded 15MB. Truncated older entries.\n'
 +              '${keepLines.join('\n')}\n',
 +            );
 +          } catch (_) {}
 +        }
 +      }
 +
-+      final raf = await file.open(mode: FileMode.writeOnlyAppend);
-+      try {
-+        await raf.lock(FileLock.blockingExclusive);
-+        final timestamp = DateTime.now().toIso8601String();
-+        await raf.writeString('[$timestamp] $message\n');
-+        // Also print to stderr/stdout
-+        stderr.writeln('[$timestamp] FileLogger: $message');
-+      } finally {
-+        try {
-+          await raf.unlock();
-+        } catch (_) {}
-+        await raf.close();
-+      }
++      final textToAppend = '${batch.join('\n')}\n';
++      await file.writeAsString(textToAppend, mode: FileMode.writeOnlyAppend, flush: false);
 +    } catch (e) {
-+      // print to console if write fails
-+      stderr.writeln('FileLogger write failed: $e');
++      stderr.writeln('FileLogger flush failed: $e');
 +    } finally {
-+      completer.complete();
++      _isFlushing = false;
++      if (_logQueue.isNotEmpty) {
++        _flushQueue();
++      }
 +    }
 +  }
 +
 +  static Future<int> getLogSize() async {
-+    final completer = Completer<void>();
-+    final previousLock = _lock;
-+    _lock = completer.future;
-+
-+    await previousLock;
-+
++    await _flushQueue();
 +    try {
 +      final path = await _getLogFilePath();
 +      final file = File(path);
 +      if (await file.exists()) {
 +        return await file.length();
 +      }
-+    } catch (_) {} finally {
-+      completer.complete();
-+    }
++    } catch (_) {}
 +    return 0;
 +  }
 +
 +  static Future<void> clearLog() async {
-+    final completer = Completer<void>();
-+    final previousLock = _lock;
-+    _lock = completer.future;
-+
-+    await previousLock;
-+
++    _logQueue.clear();
 +    try {
 +      final path = await _getLogFilePath();
 +      final file = File(path);
 +      if (await file.exists()) {
 +        await file.delete();
 +      }
-+    } catch (_) {} finally {
-+      completer.complete();
-+    }
++    } catch (_) {}
 +  }
 +
 +  static Future<String> getLogPath() async {
@@ -364009,10 +364025,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4ff79bf050e7bb9514c051627b34a5eae040f590
+index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f189b2852
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,191 @@
+@@ -0,0 +1,216 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -364079,7 +364095,7 @@ index 0000000000000000000000000000000000000000..4ff79bf050e7bb9514c051627b34a5ea
 +    // 4. Monitor App Lifecycle & Background Battery/Resource Usage
 +    _setupLifecycleTracking();
 +
-+    // 5. Monitor Frame Timings (Jank / UI Freeze Detection with Route Context)
++    // 5. Monitor Frame Timings (Jank, Slow Frames & UI Freezes with Route Context)
 +    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
 +      for (final timing in timings) {
 +        final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
@@ -364098,18 +364114,43 @@ index 0000000000000000000000000000000000000000..4ff79bf050e7bb9514c051627b34a5ea
 +            '[PERF/JANK] Slow frame on "$route": Total=${totalMs.toStringAsFixed(1)}ms '
 +            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
 +          );
++        } else if (renderMs > 16.6) {
++          FileLogger.log(
++            '[PERF/SLOW_FRAME] Frame dropped on "$route": Total=${totalMs.toStringAsFixed(1)}ms '
++            '(Build=${buildMs.toStringAsFixed(1)}ms, Raster=${rasterMs.toStringAsFixed(1)}ms)',
++          );
 +        }
 +      }
 +    });
 +
-+    // 6. Capture Global Touch / User Interaction events
++    // 6. Capture Hardware Keyboard events
++    HardwareKeyboard.instance.addHandler((KeyEvent event) {
++      final keyName = event.logicalKey.debugName ?? event.logicalKey.keyLabel;
++      final charStr = event.character != null ? ' char="${event.character}"' : '';
++      FileLogger.log(
++        '[USER_KEYBOARD] ${event.runtimeType}: key="$keyName"$charStr on "${PerformanceLoggerObserver.currentRoute}"',
++      );
++      return false;
++    });
++
++    // 7. Capture Global Touch & Pointer Interaction events
++    DateTime? lastMoveLog;
 +    GestureBinding.instance.pointerRouter.addGlobalRoute((PointerEvent event) {
++      final route = PerformanceLoggerObserver.currentRoute;
 +      if (event is PointerDownEvent) {
++        FileLogger.log(
++          '[USER_TOUCH] Touch Down at (${event.position.dx.toStringAsFixed(0)}, ${event.position.dy.toStringAsFixed(0)}) on "$route"',
++        );
++      } else if (event is PointerUpEvent) {
++        FileLogger.log(
++          '[USER_TOUCH] Touch Up at (${event.position.dx.toStringAsFixed(0)}, ${event.position.dy.toStringAsFixed(0)}) on "$route"',
++        );
++      } else if (event is PointerMoveEvent) {
 +        final now = DateTime.now();
-+        if (_lastTouchLog == null || now.difference(_lastTouchLog!).inMilliseconds > 250) {
-+          _lastTouchLog = now;
++        if (lastMoveLog == null || now.difference(lastMoveLog!).inMilliseconds > 100) {
++          lastMoveLog = now;
 +          FileLogger.log(
-+            '[USER_ACTION] Touch Down at (${event.position.dx.toStringAsFixed(0)}, ${event.position.dy.toStringAsFixed(0)}) on "${PerformanceLoggerObserver.currentRoute}"',
++            '[USER_TOUCH] Touch Move at (${event.position.dx.toStringAsFixed(0)}, ${event.position.dy.toStringAsFixed(0)}) delta=(${event.delta.dx.toStringAsFixed(1)}, ${event.delta.dy.toStringAsFixed(1)}) on "$route"',
 +          );
 +        }
 +      }
