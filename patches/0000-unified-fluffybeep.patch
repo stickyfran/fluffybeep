@@ -32010,10 +32010,10 @@ index 2d0f798acca84988f3dc06d66672e88da46902bc..8a37e1b83d78a3cec07303def16b999b
 +/q4AaOeMSQ+2b1tbFfLn
 +-----END CERTIFICATE-----''';
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index c1b5b915c345fffa623ce1720788138edacc5556..33a01c72ff027d6c5b8898dc40fc5fec41f5f063 100644
+index c1b5b915c345fffa623ce1720788138edacc5556..c393b5a6d863c02a0f7cd2d805bf03ceb0ed5e20 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
-@@ -1,527 +1,558 @@
+@@ -1,527 +1,566 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -32751,17 +32751,17 @@ index c1b5b915c345fffa623ce1720788138edacc5556..33a01c72ff027d6c5b8898dc40fc5fec
 +              redirect: loggedOutRedirect,
 +            ),
 +            ShellRoute(
-+              pageBuilder: (context, state, child) => defaultPageBuilder(
-+                context,
-+                state,
-+                FluffyThemes.isColumnMode(context)
-+                    ? TwoColumnLayout(
++              pageBuilder: (context, state, child) => FluffyThemes.isColumnMode(context)
++                  ? defaultPageBuilder(
++                      context,
++                      state,
++                      TwoColumnLayout(
 +                        mainView: Settings(key: state.pageKey),
 +                        sideView: child,
 +                        hasNavigationRail: false,
-+                      )
-+                    : child,
-+              ),
++                      ),
++                    )
++                  : noTransitionPageBuilder(context, state, child),
 +              routes: [
 +                GoRoute(
 +                  path: 'settings',
@@ -33072,11 +33072,19 @@ index c1b5b915c345fffa623ce1720788138edacc5556..33a01c72ff027d6c5b8898dc40fc5fec
 +    BuildContext context,
 +    GoRouterState state,
 +    Widget child,
-+  ) => NoTransitionPage(
-+    key: state.pageKey,
-+    restorationId: state.pageKey.value,
-+    child: child,
-+  );
++  ) {
++    final clientName = state.uri.queryParameters['client'];
++    if (clientName != null) {
++      final matrix = Matrix.of(context);
++      final client = matrix.getClientByName(clientName);
++      if (client != null) matrix.setActiveClient(client);
++    }
++    return NoTransitionPage(
++      key: state.pageKey,
++      restorationId: state.pageKey.value,
++      child: child,
++    );
++  }
 +
 +  static Page defaultPageBuilder(
 +    BuildContext context,
@@ -302336,10 +302344,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..246b22e98a0f3b409525a5471cde9ff03b627565 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..36302b194cddbd411e07e870bd849bcf9a173ecf 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1877 @@
+@@ -1,1643 +1,1881 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304528,7 +304536,11 @@ index 74707498c32bda411d06d6c9c086f390f3401135..246b22e98a0f3b409525a5471cde9ff0
 +    
 +    _cachedEventsKeyMap = <String, int>{};
 +    for (var i = 0; i < _cachedFilteredEvents!.length; i++) {
-+      _cachedEventsKeyMap![_cachedFilteredEvents![i].eventId] = i;
++      final event = _cachedFilteredEvents![i];
++      _cachedEventsKeyMap![event.eventId] = i;
++      if (event.transactionId != null && event.transactionId != event.eventId) {
++        _cachedEventsKeyMap![event.transactionId!] = i;
++      }
 +    }
 +    return _cachedFilteredEvents!;
 +  }
@@ -306516,10 +306528,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 -  }
 -}
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..bc351043ce02ab5587b04a5bb957d6134b8661c4 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..3659b7015c41ec96cd5e9979cc59d17b8b714835 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,269 @@
+@@ -1,253 +1,271 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307021,6 +307033,8 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..bc351043ce02ab5587b04a5bb957d613
 +                          ? controller.enterThread
 +                          : null,
 +                      cachedReactions: controller.reactionsMap[event.eventId],
++                      cachedThreadChildren: controller.threadsMap[event.eventId],
++                      cachedIsEdited: controller.editsSet.contains(event.eventId),
 +                      onExpand: canExpand
 +                          ? () => controller.expandEventsFrom(
 +                              event,
@@ -311087,10 +311101,10 @@ index 8be7092de0445a69687123b1a85b914ce30a3797..1a8ea1140e9a39ff1ea6f82319f0046b
 +  }
 +}
 diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
-index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a599121b194 100644
+index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..e938fbc06772c0f6c340604b1ac703b9c4446e96 100644
 --- a/lib/pages/chat/events/html_message.dart
 +++ b/lib/pages/chat/events/html_message.dart
-@@ -1,743 +1,760 @@
+@@ -1,743 +1,826 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -311858,7 +311872,7 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a59
 +
 +import '../../../utils/url_launcher.dart';
 +
-+class HtmlMessage extends StatelessWidget {
++class HtmlMessage extends StatefulWidget {
 +  final String html;
 +  final Room room;
 +  final Color textColor;
@@ -311879,6 +311893,45 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a59
 +    this.eventId,
 +    this.checkboxCheckedEvents,
 +  });
++
++  @override
++  State<HtmlMessage> createState() => _HtmlMessageState();
++}
++
++class _HtmlMessageState extends State<HtmlMessage> {
++  InlineSpan? _cachedSpan;
++  dom.Element? _cachedElement;
++
++  void _buildSpan(BuildContext context) {
++    _cachedElement = widget._parseHtml(widget.html);
++    _cachedSpan = widget._renderHtml(_cachedElement!, context);
++  }
++
++  @override
++  void didChangeDependencies() {
++    super.didChangeDependencies();
++    _buildSpan(context);
++  }
++
++  @override
++  void didUpdateWidget(HtmlMessage oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (widget.html != oldWidget.html ||
++        widget.fontSize != oldWidget.fontSize ||
++        widget.textColor != oldWidget.textColor ||
++        widget.eventId != oldWidget.eventId) {
++      _buildSpan(context);
++    }
++  }
++
++  String get html => widget.html;
++  Room get room => widget.room;
++  Color get textColor => widget.textColor;
++  double get fontSize => widget.fontSize;
++  TextStyle get linkStyle => widget.linkStyle;
++  void Function(LinkableElement) get onOpen => widget.onOpen;
++  String? get eventId => widget.eventId;
++  Set<Event>? get checkboxCheckedEvents => widget.checkboxCheckedEvents;
 +
 +  /// Keep in sync with: https://spec.matrix.org/latest/client-server-api/#mroommessage-msgtypes
 +  static const Set<String> allowedHtmlTags = {
@@ -312189,10 +312242,7 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a59
 +                ?.split('language-')
 +                .last ??
 +            'md';
-+        final highlightedHtml = highlight
-+            .parse(node.text, language: lang)
-+            .toHtml();
-+        final element = parser.parse(highlightedHtml).body;
++        final element = _parseHighlightedCode(node.text, lang);
 +        if (element == null) {
 +          return const TextSpan(text: 'Unable to render code block!');
 +        }
@@ -312422,6 +312472,33 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a59
 +  static final List<String> _parseCacheKeys = [];
 +  static const int _maxCacheSize = 300;
 +
++  static final Map<String, dom.Element> _highlightCache = {};
++  static final List<String> _highlightCacheKeys = [];
++  static const int _maxHighlightCacheSize = 200;
++
++  dom.Element? _parseHighlightedCode(String codeText, String lang) {
++    final cacheKey = '$lang:$codeText';
++    if (_highlightCache.containsKey(cacheKey)) {
++      return _highlightCache[cacheKey];
++    }
++    try {
++      final highlightedHtml = highlight
++          .parse(codeText, language: lang)
++          .toHtml();
++      final element = parser.parse(highlightedHtml).body;
++      if (element != null) {
++        _highlightCache[cacheKey] = element;
++        _highlightCacheKeys.add(cacheKey);
++        if (_highlightCacheKeys.length > _maxHighlightCacheSize) {
++          _highlightCache.remove(_highlightCacheKeys.removeAt(0));
++        }
++      }
++      return element;
++    } catch (_) {
++      return null;
++    }
++  }
++
 +  dom.Element _parseHtml(String htmlString) {
 +    if (_parseCache.containsKey(htmlString)) {
 +      return _parseCache[htmlString]!;
@@ -312437,10 +312514,13 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..3eea4a18b1fa3fba53e12a1622268a59
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    final element = _parseHtml(html);
++    if (_cachedSpan == null) {
++      _buildSpan(context);
++    }
++    final element = _cachedElement ?? _parseHtml(html);
++    final span = _cachedSpan!;
 +    final configuredMaxLines = AppSettings.messagePreviewMaxLines.value;
 +    final maxLines = configuredMaxLines <= 0 ? null : configuredMaxLines;
-+    final span = _renderHtml(element, context);
 +    final style = TextStyle(fontSize: fontSize, color: textColor);
 +
 +    if (maxLines == null) {
@@ -313165,10 +313245,10 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b285d3ff17843ed7075749aaf3943de5a8..b9cc17fefc7bb17ca3095d92d803b69b33620540 100644
+index 930de3b285d3ff17843ed7075749aaf3943de5a8..3c63a04c07039de6b1f6ac25d566185baf926f08 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
-@@ -1,968 +1,1031 @@
+@@ -1,968 +1,1037 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -314194,6 +314274,8 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..b9cc17fefc7bb17ca3095d92d803b69b
 +  final bool isCollapsed;
 +  final Set<String> bigEmojis;
 +  final List<Event>? cachedReactions;
++  final List<Event>? cachedThreadChildren;
++  final bool? cachedIsEdited;
 +
 +  const Message(
 +    this.event, {
@@ -314221,6 +314303,8 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..b9cc17fefc7bb17ca3095d92d803b69b
 +    required this.enterThread,
 +    this.isCollapsed = false,
 +    this.cachedReactions,
++    this.cachedThreadChildren,
++    this.cachedIsEdited,
 +    super.key,
 +  });
 +
@@ -314393,14 +314477,16 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..b9cc17fefc7bb17ca3095d92d803b69b
 +            RelationshipTypes.reaction,
 +          );
 +
-+    final threadChildren = event.aggregatedEvents(
-+      timeline,
-+      RelationshipTypes.thread,
-+    );
-+    final isEdited = event.hasAggregatedEvents(
-+      timeline,
-+      RelationshipTypes.edit,
-+    );
++    final threadChildren = widget.cachedThreadChildren ??
++        event.aggregatedEvents(
++          timeline,
++          RelationshipTypes.thread,
++        );
++    final isEdited = widget.cachedIsEdited ??
++        event.hasAggregatedEvents(
++          timeline,
++          RelationshipTypes.edit,
++        );
 +
 +    final showReactionPicker =
 +        singleSelected && event.room.canSendDefaultMessages;
@@ -317936,10 +318022,10 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..bd396d5415dc79564811cf9c2cf6b150
 +  }
 +}
 diff --git a/lib/pages/chat/input_bar.dart b/lib/pages/chat/input_bar.dart
-index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..4d4d7562ba009a518ac2e10c4f3a708d2a60bb68 100644
+index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..67960f771764eda91ad120b339a6797dca6c183d 100644
 --- a/lib/pages/chat/input_bar.dart
 +++ b/lib/pages/chat/input_bar.dart
-@@ -1,474 +1,482 @@
+@@ -1,474 +1,488 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -318472,10 +318558,16 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..4d4d7562ba009a518ac2e10c4f3a708d
 +
 +  List<Map<String, String?>> getSuggestions(TextEditingValue text) {
 +    if (text.selection.baseOffset != text.selection.extentOffset ||
-+        text.selection.baseOffset < 0) {
-+      return []; // no entries if there is selected text
++        text.selection.baseOffset <= 0) {
++      return []; // no entries if there is selected text or cursor at start
 +    }
 +    final searchText = text.text.substring(0, text.selection.baseOffset);
++    if (!searchText.contains(':') &&
++        !searchText.contains('@') &&
++        !searchText.contains('#') &&
++        !searchText.contains('/')) {
++      return [];
++    }
 +    final ret = <Map<String, String?>>[];
 +    const maxResults = 30;
 +
@@ -322358,10 +322450,10 @@ index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b
 +
 +enum _Action { allow, deny, verification }
 diff --git a/lib/pages/chat/typing_indicators.dart b/lib/pages/chat/typing_indicators.dart
-index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149a7364072 100644
+index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..298ba651cebbac0a866783d708d44660063b610d 100644
 --- a/lib/pages/chat/typing_indicators.dart
 +++ b/lib/pages/chat/typing_indicators.dart
-@@ -1,165 +1,172 @@
+@@ -1,165 +1,176 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -322643,7 +322735,7 @@ index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149
 +}
 +
 +class __TypingDotsState extends State<_TypingDots> with TickerProviderStateMixin {
-+  int _tick = 0;
++  final ValueNotifier<int> _tickNotifier = ValueNotifier<int>(0);
 +
 +  late final AnimationController _controller;
 +
@@ -322657,9 +322749,7 @@ index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149
 +      duration: animationDuration,
 +    )..addStatusListener((status) {
 +        if (status == AnimationStatus.completed) {
-+          setState(() {
-+            _tick = (_tick + 1) % 4;
-+          });
++          _tickNotifier.value = (_tickNotifier.value + 1) % 4;
 +          _controller.forward(from: 0.0);
 +        }
 +      });
@@ -322669,6 +322759,7 @@ index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149
 +  @override
 +  void dispose() {
 +    _controller.dispose();
++    _tickNotifier.dispose();
 +    super.dispose();
 +  }
 +
@@ -322677,25 +322768,30 @@ index 9fa19a72a0fe0e8687da6bc9c33dfb30687437f7..2bbb8ce88aa05e7c684cbf46f9b20149
 +    final theme = Theme.of(context);
 +    const size = 8.0;
 +
-+    return Row(
-+      mainAxisSize: .min,
-+      children: [
-+        for (var i = 1; i <= 3; i++)
-+          AnimatedContainer(
-+            duration: animationDuration * 1.5,
-+            curve: FluffyThemes.animationCurve,
-+            width: size,
-+            height: _tick == i ? size * 2 : size,
-+            margin: EdgeInsets.symmetric(
-+              horizontal: 2,
-+              vertical: _tick == i ? 4 : 8,
-+            ),
-+            decoration: BoxDecoration(
-+              borderRadius: BorderRadius.circular(size * 2),
-+              color: theme.colorScheme.secondary,
-+            ),
-+          ),
-+      ],
++    return ValueListenableBuilder<int>(
++      valueListenable: _tickNotifier,
++      builder: (context, tick, _) {
++        return Row(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            for (var i = 1; i <= 3; i++)
++              AnimatedContainer(
++                duration: animationDuration * 1.5,
++                curve: FluffyThemes.animationCurve,
++                width: size,
++                height: tick == i ? size * 2 : size,
++                margin: EdgeInsets.symmetric(
++                  horizontal: 2,
++                  vertical: tick == i ? 4 : 8,
++                ),
++                decoration: BoxDecoration(
++                  borderRadius: BorderRadius.circular(size * 2),
++                  color: theme.colorScheme.secondary,
++                ),
++              ),
++          ],
++        );
++      },
 +    );
 +  }
 +}
@@ -336882,10 +336978,10 @@ index 932334e6b4bde5fc047855d85998b2298e8c0173..2c2f112998b9939ab969358a16e14106
 +  }
 +}
 diff --git a/lib/pages/device_settings/device_settings.dart b/lib/pages/device_settings/device_settings.dart
-index 0791b1017736c76964b303d6faebc97a04768465..e9350b694c399f629f0ca2f35fb38b60b00c628f 100644
+index 0791b1017736c76964b303d6faebc97a04768465..ecfdcc0e787c6f008599c9a9d9d565ba806fee29 100644
 --- a/lib/pages/device_settings/device_settings.dart
 +++ b/lib/pages/device_settings/device_settings.dart
-@@ -1,179 +1,179 @@
+@@ -1,179 +1,190 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -337094,13 +337190,19 @@ index 0791b1017736c76964b303d6faebc97a04768465..e9350b694c399f629f0ca2f35fb38b60
 +
 +class DevicesSettingsController extends State<DevicesSettings> {
 +  List<Device>? devices;
++  List<Device>? _cachedNotThisDevice;
++
 +  Future<bool> loadUserDevices(BuildContext context) async {
 +    if (devices != null) return true;
 +    devices = await Matrix.of(context).client.getDevices();
++    _cachedNotThisDevice = null;
 +    return true;
 +  }
 +
-+  void reload() => setState(() => devices = null);
++  void reload() => setState(() {
++    devices = null;
++    _cachedNotThisDevice = null;
++  });
 +
 +  bool? chatBackupEnabled;
 +
@@ -337237,9 +337339,14 @@ index 0791b1017736c76964b303d6faebc97a04768465..e9350b694c399f629f0ca2f35fb38b60
 +
 +  Device? get thisDevice => devices!.firstWhereOrNull(_isOwnDevice);
 +
-+  List<Device> get notThisDevice => List<Device>.from(devices!)
-+    ..removeWhere(_isOwnDevice)
-+    ..sort((a, b) => (b.lastSeenTs ?? 0).compareTo(a.lastSeenTs ?? 0));
++  List<Device> get notThisDevice {
++    if (devices == null) return [];
++    if (_cachedNotThisDevice != null) return _cachedNotThisDevice!;
++    _cachedNotThisDevice = List<Device>.from(devices!)
++      ..removeWhere(_isOwnDevice)
++      ..sort((a, b) => (b.lastSeenTs ?? 0).compareTo(a.lastSeenTs ?? 0));
++    return _cachedNotThisDevice!;
++  }
 +
 +  @override
 +  Widget build(BuildContext context) => DevicesSettingsView(this);
@@ -345631,10 +345738,10 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..2a1f62a2bc61c2289ac228a48269350d0f031111
+index 0000000000000000000000000000000000000000..706cce28f535797fcc2215722fa4881934975db7
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,762 @@
+@@ -0,0 +1,753 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -345711,13 +345818,8 @@ index 0000000000000000000000000000000000000000..2a1f62a2bc61c2289ac228a48269350d
 +    if (!_didLoadPushers) {
 +      _didLoadPushers = true;
 +      final client = Matrix.of(context).client;
-+      // Defer network operations until screen push transition has completed smoothly
-+      Future.delayed(const Duration(milliseconds: 350), () {
-+        if (mounted) {
-+          _computeNetworksAndTags(client);
-+          _loadPushers(client);
-+        }
-+      });
++      _computeNetworksAndTags(client);
++      _loadPushers(client);
 +    }
 +  }
 +
@@ -345841,13 +345943,9 @@ index 0000000000000000000000000000000000000000..2a1f62a2bc61c2289ac228a48269350d
 +      }
 +    }
 +
-+    if (mounted) {
-+      setState(() {
-+        _networksList = beeperNetworks.values.toList()
-+          ..sort((a, b) => a.name.compareTo(b.name));
-+        _tagsList = customTags.toList()..sort();
-+      });
-+    }
++    _networksList = beeperNetworks.values.toList()
++      ..sort((a, b) => a.name.compareTo(b.name));
++    _tagsList = customTags.toList()..sort();
 +  }
 +
 +  @override
@@ -370926,10 +371024,10 @@ index f19ea49d3c3d719fc7e813eb1e687af7fa43d786..708037e9939581427b4d0ea99aea1716
 +  );
 +}
 diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
-index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..a952b973231224a4fc3a95719719efe4f1fe633f 100644
+index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..75c39b1c4fad93f86d30676dddf406e070d8920e 100644
 --- a/lib/widgets/avatar.dart
 +++ b/lib/widgets/avatar.dart
-@@ -1,160 +1,165 @@
+@@ -1,160 +1,166 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -371173,6 +371271,7 @@ index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..a952b973231224a4fc3a95719719efe4
 +              borderRadius: borderRadius,
 +              key: ValueKey(mxContent.toString()),
 +              cacheKey: '${mxContent}_$size',
++              cacheName: 'avatars',
 +              uri: mxContent,
 +              fit: BoxFit.cover,
 +              width: size,
