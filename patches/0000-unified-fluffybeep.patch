@@ -302346,10 +302346,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..4b888085fdb43561ecc37e71f8249034ce8285cd 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..86519a181b632b2bd20c7b7101acbef8af2fdb65 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1884 @@
+@@ -1,1643 +1,1882 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304499,18 +304499,15 @@ index 74707498c32bda411d06d6c9c086f390f3401135..4b888085fdb43561ecc37e71f8249034
 +    if (animateInEventId == eventId) animateInEventId = null;
 +  }
 +
-+  bool _updateViewScheduled = false;
++  Timer? _debounceUpdateViewTimer;
 +
 +  void updateView() {
-+    if (!mounted || _updateViewScheduled) return;
-+    FileLogger.log('[BACKEND_TIMELINE] updateView triggered for room ${room.id} (events=${timeline?.events.length})');
-+    _updateViewScheduled = true;
-+    SchedulerBinding.instance.addPostFrameCallback((_) {
-+      _updateViewScheduled = false;
++    if (!mounted) return;
++    _debounceUpdateViewTimer?.cancel();
++    _debounceUpdateViewTimer = Timer(const Duration(milliseconds: 40), () {
 +      if (!mounted) return;
 +      _invalidateTimelineCache();
-+      // If the newest event is from ourselves (sent from another device),
-+      // discard the jump-banner and scroll to bottom so it appears visible.
++      FileLogger.log('[BACKEND_TIMELINE] updateView executing for room ${room.id} (events=${timeline?.events.length})');
 +      final newestEvent = timeline?.events.firstOrNull;
 +      if (newestEvent != null &&
 +          newestEvent.senderId == room.client.userID &&
@@ -304787,6 +304784,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..4b888085fdb43561ecc37e71f8249034
 +    MxcImage.clearCache(room.id);
 +    timeline?.cancelSubscriptions();
 +    timeline = null;
++    _debounceUpdateViewTimer?.cancel();
 +    _storeInputTimeoutTimer?.cancel();
 +    typingCoolDown?.cancel();
 +    typingTimeout?.cancel();
@@ -308024,10 +308022,10 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9c8bc84c2 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..1dab78ca2ffb9b59aac963dd7efc3ff683474060 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,530 @@
+@@ -1,464 +1,531 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -308894,7 +308892,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9
 +                          child: RepaintBoundary(
 +                            child: ValueListenableBuilder<int>(
 +                              valueListenable: controller.timelineUpdateNotifier,
-+                              builder: (context, _, __) => ChatEventList(controller: controller),
++                              child: ChatEventList(controller: controller),
++                              builder: (context, _, child) => child!,
 +                            ),
 +                          ),
 +                        ),
