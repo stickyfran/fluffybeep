@@ -325832,10 +325832,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..0bd31609905488186101ca77ca784335bb07da58 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..670895e817673ad8a423fd9498b56efc1ed6cb8c 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1303 @@
+@@ -1,1041 +1,1318 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -327036,10 +327036,23 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..0bd31609905488186101ca77ca784335
 +    }
 +  }
 +
++  static bool _isChatActivityEvent(Event event) {
++    final type = event.type;
++    if (type == EventTypes.Message ||
++        type == EventTypes.Encrypted ||
++        type == EventTypes.Sticker ||
++        type == 'm.room.bridged_message' ||
++        type.startsWith('m.call.') ||
++        type.contains('poll.start')) {
++      return true;
++    }
++    return false;
++  }
++
 +  DateTime _getMessageTimestamp(Room room) {
-+    // 1. SDK: check if room.lastEvent is present and update RAM/Disk cache
++    // 1. SDK: check if room.lastEvent is a real chat activity event (message, photo, sticker, call, etc.)
 +    final event = room.lastEvent;
-+    if (event != null) {
++    if (event != null && _isChatActivityEvent(event)) {
 +      final ts = event.originServerTs;
 +      final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
 +      if (cached == null || ts.isAfter(cached)) {
@@ -327091,16 +327104,18 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..0bd31609905488186101ca77ca784335
 +      final room = Matrix.of(context).client.getRoomById(roomId);
 +      if (room == null) continue;
 +      try {
-+        final events = await room.client.database.getEventList(room, limit: 10);
-+        if (events.isNotEmpty) {
-+          final ev = events.first;
-+          BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
-+          BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
-+          BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
-+          if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
-+            BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
++        final events = await room.client.database.getEventList(room, limit: 30);
++        for (final ev in events) {
++          if (_isChatActivityEvent(ev)) {
++            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
++            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
++            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
++            if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
++              BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
++            }
++            anyUpdated = true;
++            break;
 +          }
-+          anyUpdated = true;
 +        }
 +      } catch (_) {}
 +    }
