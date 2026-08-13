@@ -328203,7 +328203,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..6c6ae78cd828946a36e18536801c83d5ca9eccfa 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..c31fefe632be1afef8d77713b4d1c514658868eb 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -1,338 +1,460 @@
@@ -328630,7 +328630,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..6c6ae78cd828946a36e18536801c83d5
 +    final userSearchResult = widget.controller.userSearchResult;
 +    const dummyChatCount = 4;
 +    final filter = widget.controller.searchController.text.toLowerCase();
-+    return ValueListenableBuilder<int>(
++    final body = ValueListenableBuilder<int>(
 +      key: ValueKey(client.userID.toString()),
 +      valueListenable: widget.controller.roomCacheNotifier,
 +      builder: (context, _, __) {
