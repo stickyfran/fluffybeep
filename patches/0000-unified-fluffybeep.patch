@@ -307062,10 +307062,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a2eac2bacb1e3c933e3cefeb50c9a3b7
 +  }
 +}
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604ec075439 100644
+index 879717fa9889be421184b768e20bad7417f95114..f477b6d5082c9e6bb184145497b8f8c823dfd399 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
-@@ -1,452 +1,503 @@
+@@ -1,452 +1,507 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307865,18 +307865,22 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +                  if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
 +                      (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_input_bar') ?? true))
 +                    Padding(
-+                      padding: const EdgeInsets.only(right: 4.0),
-+                      child: SizedBox(
-+                        height: height,
-+                        width: height,
-+                        child: IconButton(
-+                          tooltip: L10n.of(context).markAsRead,
-+                          onPressed: () => controller.setReadMarker(force: true),
-+                          style: IconButton.styleFrom(
-+                            backgroundColor: theme.colorScheme.primaryContainer,
-+                            foregroundColor: theme.colorScheme.onPrimaryContainer,
++                      padding: const EdgeInsets.only(right: 6.0),
++                      child: Center(
++                        child: SizedBox(
++                          height: 32,
++                          width: 32,
++                          child: IconButton(
++                            padding: EdgeInsets.zero,
++                            constraints: const BoxConstraints(),
++                            tooltip: L10n.of(context).markAsRead,
++                            onPressed: () => controller.setReadMarker(force: true),
++                            style: IconButton.styleFrom(
++                              backgroundColor: theme.colorScheme.primaryContainer,
++                              foregroundColor: theme.colorScheme.onPrimaryContainer,
++                            ),
++                            icon: const Icon(Icons.done_all, size: 16),
 +                          ),
-+                          icon: const Icon(Icons.done_all, size: 20),
 +                        ),
 +                      ),
 +                    ),
@@ -325832,7 +325836,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4efe1e995fc1e05266d86885c9e545ca9863fc48 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c7cc6e016 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -1,1041 +1,1338 @@
@@ -327165,7 +327169,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4efe1e995fc1e05266d86885c9e545ca
 +      return bTime.compareTo(aTime);
 +    });
 +
-+    if (FileLogger.isEnabled()) {
++    if (FileLogger.isEnabled() && BeeperBridgeUtils.isRoomOrderLoggingEnabled()) {
 +      final logBuffer = StringBuffer();
 +      logBuffer.writeln('[ROOM_ORDER_DEBUG] Total sorted rooms: ${allRooms.length}. Top 200 rooms order:');
 +      for (var i = 0; i < allRooms.length && i < 200; i++) {
@@ -345781,10 +345785,10 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64a1ee86eb
+index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406bd057b0f
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,757 @@
+@@ -0,0 +1,779 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -345814,6 +345818,7 @@ index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64
 +class _SettingsPatchesState extends State<SettingsPatches> {
 +  int _logSize = 0;
 +  bool _debugLoggingEnabled = false;
++  bool _logRoomOrderEnabled = false;
 +  bool _forcePublicPushGateway = false;
 +  bool _manualReadReceipts = false;
 +  bool _manualReadShowBanner = true;
@@ -345837,6 +345842,7 @@ index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64
 +    setState(() {
 +      _logSize = logSize;
 +      _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
++      _logRoomOrderEnabled = prefs.getBool('beeper_log_room_order_enabled') ?? false;
 +      _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
 +      _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
 +      _manualReadShowBanner = prefs.getBool('beeper_manual_read_show_banner') ?? true;
@@ -345926,6 +345932,16 @@ index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64
 +    if (mounted) {
 +      setState(() {
 +        _debugLoggingEnabled = value;
++      });
++    }
++  }
++
++  Future<void> _setLogRoomOrderEnabled(bool value) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setBool('beeper_log_room_order_enabled', value);
++    if (mounted) {
++      setState(() {
++        _logRoomOrderEnabled = value;
 +      });
 +    }
 +  }
@@ -346199,6 +346215,16 @@ index 0000000000000000000000000000000000000000..7a2be3b55d477a7134c22cae87361c64
 +                  )
 +                : null,
 +          ),
++          if (_debugLoggingEnabled)
++            SwitchListTile.adaptive(
++              secondary: const Icon(Icons.sort_outlined),
++              title: const Text('Log de orden de chats (200 salas)'),
++              subtitle: const Text(
++                'Registra las primeras 200 salas en el log de depuración cada vez que se re-ordena la lista.',
++              ),
++              value: _logRoomOrderEnabled,
++              onChanged: _setLogRoomOrderEnabled,
++            ),
 +          const Divider(),
 +          ListTile(
 +            leading: const Icon(Icons.notifications_active_outlined),
@@ -357722,10 +357748,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5063fe2ffb610f8a47618c30b903c9665e0ae18b
+index 0000000000000000000000000000000000000000..8fa76e964c6d837e5adc81cc16c7eb9328f8b4df
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,810 @@
+@@ -0,0 +1,812 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -357755,7 +357781,9 @@ index 0000000000000000000000000000000000000000..5063fe2ffb610f8a47618c30b903c966
 +
 +class BeeperBridgeUtils {
 +  // --- INICIO SISTEMA DE CACHÉ PERSISTENTE ---
-+  static SharedPreferences? prefs;
++  static bool isRoomOrderLoggingEnabled() {
++    return prefs?.getBool('beeper_log_room_order_enabled') ?? false;
++  }
 +
 +  static void initCacheWithPrefs(SharedPreferences sharedPrefs) {
 +    FileLogger.log('[BeeperBridgeUtils] initCacheWithPrefs called');
