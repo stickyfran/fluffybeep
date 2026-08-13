@@ -360463,7 +360463,7 @@ index 68f9067624eb3c1ca2351f4fe83266db784faac0..89cace500ff1317ba173766b45dd0c4b
 +}
 diff --git a/lib/utils/file_logger.dart b/lib/utils/file_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5ae34d34e598b0b59ecb5775d75728de2754e6fb
+index 0000000000000000000000000000000000000000..c5999c6b3d1995f6e5b1cdcbc24fa1f01602fa29
 --- /dev/null
 +++ b/lib/utils/file_logger.dart
 @@ -0,0 +1,131 @@
@@ -360513,7 +360513,7 @@ index 0000000000000000000000000000000000000000..5ae34d34e598b0b59ecb5775d75728de
 +    return _logFilePath!;
 +  }
 +
-+  static void log(String message) {
++  static Future<void> log(String message) async {
 +    if (!isEnabled()) return;
 +
 +    final timestamp = DateTime.now().toIso8601String();
