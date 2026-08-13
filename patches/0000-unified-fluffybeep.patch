@@ -357748,10 +357748,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..8fa76e964c6d837e5adc81cc16c7eb9328f8b4df
+index 0000000000000000000000000000000000000000..7054ef9ace61ddf54619d18f4ae35703aa041d6b
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,812 @@
+@@ -0,0 +1,814 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -357781,6 +357781,8 @@ index 0000000000000000000000000000000000000000..8fa76e964c6d837e5adc81cc16c7eb93
 +
 +class BeeperBridgeUtils {
 +  // --- INICIO SISTEMA DE CACHÉ PERSISTENTE ---
++  static SharedPreferences? prefs;
++
 +  static bool isRoomOrderLoggingEnabled() {
 +    return prefs?.getBool('beeper_log_room_order_enabled') ?? false;
 +  }
