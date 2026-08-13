@@ -325832,10 +325832,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..670895e817673ad8a423fd9498b56efc1ed6cb8c 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..a82d104fc6762b1d3bd6d18b5300a3f294f8a04e 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1318 @@
+@@ -1,1041 +1,1337 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -327076,9 +327076,9 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..670895e817673ad8a423fd9498b56efc
 +      return ts;
 +    }
 +
-+    // 4. Matrix DB fallback: async query
++    // 4. Matrix DB fallback: async query, return 1970 so uncached rooms sort to bottom
 +    _fetchLastMessageTimeAsync(room);
-+    return room.latestEventReceivedTime;
++    return DateTime.fromMillisecondsSinceEpoch(0);
 +  }
 +
 +  static final Set<String> _pendingTimestampFetches = {};
@@ -327089,35 +327089,43 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..670895e817673ad8a423fd9498b56efc
 +    _pendingTimestampFetches.add(room.id);
 +    
 +    _batchTimestampTimer?.cancel();
-+    _batchTimestampTimer = Timer(const Duration(milliseconds: 300), () {
++    _batchTimestampTimer = Timer(const Duration(milliseconds: 150), () {
 +      _processPendingTimestamps();
 +    });
 +  }
 +
 +  Future<void> _processPendingTimestamps() async {
-+    final batch = Set<String>.from(_pendingTimestampFetches);
++    final batch = List<String>.from(_pendingTimestampFetches);
 +    _pendingTimestampFetches.clear();
++    if (batch.isEmpty || !mounted) return;
++    
++    final client = Matrix.of(context).client;
 +    bool anyUpdated = false;
 +    
-+    for (final roomId in batch) {
++    // Process DB fetches in parallel batches of 20
++    const chunkSize = 20;
++    for (var i = 0; i < batch.length; i += chunkSize) {
 +      if (!mounted) break;
-+      final room = Matrix.of(context).client.getRoomById(roomId);
-+      if (room == null) continue;
-+      try {
-+        final events = await room.client.database.getEventList(room, limit: 30);
-+        for (final ev in events) {
-+          if (_isChatActivityEvent(ev)) {
-+            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
-+            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
-+            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
-+            if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
-+              BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
++      final chunk = batch.sublist(i, (i + chunkSize > batch.length) ? batch.length : i + chunkSize);
++      await Future.wait(chunk.map((roomId) async {
++        final room = client.getRoomById(roomId);
++        if (room == null) return;
++        try {
++          final events = await room.client.database.getEventList(room, limit: 30);
++          for (final ev in events) {
++            if (_isChatActivityEvent(ev)) {
++              BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
++              BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
++              BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
++              if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
++                BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
++              }
++              anyUpdated = true;
++              break;
 +            }
-+            anyUpdated = true;
-+            break;
 +          }
-+        }
-+      } catch (_) {}
++        } catch (_) {}
++      }));
 +    }
 +    
 +    if (anyUpdated && mounted) {
@@ -327155,6 +327163,17 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..670895e817673ad8a423fd9498b56efc
 +      final bTime = timestamps[b.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
 +      return bTime.compareTo(aTime);
 +    });
++
++    if (FileLogger.enabled) {
++      final logBuffer = StringBuffer();
++      logBuffer.writeln('[ROOM_ORDER_DEBUG] Total sorted rooms: ${allRooms.length}. Top 200 rooms order:');
++      for (var i = 0; i < allRooms.length && i < 200; i++) {
++        final r = allRooms[i];
++        final ts = timestamps[r.id];
++        logBuffer.writeln('  #$i: "${r.getLocalizedDisplayname(Matrix.of(context).client)}" (id=${r.id}, ts=$ts, lastEv=${r.lastEvent?.type})');
++      }
++      FileLogger.log(logBuffer.toString());
++    }
 +
 +    _cachedAllRoomsSorted = allRooms;
 +    _cachedFilteredRooms =
@@ -329296,10 +329315,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..8ef5c9add5a947284da207d275360ca1c7bced0d 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..c51a20e88327436d4e68d5e610878f2cb5c07f7c 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,480 @@
+@@ -1,410 +1,487 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -330014,9 +330033,16 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..8ef5c9add5a947284da207d275360ca1
 +                    Padding(
 +                      padding: const EdgeInsets.only(left: 4.0),
 +                      child: Text(
-+                        widget.room.latestEventReceivedTime.localizedTimeShort(
-+                          context,
-+                        ),
++                        (BeeperBridgeUtils.getLastMessageTime(widget.room.id) ??
++                                (widget.room.lastEvent != null
++                                    ? widget.room.lastEvent!.originServerTs
++                                    : null) ??
++                                (BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id) != null
++                                    ? DateTime.fromMillisecondsSinceEpoch(
++                                        BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id)!)
++                                    : null) ??
++                                widget.room.latestEventReceivedTime)
++                            .localizedTimeShort(context),
 +                        style: TextStyle(
 +                          fontSize: 11,
 +                          fontWeight: widget.room.hasNewMessages
