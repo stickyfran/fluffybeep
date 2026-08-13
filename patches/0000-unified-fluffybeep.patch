@@ -325832,10 +325832,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc7465f1a921 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..0bd31609905488186101ca77ca784335bb07da58 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1324 @@
+@@ -1,1041 +1,1303 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -327037,39 +327037,33 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  }
 +
 +  DateTime _getMessageTimestamp(Room room) {
-+    // 1. SDK: check if room.lastEvent is a real message event and update RAM/Disk cache
++    // 1. SDK: check if room.lastEvent is present and update RAM/Disk cache
 +    final event = room.lastEvent;
 +    if (event != null) {
-+      final type = event.type;
-+      if (type == 'm.room.message' ||
-+          type == 'm.room.encrypted' ||
-+          type == 'm.sticker' ||
-+          type == 'm.room.bridged_message') {
-+        final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
-+        if (cached == null || event.originServerTs.isAfter(cached)) {
-+          BeeperBridgeUtils.setLastMessageTime(room.id, event.originServerTs);
-+          BeeperBridgeUtils.saveLastTimestamp(
-+              room.id, event.originServerTs.millisecondsSinceEpoch);
-+        }
-+        return event.originServerTs;
++      final ts = event.originServerTs;
++      final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
++      if (cached == null || ts.isAfter(cached)) {
++        BeeperBridgeUtils.setLastMessageTime(room.id, ts);
++        BeeperBridgeUtils.saveLastTimestamp(
++            room.id, ts.millisecondsSinceEpoch);
 +      }
++      return ts;
 +    }
 +
 +    // 2. RAM: in-session cache (fastest)
 +    final cached = BeeperBridgeUtils.getLastMessageTime(room.id);
 +    if (cached != null) return cached;
 +
-+    // 3. Disco: SharedPreferences — disponible instantáneamente al abrir la app,
-+    //    antes de que Matrix lea su SQLite. Evita el "salto" del orden de la lista.
++    // 3. Disk: SharedPreferences — instant access on startup
 +    final cachedDiskTs = BeeperBridgeUtils.getCachedLastTimestamp(room.id);
 +    if (cachedDiskTs != null) {
 +      final ts = DateTime.fromMillisecondsSinceEpoch(cachedDiskTs);
-+      BeeperBridgeUtils.setLastMessageTime(room.id, ts); // promover a RAM
-+      _fetchLastMessageTimeAsync(room); // actualizar en segundo plano si cambio
++      BeeperBridgeUtils.setLastMessageTime(room.id, ts);
++      _fetchLastMessageTimeAsync(room);
 +      return ts;
 +    }
 +
-+    // 4. Último recurso: disparar búsqueda async en la DB de Matrix
++    // 4. Matrix DB fallback: async query
 +    _fetchLastMessageTimeAsync(room);
 +    return room.latestEventReceivedTime;
 +  }
@@ -327097,22 +327091,16 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +      final room = Matrix.of(context).client.getRoomById(roomId);
 +      if (room == null) continue;
 +      try {
-+        final events = await room.client.database.getEventList(room, limit: 30);
-+        for (final ev in events) {
-+          final t = ev.type;
-+          if (t == 'm.room.message' ||
-+              t == 'm.room.encrypted' ||
-+              t == 'm.sticker' ||
-+              t == 'm.room.bridged_message') {
-+            BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
-+            BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
-+            BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
-+            if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
-+              BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
-+            }
-+            anyUpdated = true;
-+            break;
++        final events = await room.client.database.getEventList(room, limit: 10);
++        if (events.isNotEmpty) {
++          final ev = events.first;
++          BeeperBridgeUtils.setLastMessageTime(roomId, ev.originServerTs);
++          BeeperBridgeUtils.saveLastTimestamp(roomId, ev.originServerTs.millisecondsSinceEpoch);
++          BeeperBridgeUtils.lastRealMessageCache[roomId] = ev;
++          if (BeeperBridgeUtils.lastRealMessageCache.length > BeeperBridgeUtils.maxCacheSize) {
++            BeeperBridgeUtils.lastRealMessageCache.remove(BeeperBridgeUtils.lastRealMessageCache.keys.first);
 +          }
++          anyUpdated = true;
 +        }
 +      } catch (_) {}
 +    }
@@ -327123,9 +327111,6 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  }
 +
 +  // ── Room-list cache ──────────────────────────────────────────────────────────
-+  // filteredRooms is O(N log N) and runs on the UI thread. We cache the result
-+  // and only recompute when a real Matrix sync arrives (via _onSyncForRoomCache)
-+  // instead of on every setState (cancelSearch, filter toggles, etc.).
 +  List<Room> _cachedAllRoomsSorted = [];
 +  List<Room> _cachedFilteredRooms = [];
 +  StreamSubscription? _onSyncForRoomCache;
@@ -327150,12 +327135,6 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +      if (!a.isFavourite && b.isFavourite) return 1;
 +      if (a.isLowPriority && !b.isLowPriority) return 1;
 +      if (!a.isLowPriority && b.isLowPriority) return -1;
-+
-+      final aOrder = a.lastEvent?.unsigned?['com.beeper.hs.order'] as int?;
-+      final bOrder = b.lastEvent?.unsigned?['com.beeper.hs.order'] as int?;
-+      if (aOrder != null && bOrder != null && aOrder != bOrder) {
-+        return bOrder.compareTo(aOrder);
-+      }
 +
 +      final aTime = timestamps[a.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
 +      final bTime = timestamps[b.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
