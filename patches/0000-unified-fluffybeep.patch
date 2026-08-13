@@ -325832,10 +325832,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..a51fb4573fa7434d5807f0364d3d6e7ef79c06c0 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4efe1e995fc1e05266d86885c9e545ca9863fc48 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1337 @@
+@@ -1,1041 +1,1338 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -326889,6 +326889,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..a51fb4573fa7434d5807f0364d3d6e7e
 +import 'package:cross_file/cross_file.dart';
 +import 'package:fluffychat/config/app_config.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
++import 'package:fluffychat/pages/chat_list/chat_list_view.dart';
 +import 'package:fluffychat/utils/error_reporter.dart';
 +import 'package:fluffychat/utils/file_logger.dart';
 +import 'package:fluffychat/utils/localized_exception_extension.dart';
