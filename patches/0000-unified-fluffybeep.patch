@@ -302336,10 +302336,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..e714d1403f673a7f15cb370dca74c33561b09440 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..246b22e98a0f3b409525a5471cde9ff03b627565 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1874 @@
+@@ -1,1643 +1,1877 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304165,6 +304165,8 @@ index 74707498c32bda411d06d6c9c086f390f3401135..e714d1403f673a7f15cb370dca74c335
 +
 +  Event? editEvent;
 +
++  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
++
 +  bool _scrolledUp = false;
 +
 +  bool get showScrollDownButton =>
@@ -304511,7 +304513,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..e714d1403f673a7f15cb370dca74c335
 +        }
 +      }
 +      setReadMarker();
-+      setState(() {});
++      timelineUpdateNotifier.value++;
 +    });
 +  }
 +
@@ -304765,6 +304767,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..e714d1403f673a7f15cb370dca74c335
 +
 +  @override
 +  void dispose() {
++    timelineUpdateNotifier.dispose();
 +    MxcImage.clearCache(room.id);
 +    timeline?.cancelSubscriptions();
 +    timeline = null;
@@ -308000,10 +308003,10 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eaecf3b0c24bb89a4e0eb135b319fbbe2305b182 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..0691ad1b7469882c8f563fa6465ed82876449db4 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,519 @@
+@@ -1,464 +1,525 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -308594,7 +308597,10 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eaecf3b0c24bb89a4e0eb135b319fbbe
 +                    ? null
 +                    : const Center(child: BackButton()),
 +                titleSpacing: FluffyThemes.isColumnMode(context) ? 24 : 0,
-+                title: ChatAppBarTitle(controller),
++                title: ValueListenableBuilder<int>(
++                  valueListenable: controller.timelineUpdateNotifier,
++                  builder: (context, _, __) => ChatAppBarTitle(controller),
++                ),
 +                actions: [
 +                  if (controller.selectMode) ...[
 +                    if (controller.canEditSelectedEvents)
@@ -308861,7 +308867,10 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eaecf3b0c24bb89a4e0eb135b319fbbe
 +                          ),
 +                        GestureDetector(
 +                          onTap: controller.clearSingleSelectedEvent,
-+                          child: ChatEventList(controller: controller),
++                          child: ValueListenableBuilder<int>(
++                            valueListenable: controller.timelineUpdateNotifier,
++                            builder: (context, _, __) => ChatEventList(controller: controller),
++                          ),
 +                        ),
 +                        Positioned(
 +                          bottom: 0,
@@ -325716,10 +325725,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc446300231cac3 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc7465f1a921 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1321 @@
+@@ -1,1041 +1,1324 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -327051,7 +327060,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc44630
 +        allRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
-+    if (mounted) setState(() {});
++    roomCacheNotifier.value++;
 +  }
 +
 +  // Returns the cached list. Build methods read this; it is always up to date
@@ -327163,6 +327172,8 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc44630
 +
 +  final ScrollController scrollController = ScrollController();
 +  final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
++
++  final ValueNotifier<int> roomCacheNotifier = ValueNotifier(0);
 +
 +  final StreamController<Client> _clientStream = StreamController.broadcast();
 +
@@ -327328,6 +327339,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc44630
 +    searchFocusNode.dispose();
 +    scrollController.dispose();
 +    scrolledToTop.dispose();
++    roomCacheNotifier.dispose();
 +    _clientStream.close();
 +    super.dispose();
 +  }
@@ -328083,10 +328095,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..8897f9b3551093be7b87d8946fc44630
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..260fae7bb7cec53072159a14fa55af6f96746a17 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..d5e9396edd14e28cc885f9eb6814b97406bb087c 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,451 @@
+@@ -1,338 +1,449 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328501,12 +328513,10 @@ index 8610b92531be84898e03439fa07f16145a6d552c..260fae7bb7cec53072159a14fa55af6f
 +    final userSearchResult = widget.controller.userSearchResult;
 +    const dummyChatCount = 4;
 +    final filter = widget.controller.searchController.text.toLowerCase();
-+    return StreamBuilder(
++    return ValueListenableBuilder<int>(
 +      key: ValueKey(client.userID.toString()),
-+      stream: client.onSync.stream
-+          .where((s) => s.hasRoomUpdate)
-+          .rateLimit(const Duration(seconds: 1)),
-+      builder: (context, _) {
++      valueListenable: widget.controller.roomCacheNotifier,
++      builder: (context, _, __) {
 +        final hiddenInboxRoomIds = BeeperBridgeUtils.getHiddenInboxRoomIds(client);
 +        var rooms = (filter.isNotEmpty || widget.controller.isSearchMode
 +                ? widget.controller.allRoomsSorted
