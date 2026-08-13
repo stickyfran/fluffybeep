@@ -308024,10 +308024,10 @@ index 879717fa9889be421184b768e20bad7417f95114..fa9ebde7da80fc329aa496eef0a58604
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..10829983a5e411571cfe4b81c7c17a36d0aa3f28 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9c8bc84c2 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,528 @@
+@@ -1,464 +1,530 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -308891,9 +308891,11 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..10829983a5e411571cfe4b81c7c17a36
 +                          ),
 +                        GestureDetector(
 +                          onTap: controller.clearSingleSelectedEvent,
-+                          child: ValueListenableBuilder<int>(
-+                            valueListenable: controller.timelineUpdateNotifier,
-+                            builder: (context, _, __) => ChatEventList(controller: controller),
++                          child: RepaintBoundary(
++                            child: ValueListenableBuilder<int>(
++                              valueListenable: controller.timelineUpdateNotifier,
++                              builder: (context, _, __) => ChatEventList(controller: controller),
++                            ),
 +                          ),
 +                        ),
 +                        Positioned(
@@ -328201,10 +328203,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..25df77b1d078b0bbde7021668c89cc74
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..25be1fbe498ca0fbcfad3fb7b97cb4441b104c24 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..6c6ae78cd828946a36e18536801c83d5ca9eccfa 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,452 @@
+@@ -1,338 +1,460 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328582,12 +328584,18 @@ index 8610b92531be84898e03439fa07f16145a6d552c..25be1fbe498ca0fbcfad3fb7b97cb444
 +}
 +
 +class _ChatListViewBodyState extends State<ChatListViewBody> with AutomaticKeepAliveClientMixin {
++  Widget? _cachedListViewBodyWidget;
++
 +  @override
 +  bool get wantKeepAlive => true;
 +
 +  @override
 +  Widget build(BuildContext context) {
 +    super.build(context);
++    final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
++    if (!isCurrentRoute && _cachedListViewBodyWidget != null) {
++      return _cachedListViewBodyWidget!;
++    }
 +    FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
 +    final theme = Theme.of(context);
 +
@@ -328914,6 +328922,8 @@ index 8610b92531be84898e03439fa07f16145a6d552c..25be1fbe498ca0fbcfad3fb7b97cb444
 +            ),
 +          ],
 +        );
++        _cachedListViewBodyWidget = builtWidget;
++        return builtWidget;
 +      },
 +    );
 +  }
