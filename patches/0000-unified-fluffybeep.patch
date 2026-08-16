@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..264146b3131ce625e1c787dd34da6de1bcc4b247 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..04afe9664913bf57bc7e50b70a17ae4304b2e3cc 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1885 @@
+@@ -1,1643 +1,1887 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305309,6 +305309,8 @@ index 74707498c32bda411d06d6c9c086f390f3401135..264146b3131ce625e1c787dd34da6de1
 +    loadTimelineFuture = _getTimeline();
 +    try {
 +      await loadTimelineFuture;
++      _invalidateTimelineCache();
++      timelineUpdateNotifier.value++;
 +      // We launched the chat with a given initial event ID:
 +      if (initialEventId != null) {
 +        scrollToEventId(initialEventId);
@@ -307404,10 +307406,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..c2b1b4f1c80628af2aee0b593c4eb9c279246028 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..cfcbd8a311f2b89fdc1da1ea0eed1a705d3fdbe7 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,287 @@
+@@ -1,253 +1,276 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307689,24 +307691,13 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c2b1b4f1c80628af2aee0b593c4eb9c2
 +import '../../utils/date_time_extension.dart';
 +import '../../widgets/font_size_scaler.dart';
 +
-+class ChatEventList extends StatefulWidget {
++class ChatEventList extends StatelessWidget {
 +  final ChatController controller;
 +
 +  const ChatEventList({super.key, required this.controller});
 +
 +  @override
-+  State<ChatEventList> createState() => _ChatEventListState();
-+}
-+
-+class _ChatEventListState extends State<ChatEventList>
-+    with AutomaticKeepAliveClientMixin {
-+  @override
-+  bool get wantKeepAlive => true;
-+
-+  @override
 +  Widget build(BuildContext context) {
-+    super.build(context);
-+    final controller = widget.controller;
 +    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (events=${controller.filteredEvents.length}, room=${controller.room.id})');
 +    final timeline = controller.timeline;
 +
@@ -329142,10 +329133,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..f88a1a5754d35b62750c2630a6efc4cf98be3e7e 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..da720d4d88c40678dd143180e39d412dd4e52574 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,461 @@
+@@ -1,338 +1,452 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329523,20 +329514,12 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f88a1a5754d35b62750c2630a6efc4cf
 +}
 +
 +class _ChatListViewBodyState extends State<ChatListViewBody> with AutomaticKeepAliveClientMixin {
-+  Widget? _cachedListViewBodyWidget;
-+  String? _lastActiveSpace;
-+
 +  @override
 +  bool get wantKeepAlive => true;
 +
 +  @override
 +  Widget build(BuildContext context) {
 +    super.build(context);
-+    final activeSpace = widget.controller.activeSpaceId;
-+    if (_cachedListViewBodyWidget != null && _lastActiveSpace == activeSpace) {
-+      return _cachedListViewBodyWidget!;
-+    }
-+    _lastActiveSpace = activeSpace;
 +    FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
 +    final theme = Theme.of(context);
 +
@@ -329864,7 +329847,6 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f88a1a5754d35b62750c2630a6efc4cf
 +        );
 +      },
 +    );
-+    _cachedListViewBodyWidget = body;
 +    return body;
 +  }
 +}
