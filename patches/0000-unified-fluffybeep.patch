@@ -326799,10 +326799,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..60eab7e0e08899f0048fc958cada18663afe0807 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a0c5d62de 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1366 @@
+@@ -1,1041 +1,1372 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328377,15 +328377,21 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..60eab7e0e08899f0048fc958cada1866
 +  }
 +
 +  bool _initialized = false;
++  Locale? _lastLocale;
 +
 +  @override
 +  void didChangeDependencies() {
 +    super.didChangeDependencies();
++    final currentLocale = Localizations.localeOf(context);
 +    if (_initialized) {
-+      _invalidateRoomCache();
++      if (_lastLocale != currentLocale) {
++        _lastLocale = currentLocale;
++        _invalidateRoomCache();
++      }
 +    }
 +    if (!_initialized) {
 +      _initialized = true;
++      _lastLocale = currentLocale;
 +
 +      // Safe to lookup context here
 +      Matrix.of(context).voipPlugin?.context = context;
@@ -330302,10 +330308,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..5a6770715d649fae0dadd9674766403f1825443c 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..7d11b4853240e88bcf7c4af5f5000442dbad7371 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,499 @@
+@@ -1,410 +1,503 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -330767,7 +330773,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..5a6770715d649fae0dadd9674766403f
 +  Future<String>? _calcLocalizedBodyFuture;
 +
 +  @override
-+  bool get wantKeepAlive => true;
++  bool get wantKeepAlive => false;
 +
 +  @override
 +  void initState() {
@@ -330861,12 +330867,36 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..5a6770715d649fae0dadd9674766403f
 +    final space = isBeeperFakeDM ? null : widget.space;
 +    final mxContent = beeperData.avatarUrl;
 +    final showSpaceAvatar = space != null && BeeperBridgeUtils.getRoomNetwork(space!) == null;
-+    final avatarWidget = SizedBox(
-+      width: Avatar.defaultSize,
-+      height: Avatar.defaultSize,
-+      child: Stack(
-+        children: [
-+          if (showSpaceAvatar)
++    final Widget avatarWidget;
++    if (!showSpaceAvatar) {
++      avatarWidget = Avatar(
++        shapeBorder: widget.room.isSpace
++            ? RoundedSuperellipseBorder(
++                side: BorderSide(
++                  width: 1,
++                  color: theme.dividerColor,
++                ),
++                borderRadius: BorderRadius.circular(
++                  AppConfig.spaceBorderRadius,
++                ),
++              )
++            : null,
++        borderRadius: widget.room.isSpace
++            ? BorderRadius.circular(AppConfig.spaceBorderRadius)
++            : null,
++        mxContent: mxContent,
++        size: Avatar.defaultSize,
++        name: displayname,
++        presenceUserId: directChatMatrixId,
++        presenceBackgroundColor: backgroundColor,
++        onTap: () => widget.onLongPress?.call(context),
++      );
++    } else {
++      avatarWidget = SizedBox(
++        width: Avatar.defaultSize,
++        height: Avatar.defaultSize,
++        child: Stack(
++          children: [
 +            Positioned(
 +              top: 0,
 +              left: 0,
@@ -330889,49 +330919,29 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..5a6770715d649fae0dadd9674766403f
 +                onTap: () => widget.onLongPress?.call(context),
 +              ),
 +            ),
-+          Positioned(
-+            bottom: 0,
-+            right: 0,
-+            child: Avatar(
-+              shapeBorder: !showSpaceAvatar
-+                  ? widget.room.isSpace
-+                        ? RoundedSuperellipseBorder(
-+                            side: BorderSide(
-+                              width: 1,
-+                              color: theme.dividerColor,
-+                            ),
-+                            borderRadius: BorderRadius.circular(
-+                              AppConfig.spaceBorderRadius,
-+                            ),
-+                          )
-+                        : null
-+                  : RoundedRectangleBorder(
-+                      side: BorderSide(
-+                        width: 2,
-+                        color: backgroundColor ?? theme.colorScheme.surface,
-+                      ),
-+                      borderRadius: BorderRadius.circular(
-+                        Avatar.defaultSize,
-+                      ),
-+                    ),
-+              borderRadius: widget.room.isSpace
-+                  ? BorderRadius.circular(
-+                      AppConfig.spaceBorderRadius,
-+                    )
-+                  : null,
-+              mxContent: mxContent,
-+              size: showSpaceAvatar
-+                  ? Avatar.defaultSize * 0.75
-+                  : Avatar.defaultSize,
-+              name: displayname,
-+              presenceUserId: directChatMatrixId,
-+              presenceBackgroundColor: backgroundColor,
-+              onTap: () => widget.onLongPress?.call(context),
++            Positioned(
++              bottom: 0,
++              right: 0,
++              child: Avatar(
++                shapeBorder: RoundedRectangleBorder(
++                  side: BorderSide(
++                    width: 2,
++                    color: backgroundColor ?? theme.colorScheme.surface,
++                  ),
++                  borderRadius: BorderRadius.circular(Avatar.defaultSize),
++                ),
++                mxContent: mxContent,
++                size: Avatar.defaultSize * 0.75,
++                name: displayname,
++                presenceUserId: directChatMatrixId,
++                presenceBackgroundColor: backgroundColor,
++                onTap: () => widget.onLongPress?.call(context),
++              ),
 +            ),
-+          ),
-+        ],
-+      ),
-+    );
++          ],
++        ),
++      );
++    }
 +
 +    Widget buildTile(bool listTileHovered) => ListTile(
 +      minVerticalPadding: 16,
