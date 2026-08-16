@@ -109,7 +109,7 @@ regenerate_patch() {
     fi
     
     # Generate the patch from upstream base to HEAD
-    git diff --full-index "$UPSTREAM_BASE" HEAD > "$PATCHES_DIR/0000-unified-fluffybeep.patch"
+    git diff --binary --full-index "$UPSTREAM_BASE" HEAD > "$PATCHES_DIR/0000-unified-fluffybeep.patch"
     log_info "Patch written to $PATCHES_DIR/0000-unified-fluffybeep.patch"
     log_info "Patch size: $(wc -c < "$PATCHES_DIR/0000-unified-fluffybeep.patch") bytes"
     
