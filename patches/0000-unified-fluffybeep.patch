@@ -326798,10 +326798,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a0c5d62de 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4d14b079b1e7fb6e1c046a35269380a4002a2a39 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1372 @@
+@@ -1,1041 +1,1374 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328110,13 +328110,13 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a
 +  List<Room> _cachedFilteredRooms = [];
 +  Set<String> _cachedHiddenInboxRoomIds = {};
 +  Map<String, String> _cachedRoomDisplayNames = {};
-+  StreamSubscription? _onSyncForRoomCache;
-+
 +  void _invalidateRoomCache([dynamic syncUpdate]) {
 +    final sw = Stopwatch()..start();
++    final changedRoomIds = <String>{};
 +    if (syncUpdate is SyncUpdate && syncUpdate.rooms?.join != null) {
 +      for (final roomId in syncUpdate.rooms!.join!.keys) {
 +        BeeperBridgeUtils.invalidateLastMessageTime(roomId);
++        changedRoomIds.add(roomId);
 +      }
 +    }
 +
@@ -328151,14 +328151,15 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a
 +      FileLogger.log(logBuffer.toString());
 +    }
 +
-+    // Precompute display names for fast non-blocking search filtering
-+    final displayNames = <String, String>{};
++    // Incrementally update display names map for fast non-blocking search filtering (O(1) for unchanged rooms)
++    final matrixLocals = MatrixLocals(L10n.of(context));
 +    for (final r in allRooms) {
-+      final beeperData = BeeperBridgeUtils.getRoomData(r);
-+      final dName = beeperData.displayName ?? r.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
-+      displayNames[r.id] = dName.toLowerCase();
++      if (!_cachedRoomDisplayNames.containsKey(r.id) || changedRoomIds.contains(r.id)) {
++        final beeperData = BeeperBridgeUtils.getRoomData(r);
++        final dName = beeperData.displayName ?? r.getLocalizedDisplayname(matrixLocals);
++        _cachedRoomDisplayNames[r.id] = dName.toLowerCase();
++      }
 +    }
-+    _cachedRoomDisplayNames = displayNames;
 +
 +    // Precalculate hidden inbox room IDs (avoid computing on every build)
 +    _cachedHiddenInboxRoomIds = BeeperBridgeUtils.getHiddenInboxRoomIds(client);
@@ -328385,6 +328386,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a
 +    if (_initialized) {
 +      if (_lastLocale != currentLocale) {
 +        _lastLocale = currentLocale;
++        _cachedRoomDisplayNames.clear();
 +        _invalidateRoomCache();
 +      }
 +    }
@@ -329216,10 +329218,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..d8e26045aeb971bc724a299dfac27a2a
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..15014fdf4cfbc119c32c03bc711ec3cd91a938ea 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..732e85f12336eee8b374a2751a28e17cf72eac7d 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,451 @@
+@@ -1,338 +1,449 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329645,16 +329647,14 @@ index 8610b92531be84898e03439fa07f16145a6d552c..15014fdf4cfbc119c32c03bc711ec3cd
 +        var rooms = (filter.isNotEmpty || widget.controller.isSearchMode
 +                ? widget.controller.allRoomsSorted
 +                : widget.controller.filteredRooms)
-+            .where(
-+              (room) =>
-+                  isVirtualSpace ||
++            .where((room) {
++              final passesSpaces = isVirtualSpace ||
 +                  isVirtualTag ||
 +                  isVirtualBeeperLabel ||
 +                  widget.controller.activeFilter == ActiveFilter.tag ||
 +                  !AppSettings.hideRoomsInSpaces.value ||
-+                  spaceDelegateCandidates[room.id] == null,
-+            )
-+            .where((room) {
++                  spaceDelegateCandidates[room.id] == null;
++              if (!passesSpaces) return false;
 +              if (isVirtualSpace || isVirtualTag || isVirtualBeeperLabel) return true;
 +              return !hiddenInboxRoomIds.contains(room.id);
 +            })
