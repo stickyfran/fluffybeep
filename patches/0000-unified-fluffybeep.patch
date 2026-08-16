@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..f69a37ff4437cc8464ea2a05c5d68c2d758b9f3a 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..6536e60a0937983a5eeb139c3ea8f6e8ee82c579 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1893 @@
+@@ -1,1643 +1,1899 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305291,17 +305291,17 @@ index 74707498c32bda411d06d6c9c086f390f3401135..f69a37ff4437cc8464ea2a05c5d68c2d
 +      threadId: activeThreadId,
 +    );
 +    final start = events.indexOf(event);
-+    setState(() {
-+      for (var i = start; i < events.length; i++) {
-+        final event = events[i];
-+        if (!event.isCollapsedState) return;
-+        if (expand) {
-+          expandedEventIds.add(event.eventId);
-+        } else {
-+          expandedEventIds.remove(event.eventId);
-+        }
++    for (var i = start; i < events.length; i++) {
++      final event = events[i];
++      if (!event.isCollapsedState) return;
++      if (expand) {
++        expandedEventIds.add(event.eventId);
++      } else {
++        expandedEventIds.remove(event.eventId);
 +      }
-+    });
++    }
++    _invalidateTimelineCache();
++    timelineUpdateNotifier.value++;
 +  }
 +
 +  Future<void> _tryLoadTimeline() async {
@@ -305343,15 +305343,20 @@ index 74707498c32bda411d06d6c9c086f390f3401135..f69a37ff4437cc8464ea2a05c5d68c2d
 +    }
 +  }
 +
-+  String? scrollUpBannerEventId;
++  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
++      ValueNotifier<String?>(null);
 +
-+  void discardScrollUpBannerEventId() => setState(() {
++  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
++  set scrollUpBannerEventId(String? value) =>
++      scrollUpBannerEventIdNotifier.value = value;
++
++  void discardScrollUpBannerEventId() {
 +    scrollUpBannerEventId = null;
-+  });
++  }
 +
-+  void _showScrollUpMaterialBanner(String eventId) => setState(() {
++  void _showScrollUpMaterialBanner(String eventId) {
 +    scrollUpBannerEventId = eventId;
-+  });
++  }
 +
 +  String? animateInEventId;
 +
@@ -305655,6 +305660,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..f69a37ff4437cc8464ea2a05c5d68c2d
 +    timelineUpdateNotifier.dispose();
 +    isInputEmptyNotifier.dispose();
 +    inputBarHeightNotifier.dispose();
++    scrollUpBannerEventIdNotifier.dispose();
 +    _displayChatDetailsColumn.dispose();
 +
 +    MxcImage.clearCache(room.id);
@@ -307412,10 +307418,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..cfcbd8a311f2b89fdc1da1ea0eed1a705d3fdbe7 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..d07ba31c0fde78e81e794d475642df2447dca60e 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,276 @@
+@@ -1,253 +1,278 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307851,88 +307857,90 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..cfcbd8a311f2b89fdc1da1ea0eed1a70
 +                key: ValueKey(event.transactionId ?? event.eventId),
 +                index: i,
 +                controller: controller.scrollController,
-+                child: Column(
-+                  mainAxisSize: .min,
-+                  children: [
-+                    if (!isCollapsed && displayDate)
-+                      Padding(
-+                        padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-+                        child: Center(
-+                          child: Padding(
-+                            padding: const EdgeInsets.only(top: 4.0),
-+                            child: Material(
-+                              borderRadius: BorderRadius.circular(
-+                                AppConfig.borderRadius * 2,
-+                              ),
-+                              color: theme.colorScheme.inverseSurface.withAlpha(
-+                                200,
-+                              ),
-+                              child: Padding(
-+                                padding: const EdgeInsets.symmetric(
-+                                  horizontal: 8.0,
-+                                  vertical: 2.0,
++                child: RepaintBoundary(
++                  child: Column(
++                    mainAxisSize: .min,
++                    children: [
++                      if (!isCollapsed && displayDate)
++                        Padding(
++                          padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
++                          child: Center(
++                            child: Padding(
++                              padding: const EdgeInsets.only(top: 4.0),
++                              child: Material(
++                                borderRadius: BorderRadius.circular(
++                                  AppConfig.borderRadius * 2,
 +                                ),
-+                                child: Text(
-+                                  event.originServerTs.localizedDate(context),
-+                                  style: TextStyle(
-+                                    fontWeight: FontWeight.bold,
-+                                    color: theme.colorScheme.onInverseSurface,
++                                color: theme.colorScheme.inverseSurface.withAlpha(
++                                  200,
++                                ),
++                                child: Padding(
++                                  padding: const EdgeInsets.symmetric(
++                                    horizontal: 8.0,
++                                    vertical: 2.0,
++                                  ),
++                                  child: Text(
++                                    event.originServerTs.localizedDate(context),
++                                    style: TextStyle(
++                                      fontWeight: FontWeight.bold,
++                                      color: theme.colorScheme.onInverseSurface,
++                                    ),
 +                                  ),
 +                                ),
 +                              ),
 +                            ),
 +                          ),
 +                        ),
++                      Message(
++                        event,
++                        bigEmojis: controller.bigEmojis,
++                        animateIn: animateIn,
++                        onSwipe: () => controller.replyAction(replyTo: event),
++                        onInfoTab: controller.showEventInfo,
++                        onMention: () => controller.sendController.text +=
++                            '${event.senderFromMemoryOrFallback.mention} ',
++                        highlightMarker:
++                            controller.scrollToEventIdMarker == event.eventId,
++                        onSelect: controller.onSelectMessage,
++                        scrollToEventId: controller.scrollToEventId,
++                        longPressSelect: controller.selectedEvents.isNotEmpty,
++                        selected: controller.selectedEvents.any(
++                          (e) => e.eventId == event.eventId,
++                        ),
++                        singleSelected:
++                            controller.selectedEvents.singleOrNull?.eventId ==
++                            event.eventId,
++                        onEdit: controller.editSelectedEventAction,
++                        timeline: timeline,
++                        displayReadMarker:
++                            i > 0 &&
++                            controller.readMarkerEventId == event.eventId,
++                        onMarkRead: () => controller.setReadMarker(
++                          force: true,
++                        ),
++                        nextEvent: nextEvent,
++                        previousEvent: previousEvent,
++                        wallpaperMode: hasWallpaper,
++                        scrollController: controller.scrollController,
++                        colors: colors,
++                        isCollapsed: isCollapsed,
++                        enterThread: controller.activeThreadId == null
++                            ? controller.enterThread
++                            : null,
++                        cachedReactions: controller.reactionsMap[event.eventId],
++                        cachedThreadChildren: controller.threadsMap[event.eventId],
++                        cachedIsEdited: controller.editsSet.contains(event.eventId),
++                        onExpand: canExpand
++                            ? () => controller.expandEventsFrom(
++                                event,
++                                !controller.expandedEventIds.contains(
++                                  event.eventId,
++                                ),
++                              )
++                            : null,
 +                      ),
-+                    Message(
-+                      event,
-+                      bigEmojis: controller.bigEmojis,
-+                      animateIn: animateIn,
-+                      onSwipe: () => controller.replyAction(replyTo: event),
-+                      onInfoTab: controller.showEventInfo,
-+                      onMention: () => controller.sendController.text +=
-+                          '${event.senderFromMemoryOrFallback.mention} ',
-+                      highlightMarker:
-+                          controller.scrollToEventIdMarker == event.eventId,
-+                      onSelect: controller.onSelectMessage,
-+                      scrollToEventId: controller.scrollToEventId,
-+                      longPressSelect: controller.selectedEvents.isNotEmpty,
-+                      selected: controller.selectedEvents.any(
-+                        (e) => e.eventId == event.eventId,
-+                      ),
-+                      singleSelected:
-+                          controller.selectedEvents.singleOrNull?.eventId ==
-+                          event.eventId,
-+                      onEdit: controller.editSelectedEventAction,
-+                      timeline: timeline,
-+                      displayReadMarker:
-+                          i > 0 &&
-+                          controller.readMarkerEventId == event.eventId,
-+                      onMarkRead: () => controller.setReadMarker(
-+                        force: true,
-+                      ),
-+                      nextEvent: nextEvent,
-+                      previousEvent: previousEvent,
-+                      wallpaperMode: hasWallpaper,
-+                      scrollController: controller.scrollController,
-+                      colors: colors,
-+                      isCollapsed: isCollapsed,
-+                      enterThread: controller.activeThreadId == null
-+                          ? controller.enterThread
-+                          : null,
-+                      cachedReactions: controller.reactionsMap[event.eventId],
-+                      cachedThreadChildren: controller.threadsMap[event.eventId],
-+                      cachedIsEdited: controller.editsSet.contains(event.eventId),
-+                      onExpand: canExpand
-+                          ? () => controller.expandEventsFrom(
-+                              event,
-+                              !controller.expandedEventIds.contains(
-+                                event.eventId,
-+                              ),
-+                            )
-+                          : null,
-+                    ),
-+                  ],
++                    ],
++                  ),
 +                ),
 +              );
 +            },
@@ -308946,10 +308954,10 @@ index 879717fa9889be421184b768e20bad7417f95114..aab752aef8a9a8edd1b603e721960087
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9c8bc84c2 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..21d35fbe0e7d68a622cf0498ea8b52425469fa45 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,530 @@
+@@ -1,464 +1,567 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309413,7 +309421,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9
 -      ),
 -    );
 -  }
--}
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -309467,10 +309474,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9
 +      );
 +    }
 +    final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
-+    final scrollUpBannerEventId = controller.scrollUpBannerEventId;
 +
 +    final accountConfig = Matrix.of(context).client.applicationAccountConfig;
-+
 +    return PopScope(
 +      canPop:
 +          controller.selectedEvents.isEmpty &&
@@ -309486,464 +309491,503 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..efeef832cc5c6520597fa8a7449269f9
 +          controller.closeThread();
 +        }
 +      },
-+      child: StreamBuilder(
-+        stream: controller.room.client.onRoomState.stream
-+            .where((update) => update.roomId == controller.room.id)
-+            .rateLimit(const Duration(seconds: 1)),
-+        builder: (context, snapshot) => FutureBuilder(
-+          future: controller.loadTimelineFuture,
-+          builder: (BuildContext context, snapshot) {
-+            var appbarBottomHeight = 0.0;
-+            final activeThreadId = controller.activeThreadId;
-+            if (activeThreadId != null) {
-+              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
-+            }
-+            if (controller.room.pinnedEventIds.isNotEmpty &&
-+                activeThreadId == null) {
-+              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
-+            }
-+            if (scrollUpBannerEventId != null && activeThreadId == null) {
-+              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
-+            }
-+            return Scaffold(
-+              key: Key('chat_page'),
-+              extendBodyBehindAppBar: true,
-+              appBar: AppBar(
-+                shape: FluffyThemes.isColumnMode(context)
-+                    ? Border(
-+                        bottom: BorderSide(color: theme.dividerColor, width: 1),
-+                      )
-+                    : null,
-+                actionsIconTheme: IconThemeData(
-+                  color: controller.selectedEvents.isEmpty
-+                      ? null
-+                      : theme.colorScheme.onTertiaryContainer,
++      child: Scaffold(
++        key: const Key('chat_page'),
++        extendBodyBehindAppBar: true,
++        appBar: _ChatAppBar(controller),
++        floatingActionButton:
++            controller.showScrollDownButton &&
++                controller.selectedEvents.isEmpty
++            ? Padding(
++                padding: EdgeInsets.only(
++                  bottom: theme.appBarTheme.toolbarHeight ?? 56,
 +                ),
-+                backgroundColor: controller.selectedEvents.isEmpty
-+                    ? controller.activeThreadId != null
-+                          ? theme.colorScheme.secondaryContainer
-+                          : theme.colorScheme.surface.withAlpha(240)
-+                    : theme.colorScheme.tertiaryContainer,
-+                automaticallyImplyLeading: false,
-+                leading: controller.selectMode
-+                    ? IconButton(
-+                        icon: const Icon(Icons.close),
-+                        onPressed: controller.clearSelectedEvents,
-+                        tooltip: L10n.of(context).close,
-+                        color: theme.colorScheme.onTertiaryContainer,
-+                      )
-+                    : activeThreadId != null
-+                    ? IconButton(
-+                        icon: const Icon(Icons.close),
-+                        onPressed: controller.closeThread,
-+                        tooltip: L10n.of(context).backToMainChat,
-+                        color: theme.colorScheme.onSecondaryContainer,
-+                      )
-+                    : FluffyThemes.isColumnMode(context)
-+                    ? null
-+                    : const Center(child: BackButton()),
-+                titleSpacing: FluffyThemes.isColumnMode(context) ? 24 : 0,
-+                title: ValueListenableBuilder<int>(
-+                  valueListenable: controller.timelineUpdateNotifier,
-+                  builder: (context, _, __) => ChatAppBarTitle(controller),
++                child: FloatingActionButton(
++                  onPressed: controller.scrollDown,
++                  heroTag: null,
++                  mini: true,
++                  backgroundColor: theme.colorScheme.surface,
++                  foregroundColor: theme.colorScheme.onSurface,
++                  child: const Icon(Icons.arrow_downward_outlined),
 +                ),
-+                actions: [
-+                  if (controller.selectMode) ...[
-+                    if (controller.canEditSelectedEvents)
-+                      IconButton(
-+                        icon: const Icon(Icons.edit_outlined),
-+                        tooltip: L10n.of(context).edit,
-+                        onPressed: controller.editSelectedEventAction,
-+                      ),
-+                    if (controller.selectedEvents.length == 1 &&
-+                        controller.activeThreadId == null &&
-+                        controller.room.canSendDefaultMessages)
-+                      IconButton(
-+                        icon: const Icon(Icons.message_outlined),
-+                        tooltip: L10n.of(context).replyInThread,
-+                        onPressed: () => controller.enterThread(
-+                          controller.selectedEvents.single.eventId,
-+                        ),
-+                      ),
-+                    IconButton(
-+                      icon: const Icon(Icons.copy_outlined),
-+                      tooltip: L10n.of(context).copyToClipboard,
-+                      onPressed: controller.copyEventsAction,
-+                    ),
-+                    if (controller.canRedactSelectedEvents)
-+                      IconButton(
-+                        icon: const Icon(Icons.delete_outlined),
-+                        tooltip: L10n.of(context).redactMessage,
-+                        onPressed: controller.redactEventsAction,
-+                      ),
-+                    if (controller.selectedEvents.length == 1)
-+                      PopupMenuButton<_EventContextAction>(
-+                        useRootNavigator: true,
-+                        onSelected: (action) {
-+                          switch (action) {
-+                            case _EventContextAction.info:
-+                              controller.showEventInfo();
-+                              controller.clearSelectedEvents();
-+                              break;
-+                            case _EventContextAction.report:
-+                              controller.reportEventAction();
-+                              break;
-+                          }
-+                        },
-+                        itemBuilder: (context) => [
-+                          if (controller.canPinSelectedEvents)
-+                            PopupMenuItem(
-+                              onTap: controller.pinEvent,
-+                              value: null,
-+                              child: Row(
-+                                mainAxisSize: .min,
-+                                children: [
-+                                  const Icon(Icons.push_pin_outlined),
-+                                  const SizedBox(width: 12),
-+                                  Text(L10n.of(context).pinMessage),
-+                                ],
-+                              ),
-+                            ),
-+                          if (controller.selectedEvents.single.type == 'm.sticker')
-+                            PopupMenuItem(
-+                              onTap: () => BeeperBridgeUtils.addStickerToWhatsappPack(
-+                                context,
-+                                controller.selectedEvents.single,
-+                              ),
-+                              value: null,
-+                              child: Row(
-+                                mainAxisSize: .min,
-+                                children: [
-+                                  const Icon(Icons.add_photo_alternate_outlined),
-+                                  const SizedBox(width: 12),
-+                                  const Text('Agregar a Mis stickers'),
-+                                ],
-+                              ),
-+                            ),
-+                          if (controller.canSaveSelectedEvent)
-+                            PopupMenuItem(
-+                              onTap: () =>
-+                                  controller.saveSelectedEvent(context),
-+                              value: null,
-+                              child: Row(
-+                                mainAxisSize: .min,
-+                                children: [
-+                                  const Icon(Icons.download_outlined),
-+                                  const SizedBox(width: 12),
-+                                  Text(L10n.of(context).downloadFile),
-+                                ],
-+                              ),
-+                            ),
-+                          PopupMenuItem(
-+                            value: _EventContextAction.info,
-+                            child: Row(
-+                              mainAxisSize: .min,
-+                              children: [
-+                                const Icon(Icons.info_outlined),
-+                                const SizedBox(width: 12),
-+                                Text(L10n.of(context).messageInfo),
-+                              ],
-+                            ),
-+                          ),
-+                          if (controller.selectedEvents.single.status.isSent)
-+                            PopupMenuItem(
-+                              value: _EventContextAction.report,
-+                              child: Row(
-+                                mainAxisSize: .min,
-+                                children: [
-+                                  const Icon(
-+                                    Icons.shield_outlined,
-+                                    color: Colors.red,
-+                                  ),
-+                                  const SizedBox(width: 12),
-+                                  Text(L10n.of(context).reportMessage),
-+                                ],
-+                              ),
-+                            ),
-+                        ],
-+                      ),
-+                  ] else if (!controller.room.isArchived) ...[
-+                    if (BeeperBridgeUtils.getRoomNetwork(controller.room)?.key == 'whatsapp')
-+                      IconButton(
-+                        onPressed: () {
-+                          final directId = controller.room.directChatMatrixID ?? '';
-+                          final match = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(directId);
-+                          if (match != null) {
-+                            final number = match.group(1);
-+                            launchUrl(Uri.parse('tel:+$number'));
-+                          }
-+                        },
-+                        icon: const Icon(Icons.call_outlined),
-+                        tooltip: 'Llamar por celular',
-+                      ),
-+                    if (BeeperBridgeUtils.getRoomNetwork(controller.room)?.key == 'instagram')
-+                      IconButton(
-+                        onPressed: () async {
-+                          final directId = controller.room.directChatMatrixID ?? '';
-+                          final match = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
-+                          if (match != null) {
-+                            final id = match.group(1)!;
-+                            final isNumeric = RegExp(r'^\d+$').hasMatch(id);
-+                            final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=$id' : 'https://instagram.com/$id');
-+                            try {
-+                              if (!await launchUrl(uri)) {
-+                                await launchUrl(Uri.parse('https://instagram.com/$id'));
-+                              }
-+                            } catch (_) {
-+                              await launchUrl(Uri.parse('https://instagram.com/$id'));
-+                            }
-+                          }
-+                        },
-+                        icon: const Icon(Icons.camera_alt_outlined),
-+                        tooltip: 'Ver perfil',
-+                      ),
-+                    if ((AppSettings.experimentalVoip.value &&
-+                        controller.room.isDirectChat))
-+                      IconButton(
-+                        onPressed: controller.onPhoneButtonTap,
-+                        icon: const Icon(Icons.call_outlined),
-+                        tooltip: L10n.of(context).placeCall,
-+                      ),
-+                    ChatSettingsPopupMenu(controller.room, true),
-+                  ],
-+                ],
-+                bottom: PreferredSize(
-+                  preferredSize: Size.fromHeight(appbarBottomHeight),
-+                  child: Column(
-+                    mainAxisSize: .min,
-+                    children: [
-+                      PinnedEvents(controller),
-+                      if (activeThreadId != null)
-+                        SizedBox(
-+                          height: ChatAppBarListTile.fixedHeight,
-+                          child: Center(
-+                            child: TextButton.icon(
-+                              onPressed: () =>
-+                                  controller.scrollToEventId(activeThreadId),
-+                              icon: const Icon(Icons.message),
-+                              label: Text(L10n.of(context).replyInThread),
-+                              style: TextButton.styleFrom(
-+                                foregroundColor:
-+                                    theme.colorScheme.onSecondaryContainer,
-+                                shape: RoundedRectangleBorder(
-+                                  borderRadius: BorderRadius.circular(4),
-+                                ),
-+                              ),
-+                            ),
-+                          ),
-+                        ),
-+                      if (scrollUpBannerEventId != null &&
-+                          activeThreadId == null &&
-+                          (BeeperBridgeUtils.prefs?.getBool('beeper_show_jump_banner') ?? true))
-+                        ChatAppBarListTile(
-+                          leading: IconButton(
-+                            color: theme.colorScheme.onSurfaceVariant,
-+                            icon: const Icon(Icons.close),
-+                            tooltip: L10n.of(context).close,
-+                            onPressed: () {
-+                              controller.discardScrollUpBannerEventId();
-+                              controller.setReadMarker(force: true);
-+                            },
-+                          ),
-+                          title: L10n.of(context).jumpToLastReadMessage,
-+                          trailing: TextButton(
-+                            onPressed: () {
-+                              controller.scrollToEventId(scrollUpBannerEventId);
-+                              controller.discardScrollUpBannerEventId();
-+                            },
-+                            child: Text(L10n.of(context).jump),
-+                          ),
-+                        ),
-+                    ],
-+                  ),
-+                ),
-+              ),
-+              floatingActionButton:
-+                  controller.showScrollDownButton &&
-+                      controller.selectedEvents.isEmpty
-+                  ? Padding(
-+                      padding: EdgeInsets.only(
-+                        bottom: theme.appBarTheme.toolbarHeight ?? 56,
-+                      ),
-+                      child: FloatingActionButton(
-+                        onPressed: controller.scrollDown,
-+                        heroTag: null,
-+                        mini: true,
-+                        backgroundColor: theme.colorScheme.surface,
-+                        foregroundColor: theme.colorScheme.onSurface,
-+                        child: const Icon(Icons.arrow_downward_outlined),
-+                      ),
-+                    )
-+                  : null,
-+              body: NotificationListener<SizeChangedLayoutNotification>(
-+                onNotification: (SizeChangedLayoutNotification notification) {
-+                  WidgetsBinding.instance.addPostFrameCallback(
-+                    (_) => controller.updateInputBarHeight(),
-+                  );
-+                  return true;
-+                },
-+                child: DropTarget(
-+                  onDragDone: controller.onDragDone,
-+                  onDragEntered: controller.onDragEntered,
-+                  onDragExited: controller.onDragExited,
-+                  child: SafeArea(
-+                    top: false,
-+                    child: Stack(
-+                      children: <Widget>[
-+                        if (accountConfig.wallpaperUrl != null)
-+                          RepaintBoundary(
-+                            child: Opacity(
-+                              opacity: accountConfig.wallpaperOpacity ?? 0.5,
-+                              child: ImageFiltered(
-+                                imageFilter: ui.ImageFilter.blur(
-+                                  sigmaX: accountConfig.wallpaperBlur ?? 0.0,
-+                                  sigmaY: accountConfig.wallpaperBlur ?? 0.0,
-+                                ),
-+                                child: MxcImage(
-+                                  cacheKey: accountConfig.wallpaperUrl.toString(),
-+                                  uri: accountConfig.wallpaperUrl,
-+                                  fit: BoxFit.cover,
-+                                  height: MediaQuery.sizeOf(context).height,
-+                                  width: MediaQuery.sizeOf(context).width,
-+                                  isThumbnail: false,
-+                                  placeholder: (_) => Container(),
-+                                ),
-+                              ),
-+                            ),
-+                          ),
-+                        GestureDetector(
-+                          onTap: controller.clearSingleSelectedEvent,
-+                          child: RepaintBoundary(
-+                            child: ValueListenableBuilder<int>(
-+                              valueListenable: controller.timelineUpdateNotifier,
-+                              builder: (context, _, __) => ChatEventList(controller: controller),
-+                            ),
-+                          ),
-+                        ),
-+                        Positioned(
-+                          bottom: 0,
-+                          left: 0,
-+                          right: 0,
-+                          child: SizeChangedLayoutNotifier(
-+                            child: Container(
-+                              key: controller.inputBarKey,
-+                              decoration: BoxDecoration(
-+                                gradient: LinearGradient(
-+                                  colors: [
-+                                    theme.colorScheme.surface.withAlpha(0),
-+                                    theme.colorScheme.surface.withAlpha(0),
-+                                    theme.colorScheme.surface,
-+                                    theme.colorScheme.surface,
-+                                  ],
-+                                  begin: Alignment.topCenter,
-+                                  end: Alignment.bottomCenter,
-+                                ),
-+                              ),
-+                              alignment: Alignment.center,
-+                              child: Container(
-+                                margin: EdgeInsets.all(bottomSheetPadding),
-+                                constraints: const BoxConstraints(
-+                                  maxWidth: FluffyThemes.maxTimelineWidth,
-+                                ),
-+                                child: controller.room.isExtinct
-+                                    ? ElevatedButton.icon(
-+                                        icon: const Icon(Icons.chevron_right),
-+                                        label: Text(
-+                                          L10n.of(context).enterNewChat,
-+                                        ),
-+                                        onPressed: controller.goToNewRoomAction,
-+                                      )
-+                                    : controller.room.canSendDefaultMessages &&
-+                                          controller.room.membership ==
-+                                              Membership.join
-+                                    ? Material(
-+                                        clipBehavior: Clip.hardEdge,
-+                                        color:
-+                                            controller.selectedEvents.isNotEmpty
-+                                            ? theme
-+                                                  .colorScheme
-+                                                  .tertiaryContainer
-+                                            : theme
-+                                                  .colorScheme
-+                                                  .surfaceContainer,
-+                                        borderRadius: BorderRadius.circular(32),
-+                                        child:
-+                                            controller.room.isAbandonedDMRoom ==
-+                                                true
-+                                            ? Row(
-+                                                mainAxisAlignment: .spaceEvenly,
-+                                                children: [
-+                                                  TextButton.icon(
-+                                                    style: TextButton.styleFrom(
-+                                                      padding:
-+                                                          const EdgeInsets.all(
-+                                                            16,
-+                                                          ),
-+                                                      foregroundColor: theme
-+                                                          .colorScheme
-+                                                          .error,
-+                                                    ),
-+                                                    icon: const Icon(
-+                                                      Icons.archive_outlined,
-+                                                    ),
-+                                                    onPressed:
-+                                                        controller.leaveChat,
-+                                                    label: Text(
-+                                                      L10n.of(context).leave,
-+                                                    ),
-+                                                  ),
-+                                                  TextButton.icon(
-+                                                    style: TextButton.styleFrom(
-+                                                      padding:
-+                                                          const EdgeInsets.all(
-+                                                            16,
-+                                                          ),
-+                                                    ),
-+                                                    icon: const Icon(
-+                                                      Icons.forum_outlined,
-+                                                    ),
-+                                                    onPressed:
-+                                                        controller.recreateChat,
-+                                                    label: Text(
-+                                                      L10n.of(
-+                                                        context,
-+                                                      ).reopenChat,
-+                                                    ),
-+                                                  ),
-+                                                ],
-+                                              )
-+                                            : Column(
-+                                                mainAxisSize: .min,
-+                                                children: [
-+                                                  ReplyDisplay(controller),
-+                                                  ChatInputRow(controller),
-+                                                  ChatEmojiPicker(controller),
-+                                                ],
-+                                              ),
-+                                      )
-+                                    : SizedBox.shrink(),
-+                              ),
-+                            ),
-+                          ),
-+                        ),
-+                        if (controller.dragging)
-+                          Container(
-+                            color: theme.scaffoldBackgroundColor.withAlpha(230),
-+                            alignment: Alignment.center,
-+                            child: const Icon(Icons.upload_outlined, size: 100),
-+                          ),
-+                      ],
-+                    ),
-+                  ),
-+                ),
-+              ),
++              )
++            : null,
++        body: NotificationListener<SizeChangedLayoutNotification>(
++          onNotification: (SizeChangedLayoutNotification notification) {
++            WidgetsBinding.instance.addPostFrameCallback(
++              (_) => controller.updateInputBarHeight(),
 +            );
++            return true;
 +          },
++          child: DropTarget(
++            onDragDone: controller.onDragDone,
++            onDragEntered: controller.onDragEntered,
++            onDragExited: controller.onDragExited,
++            child: SafeArea(
++              top: false,
++              child: Stack(
++                children: <Widget>[
++                  if (accountConfig.wallpaperUrl != null)
++                    RepaintBoundary(
++                      child: Opacity(
++                        opacity: accountConfig.wallpaperOpacity ?? 0.5,
++                        child: ImageFiltered(
++                          imageFilter: ui.ImageFilter.blur(
++                            sigmaX: accountConfig.wallpaperBlur ?? 0.0,
++                            sigmaY: accountConfig.wallpaperBlur ?? 0.0,
++                          ),
++                          child: MxcImage(
++                            cacheKey: accountConfig.wallpaperUrl.toString(),
++                            uri: accountConfig.wallpaperUrl,
++                            fit: BoxFit.cover,
++                            height: MediaQuery.sizeOf(context).height,
++                            width: MediaQuery.sizeOf(context).width,
++                            isThumbnail: false,
++                            placeholder: (_) => Container(),
++                          ),
++                        ),
++                      ),
++                    ),
++                  GestureDetector(
++                    onTap: controller.clearSingleSelectedEvent,
++                    child: RepaintBoundary(
++                      child: ValueListenableBuilder<int>(
++                        valueListenable: controller.timelineUpdateNotifier,
++                        builder: (context, _, __) => ChatEventList(controller: controller),
++                      ),
++                    ),
++                  ),
++                  Positioned(
++                    bottom: 0,
++                    left: 0,
++                    right: 0,
++                    child: SizeChangedLayoutNotifier(
++                      child: Container(
++                        key: controller.inputBarKey,
++                        decoration: BoxDecoration(
++                          gradient: LinearGradient(
++                            colors: [
++                              theme.colorScheme.surface.withAlpha(0),
++                              theme.colorScheme.surface.withAlpha(0),
++                              theme.colorScheme.surface,
++                              theme.colorScheme.surface,
++                            ],
++                            begin: Alignment.topCenter,
++                            end: Alignment.bottomCenter,
++                          ),
++                        ),
++                        alignment: Alignment.center,
++                        child: Container(
++                          margin: EdgeInsets.all(bottomSheetPadding),
++                          constraints: const BoxConstraints(
++                            maxWidth: FluffyThemes.maxTimelineWidth,
++                          ),
++                          child: controller.room.isExtinct
++                              ? ElevatedButton.icon(
++                                  icon: const Icon(Icons.chevron_right),
++                                  label: Text(
++                                    L10n.of(context).enterNewChat,
++                                  ),
++                                  onPressed: controller.goToNewRoomAction,
++                                )
++                              : controller.room.canSendDefaultMessages &&
++                                    controller.room.membership ==
++                                        Membership.join
++                              ? Material(
++                                  clipBehavior: Clip.hardEdge,
++                                  color:
++                                      controller.selectedEvents.isNotEmpty
++                                      ? theme
++                                            .colorScheme
++                                            .tertiaryContainer
++                                      : theme
++                                            .colorScheme
++                                            .surfaceContainer,
++                                  borderRadius: BorderRadius.circular(32),
++                                  child:
++                                      controller.room.isAbandonedDMRoom ==
++                                          true
++                                      ? Row(
++                                          mainAxisAlignment: .spaceEvenly,
++                                          children: [
++                                            TextButton.icon(
++                                              style: TextButton.styleFrom(
++                                                padding:
++                                                    const EdgeInsets.all(
++                                                      16,
++                                                    ),
++                                                foregroundColor: theme
++                                                    .colorScheme
++                                                    .error,
++                                              ),
++                                              icon: const Icon(
++                                                Icons.archive_outlined,
++                                              ),
++                                              onPressed:
++                                                  controller.leaveChat,
++                                              label: Text(
++                                                L10n.of(context).leave,
++                                              ),
++                                            ),
++                                            TextButton.icon(
++                                              style: TextButton.styleFrom(
++                                                padding:
++                                                    const EdgeInsets.all(
++                                                      16,
++                                                    ),
++                                              ),
++                                              icon: const Icon(
++                                                Icons.forum_outlined,
++                                              ),
++                                              onPressed:
++                                                  controller.recreateChat,
++                                              label: Text(
++                                                L10n.of(
++                                                  context,
++                                                ).reopenChat,
++                                              ),
++                                            ),
++                                          ],
++                                        )
++                                      : Column(
++                                          mainAxisSize: .min,
++                                          children: [
++                                            ReplyDisplay(controller),
++                                            ChatInputRow(controller),
++                                            ChatEmojiPicker(controller),
++                                          ],
++                                        ),
++                                )
++                              : SizedBox.shrink(),
++                        ),
++                      ),
++                    ),
++                  ),
++                  if (controller.dragging)
++                    Container(
++                      color: theme.scaffoldBackgroundColor.withAlpha(230),
++                      alignment: Alignment.center,
++                      child: const Icon(Icons.upload_outlined, size: 100),
++                    ),
++                ],
++              ),
++            ),
++          ),
 +        ),
 +      ),
 +    );
 +  }
 +}
++
++class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
++  final ChatController controller;
++
++  const _ChatAppBar(this.controller);
++
++  static bool _isUiRelevantStateEvent(RoomStateUpdate update) {
++    final type = update.state.type;
++    return type == EventTypes.RoomName ||
++        type == EventTypes.RoomAvatar ||
++        type == EventTypes.RoomTopic ||
++        type == EventTypes.RoomPinnedEvents ||
++        type == EventTypes.RoomMember ||
++        type == EventTypes.RoomPowerLevels;
++  }
++
++  @override
++  Size get preferredSize {
++    var height = kToolbarHeight;
++    final activeThreadId = controller.activeThreadId;
++    if (activeThreadId != null) {
++      height += ChatAppBarListTile.fixedHeight;
++    }
++    if (controller.room.pinnedEventIds.isNotEmpty && activeThreadId == null) {
++      height += ChatAppBarListTile.fixedHeight;
++    }
++    if (controller.scrollUpBannerEventId != null && activeThreadId == null) {
++      height += ChatAppBarListTile.fixedHeight;
++    }
++    return Size.fromHeight(height);
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    return StreamBuilder<RoomStateUpdate>(
++      stream: controller.room.client.onRoomState.stream
++          .where((update) => update.roomId == controller.room.id && _isUiRelevantStateEvent(update))
++          .rateLimit(const Duration(seconds: 1)),
++      builder: (context, _) => ValueListenableBuilder<String?>(
++        valueListenable: controller.scrollUpBannerEventIdNotifier,
++        builder: (context, scrollUpBannerEventId, _) {
++          var appbarBottomHeight = 0.0;
++          final activeThreadId = controller.activeThreadId;
++          if (activeThreadId != null) {
++            appbarBottomHeight += ChatAppBarListTile.fixedHeight;
++          }
++          if (controller.room.pinnedEventIds.isNotEmpty &&
++              activeThreadId == null) {
++            appbarBottomHeight += ChatAppBarListTile.fixedHeight;
++          }
++          if (scrollUpBannerEventId != null && activeThreadId == null) {
++            appbarBottomHeight += ChatAppBarListTile.fixedHeight;
++          }
++
++          return AppBar(
++            shape: FluffyThemes.isColumnMode(context)
++                ? Border(
++                    bottom: BorderSide(color: theme.dividerColor, width: 1),
++                  )
++                : null,
++            actionsIconTheme: IconThemeData(
++              color: controller.selectedEvents.isEmpty
++                  ? null
++                  : theme.colorScheme.onTertiaryContainer,
++            ),
++            backgroundColor: controller.selectedEvents.isEmpty
++                ? controller.activeThreadId != null
++                      ? theme.colorScheme.secondaryContainer
++                      : theme.colorScheme.surface.withAlpha(240)
++                : theme.colorScheme.tertiaryContainer,
++            automaticallyImplyLeading: false,
++            leading: controller.selectMode
++                ? IconButton(
++                    icon: const Icon(Icons.close),
++                    onPressed: controller.clearSelectedEvents,
++                    tooltip: L10n.of(context).close,
++                    color: theme.colorScheme.onTertiaryContainer,
++                  )
++                : activeThreadId != null
++                ? IconButton(
++                    icon: const Icon(Icons.close),
++                    onPressed: controller.closeThread,
++                    tooltip: L10n.of(context).backToMainChat,
++                    color: theme.colorScheme.onSecondaryContainer,
++                  )
++                : FluffyThemes.isColumnMode(context)
++                ? null
++                : const Center(child: BackButton()),
++            titleSpacing: FluffyThemes.isColumnMode(context) ? 24 : 0,
++            title: ValueListenableBuilder<int>(
++              valueListenable: controller.timelineUpdateNotifier,
++              builder: (context, _, __) => ChatAppBarTitle(controller),
++            ),
++            actions: [
++              if (controller.selectMode) ...[
++                if (controller.canEditSelectedEvents)
++                  IconButton(
++                    icon: const Icon(Icons.edit_outlined),
++                    tooltip: L10n.of(context).edit,
++                    onPressed: controller.editSelectedEventAction,
++                  ),
++                if (controller.selectedEvents.length == 1 &&
++                    controller.activeThreadId == null &&
++                    controller.room.canSendDefaultMessages)
++                  IconButton(
++                    icon: const Icon(Icons.message_outlined),
++                    tooltip: L10n.of(context).replyInThread,
++                    onPressed: () => controller.enterThread(
++                      controller.selectedEvents.single.eventId,
++                    ),
++                  ),
++                IconButton(
++                  icon: const Icon(Icons.copy_outlined),
++                  tooltip: L10n.of(context).copyToClipboard,
++                  onPressed: controller.copyEventsAction,
++                ),
++                if (controller.canRedactSelectedEvents)
++                  IconButton(
++                    icon: const Icon(Icons.delete_outlined),
++                    tooltip: L10n.of(context).redactMessage,
++                    onPressed: controller.redactEventsAction,
++                  ),
++                if (controller.selectedEvents.length == 1)
++                  PopupMenuButton<_EventContextAction>(
++                    useRootNavigator: true,
++                    onSelected: (action) {
++                      switch (action) {
++                        case _EventContextAction.info:
++                          controller.showEventInfo();
++                          controller.clearSelectedEvents();
++                          break;
++                        case _EventContextAction.report:
++                          controller.reportEventAction();
++                          break;
++                      }
++                    },
++                    itemBuilder: (context) => [
++                      if (controller.canPinSelectedEvents)
++                        PopupMenuItem(
++                          onTap: controller.pinEvent,
++                          value: null,
++                          child: Row(
++                            mainAxisSize: .min,
++                            children: [
++                              const Icon(Icons.push_pin_outlined),
++                              const SizedBox(width: 12),
++                              Text(L10n.of(context).pinMessage),
++                            ],
++                          ),
++                        ),
++                      if (controller.selectedEvents.single.type == 'm.sticker')
++                        PopupMenuItem(
++                          onTap: () => BeeperBridgeUtils.addStickerToWhatsappPack(
++                            context,
++                            controller.selectedEvents.single,
++                          ),
++                          value: null,
++                          child: Row(
++                            mainAxisSize: .min,
++                            children: [
++                              const Icon(Icons.add_photo_alternate_outlined),
++                              const SizedBox(width: 12),
++                              const Text('Agregar a Mis stickers'),
++                            ],
++                          ),
++                        ),
++                      if (controller.canSaveSelectedEvent)
++                        PopupMenuItem(
++                          onTap: () =>
++                              controller.saveSelectedEvent(context),
++                          value: null,
++                          child: Row(
++                            mainAxisSize: .min,
++                            children: [
++                              const Icon(Icons.download_outlined),
++                              const SizedBox(width: 12),
++                              Text(L10n.of(context).downloadFile),
++                            ],
++                          ),
++                        ),
++                      PopupMenuItem(
++                        value: _EventContextAction.info,
++                        child: Row(
++                          mainAxisSize: .min,
++                          children: [
++                            const Icon(Icons.info_outlined),
++                            const SizedBox(width: 12),
++                            Text(L10n.of(context).messageInfo),
++                          ],
++                        ),
++                      ),
++                      if (controller.selectedEvents.single.status.isSent)
++                        PopupMenuItem(
++                          value: _EventContextAction.report,
++                          child: Row(
++                            mainAxisSize: .min,
++                            children: [
++                              const Icon(
++                                Icons.shield_outlined,
++                                color: Colors.red,
++                              ),
++                              const SizedBox(width: 12),
++                              Text(L10n.of(context).reportMessage),
++                            ],
++                          ),
++                        ),
++                    ],
++                  ),
++              ] else if (!controller.room.isArchived) ...[
++                if (BeeperBridgeUtils.getRoomNetwork(controller.room)?.key == 'whatsapp')
++                  IconButton(
++                    onPressed: () {
++                      final directId = controller.room.directChatMatrixID ?? '';
++                      final match = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(directId);
++                      if (match != null) {
++                        final number = match.group(1);
++                        launchUrl(Uri.parse('tel:+$number'));
++                      }
++                    },
++                    icon: const Icon(Icons.call_outlined),
++                    tooltip: 'Llamar por celular',
++                  ),
++                if (BeeperBridgeUtils.getRoomNetwork(controller.room)?.key == 'instagram')
++                  IconButton(
++                    onPressed: () async {
++                      final directId = controller.room.directChatMatrixID ?? '';
++                      final match = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
++                      if (match != null) {
++                        final id = match.group(1)!;
++                        final isNumeric = RegExp(r'^\d+$').hasMatch(id);
++                        final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=$id' : 'https://instagram.com/$id');
++                        try {
++                          if (!await launchUrl(uri)) {
++                            await launchUrl(Uri.parse('https://instagram.com/$id'));
++                          }
++                        } catch (_) {
++                          await launchUrl(Uri.parse('https://instagram.com/$id'));
++                        }
++                      }
++                    },
++                    icon: const Icon(Icons.camera_alt_outlined),
++                    tooltip: 'Ver perfil',
++                  ),
++                if ((AppSettings.experimentalVoip.value &&
++                    controller.room.isDirectChat))
++                  IconButton(
++                    onPressed: controller.onPhoneButtonTap,
++                    icon: const Icon(Icons.call_outlined),
++                    tooltip: L10n.of(context).placeCall,
++                  ),
++                ChatSettingsPopupMenu(controller.room, true),
++              ],
++            ],
++            bottom: PreferredSize(
++              preferredSize: Size.fromHeight(appbarBottomHeight),
++              child: Column(
++                mainAxisSize: .min,
++                children: [
++                  PinnedEvents(controller),
++                  if (activeThreadId != null)
++                    SizedBox(
++                      height: ChatAppBarListTile.fixedHeight,
++                      child: Center(
++                        child: TextButton.icon(
++                          onPressed: () =>
++                              controller.scrollToEventId(activeThreadId),
++                          icon: const Icon(Icons.message),
++                          label: Text(L10n.of(context).replyInThread),
++                          style: TextButton.styleFrom(
++                            foregroundColor:
++                                theme.colorScheme.onSecondaryContainer,
++                            shape: RoundedRectangleBorder(
++                              borderRadius: BorderRadius.circular(4),
++                            ),
++                          ),
++                        ),
++                      ),
++                    ),
++                  if (scrollUpBannerEventId != null &&
++                      activeThreadId == null &&
++                      (BeeperBridgeUtils.prefs?.getBool('beeper_show_jump_banner') ?? true))
++                    ChatAppBarListTile(
++                      leading: IconButton(
++                        color: theme.colorScheme.onSurfaceVariant,
++                        icon: const Icon(Icons.close),
++                        tooltip: L10n.of(context).close,
++                        onPressed: () {
++                          controller.discardScrollUpBannerEventId();
++                          controller.setReadMarker(force: true);
++                        },
++                      ),
++                      title: L10n.of(context).jumpToLastReadMessage,
++                      trailing: TextButton(
++                        onPressed: () {
++                          controller.scrollToEventId(scrollUpBannerEventId);
++                          controller.discardScrollUpBannerEventId();
++                        },
++                        child: Text(L10n.of(context).jump),
++                      ),
++                    ),
++                ],
++              ),
++            ),
++          );
++        },
++      ),
++    );
++  }
+ }
 diff --git a/lib/pages/chat/command_hints.dart b/lib/pages/chat/command_hints.dart
 index e872284f3c0e6fc925cbb97287ee544ba5dbfc7f..01feb3bad1d22d9cfac166a31d15a62d083f7baa 100644
 --- a/lib/pages/chat/command_hints.dart
@@ -326755,10 +326799,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c7cc6e016 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..60eab7e0e08899f0048fc958cada18663afe0807 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1338 @@
+@@ -1,1041 +1,1366 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328023,6 +328067,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +    _pendingTimestampFetches.clear();
 +    if (batch.isEmpty || !mounted) return;
 +    
++    final sw = Stopwatch()..start();
 +    final client = Matrix.of(context).client;
 +    bool anyUpdated = false;
 +    
@@ -328053,6 +328098,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +    }
 +    
 +    if (anyUpdated && mounted) {
++      sw.stop();
++      if (FileLogger.isEnabled()) {
++        FileLogger.log('[PERF/DB] Processed ${batch.length} timestamps from database in ${sw.elapsedMilliseconds}ms');
++      }
 +      _invalidateRoomCache();
 +    }
 +  }
@@ -328060,16 +328109,20 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  // ── Room-list cache ──────────────────────────────────────────────────────────
 +  List<Room> _cachedAllRoomsSorted = [];
 +  List<Room> _cachedFilteredRooms = [];
++  Set<String> _cachedHiddenInboxRoomIds = {};
++  Map<String, String> _cachedRoomDisplayNames = {};
 +  StreamSubscription? _onSyncForRoomCache;
 +
 +  void _invalidateRoomCache([dynamic syncUpdate]) {
++    final sw = Stopwatch()..start();
 +    if (syncUpdate is SyncUpdate && syncUpdate.rooms?.join != null) {
 +      for (final roomId in syncUpdate.rooms!.join!.keys) {
 +        BeeperBridgeUtils.invalidateLastMessageTime(roomId);
 +      }
 +    }
 +
-+    final allRooms = Matrix.of(context).client.rooms.toList();
++    final client = Matrix.of(context).client;
++    final allRooms = client.rooms.toList();
 +
 +    // Precalculate timestamps to avoid repeated iteration inside comparator
 +    final timestamps = <String, DateTime>{};
@@ -328099,18 +328152,37 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +      FileLogger.log(logBuffer.toString());
 +    }
 +
++    // Precompute display names for fast non-blocking search filtering
++    final displayNames = <String, String>{};
++    for (final r in allRooms) {
++      final beeperData = BeeperBridgeUtils.getRoomData(r);
++      final dName = beeperData.displayName ?? r.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
++      displayNames[r.id] = dName.toLowerCase();
++    }
++    _cachedRoomDisplayNames = displayNames;
++
++    // Precalculate hidden inbox room IDs (avoid computing on every build)
++    _cachedHiddenInboxRoomIds = BeeperBridgeUtils.getHiddenInboxRoomIds(client);
++
 +    _cachedAllRoomsSorted = allRooms;
 +    _cachedFilteredRooms =
 +        allRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
 +    roomCacheNotifier.value++;
++
++    sw.stop();
++    if (FileLogger.isEnabled()) {
++      FileLogger.log('[PERF/ROOM_CACHE] _invalidateRoomCache completed in ${sw.elapsedMilliseconds}ms (${allRooms.length} rooms)');
++    }
 +  }
 +
 +  // Returns the cached list. Build methods read this; it is always up to date
 +  // because _invalidateRoomCache() is called on every sync event.
 +  List<Room> get filteredRooms => _cachedFilteredRooms;
 +  List<Room> get allRoomsSorted => _cachedAllRoomsSorted;
++  Set<String> get hiddenInboxRoomIds => _cachedHiddenInboxRoomIds;
++  Map<String, String> get roomDisplayNames => _cachedRoomDisplayNames;
 +
 +  // ── Space-delegate cache ─────────────────────────────────────────────────────
 +  // Previously computed inside build() on every frame – now computed once per sync.
@@ -329139,10 +329211,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..0f43c509fb72be204bdb18223641b5071f46cd9e 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..15014fdf4cfbc119c32c03bc711ec3cd91a938ea 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,453 @@
+@@ -1,338 +1,451 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329564,7 +329636,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..0f43c509fb72be204bdb18223641b507
 +      key: ValueKey(client.userID.toString()),
 +      valueListenable: widget.controller.roomCacheNotifier,
 +      builder: (context, _, __) {
-+        final hiddenInboxRoomIds = BeeperBridgeUtils.getHiddenInboxRoomIds(client);
++        final hiddenInboxRoomIds = widget.controller.hiddenInboxRoomIds;
 +        var rooms = (filter.isNotEmpty || widget.controller.isSearchMode
 +                ? widget.controller.allRoomsSorted
 +                : widget.controller.filteredRooms)
@@ -329610,12 +329682,10 @@ index 8610b92531be84898e03439fa07f16145a6d552c..0f43c509fb72be204bdb18223641b507
 +        }
 +
 +        if (filter.isNotEmpty) {
++          final displayNames = widget.controller.roomDisplayNames;
 +          rooms = rooms.where((room) {
-+            final beeperData = BeeperBridgeUtils.getRoomData(room);
-+            final displayname = beeperData.displayName ?? room.getLocalizedDisplayname(
-+              MatrixLocals(L10n.of(context)),
-+            );
-+            return displayname.toLowerCase().contains(filter);
++            final displayname = displayNames[room.id] ?? '';
++            return displayname.contains(filter);
 +          }).toList();
 +        }
 +
