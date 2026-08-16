@@ -330220,10 +330220,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..8c7d101b63baf009cbe3dd1a2e2a82f015e67cec 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..5a6770715d649fae0dadd9674766403f1825443c 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,498 @@
+@@ -1,410 +1,499 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -330645,6 +330645,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..8c7d101b63baf009cbe3dd1a2e2a82f0
 +import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 +import 'package:fluffychat/utils/room_status_extension.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:fluffychat/widgets/hover_builder.dart';
