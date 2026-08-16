@@ -308954,10 +308954,10 @@ index 879717fa9889be421184b768e20bad7417f95114..aab752aef8a9a8edd1b603e721960087
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..319058b23c00542d9dce1d6a7c309f940f500106 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..390b6bb37fcde2ad22e2ad8dbe3c3173b4a334ea 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -1,464 +1,567 @@
+@@ -1,464 +1,566 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309683,9 +309683,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..319058b23c00542d9dce1d6a7c309f94
 +  final ChatController controller;
 +
 +  const _ChatAppBar(this.controller);
-+
-+  static bool _isUiRelevantStateEvent(Event update) {
-+    final type = update.type;
++  static bool _isUiRelevantStateEvent(dynamic update) {
++    final type = update.state?.type;
 +    return type == EventTypes.RoomName ||
 +        type == EventTypes.RoomAvatar ||
 +        type == EventTypes.RoomTopic ||
@@ -309713,7 +309712,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..319058b23c00542d9dce1d6a7c309f94
 +  @override
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
-+    return StreamBuilder<Event>(
++    return StreamBuilder(
 +      stream: controller.room.client.onRoomState.stream
 +          .where((update) => update.roomId == controller.room.id && _isUiRelevantStateEvent(update))
 +          .rateLimit(const Duration(seconds: 1)),
