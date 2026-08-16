@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..04afe9664913bf57bc7e50b70a17ae4304b2e3cc 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..f69a37ff4437cc8464ea2a05c5d68c2d758b9f3a 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1887 @@
+@@ -1,1643 +1,1893 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305642,25 +305642,30 @@ index 74707498c32bda411d06d6c9c086f390f3401135..04afe9664913bf57bc7e50b70a17ae43
 +
 +  @override
 +  void dispose() {
-+    timelineUpdateNotifier.dispose();
-+    MxcImage.clearCache(room.id);
-+    timeline?.cancelSubscriptions();
-+    timeline = null;
++    // Cancel all timers FIRST to prevent race conditions where a timer
++    // fires after a ValueNotifier has been disposed, causing
++    // "used after dispose" errors on fast navigation.
 +    _debounceUpdateViewTimer?.cancel();
 +    _debounceInputHeightTimer?.cancel();
 +    _storeInputTimeoutTimer?.cancel();
 +    typingCoolDown?.cancel();
 +    typingTimeout?.cancel();
++
++    // Now safe to dispose notifiers — no pending timers can touch them.
++    timelineUpdateNotifier.dispose();
++    isInputEmptyNotifier.dispose();
++    inputBarHeightNotifier.dispose();
++    _displayChatDetailsColumn.dispose();
++
++    MxcImage.clearCache(room.id);
++    timeline?.cancelSubscriptions();
++    timeline = null;
 +    sendController.dispose();
 +    scrollController.dispose();
 +    inputFocus.removeListener(_inputFocusListener);
 +    inputFocus.dispose();
-+    _displayChatDetailsColumn.dispose();
-+    isInputEmptyNotifier.dispose();
-+    inputBarHeightNotifier.dispose();
 +    web.window.removeEventListener('paste', _handleClipboardFilePasteWeb);
 +    if (currentlyTyping) room.setTyping(false);
-+    MxcImage.clearCache(widget.room.id);
 +    super.dispose();
 +  }
 +
@@ -305731,11 +305736,12 @@ index 74707498c32bda411d06d6c9c086f390f3401135..04afe9664913bf57bc7e50b70a17ae43
 +
 +    setState(() {
 +      sendController.text = pendingText;
-+      isInputEmptyNotifier.value = pendingText.isEmpty;
 +      replyEvent = null;
 +      editEvent = null;
 +      pendingText = '';
 +    });
++    // Update notifier outside setState to avoid double-notification
++    isInputEmptyNotifier.value = sendController.text.isEmpty;
 +    // Scroll to the very bottom so own message is always visible
 +    WidgetsBinding.instance.addPostFrameCallback((_) {
 +      if (mounted && scrollController.hasClients) {
@@ -329133,7 +329139,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..e5669ae7d1073a7022b521dcb37f9b4e2c731c69 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..0f43c509fb72be204bdb18223641b5071f46cd9e 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -1,338 +1,453 @@
@@ -329839,7 +329845,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..e5669ae7d1073a7022b521dcb37f9b4e
 +                      );
 +                    },
 +                    childCount: rooms.length,
-+                    addAutomaticKeepAlives: true,
++                    addAutomaticKeepAlives: false,
 +                    addRepaintBoundaries: true,
 +                  ),
 +              ),
