@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..46f6d6a20cd9e8257340e9f78ed5693f8b13701f 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..264146b3131ce625e1c787dd34da6de1bcc4b247 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1881 @@
+@@ -1,1643 +1,1885 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305488,9 +305488,6 @@ index 74707498c32bda411d06d6c9c086f390f3401135..46f6d6a20cd9e8257340e9f78ed5693f
 +    await matrix.client.roomsLoading;
 +    await matrix.client.accountDataLoading;
 +
-+    // Defer timeline loading slightly to ensure screen transition animation completes smoothly.
-+    await Future.delayed(const Duration(milliseconds: 60));
-+
 +    if (eventContextId != null &&
 +        (!eventContextId.isValidMatrixIdStrict() ||
 +            eventContextId.sigil != '\$')) {
@@ -305648,6 +305645,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..46f6d6a20cd9e8257340e9f78ed5693f
 +    timeline?.cancelSubscriptions();
 +    timeline = null;
 +    _debounceUpdateViewTimer?.cancel();
++    _debounceInputHeightTimer?.cancel();
 +    _storeInputTimeoutTimer?.cancel();
 +    typingCoolDown?.cancel();
 +    typingTimeout?.cancel();
@@ -306529,16 +306527,22 @@ index 74707498c32bda411d06d6c9c086f390f3401135..46f6d6a20cd9e8257340e9f78ed5693f
 +
 +  double get inputBarHeight => inputBarHeightNotifier.value;
 +
-+  void updateInputBarHeight() {
-+    RenderBox? renderBox;
-+    if (inputBarKey.currentContext?.findRenderObject() != null) {
-+      renderBox = inputBarKey.currentContext!.findRenderObject() as RenderBox;
-+    }
++  Timer? _debounceInputHeightTimer;
 +
-+    final height = renderBox?.size.height ?? 72.0;
-+    if (height != inputBarHeightNotifier.value) {
-+      inputBarHeightNotifier.value = height;
-+    }
++  void updateInputBarHeight() {
++    _debounceInputHeightTimer?.cancel();
++    _debounceInputHeightTimer = Timer(const Duration(milliseconds: 30), () {
++      if (!mounted) return;
++      RenderBox? renderBox;
++      if (inputBarKey.currentContext?.findRenderObject() != null) {
++        renderBox = inputBarKey.currentContext!.findRenderObject() as RenderBox;
++      }
++
++      final height = renderBox?.size.height ?? 72.0;
++      if ((height - inputBarHeightNotifier.value).abs() > 1.0) {
++        inputBarHeightNotifier.value = height;
++      }
++    });
 +  }
 +
 +  void onInputBarChanged(String text) {
@@ -307249,7 +307253,7 @@ index 6305f453caf0d3b42ba022274ca3f3e367e9c62f..61862a95da46cde245bf264c52730936
 +  }
 +}
 diff --git a/lib/pages/chat/chat_emoji_picker.dart b/lib/pages/chat/chat_emoji_picker.dart
-index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af24d2202e 100644
+index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502a0c18a37 100644
 --- a/lib/pages/chat/chat_emoji_picker.dart
 +++ b/lib/pages/chat/chat_emoji_picker.dart
 @@ -3,9 +3,7 @@
@@ -307262,15 +307266,23 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
  import 'package:fluffychat/pages/chat/sticker_picker_dialog.dart';
  import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
  import 'package:flutter/material.dart';
-@@ -19,7 +17,6 @@ class ChatEmojiPicker extends StatelessWidget {
+@@ -19,106 +17,42 @@ class ChatEmojiPicker extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
 -    final theme = Theme.of(context);
-     return AnimatedContainer(
-       duration: FluffyThemes.animationDuration,
-       curve: FluffyThemes.animationCurve,
-@@ -29,97 +26,32 @@ class ChatEmojiPicker extends StatelessWidget {
+-    return AnimatedContainer(
+-      duration: FluffyThemes.animationDuration,
+-      curve: FluffyThemes.animationCurve,
+-      clipBehavior: Clip.hardEdge,
+-      decoration: const BoxDecoration(),
++    return RepaintBoundary(
++      child: AnimatedContainer(
++        duration: FluffyThemes.animationDuration,
++        curve: FluffyThemes.animationCurve,
++        clipBehavior: Clip.hardEdge,
++        decoration: const BoxDecoration(),
+       height: controller.showEmojiPicker
            ? MediaQuery.sizeOf(context).height / 2
            : 0,
        child: controller.showEmojiPicker
@@ -307371,9 +307383,9 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 +              },
              )
            : null,
-     );
-   }
- }
+-    );
+-  }
+-}
 -
 -class NoRecent extends StatelessWidget {
 -  const NoRecent({super.key});
@@ -307388,15 +307400,14 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..09288f6bf61ef1783d5fc6b5515474af
 -          style: Theme.of(context).textTheme.bodyLarge,
 -          textAlign: TextAlign.center,
 -        ),
--      ),
--    );
--  }
--}
+       ),
+     );
+   }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..cfcbd8a311f2b89fdc1da1ea0eed1a705d3fdbe7 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..c2b1b4f1c80628af2aee0b593c4eb9c279246028 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -1,253 +1,276 @@
+@@ -1,253 +1,287 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -307678,13 +307689,24 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..cfcbd8a311f2b89fdc1da1ea0eed1a70
 +import '../../utils/date_time_extension.dart';
 +import '../../widgets/font_size_scaler.dart';
 +
-+class ChatEventList extends StatelessWidget {
++class ChatEventList extends StatefulWidget {
 +  final ChatController controller;
 +
 +  const ChatEventList({super.key, required this.controller});
 +
 +  @override
++  State<ChatEventList> createState() => _ChatEventListState();
++}
++
++class _ChatEventListState extends State<ChatEventList>
++    with AutomaticKeepAliveClientMixin {
++  @override
++  bool get wantKeepAlive => true;
++
++  @override
 +  Widget build(BuildContext context) {
++    super.build(context);
++    final controller = widget.controller;
 +    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (events=${controller.filteredEvents.length}, room=${controller.room.id})');
 +    final timeline = controller.timeline;
 +
@@ -329120,10 +329142,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..8d68182751e83ce138a76e3e32215c0afa67a4e1 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..f88a1a5754d35b62750c2630a6efc4cf98be3e7e 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,460 @@
+@@ -1,338 +1,461 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329502,6 +329524,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..8d68182751e83ce138a76e3e32215c0a
 +
 +class _ChatListViewBodyState extends State<ChatListViewBody> with AutomaticKeepAliveClientMixin {
 +  Widget? _cachedListViewBodyWidget;
++  String? _lastActiveSpace;
 +
 +  @override
 +  bool get wantKeepAlive => true;
@@ -329509,15 +329532,15 @@ index 8610b92531be84898e03439fa07f16145a6d552c..8d68182751e83ce138a76e3e32215c0a
 +  @override
 +  Widget build(BuildContext context) {
 +    super.build(context);
-+    final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
-+    if (!isCurrentRoute && _cachedListViewBodyWidget != null) {
++    final activeSpace = widget.controller.activeSpaceId;
++    if (_cachedListViewBodyWidget != null && _lastActiveSpace == activeSpace) {
 +      return _cachedListViewBodyWidget!;
 +    }
++    _lastActiveSpace = activeSpace;
 +    FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
 +    final theme = Theme.of(context);
 +
 +    final client = Matrix.of(context).client;
-+    final activeSpace = widget.controller.activeSpaceId;
 +    final isVirtualSpace = activeSpace?.startsWith('virtual_space_') ?? false;
 +    final isVirtualTag = activeSpace?.startsWith('virtual_tag_') ?? false;
 +    final isVirtualBeeperLabel =
