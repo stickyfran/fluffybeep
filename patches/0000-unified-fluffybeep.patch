@@ -307954,7 +307954,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d07ba31c0fde78e81e794d475642df24
 +  }
 +}
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..aab752aef8a9a8edd1b603e72196008740686b25 100644
+index 879717fa9889be421184b768e20bad7417f95114..8a41e299d604423d817f701551340f6c4a189b82 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
 @@ -1,452 +1,543 @@
@@ -308761,23 +308761,23 @@ index 879717fa9889be421184b768e20bad7417f95114..aab752aef8a9a8edd1b603e721960087
 +                  ),
 +                  if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
 +                      (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_input_bar') ?? true))
-+                    Padding(
++                    Container(
++                      height: height,
++                      alignment: Alignment.center,
 +                      padding: const EdgeInsets.only(right: 6.0),
-+                      child: Center(
-+                        child: SizedBox(
-+                          height: 32,
-+                          width: 32,
-+                          child: IconButton(
-+                            padding: EdgeInsets.zero,
-+                            constraints: const BoxConstraints(),
-+                            tooltip: L10n.of(context).markAsRead,
-+                            onPressed: () => controller.setReadMarker(force: true),
-+                            style: IconButton.styleFrom(
-+                              backgroundColor: theme.colorScheme.primaryContainer,
-+                              foregroundColor: theme.colorScheme.onPrimaryContainer,
-+                            ),
-+                            icon: const Icon(Icons.done_all, size: 16),
++                      child: SizedBox(
++                        height: 32,
++                        width: 32,
++                        child: IconButton(
++                          padding: EdgeInsets.zero,
++                          constraints: const BoxConstraints(),
++                          tooltip: L10n.of(context).markAsRead,
++                          onPressed: () => controller.setReadMarker(force: true),
++                          style: IconButton.styleFrom(
++                            backgroundColor: theme.colorScheme.primaryContainer,
++                            foregroundColor: theme.colorScheme.onPrimaryContainer,
 +                          ),
++                          icon: const Icon(Icons.done_all, size: 16),
 +                        ),
 +                      ),
 +                    ),

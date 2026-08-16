@@ -81,9 +81,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: v1.0.${{ github.run_number }}.${{ github.run_attempt }}
+          tag_name: v1.0
           target_commitish: main
-          name: "Fluffybeep v1.0.${{ github.run_number }}.${{ github.run_attempt }} - Beeper Patches"
+          name: "Fluffybeep v1.0 - Beeper Patches"
           body: |
             ### Initial Release & Beeper Enhancements
             This release contains the custom compiled APK for Fluffychat with native Beeper bridge support.
