@@ -329133,10 +329133,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..e2ff9e8b5cfab2d9a362f031037b0f7c
 +  removeFromLabel,
 +}
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..da720d4d88c40678dd143180e39d412dd4e52574 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..e5669ae7d1073a7022b521dcb37f9b4e2c731c69 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,452 @@
+@@ -1,338 +1,453 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329524,6 +329524,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..da720d4d88c40678dd143180e39d412d
 +    final theme = Theme.of(context);
 +
 +    final client = Matrix.of(context).client;
++    final activeSpace = widget.controller.activeSpaceId;
 +    final isVirtualSpace = activeSpace?.startsWith('virtual_space_') ?? false;
 +    final isVirtualTag = activeSpace?.startsWith('virtual_tag_') ?? false;
 +    final isVirtualBeeperLabel =
