@@ -330308,10 +330308,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..7d11b4853240e88bcf7c4af5f5000442dbad7371 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9ae2d2649062e892414c744d8c678b6259f3aa65 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,503 @@
+@@ -1,410 +1,506 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -331199,17 +331199,20 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..7d11b4853240e88bcf7c4af5f5000442
 +                    ),
 +    );
 +
-+    Widget content = PlatformInfos.isMobile
++    Widget buildContent() => PlatformInfos.isMobile
 +        ? buildTile(false)
 +        : HoverBuilder(
 +            builder: (context, listTileHovered) => buildTile(listTileHovered),
 +          );
 +
++    final Widget content;
 +    if (_loadHeroUsersFuture != null) {
 +      content = FutureBuilder(
 +        future: _loadHeroUsersFuture,
-+        builder: (context, _) => content,
++        builder: (context, _) => buildContent(),
 +      );
++    } else {
++      content = buildContent();
 +    }
 +
 +    return RepaintBoundary(
@@ -375787,7 +375790,7 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..780ba37e9b754454c518dd2b2be463e06cef889d 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..670de62da14313f2463d08c7284e700da7f2e8f5 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -1,443 +1,488 @@
@@ -376647,9 +376650,9 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..780ba37e9b754454c518dd2b2be463e0
 +        Logs().v('Set background sync to', foreground);
 +      }
 +    }
-+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
-+      PaintingBinding.instance.imageCache.clearLiveImages();
-+      PaintingBinding.instance.imageCache.clear();
++    if (state == AppLifecycleState.paused) {
++      // Beeper patch: Don't trim cache on background to avoid UI jank on resume
++      // MxcImage.trimAllCaches();
 +    }
 +  }
 +
