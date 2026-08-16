@@ -326798,10 +326798,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4d14b079b1e7fb6e1c046a35269380a4002a2a39 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c48b5f78ec 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1374 @@
+@@ -1,1041 +1,1376 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328110,6 +328110,8 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..4d14b079b1e7fb6e1c046a35269380a4
 +  List<Room> _cachedFilteredRooms = [];
 +  Set<String> _cachedHiddenInboxRoomIds = {};
 +  Map<String, String> _cachedRoomDisplayNames = {};
++  StreamSubscription? _onSyncForRoomCache;
++
 +  void _invalidateRoomCache([dynamic syncUpdate]) {
 +    final sw = Stopwatch()..start();
 +    final changedRoomIds = <String>{};
