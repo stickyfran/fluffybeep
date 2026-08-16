@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..6536e60a0937983a5eeb139c3ea8f6e8ee82c579 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..ac7b8fc0195d146bcf68d6bbcd3a9427332d11d0 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1899 @@
+@@ -1,1643 +1,1901 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -305374,7 +305374,9 @@ index 74707498c32bda411d06d6c9c086f390f3401135..6536e60a0937983a5eeb139c3ea8f6e8
 +  void updateView() {
 +    if (!mounted) return;
 +    _debounceUpdateViewTimer?.cancel();
-+    _debounceUpdateViewTimer = Timer(const Duration(milliseconds: 40), () {
++    // 100ms window: batches local-echo, server confirmation, and read-receipt
++    // that typically arrive within 50-80ms of each other after sending a message.
++    _debounceUpdateViewTimer = Timer(const Duration(milliseconds: 100), () {
 +      if (!mounted) return;
 +      _invalidateTimelineCache();
 +      FileLogger.log('[BACKEND_TIMELINE] updateView executing for room ${room.id} (events=${timeline?.events.length})');
@@ -326798,10 +326800,10 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c48b5f78ec 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..cee6cf2c8cfb5c61d9cbb2ab056f385e25c51170 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
-@@ -1,1041 +1,1376 @@
+@@ -1,1041 +1,1406 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -327854,6 +327856,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c4
 +import 'package:collection/collection.dart';
 +import 'package:cross_file/cross_file.dart';
 +import 'package:fluffychat/config/app_config.dart';
++import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_list/chat_list_view.dart';
 +import 'package:fluffychat/utils/error_reporter.dart';
@@ -328171,7 +328174,19 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c4
 +        allRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
-+    roomCacheNotifier.value++;
++
++    // In single-column mode (mobile), if a chat is active the ChatListViewBody
++    // is fully obscured by the chat screen. Suppress the rebuild to avoid
++    // wasting build budget on an invisible widget. Mark a pending flush so that
++    // when the user pops back to the list we notify immediately.
++    final isSingleColumn = !FluffyThemes.isColumnMode(context);
++    final chatCoveringList = isSingleColumn && widget.activeChat != null;
++    if (chatCoveringList) {
++      _pendingRoomCacheNotify = true;
++    } else {
++      _pendingRoomCacheNotify = false;
++      roomCacheNotifier.value++;
++    }
 +
 +    sw.stop();
 +    if (FileLogger.isEnabled()) {
@@ -328293,6 +328308,11 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c4
 +
 +  final ValueNotifier<int> roomCacheNotifier = ValueNotifier(0);
 +
++  /// True when _invalidateRoomCache deferred notifying roomCacheNotifier
++  /// because the chat list was obscured by an active chat in single-column mode.
++  /// Flushed in didUpdateWidget when activeChat becomes null.
++  bool _pendingRoomCacheNotify = false;
++
 +  final StreamController<Client> _clientStream = StreamController.broadcast();
 +
 +  Stream<Client> get clientStream => _clientStream.stream;
@@ -328376,6 +328396,18 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..eeb51c120e1ef73605cec3814614f5c4
 +    scrollController.addListener(_onScroll);
 +    _waitForFirstSync();
 +    super.initState();
++  }
++
++  @override
++  void didUpdateWidget(ChatList oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    // When the user navigates back from a chat (activeChat transitions to null),
++    // flush any pending roomCacheNotifier update that was deferred while the
++    // chat list was obscured by the chat screen in single-column mode.
++    if (oldWidget.activeChat != null && widget.activeChat == null && _pendingRoomCacheNotify) {
++      _pendingRoomCacheNotify = false;
++      roomCacheNotifier.value++;
++    }
 +  }
 +
 +  bool _initialized = false;
