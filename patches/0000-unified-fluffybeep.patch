@@ -303209,10 +303209,10 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..ac7b8fc0195d146bcf68d6bbcd3a9427332d11d0 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..01dcd7cf329e12d983e880cbe83507c6f1134914 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
-@@ -1,1643 +1,1901 @@
+@@ -1,1643 +1,1918 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -304995,6 +304995,9 @@ index 74707498c32bda411d06d6c9c086f390f3401135..ac7b8fc0195d146bcf68d6bbcd3a9427
 +  Timer? typingTimeout;
 +  bool currentlyTyping = false;
 +  bool dragging = false;
++  bool _isSendingVoiceMessage = false;
++  String? _lastVoiceMessageSentPath;
++  DateTime? _lastVoiceMessageSentAt;
 +
 +  final GlobalKey inputBarKey = GlobalKey();
 +
@@ -305923,84 +305926,98 @@ index 74707498c32bda411d06d6c9c086f390f3401135..ac7b8fc0195d146bcf68d6bbcd3a9427
 +    List<int> waveform,
 +    String fileName,
 +  ) async {
-+    final proceed = await showTrustUserInRoomDialog(context, room);
-+    if (!mounted || !proceed) return;
-+    final scaffoldMessenger = ScaffoldMessenger.of(context);
-+    final audioFile = XFile(path);
-+
-+    final bytesResult = await showFutureLoadingDialog(
-+      context: context,
-+      future: audioFile.readAsBytes,
-+    );
-+    final bytes = bytesResult.result;
-+    if (bytes == null || bytes.isEmpty) {
-+      if (mounted) {
-+        scaffoldMessenger.showSnackBar(
-+          const SnackBar(content: Text('Error: El archivo de audio grabado está vacío.')),
-+        );
-+      }
++    if (_isSendingVoiceMessage) return;
++    if (_lastVoiceMessageSentPath == path &&
++        _lastVoiceMessageSentAt != null &&
++        DateTime.now().difference(_lastVoiceMessageSentAt!) <
++            const Duration(seconds: 3)) {
++      Logs().w('Ignoring duplicate voice message send for path $path');
 +      return;
 +    }
-+
-+    final mimeType = lookupMimeType(fileName, headerBytes: bytes);
-+    var effectiveMimeType = mimeType;
-+    if (effectiveMimeType == 'audio/ogg' ||
-+        (fileName.endsWith('.ogg') &&
-+            (effectiveMimeType == null || effectiveMimeType == 'audio/ogg'))) {
-+      effectiveMimeType = 'audio/ogg';
-+    } else if (fileName.endsWith('.m4a') || fileName.endsWith('.aac') || effectiveMimeType == 'audio/mp4') {
-+      effectiveMimeType = 'audio/mp4';
-+    } else if (effectiveMimeType == null) {
-+      if (fileName.endsWith('.ogg')) {
-+        effectiveMimeType = 'audio/ogg';
-+      } else {
-+        effectiveMimeType = 'audio/mp4';
-+      }
-+    }
-+
-+    final extension = mimeType == null ? null : extensionFromMime(mimeType);
-+    if (extension != null) {
-+      fileName =
-+          'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
-+    }
-+
-+    final file = MatrixAudioFile(
-+      bytes: bytes,
-+      name: fileName,
-+      mimeType: effectiveMimeType,
-+    );
-+
++    _isSendingVoiceMessage = true;
 +    try {
-+      await room.sendFileEvent(
-+        file,
-+        inReplyTo: replyEvent,
-+        threadRootEventId: activeThreadId,
-+        extraContent: {
-+          'filename': file.name,
-+          'info': {
-+            ...file.info,
-+            'duration': duration,
-+            'size': bytes.length,
-+            if (effectiveMimeType != null) 'mimetype': effectiveMimeType,
-+          },
-+          'org.matrix.msc3245.voice': {},
-+          'org.matrix.msc1767.audio': {
-+            'duration': duration,
-+            'waveform': waveform,
-+          },
-+        },
++      final proceed = await showTrustUserInRoomDialog(context, room);
++      if (!mounted || !proceed) return;
++      final scaffoldMessenger = ScaffoldMessenger.of(context);
++      final audioFile = XFile(path);
++
++      final bytesResult = await showFutureLoadingDialog(
++        context: context,
++        future: audioFile.readAsBytes,
 +      );
-+    } catch (e) {
-+      if (!mounted) return;
-+      scaffoldMessenger.showSnackBar(
-+        SnackBar(content: Text(e.toLocalizedString(context))),
++      final bytes = bytesResult.result;
++      if (bytes == null || bytes.isEmpty) {
++        if (mounted) {
++          scaffoldMessenger.showSnackBar(
++            const SnackBar(content: Text('Error: El archivo de audio grabado está vacío.')),
++          );
++        }
++        return;
++      }
++
++      final mimeType = lookupMimeType(fileName, headerBytes: bytes);
++      var effectiveMimeType = mimeType;
++      if (effectiveMimeType == 'audio/ogg' ||
++          (fileName.endsWith('.ogg') &&
++              (effectiveMimeType == null || effectiveMimeType == 'audio/ogg'))) {
++        effectiveMimeType = 'audio/ogg';
++      } else if (fileName.endsWith('.m4a') || fileName.endsWith('.aac') || effectiveMimeType == 'audio/mp4') {
++        effectiveMimeType = 'audio/mp4';
++      } else if (effectiveMimeType == null) {
++        if (fileName.endsWith('.ogg')) {
++          effectiveMimeType = 'audio/ogg';
++        } else {
++          effectiveMimeType = 'audio/mp4';
++        }
++      }
++
++      final extension = mimeType == null ? null : extensionFromMime(mimeType);
++      if (extension != null) {
++        fileName =
++            'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
++      }
++
++      final file = MatrixAudioFile(
++        bytes: bytes,
++        name: fileName,
++        mimeType: effectiveMimeType,
 +      );
-+      return;
++
++      try {
++        await room.sendFileEvent(
++          file,
++          inReplyTo: replyEvent,
++          threadRootEventId: activeThreadId,
++          extraContent: {
++            'filename': file.name,
++            'info': {
++              ...file.info,
++              'duration': duration,
++              'size': bytes.length,
++              if (effectiveMimeType != null) 'mimetype': effectiveMimeType,
++            },
++            'org.matrix.msc3245.voice': {},
++            'org.matrix.msc1767.audio': {
++              'duration': duration,
++              'waveform': waveform,
++            },
++          },
++        );
++        _lastVoiceMessageSentPath = path;
++        _lastVoiceMessageSentAt = DateTime.now();
++      } catch (e) {
++        if (!mounted) return;
++        scaffoldMessenger.showSnackBar(
++          SnackBar(content: Text(e.toLocalizedString(context))),
++        );
++        return;
++      }
++      setState(() {
++        replyEvent = null;
++      });
++    } finally {
++      _isSendingVoiceMessage = false;
 +    }
-+    setState(() {
-+      replyEvent = null;
-+    });
-+    return;
 +  }
 +
 +  void hideEmojiPicker() {
@@ -320181,10 +320198,10 @@ index 0b8dc33f50384162f195fcf8251ef86b45f47a8e..7cbbc7163f8ee0ea18304372bece0e1d
 +  }
 +}
 diff --git a/lib/pages/chat/recording_input_row.dart b/lib/pages/chat/recording_input_row.dart
-index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3be166e88 100644
+index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead6839a91c 100644
 --- a/lib/pages/chat/recording_input_row.dart
 +++ b/lib/pages/chat/recording_input_row.dart
-@@ -1,107 +1,107 @@
+@@ -1,107 +1,116 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320332,7 +320349,7 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +              tooltip: L10n.of(context).cancel,
 +              icon: const Icon(Icons.delete_outlined),
 +              color: theme.colorScheme.error,
-+              onPressed: state.cancel,
++              onPressed: state.isSending ? null : state.cancel,
 +            ),
 +          ),
 +          if (state.isPaused)
@@ -320342,7 +320359,7 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +              child: IconButton(
 +                tooltip: L10n.of(context).resume,
 +                icon: const Icon(Icons.play_circle_outline_outlined),
-+                onPressed: state.resume,
++                onPressed: state.isSending ? null : state.resume,
 +              ),
 +            )
 +          else
@@ -320352,7 +320369,7 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +              child: IconButton(
 +                tooltip: L10n.of(context).pause,
 +                icon: const Icon(Icons.pause_circle_outline_outlined),
-+                onPressed: state.pause,
++                onPressed: state.isSending ? null : state.pause,
 +              ),
 +            ),
 +          Text(time),
@@ -320390,8 +320407,17 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +              foregroundColor: theme.onBubbleColor,
 +            ),
 +            tooltip: L10n.of(context).sendAudio,
-+            icon: const Icon(Icons.send_outlined),
-+            onPressed: () => state.stopAndSend(onSend),
++            icon: state.isSending
++                ? SizedBox(
++                    width: 18,
++                    height: 18,
++                    child: CircularProgressIndicator(
++                      strokeWidth: 2,
++                      color: theme.onBubbleColor,
++                    ),
++                  )
++                : const Icon(Icons.send_outlined),
++            onPressed: state.isSending ? null : () => state.stopAndSend(onSend),
 +          ),
 +          const SizedBox(width: 4),
 +        ],
@@ -320400,10 +320426,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..54bfcbf579c6bb24cbafe871a30555ac5b107c97 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..ad98619b0d3c49d0812a71177c9415eaf934c848 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,286 @@
+@@ -1,222 +1,293 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320690,6 +320716,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..54bfcbf579c6bb24cbafe871a30555ac
 +  String? fileName;
 +
 +  bool isPaused = false;
++  bool isSending = false;
 +
 +  Future<void> startRecording(Room room) async {
 +    room.client.getConfig(); // Preload server file configuration.
@@ -320797,6 +320824,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..54bfcbf579c6bb24cbafe871a30555ac
 +    duration = Duration.zero;
 +    amplitudeTimeline.clear();
 +    isPaused = false;
++    isSending = false;
 +  }
 +
 +  void cancel() {
@@ -320864,29 +320892,34 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..54bfcbf579c6bb24cbafe871a30555ac
 +    )
 +    onSend,
 +  ) async {
-+    _recorderSubscription?.cancel();
-+    final path = await _audioRecorder?.stop();
++    if (isSending) return;
++    setState(() => isSending = true);
 +
-+    if (path == null) throw ('Recording failed!');
++    try {
++      _recorderSubscription?.cancel();
++      final path = await _audioRecorder?.stop();
 +
-+    // Wait for native recorder thread to finish flushing container
-+    // headers/footers (MOOV atom or Ogg EOS page) to disk.
-+    // Then verify the file is stable (size stops changing).
-+    await _waitForFileStable(path);
++      if (path == null) throw ('Recording failed!');
 +
-+    const waveCount = AudioPlayerWidget.wavesCount;
-+    final step = amplitudeTimeline.length < waveCount
-+        ? 1
-+        : (amplitudeTimeline.length / waveCount).round();
-+    final waveform = <int>[];
-+    for (var i = 0; i < amplitudeTimeline.length; i += step) {
-+      final sample = (amplitudeTimeline[i] / 100 * 1024).round();
-+      waveform.add(sample.clamp(0, 1024));
++      // Wait for native recorder thread to finish flushing container
++      // headers/footers (MOOV atom or Ogg EOS page) to disk.
++      // Then verify the file is stable (size stops changing).
++      await _waitForFileStable(path);
++
++      const waveCount = AudioPlayerWidget.wavesCount;
++      final step = amplitudeTimeline.length < waveCount
++          ? 1
++          : (amplitudeTimeline.length / waveCount).round();
++      final waveform = <int>[];
++      for (var i = 0; i < amplitudeTimeline.length; i += step) {
++        final sample = (amplitudeTimeline[i] / 100 * 1024).round();
++        waveform.add(sample.clamp(0, 1024));
++      }
++
++      await onSend(path, duration.inMilliseconds, waveform, fileName!);
++    } finally {
++      cancel();
 +    }
-+
-+    await onSend(path, duration.inMilliseconds, waveform, fileName!);
-+
-+    cancel();
 +  }
 +
 +  @override
