@@ -320400,10 +320400,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..c59ae08707f1c7d897bc6ec08de3c1e3
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf0230531b9d 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..54bfcbf579c6bb24cbafe871a30555ac5b107c97 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,248 @@
+@@ -1,222 +1,286 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320632,6 +320632,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf02
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
 +import 'dart:async';
++import 'dart:io';
 +
 +import 'package:device_info_plus/device_info_plus.dart';
 +import 'package:fluffychat/config/setting_keys.dart';
@@ -320789,7 +320790,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf02
 +  void _reset() {
 +    WakelockPlus.disable();
 +    _recorderSubscription?.cancel();
-+    _audioRecorder?.stop();
++    _audioRecorder?.dispose();
 +    _audioRecorder = null;
 +
 +    fileName = null;
@@ -320818,6 +320819,42 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf02
 +    });
 +  }
 +
++  /// Polls the file size until it stabilizes, indicating the native
++  /// recorder thread has finished flushing all data to disk.
++  /// Falls back to a generous fixed delay on web or if checking fails.
++  Future<void> _waitForFileStable(String filePath) async {
++    if (kIsWeb) {
++      await Future.delayed(const Duration(milliseconds: 300));
++      return;
++    }
++
++    final file = File(filePath);
++    const maxAttempts = 20; // 20 * 100ms = 2 seconds max wait
++    const pollInterval = Duration(milliseconds: 100);
++
++    int previousSize = -1;
++    int stableCount = 0;
++
++    for (var i = 0; i < maxAttempts; i++) {
++      await Future.delayed(pollInterval);
++      try {
++        if (await file.exists()) {
++          final currentSize = await file.length();
++          if (currentSize > 0 && currentSize == previousSize) {
++            stableCount++;
++            if (stableCount >= 2) return; // Stable for 200ms -> done
++          } else {
++            stableCount = 0;
++          }
++          previousSize = currentSize;
++        }
++      } catch (_) {
++        // File not yet accessible, keep waiting
++      }
++    }
++    Logs().w('Audio file did not stabilize within timeout, proceeding anyway');
++  }
++
 +  Future<void> stopAndSend(
 +    Future<void> Function(
 +      String path,
@@ -320831,10 +320868,11 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf02
 +    final path = await _audioRecorder?.stop();
 +
 +    if (path == null) throw ('Recording failed!');
-+    
-+    // Wait briefly to allow native Android MediaRecorder / AudioRecord thread
-+    // to finish writing container headers/footers (MOOV atom or Ogg EOS page) to disk.
-+    await Future.delayed(const Duration(milliseconds: 150));
++
++    // Wait for native recorder thread to finish flushing container
++    // headers/footers (MOOV atom or Ogg EOS page) to disk.
++    // Then verify the file is stable (size stops changing).
++    await _waitForFileStable(path);
 +
 +    const waveCount = AudioPlayerWidget.wavesCount;
 +    final step = amplitudeTimeline.length < waveCount
@@ -320846,7 +320884,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..675d0d714e3c7dfc362f8bcacf85cf02
 +      waveform.add(sample.clamp(0, 1024));
 +    }
 +
-+    onSend(path, duration.inMilliseconds, waveform, fileName!);
++    await onSend(path, duration.inMilliseconds, waveform, fileName!);
 +
 +    cancel();
 +  }
