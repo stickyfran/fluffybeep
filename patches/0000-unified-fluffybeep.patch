@@ -21006,7 +21006,7 @@ index f0eb702cfd934f5be1043bc4d45bdbbe3d893c0d..0a36b6a15a02033ebf5cb4ab7f8d5282
  ]
 \ No newline at end of file
 diff --git a/config.sample.json b/config.sample.json
-index ebc126e890f81f8cd50bfeb6a43a09ce67be4117..bd3e454831587ecc10a23fc9752705b2ea636e2f 100644
+index ebc126e890f81f8cd50bfeb6a43a09ce67be4117..b29a69936c1b81cd456b438e5c5f248e1b528889 100644
 --- a/config.sample.json
 +++ b/config.sample.json
 @@ -1,32 +1,32 @@
@@ -21052,7 +21052,7 @@ index ebc126e890f81f8cd50bfeb6a43a09ce67be4117..bd3e454831587ecc10a23fc9752705b2
 +  "audioRecordingEchoCancel": false,
 +  "audioRecordingNoiseSuppress": true,
 +  "audioRecordingBitRate": 64000,
-+  "audioRecordingSamplingRate": 44100,
++  "audioRecordingSamplingRate": 48000,
 +  "renderHtml": true,
 +  "fontSizeFactor": 1,
 +  "messagePreviewMaxLines": 128,
@@ -33971,7 +33971,7 @@ index c1b5b915c345fffa623ce1720788138edacc5556..c393b5a6d863c02a0f7cd2d805bf03ce
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..0512ab982af1819dcc85a31d4332c28a840705bd 100644
+index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..ae8f29a88f69b50cf854a146db1733c3b2616135 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
 @@ -1,215 +1,215 @@
@@ -34214,7 +34214,7 @@ index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..0512ab982af1819dcc85a31d4332c28a
 +  audioRecordingEchoCancel<bool>('audioRecordingEchoCancel', false),
 +  audioRecordingNoiseSuppress<bool>('audioRecordingNoiseSuppress', true),
 +  audioRecordingBitRate<int>('audioRecordingBitRate', 64000),
-+  audioRecordingSamplingRate<int>('audioRecordingSamplingRate', 44100),
++  audioRecordingSamplingRate<int>('audioRecordingSamplingRate', 48000),
 +  showNoGoogle<bool>('chat.fluffy.show_no_google', false),
 +  unifiedPushRegistered<bool>('chat.fluffy.unifiedpush.registered', false),
 +  unifiedPushEndpoint<String>('chat.fluffy.unifiedpush.endpoint', ''),
@@ -310557,10 +310557,10 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..98b353f789315a339cbc92d457a8135cdef5013b 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..11fbabb84fdd6db03422df0e8ad615ed808baeb1 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
-@@ -1,535 +1,535 @@
+@@ -1,535 +1,537 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -311277,7 +311277,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..98b353f789315a339cbc92d457a8135c
 +        await file.writeAsBytes(matrixFile.bytes);
 +
 +        if (Platform.isIOS &&
-+            matrixFile.mimeType.toLowerCase() == 'audio/ogg') {
++            (matrixFile.mimeType.toLowerCase().startsWith('audio/ogg') ||
++                matrixFile.name.toLowerCase().endsWith('.ogg') ||
++                matrixFile.name.toLowerCase().endsWith('.opus'))) {
 +          Logs().v('Convert ogg audio file for iOS...');
 +          final convertedFile = File('${file.path}.caf');
 +          if (await convertedFile.exists() == false) {
