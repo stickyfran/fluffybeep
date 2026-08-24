@@ -14131,10 +14131,10 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..e7455e7a4a86a9a5642cf418a64ba49e
 +-dontwarn org.matrix.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
-index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..bb1f4444e3dc1841f3ffd82c156bc4dcb133492b 100644
+index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..9311034041127a24e44647db3a24d9e41085d196 100644
 --- a/android/app/src/main/AndroidManifest.xml
 +++ b/android/app/src/main/AndroidManifest.xml
-@@ -1,139 +1,151 @@
+@@ -1,139 +1,155 @@
 -<manifest xmlns:android="http://schemas.android.com/apk/res/android"
 -          xmlns:tools="http://schemas.android.com/tools"
 -    android:installLocation="auto">
@@ -14306,6 +14306,9 @@ index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..bb1f4444e3dc1841f3ffd82c156bc4dc
 +    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 +    <uses-permission android:name="android.permission.WAKE_LOCK" />
 +    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
++    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
++    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING"/>
++    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 +
 +    <!-- To make app compatible with tablets -->
 +    <uses-feature android:name="android.hardware.camera" android:required="false"/>
@@ -14407,7 +14410,8 @@ index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..bb1f4444e3dc1841f3ffd82c156bc4dc
 +        </service>
 +
 +        <service android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
-+             android:foregroundServiceType="camera|microphone|mediaProjection">
++             android:foregroundServiceType="camera|microphone|mediaProjection|remoteMessaging"
++             android:exported="false">
 +        </service>
 +
 +        <!-- From flutter_local_notifications package for notification actions -->
@@ -351834,10 +351838,10 @@ index 9ab83eb27963f39eb590cf61f4c8c558f93be70d..8f3ba0e23025cf04a767131cd0ed755e
 +  return encoder.convert(object);
 +}
 diff --git a/lib/pages/settings_notifications/settings_notifications_view.dart b/lib/pages/settings_notifications/settings_notifications_view.dart
-index 7fac63f7fe46ffb4aef3b0c3a4c0bc398f6da05d..e28daf696c5307ca930a1690b02cf3bcfc48ef6a 100644
+index 7fac63f7fe46ffb4aef3b0c3a4c0bc398f6da05d..9f9bd423f1fd29da64d16bc757c442eac5c7f344 100644
 --- a/lib/pages/settings_notifications/settings_notifications_view.dart
 +++ b/lib/pages/settings_notifications/settings_notifications_view.dart
-@@ -1,192 +1,357 @@
+@@ -1,192 +1,412 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352035,10 +352039,12 @@ index 7fac63f7fe46ffb4aef3b0c3a4c0bc398f6da05d..e28daf696c5307ca930a1690b02cf3bc
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:io';
 +import 'package:fluffychat/config/setting_keys.dart';
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/settings_notifications/push_rule_extensions.dart';
++import 'package:fluffychat/utils/background_push.dart';
 +import 'package:fluffychat/utils/push_helper.dart';
 +import 'package:fluffychat/widgets/layouts/max_width_body.dart';
 +import 'package:fluffychat/widgets/settings_switch_list_tile.dart';
@@ -352164,6 +352170,59 @@ index 7fac63f7fe46ffb4aef3b0c3a4c0bc398f6da05d..e28daf696c5307ca930a1690b02cf3bc
 +                        ),
 +                      Divider(color: theme.dividerColor),
 +                    ],
++                  if (Platform.isAndroid) ...[
++                    StatefulBuilder(
++                      builder: (context, setTileState) {
++                        return FutureBuilder<bool>(
++                          future: BackgroundPush.isIgnoringBatteryOptimizations(),
++                          builder: (context, snapshot) {
++                            final isExempted = snapshot.data ?? true;
++                            return Column(
++                              mainAxisSize: MainAxisSize.min,
++                              crossAxisAlignment: CrossAxisAlignment.start,
++                              children: [
++                                ListTile(
++                                  title: Text(
++                                    'Segundo plano y Batería',
++                                    style: TextStyle(
++                                      color: theme.colorScheme.secondary,
++                                      fontWeight: FontWeight.bold,
++                                    ),
++                                  ),
++                                ),
++                                ListTile(
++                                  leading: Icon(
++                                    isExempted ? Icons.battery_charging_full : Icons.battery_alert,
++                                    color: isExempted ? Colors.green : Colors.orange,
++                                  ),
++                                  title: Text(
++                                    isExempted
++                                        ? 'Sin restricciones de batería ✓'
++                                        : 'Restricciones de batería activas',
++                                  ),
++                                  subtitle: Text(
++                                    isExempted
++                                        ? 'Las notificaciones llegarán sin demora en segundo plano.'
++                                        : 'Android puede demorar o silenciar notificaciones con la pantalla apagada. Toca para desactivar la optimización.',
++                                  ),
++                                  trailing: isExempted
++                                      ? null
++                                      : const Icon(Icons.chevron_right),
++                                  onTap: isExempted
++                                      ? null
++                                      : () async {
++                                          await BackgroundPush.requestBatteryOptimizationExemption();
++                                          setTileState(() {});
++                                        },
++                                ),
++                                Divider(color: theme.dividerColor),
++                              ],
++                            );
++                          },
++                        );
++                      },
++                    ),
++                  ],
 +                  ListTile(
 +                    title: Text(
 +                      L10n.of(context).devices,
@@ -356158,10 +356217,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736b00aaf67 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..cdbbb69698df804bf968cb15a59e20554a8938d0 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,565 @@
+@@ -1,471 +1,636 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -356659,6 +356718,7 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +import 'package:unifiedpush/unifiedpush.dart';
 +import 'package:unifiedpush_ui/unifiedpush_ui.dart';
 +
++import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +
 +import '../config/app_config.dart';
@@ -356666,6 +356726,8 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +import '../widgets/matrix.dart';
 +import 'platform_infos.dart';
 +import 'file_logger.dart';
++
++const _pushProcessingServiceId = 9001;
 +
 +class BackgroundPush {
 +  static BackgroundPush? _instance;
@@ -356971,6 +357033,14 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +          );
 +        }
 +      }
++
++      if (Platform.isAndroid) {
++        final isExempted = await BackgroundPush.isIgnoringBatteryOptimizations();
++        if (!isExempted && context.mounted) {
++          await Future.delayed(const Duration(milliseconds: 800));
++          await BackgroundPush.requestBatteryOptimizationExemption();
++        }
++      }
 +    } else {
 +      for (final client in clients) {
 +        Logs().d('SetupPush for Client ${client.clientName}');
@@ -357020,6 +357090,35 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +
 +  Future<void> _noFcmWarning() async {
 +    return; // Beeper Patch: Disable Firebase missing warning completely
++  }
++
++  /// Requests the user to exempt the app from battery optimizations.
++  /// Without this, Android (Doze Mode) can delay or drop ntfy broadcasts.
++  static Future<bool> requestBatteryOptimizationExemption() async {
++    if (!Platform.isAndroid) return true;
++    try {
++      final isIgnoring = await FlutterForegroundTask.isIgnoringBatteryOptimizations;
++      if (isIgnoring) {
++        Logs().v('[Push] Battery optimization already exempted.');
++        return true;
++      }
++      Logs().i('[Push] Requesting battery optimization exemption...');
++      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
++      return false;
++    } catch (e, s) {
++      Logs().w('[Push] Failed to request battery optimization exemption', e, s);
++      return false;
++    }
++  }
++
++  /// Checks if the app is currently ignoring battery optimizations.
++  static Future<bool> isIgnoringBatteryOptimizations() async {
++    if (!Platform.isAndroid) return true;
++    try {
++      return await FlutterForegroundTask.isIgnoringBatteryOptimizations;
++    } catch (_) {
++      return false;
++    }
 +  }
 +
 +  Future<void> setupFirebase(Client client) async {
@@ -357125,6 +357224,40 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +
 +  Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
 +    await FileLogger.log('[UnifiedPush] _onUpMessage triggered');
++
++    bool foregroundServiceStarted = false;
++    if (Platform.isAndroid) {
++      try {
++        FlutterForegroundTask.init(
++          androidNotificationOptions: AndroidNotificationOptions(
++            channelId: 'push_processing',
++            channelName: 'Push Processing',
++            channelDescription: 'Processing incoming message',
++            importance: NotificationImportance.LOW,
++            enableVibration: false,
++            playSound: false,
++          ),
++          iosNotificationOptions: const IOSNotificationOptions(
++            showNotification: false,
++          ),
++          foregroundTaskOptions: ForegroundTaskOptions(
++            eventAction: ForegroundTaskEventAction.nothing(),
++            allowWakeLock: true,
++          ),
++        );
++        final result = await FlutterForegroundTask.startService(
++          serviceId: _pushProcessingServiceId,
++          serviceTypes: [ForegroundServiceTypes.remoteMessaging],
++          notificationTitle: 'FluffyBeep',
++          notificationText: 'Procesando notificación...',
++        );
++        foregroundServiceStarted = result.success;
++        await FileLogger.log('[UnifiedPush] Foreground service started: ${result.success}');
++      } catch (e) {
++        await FileLogger.log('[UnifiedPush] Could not start foreground service: $e. Continuing without it.');
++      }
++    }
++
 +    final pushIsolateReceivePort = ReceivePort();
 +    IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
 +    IsolateNameServer.registerPortWithName(
@@ -357143,25 +357276,14 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +      // UP may strip the devices list
 +      data['devices'] ??= [];
 +      await FileLogger.log('[UnifiedPush] Starting pushHelper sync...');
-+      if (clients != null) {
-+        unawaited(pushHelper(
-+          PushNotification.fromJson(data),
-+          clients: clients,
-+          l10n: l10n,
-+          activeRoomId: matrix?.activeRoomId,
-+          flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
-+          useNotificationActions: false,
-+        ));
-+      } else {
-+        await pushHelper(
-+          PushNotification.fromJson(data),
-+          clients: clients,
-+          l10n: l10n,
-+          activeRoomId: matrix?.activeRoomId,
-+          flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
-+          useNotificationActions: false,
-+        );
-+      }
++      await pushHelper(
++        PushNotification.fromJson(data),
++        clients: clients,
++        l10n: l10n,
++        activeRoomId: matrix?.activeRoomId,
++        flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
++        useNotificationActions: false,
++      );
 +      await FileLogger.log('[UnifiedPush] Finished pushHelper sync successfully');
 +    } catch (e, s) {
 +      await FileLogger.log('[UnifiedPush] CRITICAL ERROR in _onUpMessage: $e\nStacktrace:\n$s');
@@ -357169,6 +357291,14 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..d8b0247d77774f66f758a8af89314736
 +    } finally {
 +      IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
 +      pushIsolateReceivePort.close();
++      if (foregroundServiceStarted) {
++        try {
++          await FlutterForegroundTask.stopService();
++          await FileLogger.log('[UnifiedPush] Foreground service stopped.');
++        } catch (e) {
++          await FileLogger.log('[UnifiedPush] Failed to stop foreground service: $e');
++        }
++      }
 +    }
 +  }
 +}
