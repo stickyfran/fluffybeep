@@ -364052,7 +364052,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e6496197667270aaa2a060f18babb76b524bf..29655c46155a7348822cabab370ebca36ecd0139 100644
+index e90e6496197667270aaa2a060f18babb76b524bf..dced73694757e378bb150f3708710b7a122b2964 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,483 +1,640 @@
@@ -364640,7 +364640,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..29655c46155a7348822cabab370ebca3
 +
 +  if (notification.roomId != null &&
 +      activeRoomId == notification.roomId &&
-+      WidgetsBinding.instanceOrNull?.lifecycleState == AppLifecycleState.resumed) {
++      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
 +    Logs().v('Room is in foreground. Stop push helper here.');
 +    return;
 +  }
@@ -364700,7 +364700,7 @@ index e90e6496197667270aaa2a060f18babb76b524bf..29655c46155a7348822cabab370ebca3
 +    //
 +    // When paused/hidden/detached: we need oneShotSync to fetch decryption keys.
 +    // When resumed (truly foreground): the normal sync loop handles decryption.
-+    final lifecycleState = WidgetsBinding.instanceOrNull?.lifecycleState;
++    final lifecycleState = WidgetsBinding.instance.lifecycleState;
 +    final isForeground = clients != null &&
 +        lifecycleState == AppLifecycleState.resumed;
 +
