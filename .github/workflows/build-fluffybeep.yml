@@ -81,20 +81,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: v1.0
+          tag_name: v1.1
           target_commitish: main
-          name: "Fluffybeep v1.0 - Beeper Patches"
+          name: "Fluffybeep v1.1 - Background Push & Performance Enhancements"
           body: |
-            ### Initial Release & Beeper Enhancements
-            This release contains the custom compiled APK for Fluffychat with native Beeper bridge support.
-            
-            **Changes included:**
-            - **Room Name Correction**: Fixes bridged direct messages (WhatsApp, Telegram, etc.) showing as "Grupo con [Nombre]" to display only the contact name.
-            - **Beeper Re-sync**: Added a cache-clearing button in Settings to purge room metadata, profiles, and avatares safely.
-            - **Reproducible Signatures**: Signed with a permanent keystore key to allow updating the app without reinstalling.
+            ### 🚀 Fluffybeep v1.1 Release
+
+            This release brings major reliability improvements to background push notifications, performance optimizations, and bridge stability.
+
+            **Highlights in v1.1:**
+            - **Reliable Push Notifications (ntfy / UnifiedPush)**: Integrated an ephemeral background foreground service (`remoteMessaging`) to ensure the OS never kills the app process during push payload arrival and E2EE decryption (`oneShotSync`).
+            - **Battery Optimization (Doze Mode) Exemption**: Added automated prompt and a dedicated Settings status tile (`Ajustes → Notificaciones → Segundo plano y Batería`) to prevent Android from delaying background broadcast intents.
+            - **Massive Performance Optimizations**: Fixed UI jank and typing stutter by overhauling room cache invalidation (`_invalidateRoomCache` reduced from >400ms down to ~20-30ms) and isolating input field rebuilds.
+            - **Voice Messages & Audio Fixes**: Added 48kHz Opus sample rate support and improved compatibility for WhatsApp bridged voice notes.
+            - **Room Name & Bridge Consistency**: Resolved bridged DM naming issues and optimized avatar/profile bridge caching.
+            - **Permanent Keystore**: Seamless update support without uninstalling.
           files: fluffychat/build/app/outputs/flutter-apk/*.apk
           fail_on_unmatched_files: false
           draft: false
           prerelease: false
           make_latest: true
-          overwrite: true
