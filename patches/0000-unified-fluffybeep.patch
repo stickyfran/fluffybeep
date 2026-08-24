@@ -326873,7 +326873,7 @@ index f454d68..d3882ee 100644
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8b..968a93b 100644
+index 6ceba8b..3b7932e 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -327064,7 +327064,7 @@ index 6ceba8b..968a93b 100644
 +        final roomId = entry.key;
 +        final roomUpdate = entry.value;
 +        if (roomUpdate.timeline?.events?.isNotEmpty == true ||
-+            roomUpdate.state?.events?.isNotEmpty == true ||
++            roomUpdate.state?.isNotEmpty == true ||
 +            roomUpdate.unreadNotifications != null) {
 +          BeeperBridgeUtils.invalidateLastMessageTime(roomId);
 +          changedRoomIds.add(roomId);
