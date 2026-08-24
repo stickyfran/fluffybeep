@@ -363011,10 +363011,10 @@ index f331edc..267e252 100644
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index e90e649..d318022 100644
+index e90e649..dced736 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,483 +1,628 @@
+@@ -1,483 +1,640 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -363652,9 +363652,21 @@ index e90e649..d318022 100644
 +      Logs().w('[PushCrypto] Initial getEventByPushNotification failed', e, s);
 +    }
 +
-+    final isForeground = clients != null;
++    // isForeground must reflect whether the app's UI is actually visible and
++    // actively syncing. Using `clients != null` is WRONG because BackgroundPush
++    // always passes `clients` (from `_clients` fallback), even when the app is
++    // backgrounded. The only reliable source of truth is the Flutter lifecycle.
++    //
++    // When paused/hidden/detached: we need oneShotSync to fetch decryption keys.
++    // When resumed (truly foreground): the normal sync loop handles decryption.
++    final lifecycleState = WidgetsBinding.instance.lifecycleState;
++    final isForeground = clients != null &&
++        lifecycleState == AppLifecycleState.resumed;
++
 +    if ((event == null || event.type == EventTypes.Encrypted) && !isForeground) {
-+      Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. Main isolate alive: $isMainIsolateAlive. Running background oneShotSync to fetch decryption keys...');
++      Logs().v('[PushCrypto] Event is ${event == null ? "null" : "encrypted"}. '
++          'Lifecycle: $lifecycleState. Main isolate alive: $isMainIsolateAlive. '
++          'Running background oneShotSync to fetch decryption keys...');
 +      await client.oneShotSync().timeout(const Duration(seconds: 5)).catchError((e, s) {
 +        Logs().w('[PushCrypto] Background oneShotSync failed', e, s);
 +      });
