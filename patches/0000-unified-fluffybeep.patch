@@ -320432,10 +320432,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..ad98619b0d3c49d0812a71177c9415eaf934c848 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..0a138183f312dcaec6876e2d25105454edd95488 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,293 @@
+@@ -1,222 +1,291 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320745,12 +320745,10 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..ad98619b0d3c49d0812a71177c9415ea
 +    setState(() {});
 +
 +    try {
-+      final codec =
-+          !PlatformInfos
-+                  .isIOS && // Blocked by https://github.com/llfbandit/record/issues/560
-+              await audioRecorder.isEncoderSupported(AudioEncoder.opus)
-+          ? AudioEncoder.opus
-+          : AudioEncoder.aacLc;
++      // Always use AAC (M4A) for maximum cross-platform compatibility.
++      // OGG/Opus is not supported by WhatsApp on iOS, causing voice messages
++      // to be unplayable for iPhone recipients.
++      const codec = AudioEncoder.aacLc;
 +      fileName =
 +          'voice_message_${DateTime.now().millisecondsSinceEpoch}.${codec.fileExtension}';
 +      String? path;
