@@ -326875,7 +326875,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e76964614 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a427388812 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -326904,7 +326904,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
  import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
  import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart' as sdk;
-@@ -32,7 +37,10 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -32,7 +37,11 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
@@ -326912,10 +326912,11 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 +import '../../utils/stream_extension.dart';
  import '../../utils/url_launcher.dart';
 +import '../../utils/encryption_health_monitor.dart';
++import '../../utils/performance_logger.dart';
  import '../../widgets/matrix.dart';
  
  enum ActiveFilter { allChats, unread, groups, messages, tag }
-@@ -83,7 +91,9 @@ class ChatListController extends State<ChatList>
+@@ -83,7 +92,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -326926,7 +326927,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +149,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +150,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -326938,7 +326939,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +159,247 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +160,251 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -326981,7 +326982,6 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 +    if (cachedDiskTs != null) {
 +      final ts = DateTime.fromMillisecondsSinceEpoch(cachedDiskTs);
 +      BeeperBridgeUtils.setLastMessageTime(room.id, ts);
-+      _fetchLastMessageTimeAsync(room);
 +      return ts;
 +    }
 +
@@ -327016,6 +327016,9 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 +    const chunkSize = 20;
 +    for (var i = 0; i < batch.length; i += chunkSize) {
 +      if (!mounted) break;
++      if (i > 0) {
++        await Future.delayed(const Duration(milliseconds: 10));
++      }
 +      final chunk = batch.sublist(i, (i + chunkSize > batch.length) ? batch.length : i + chunkSize);
 +      await Future.wait(chunk.map((roomId) async {
 +        final room = client.getRoomById(roomId);
@@ -327138,12 +327141,14 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
 +
-+    // In single-column mode (mobile), if a chat is active the ChatListViewBody
-+    // is fully obscured by the chat screen. Suppress the rebuild to avoid
-+    // wasting build budget on an invisible widget. Mark a pending flush so that
-+    // when the user pops back to the list we notify immediately.
++    // In single-column mode (mobile), if a chat is active or another screen (e.g. Settings)
++    // is covering the ChatListViewBody, suppress the rebuild to avoid wasting build budget
++    // on an invisible widget. Mark a pending flush so that when the user returns to /rooms
++    // we notify immediately.
 +    final isSingleColumn = !FluffyThemes.isColumnMode(context);
-+    final chatCoveringList = isSingleColumn && widget.activeChat != null;
++    final isCoveredByOtherScreen = PerformanceLoggerObserver.currentRoute != '/rooms' &&
++        PerformanceLoggerObserver.currentRoute != 'unknown';
++    final chatCoveringList = isSingleColumn && (widget.activeChat != null || isCoveredByOtherScreen);
 +    if (chatCoveringList) {
 +      _pendingRoomCacheNotify = true;
 +    } else {
@@ -327190,7 +327195,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +408,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +413,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -327297,7 +327302,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +465,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +470,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -327321,7 +327326,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -298,6 +483,13 @@ class ChatListController extends State<ChatList>
+@@ -298,6 +488,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -327335,9 +327340,11 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,63 +572,108 @@ class ChatListController extends State<ChatList>
+@@ -379,64 +576,119 @@ class ChatListController extends State<ChatList>
+     _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
++    PerformanceLoggerObserver.currentRouteNotifier.addListener(_onRouteChange);
      _waitForFirstSync();
 -    Matrix.of(context).voipPlugin?.context = context;
 -    WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -327348,6 +327355,14 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 -        Matrix.of(context).backgroundPush?.setupPush();
 -        UpdateNotifier.showUpdateDialog(context);
 +    super.initState();
++  }
++
++  void _onRouteChange() {
++    if (!mounted) return;
++    if (PerformanceLoggerObserver.currentRoute == '/rooms' && _pendingRoomCacheNotify) {
++      _pendingRoomCacheNotify = false;
++      roomCacheNotifier.value++;
++    }
 +  }
 +
 +  @override
@@ -327397,7 +327412,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
          Theme.of(context).appBarTheme.systemOverlayStyle!,
        );
 -    });
- 
+-
 -    _updateRoomTags();
 -    _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
 -        .where(
@@ -327412,7 +327427,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 -              false,
 -        )
 -        .listen(_updateRoomTags);
--
+ 
 -    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
 -      activeFilter = ActiveFilter.tag;
 -      activeTag = AppSettings.chatFilter.value;
@@ -327472,6 +327487,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
      _onRoomTagUpdate?.cancel();
 +    _onSyncForRoomCache?.cancel();
      scrollController.removeListener(_onScroll);
++    PerformanceLoggerObserver.currentRouteNotifier.removeListener(_onRouteChange);
      searchController.dispose();
      searchFocusNode.dispose();
      scrollController.dispose();
@@ -327480,7 +327496,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
      _clientStream.close();
      super.dispose();
    }
-@@ -530,13 +767,13 @@ class ChatListController extends State<ChatList>
+@@ -530,13 +782,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -327496,7 +327512,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -643,19 +880,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +895,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327528,7 +327544,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +915,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +930,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327557,7 +327573,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
          ],
        );
      }
-@@ -699,7 +957,30 @@ class ChatListController extends State<ChatList>
+@@ -699,7 +972,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -327589,7 +327605,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
          );
          return;
        case ChatContextAction.mute:
-@@ -800,13 +1081,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +1096,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -327711,7 +327727,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
      }
    }
  
-@@ -913,10 +1301,9 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1316,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -327725,7 +327741,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1425,6 @@ enum ChatContextAction {
+@@ -1038,4 +1440,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -357471,7 +357487,7 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..7054ef9ace61ddf54619d18f4ae35703aa041d6b
+index 0000000000000000000000000000000000000000..2aa3209d66c7416b8bd95d57f75e8f19f1d28734
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
 @@ -0,0 +1,814 @@
@@ -357619,7 +357635,7 @@ index 0000000000000000000000000000000000000000..7054ef9ace61ddf54619d18f4ae35703
 +  }
 +  // --- FIN SISTEMA DE CACHÉ PERSISTENTE ---
 +
-+  static const int maxCacheSize = 100;
++  static const int maxCacheSize = 5000;
 +
 +  /// Caché en RAM — O(1) lookup, invalidada por sync
 +  static final Map<String, BeeperRoomData> _roomDataCache = LinkedHashMap<String, BeeperRoomData>();
@@ -363814,10 +363830,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f189b2852
+index 0000000000000000000000000000000000000000..c3d5ec6cdec9b3c610aea358275e5521236c42ad
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,220 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -364001,6 +364017,7 @@ index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f
 +
 +class PerformanceLoggerObserver extends NavigatorObserver {
 +  static String currentRoute = 'unknown';
++  static final ValueNotifier<String> currentRouteNotifier = ValueNotifier<String>('unknown');
 +
 +  static String _getRouteName(Route<dynamic> route) {
 +    final name = route.settings.name ?? route.runtimeType.toString();
@@ -364015,6 +364032,7 @@ index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f
 +  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
 +    super.didPush(route, previousRoute);
 +    currentRoute = _getRouteName(route);
++    currentRouteNotifier.value = currentRoute;
 +    PerformanceLogger.logAction('Screen Pushed: $currentRoute');
 +  }
 +
@@ -364022,6 +364040,7 @@ index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f
 +  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
 +    super.didPop(route, previousRoute);
 +    currentRoute = previousRoute != null ? _getRouteName(previousRoute) : 'unknown';
++    currentRouteNotifier.value = currentRoute;
 +    PerformanceLogger.logAction('Screen Popped: ${_getRouteName(route)} -> Active: $currentRoute');
 +  }
 +
@@ -364030,6 +364049,7 @@ index 0000000000000000000000000000000000000000..25fc2593b76fe5982d69b455a198273f
 +    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
 +    if (newRoute != null) {
 +      currentRoute = _getRouteName(newRoute);
++      currentRouteNotifier.value = currentRoute;
 +      PerformanceLogger.logAction('Screen Replaced: $currentRoute');
 +    }
 +  }
