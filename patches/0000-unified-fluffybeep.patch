@@ -326875,7 +326875,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a427388812 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..7a7fd8d2373af6a2325f8cfe51de62acdfb6f3c0 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -326904,19 +326904,21 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
  import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
  import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart' as sdk;
-@@ -32,7 +37,11 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -32,7 +37,13 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
 +import '../../utils/beeper_bridge_utils.dart';
 +import '../../utils/stream_extension.dart';
++import '../../utils/room_sort_isolate.dart';
  import '../../utils/url_launcher.dart';
 +import '../../utils/encryption_health_monitor.dart';
 +import '../../utils/performance_logger.dart';
++import 'package:flutter/foundation.dart';
  import '../../widgets/matrix.dart';
  
  enum ActiveFilter { allChats, unread, groups, messages, tag }
-@@ -83,7 +92,9 @@ class ChatListController extends State<ChatList>
+@@ -83,7 +94,9 @@ class ChatListController extends State<ChatList>
    String? get activeSpaceId => _activeSpaceId;
  
    Future<void> setActiveSpace(String spaceId) async {
@@ -326927,7 +326929,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -139,9 +150,9 @@ class ChatListController extends State<ChatList>
+@@ -139,9 +152,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -326939,7 +326941,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +160,251 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +162,240 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -327046,7 +327048,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +      if (FileLogger.isEnabled()) {
 +        FileLogger.log('[PERF/DB] Processed ${batch.length} timestamps from database in ${sw.elapsedMilliseconds}ms');
 +      }
-+      _invalidateRoomCache();
++      _invalidateRoomCache(batch.toSet());
 +    }
 +  }
 +
@@ -327057,30 +327059,17 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +  Map<String, String> _cachedRoomDisplayNames = {};
 +  Map<String, DateTime> _cachedTimestamps = {};
 +  StreamSubscription? _onSyncForRoomCache;
++  
++  final Set<String> _pendingChangedRoomIds = {};
++  Timer? _roomCacheDebounceTimer;
 +
-+  void _invalidateRoomCache([dynamic syncUpdate]) {
++  Future<void> _invalidateRoomCache([Set<String>? batchChangedRoomIds]) async {
 +    final sw = Stopwatch()..start();
-+    final changedRoomIds = <String>{};
-+    bool isIncremental = false;
++    bool isIncremental = batchChangedRoomIds != null;
++    final changedRoomIds = batchChangedRoomIds ?? <String>{};
 +
-+    if (syncUpdate is SyncUpdate && syncUpdate.rooms?.join != null) {
-+      isIncremental = true;
-+      for (final entry in syncUpdate.rooms!.join!.entries) {
-+        final roomId = entry.key;
-+        final roomUpdate = entry.value;
-+        if (roomUpdate.timeline?.events?.isNotEmpty == true ||
-+            roomUpdate.state?.isNotEmpty == true ||
-+            roomUpdate.unreadNotifications != null) {
-+          BeeperBridgeUtils.invalidateLastMessageTime(roomId);
-+          changedRoomIds.add(roomId);
-+        }
-+      }
-+      
-+      // If the sync only contained ephemeral events (like typing), the room order 
-+      // doesn't change, so we can skip the expensive cache invalidation entirely.
-+      if (changedRoomIds.isEmpty && _cachedAllRoomsSorted.isNotEmpty) {
-+        return;
-+      }
++    if (isIncremental && changedRoomIds.isEmpty && _cachedAllRoomsSorted.isNotEmpty) {
++      return;
 +    }
 +
 +    final client = Matrix.of(context).client;
@@ -327100,22 +327089,24 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +      }
 +    }
 +
-+    allRooms.sort((a, b) {
-+      if (a.isFavourite && !b.isFavourite) return -1;
-+      if (!a.isFavourite && b.isFavourite) return 1;
-+      if (a.isLowPriority && !b.isLowPriority) return 1;
-+      if (!a.isLowPriority && b.isLowPriority) return -1;
++    final sortDataList = allRooms.map((r) => RoomSortData(
++      id: r.id,
++      timestamp: _cachedTimestamps[r.id]?.millisecondsSinceEpoch ?? 0,
++      isFavourite: r.isFavourite,
++      isLowPriority: r.isLowPriority,
++    )).toList();
 +
-+      final aTime = _cachedTimestamps[a.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
-+      final bTime = _cachedTimestamps[b.id] ?? DateTime.fromMillisecondsSinceEpoch(0);
-+      return bTime.compareTo(aTime);
-+    });
++    final sortedIds = await compute(sortRoomsInIsolate, sortDataList);
++    if (!mounted) return;
++
++    final roomMap = {for (final r in allRooms) r.id: r};
++    final sortedRooms = sortedIds.map((id) => roomMap[id]!).toList();
 +
 +    if (FileLogger.isEnabled() && BeeperBridgeUtils.isRoomOrderLoggingEnabled()) {
 +      final logBuffer = StringBuffer();
-+      logBuffer.writeln('[ROOM_ORDER_DEBUG] Total sorted rooms: ${allRooms.length}. Top 200 rooms order:');
-+      for (var i = 0; i < allRooms.length && i < 200; i++) {
-+        final r = allRooms[i];
++      logBuffer.writeln('[ROOM_ORDER_DEBUG] Total sorted rooms: ${sortedRooms.length}. Top 200 rooms order:');
++      for (var i = 0; i < sortedRooms.length && i < 200; i++) {
++        final r = sortedRooms[i];
 +        final ts = _cachedTimestamps[r.id];
 +        logBuffer.writeln('  #$i: "${r.getLocalizedDisplayname(MatrixLocals(L10n.of(context)))}" (id=${r.id}, ts=$ts, lastEv=${r.lastEvent?.type})');
 +      }
@@ -327124,7 +327115,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +
 +    // Incrementally update display names map for fast non-blocking search filtering (O(1) for unchanged rooms)
 +    final matrixLocals = MatrixLocals(L10n.of(context));
-+    for (final r in allRooms) {
++    for (final r in sortedRooms) {
 +      if (!_cachedRoomDisplayNames.containsKey(r.id) || changedRoomIds.contains(r.id)) {
 +        final beeperData = BeeperBridgeUtils.getRoomData(r);
 +        final dName = beeperData.displayName ?? r.getLocalizedDisplayname(matrixLocals);
@@ -327135,9 +327126,9 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +    // Precalculate hidden inbox room IDs (avoid computing on every build)
 +    _cachedHiddenInboxRoomIds = BeeperBridgeUtils.getHiddenInboxRoomIds(client);
 +
-+    _cachedAllRoomsSorted = allRooms;
++    _cachedAllRoomsSorted = sortedRooms;
 +    _cachedFilteredRooms =
-+        allRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
++        sortedRooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
 +
@@ -327195,7 +327186,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +413,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +404,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -327302,7 +327293,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +470,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +461,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -327326,7 +327317,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -298,6 +488,13 @@ class ChatListController extends State<ChatList>
+@@ -298,6 +479,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -327340,7 +327331,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -379,64 +576,119 @@ class ChatListController extends State<ChatList>
+@@ -379,64 +567,140 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -327412,7 +327403,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
          Theme.of(context).appBarTheme.systemOverlayStyle!,
        );
 -    });
--
+ 
 -    _updateRoomTags();
 -    _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
 -        .where(
@@ -327427,17 +327418,6 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 -              false,
 -        )
 -        .listen(_updateRoomTags);
- 
--    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
--      activeFilter = ActiveFilter.tag;
--      activeTag = AppSettings.chatFilter.value;
--    } else {
--      activeFilter =
--          ActiveFilter.values.singleWhereOrNull(
--            (filter) => AppSettings.chatFilter.value == filter.name,
--          ) ??
--          ActiveFilter.allChats;
--    }
 +      _updateRoomTags();
 +      _onRoomTagUpdate = Matrix.of(context).client.onSync.stream
 +          .where(
@@ -327464,24 +327444,56 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +            ActiveFilter.allChats;
 +      }
  
--    _processPushHelperCrashReport();
+-    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
+-      activeFilter = ActiveFilter.tag;
+-      activeTag = AppSettings.chatFilter.value;
+-    } else {
+-      activeFilter =
+-          ActiveFilter.values.singleWhereOrNull(
+-            (filter) => AppSettings.chatFilter.value == filter.name,
+-          ) ??
+-          ActiveFilter.allChats;
 +      // Build initial room cache and hook into sync stream for future updates.
 +      // Rate-limit to 1s so rapid syncs don't thrash the sort. Safe to use Matrix.of(context) here.
 +      _invalidateRoomCache();
 +      _cachedSpaceDelegates = _computeSpaceDelegates();
 +      _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
 +          .where((s) => s.hasRoomUpdate)
-+          .rateLimit(const Duration(seconds: 1))
-+          .listen(_invalidateRoomCache);
- 
--    super.initState();
++          .listen((syncUpdate) {
++            if (syncUpdate.rooms?.join != null) {
++              for (final entry in syncUpdate.rooms!.join!.entries) {
++                final roomId = entry.key;
++                final roomUpdate = entry.value;
++                if (roomUpdate.timeline?.events?.isNotEmpty == true ||
++                    roomUpdate.state?.isNotEmpty == true ||
++                    roomUpdate.unreadNotifications != null) {
++                  BeeperBridgeUtils.invalidateLastMessageTime(roomId);
++                  _pendingChangedRoomIds.add(roomId);
++                }
++              }
++            }
++            
++            _roomCacheDebounceTimer?.cancel();
++            _roomCacheDebounceTimer = Timer(const Duration(milliseconds: 300), () {
++              if (!mounted) return;
++              final batch = Set<String>.from(_pendingChangedRoomIds);
++              _pendingChangedRoomIds.clear();
++              _invalidateRoomCache(batch);
++            });
++          });
++
 +      _processPushHelperCrashReport();
-+    }
+     }
+-
+-    _processPushHelperCrashReport();
+-
+-    super.initState();
    }
  
    @override
    void dispose() {
 +    _batchTimestampTimer?.cancel();
++    _roomCacheDebounceTimer?.cancel();
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
      _onRoomTagUpdate?.cancel();
@@ -327496,7 +327508,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
      _clientStream.close();
      super.dispose();
    }
-@@ -530,13 +782,13 @@ class ChatListController extends State<ChatList>
+@@ -530,13 +794,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -327512,7 +327524,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -643,19 +895,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +907,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327544,7 +327556,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +930,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +942,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327573,7 +327585,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
          ],
        );
      }
-@@ -699,7 +972,30 @@ class ChatListController extends State<ChatList>
+@@ -699,7 +984,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -327597,7 +327609,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
 +                  .where((r) => r.isUnreadOrInvited)
 +                  .length;
 +              updateAppBadge(unreadCount);
-+              _invalidateRoomCache();
++              _invalidateRoomCache({room.id});
 +            } else {
 +              await room.markUnread(true);
 +            }
@@ -327605,7 +327617,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
          );
          return;
        case ChatContextAction.mute:
-@@ -800,13 +1096,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +1108,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -327727,7 +327739,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
      }
    }
  
-@@ -913,10 +1316,9 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1328,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -327741,7 +327753,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..1e65ebf2b7f3eecfe76f5a45958949a4
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1440,6 @@ enum ChatContextAction {
+@@ -1038,4 +1452,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -365511,6 +365523,40 @@ index 620807ce316466a9b245d758876fd9c3e30334e3..b932e47c7228888761c03fead2e06f20
 +    }
 +    return null;
 +  }
++}
+diff --git a/lib/utils/room_sort_isolate.dart b/lib/utils/room_sort_isolate.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..932134bffd71c436bc80be7ec2aa008b9f7852ea
+--- /dev/null
++++ b/lib/utils/room_sort_isolate.dart
+@@ -0,0 +1,28 @@
++import 'package:matrix/matrix.dart';
++
++class RoomSortData {
++  final String id;
++  final int timestamp;
++  final bool isFavourite;
++  final bool isLowPriority;
++
++  const RoomSortData({
++    required this.id,
++    required this.timestamp,
++    required this.isFavourite,
++    required this.isLowPriority,
++  });
++}
++
++List<String> sortRoomsInIsolate(List<RoomSortData> data) {
++  data.sort((a, b) {
++    if (a.isFavourite && !b.isFavourite) return -1;
++    if (!a.isFavourite && b.isFavourite) return 1;
++    if (a.isLowPriority && !b.isLowPriority) return 1;
++    if (!a.isLowPriority && b.isLowPriority) return -1;
++
++    return b.timestamp.compareTo(a.timestamp);
++  });
++
++  return data.map((d) => d.id).toList();
 +}
 diff --git a/lib/utils/room_status_extension.dart b/lib/utils/room_status_extension.dart
 index d7eeb116da7877c0fc52a842459d376e279f00ce..3b4db901cd769b4b71d6e08fb8309220eb0bac20 100644
