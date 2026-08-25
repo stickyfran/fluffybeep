@@ -32877,10 +32877,10 @@ index 2d0f798acca84988f3dc06d66672e88da46902bc..8a37e1b83d78a3cec07303def16b999b
 +/q4AaOeMSQ+2b1tbFfLn
 +-----END CERTIFICATE-----''';
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index c1b5b915c345fffa623ce1720788138edacc5556..c393b5a6d863c02a0f7cd2d805bf03ceb0ed5e20 100644
+index c1b5b915c345fffa623ce1720788138edacc5556..77028fce9b50e675111f05761f9fe831cda35dc2 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
-@@ -1,527 +1,566 @@
+@@ -1,527 +1,578 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -33953,6 +33953,23 @@ index c1b5b915c345fffa623ce1720788138edacc5556..c393b5a6d863c02a0f7cd2d805bf03ce
 +    );
 +  }
 +
++  static Page fastFadePageBuilder(
++    BuildContext context,
++    GoRouterState state,
++    Widget child,
++  ) {
++    return CustomTransitionPage(
++      key: state.pageKey,
++      name: state.name ?? state.fullPath ?? state.matchedLocation,
++      restorationId: state.pageKey.value,
++      child: child,
++      transitionsBuilder: (context, animation, secondaryAnimation, child) {
++        return FadeTransition(opacity: animation, child: child);
++      },
++      transitionDuration: const Duration(milliseconds: 150),
++    );
++  }
++
 +  static Page defaultPageBuilder(
 +    BuildContext context,
 +    GoRouterState state,
@@ -33966,12 +33983,7 @@ index c1b5b915c345fffa623ce1720788138edacc5556..c393b5a6d863c02a0f7cd2d805bf03ce
 +    }
 +    return FluffyThemes.isColumnMode(context)
 +        ? noTransitionPageBuilder(context, state, child)
-+        : MaterialPage(
-+            name: state.name ?? state.fullPath ?? state.matchedLocation,
-+            key: state.pageKey,
-+            restorationId: state.pageKey.value,
-+            child: child,
-+          );
++        : fastFadePageBuilder(context, state, child);
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
@@ -356352,10 +356364,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..ce4870eca5dfc50147de911b04994781e1ffc56a 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..b9a8ad7539a1a342ae71f9b234ab3bf7fcd7f869 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,637 @@
+@@ -1,471 +1,595 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -357360,40 +357372,6 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..ce4870eca5dfc50147de911b04994781
 +  Future<void> _onUpMessage(PushMessage pushMessage, String i) async {
 +    await FileLogger.log('[UnifiedPush] _onUpMessage triggered');
 +
-+    bool foregroundServiceStarted = false;
-+    if (Platform.isAndroid) {
-+      try {
-+        FlutterForegroundTask.init(
-+          androidNotificationOptions: AndroidNotificationOptions(
-+            channelId: 'push_processing',
-+            channelName: 'Push Processing',
-+            channelDescription: 'Processing incoming message',
-+            channelImportance: NotificationChannelImportance.LOW,
-+            priority: NotificationPriority.LOW,
-+            enableVibration: false,
-+            playSound: false,
-+          ),
-+          iosNotificationOptions: const IOSNotificationOptions(
-+            showNotification: false,
-+          ),
-+          foregroundTaskOptions: ForegroundTaskOptions(
-+            eventAction: ForegroundTaskEventAction.nothing(),
-+            allowWakeLock: true,
-+          ),
-+        );
-+        final result = await FlutterForegroundTask.startService(
-+          serviceId: _pushProcessingServiceId,
-+          serviceTypes: [ForegroundServiceTypes.remoteMessaging],
-+          notificationTitle: 'FluffyBeep',
-+          notificationText: 'Procesando notificación...',
-+        );
-+        foregroundServiceStarted = result is ServiceRequestSuccess;
-+        await FileLogger.log('[UnifiedPush] Foreground service started: $foregroundServiceStarted');
-+      } catch (e) {
-+        await FileLogger.log('[UnifiedPush] Could not start foreground service: $e. Continuing without it.');
-+      }
-+    }
-+
 +    final pushIsolateReceivePort = ReceivePort();
 +    IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
 +    IsolateNameServer.registerPortWithName(
@@ -357427,14 +357405,6 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..ce4870eca5dfc50147de911b04994781
 +    } finally {
 +      IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
 +      pushIsolateReceivePort.close();
-+      if (foregroundServiceStarted) {
-+        try {
-+          await FlutterForegroundTask.stopService();
-+          await FileLogger.log('[UnifiedPush] Foreground service stopped.');
-+        } catch (e) {
-+          await FileLogger.log('[UnifiedPush] Failed to stop foreground service: $e');
-+        }
-+      }
 +    }
 +  }
 +}
