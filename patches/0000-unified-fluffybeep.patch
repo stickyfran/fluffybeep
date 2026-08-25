@@ -327733,10 +327733,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..3b7932e76fee360e21d19a9b1026eb2e
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..732e85f12336eee8b374a2751a28e17cf72eac7d 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..b67f73a748f81f384bda42143543a639fc48b190 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,449 @@
+@@ -1,338 +1,491 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328209,7 +328209,48 @@ index 8610b92531be84898e03439fa07f16145a6d552c..732e85f12336eee8b374a2751a28e17c
 +          }).toList();
 +        }
 +
-+        return CustomScrollView(
++        return GestureDetector(
++          onHorizontalDragEnd: (details) {
++            if (details.primaryVelocity == null) return;
++            if (widget.controller.isSearchMode) return;
++            
++            final availableFilters = <dynamic>[
++              ActiveFilter.allChats,
++              ActiveFilter.unread,
++              ActiveFilter.groups,
++              ActiveFilter.messages,
++              ...widget.controller.roomTags.keys,
++            ];
++            
++            final currentIndex = availableFilters.indexOf(
++              widget.controller.activeFilter == ActiveFilter.tag
++                  ? widget.controller.activeTag
++                  : widget.controller.activeFilter,
++            );
++            
++            if (currentIndex == -1) return;
++            
++            if (details.primaryVelocity! > 300) {
++              if (currentIndex > 0) {
++                final prev = availableFilters[currentIndex - 1];
++                if (prev is ActiveFilter) {
++                  widget.controller.setActiveFilter(prev, null);
++                } else {
++                  widget.controller.setActiveFilter(ActiveFilter.tag, prev as String);
++                }
++              }
++            } else if (details.primaryVelocity! < -300) {
++              if (currentIndex < availableFilters.length - 1) {
++                final next = availableFilters[currentIndex + 1];
++                if (next is ActiveFilter) {
++                  widget.controller.setActiveFilter(next, null);
++                } else {
++                  widget.controller.setActiveFilter(ActiveFilter.tag, next as String);
++                }
++              }
++            }
++          },
++          child: CustomScrollView(
 +          controller: widget.controller.scrollController,
 +          slivers: [
 +            ChatListHeader(controller: widget.controller),
@@ -328441,6 +328482,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..732e85f12336eee8b374a2751a28e17c
 +              ),
 +            ),
 +          ],
++        ),
 +        );
 +      },
 +    );
@@ -328822,10 +328864,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9ae2d2649062e892414c744d8c678b6259f3aa65 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc9034f804 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,506 @@
+@@ -1,410 +1,539 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329250,6 +329292,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9ae2d2649062e892414c744d8c678b62
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
++import 'package:fluffychat/config/setting_keys.dart';
 +import 'package:fluffychat/widgets/hover_builder.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
@@ -329533,29 +329576,45 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9ae2d2649062e892414c744d8c678b62
 +                      ),
 +                    ),
 +                  if (!widget.room.isSpace && widget.room.membership != Membership.invite)
-+                    Padding(
-+                      padding: const EdgeInsets.only(left: 4.0),
-+                      child: Text(
-+                        (BeeperBridgeUtils.getLastMessageTime(widget.room.id) ??
-+                                (widget.room.lastEvent != null
-+                                    ? widget.room.lastEvent!.originServerTs
-+                                    : null) ??
-+                                (BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id) != null
-+                                    ? DateTime.fromMillisecondsSinceEpoch(
-+                                        BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id)!)
-+                                    : null) ??
-+                                widget.room.latestEventReceivedTime)
-+                            .localizedTimeShort(context),
-+                        style: TextStyle(
-+                          fontSize: 11,
-+                          fontWeight: widget.room.hasNewMessages
-+                              ? FontWeight.bold
-+                              : null,
-+                          color: widget.room.highlightCount >= 1
-+                              ? theme.colorScheme.error
-+                              : widget.room.hasNewMessages
-+                              ? theme.colorScheme.primary
-+                              : null,
++                    GestureDetector(
++                      behavior: HitTestBehavior.opaque,
++                      onTap: () async {
++                        if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
++                          if (widget.room.markedUnread) {
++                            await widget.room.markUnread(false);
++                          }
++                          final lastEventId = widget.room.lastEvent?.eventId;
++                          await widget.room.setReadMarker(
++                            lastEventId,
++                            mRead: lastEventId,
++                            public: AppSettings.sendPublicReadReceipts.value,
++                          );
++                        }
++                      },
++                      child: Padding(
++                        padding: const EdgeInsets.only(left: 4.0),
++                        child: Text(
++                          (BeeperBridgeUtils.getLastMessageTime(widget.room.id) ??
++                                  (widget.room.lastEvent != null
++                                      ? widget.room.lastEvent!.originServerTs
++                                      : null) ??
++                                  (BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id) != null
++                                      ? DateTime.fromMillisecondsSinceEpoch(
++                                          BeeperBridgeUtils.getCachedLastTimestamp(widget.room.id)!)
++                                      : null) ??
++                                  widget.room.latestEventReceivedTime)
++                              .localizedTimeShort(context),
++                          style: TextStyle(
++                            fontSize: 11,
++                            fontWeight: widget.room.hasNewMessages
++                                ? FontWeight.bold
++                                : null,
++                            color: widget.room.highlightCount >= 1
++                                ? theme.colorScheme.error
++                                : widget.room.hasNewMessages
++                                ? theme.colorScheme.primary
++                                : null,
++                          ),
 +                        ),
 +                      ),
 +                    ),
@@ -329680,7 +329739,23 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9ae2d2649062e892414c744d8c678b62
 +                          ),
 +                  ),
 +                  const SizedBox(width: 8),
-+                  UnreadBubble(room: widget.room),
++                  GestureDetector(
++                    behavior: HitTestBehavior.opaque,
++                    onTap: () async {
++                      if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
++                        if (widget.room.markedUnread) {
++                          await widget.room.markUnread(false);
++                        }
++                        final lastEventId = widget.room.lastEvent?.eventId;
++                        await widget.room.setReadMarker(
++                          lastEventId,
++                          mRead: lastEventId,
++                          public: AppSettings.sendPublicReadReceipts.value,
++                        );
++                      }
++                    },
++                    child: UnreadBubble(room: widget.room),
++                  ),
 +                ],
 +              ),
 +              onTap: widget.onTap,
