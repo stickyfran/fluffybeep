@@ -326887,7 +326887,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d5718a515a6 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..79b5c4253ed62afd834c2654dfc9d9b6341129d7 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -326953,7 +326953,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +162,270 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +162,312 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -327119,18 +327119,60 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
 +      }
 +      if (!mounted) return;
 +
-+    final sortDataList = allRooms.map((r) => RoomSortData(
-+      id: r.id,
-+      timestamp: _cachedTimestamps[r.id]?.millisecondsSinceEpoch ?? 0,
-+      isFavourite: r.isFavourite,
-+      isLowPriority: r.isLowPriority,
-+    )).toList();
++      List<Room> sortedRooms;
++      if (isIncremental && _cachedAllRoomsSorted.isNotEmpty && allRooms.length == _cachedAllRoomsSorted.length && changedRoomIds.length < 50) {
++        sortedRooms = List<Room>.from(_cachedAllRoomsSorted);
++        final roomMap = {for (final r in allRooms) r.id: r};
 +
-+    final sortedIds = await compute(sortRoomsInIsolate, sortDataList);
-+    if (!mounted) return;
++        for (final changedId in changedRoomIds) {
++          final r = roomMap[changedId];
++          if (r == null) continue;
 +
-+    final roomMap = {for (final r in allRooms) r.id: r};
-+    final sortedRooms = sortedIds.map((id) => roomMap[id]!).toList();
++          sortedRooms.removeWhere((room) => room.id == changedId);
++
++          final rData = RoomSortData(
++            id: r.id,
++            timestamp: _cachedTimestamps[r.id]?.millisecondsSinceEpoch ?? 0,
++            isFavourite: r.isFavourite,
++            isLowPriority: r.isLowPriority,
++          );
++
++          int insertIndex = 0;
++          for (int i = 0; i < sortedRooms.length; i++) {
++            final other = sortedRooms[i];
++            final otherData = RoomSortData(
++              id: other.id,
++              timestamp: _cachedTimestamps[other.id]?.millisecondsSinceEpoch ?? 0,
++              isFavourite: other.isFavourite,
++              isLowPriority: other.isLowPriority,
++            );
++
++            int cmp = 0;
++            if (rData.isFavourite && !otherData.isFavourite) cmp = -1;
++            else if (!rData.isFavourite && otherData.isFavourite) cmp = 1;
++            else if (rData.isLowPriority && !otherData.isLowPriority) cmp = 1;
++            else if (!rData.isLowPriority && otherData.isLowPriority) cmp = -1;
++            else cmp = otherData.timestamp.compareTo(rData.timestamp);
++
++            if (cmp < 0) break;
++            insertIndex++;
++          }
++          sortedRooms.insert(insertIndex, r);
++        }
++      } else {
++        final sortDataList = allRooms.map((r) => RoomSortData(
++          id: r.id,
++          timestamp: _cachedTimestamps[r.id]?.millisecondsSinceEpoch ?? 0,
++          isFavourite: r.isFavourite,
++          isLowPriority: r.isLowPriority,
++        )).toList();
++
++        final sortedIds = await compute(sortRoomsInIsolate, sortDataList);
++        if (!mounted) return;
++
++        final roomMap = {for (final r in allRooms) r.id: r};
++        sortedRooms = sortedIds.map((id) => roomMap[id]!).toList();
++      }
 +
 +    if (FileLogger.isEnabled() && BeeperBridgeUtils.isRoomOrderLoggingEnabled()) {
 +      final logBuffer = StringBuffer();
@@ -327228,7 +327270,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +434,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +476,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -327335,7 +327377,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -284,13 +491,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +533,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -327359,7 +327401,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -298,6 +509,13 @@ class ChatListController extends State<ChatList>
+@@ -298,6 +551,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -327373,7 +327415,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -379,64 +597,136 @@ class ChatListController extends State<ChatList>
+@@ -379,64 +639,136 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -327546,7 +327588,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
      _clientStream.close();
      super.dispose();
    }
-@@ -530,13 +820,13 @@ class ChatListController extends State<ChatList>
+@@ -530,13 +862,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -327562,7 +327604,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -643,19 +933,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +975,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327594,7 +327636,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +968,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +1010,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -327623,7 +327665,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
          ],
        );
      }
-@@ -699,7 +1010,30 @@ class ChatListController extends State<ChatList>
+@@ -699,7 +1052,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -327655,7 +327697,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
          );
          return;
        case ChatContextAction.mute:
-@@ -800,13 +1134,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +1176,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -327777,7 +327819,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
      }
    }
  
-@@ -863,6 +1304,7 @@ class ChatListController extends State<ChatList>
+@@ -863,6 +1346,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -327785,7 +327827,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -913,10 +1355,9 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1397,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -327799,7 +327841,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1479,6 @@ enum ChatContextAction {
+@@ -1038,4 +1521,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
