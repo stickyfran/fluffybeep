@@ -327807,10 +327807,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..d46a004f2def6d5cde6c93fd396844ced0d80f0b 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..64f26447ed4b8c332d05fb9d551dc8a0d4278b87 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,498 @@
+@@ -1,338 +1,499 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328563,6 +328563,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..d46a004f2def6d5cde6c93fd396844ce
 +              ),
 +            ),
 +          ],
++        ),
 +        ),
 +        );
 +      },
