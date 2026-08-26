@@ -304782,7 +304782,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..413c348f9bc8ade7b05d179e98988a78cef18ac7 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..b3f1b3587c9c55eff17e1f88eb3a8c712e7e1012 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305087,14 +305087,16 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..413c348f9bc8ade7b05d179e98988a78
                  ),
                );
              },
-@@ -247,6 +270,7 @@ class ChatEventList extends StatelessWidget {
-                 controller.findChildIndexCallback(key, thisEventsKeyMap),
+@@ -248,6 +271,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
-+        ],
        ),
-     );
+-    );
++    ],
++  ),
++);
    }
+ }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
 index 879717fa9889be421184b768e20bad7417f95114..8a41e299d604423d817f701551340f6c4a189b82 100644
 --- a/lib/pages/chat/chat_input_row.dart
@@ -306096,7 +306098,7 @@ index 879717fa9889be421184b768e20bad7417f95114..8a41e299d604423d817f701551340f6c
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630df19a03e9 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..bc87b5639ebbd63a469dd878014fdc14aee61044 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,13 +16,17 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -306140,7 +306142,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630d
        canPop:
            controller.selectedEvents.isEmpty &&
            !controller.showEmojiPicker &&
-@@ -65,399 +70,506 @@ class ChatView extends StatelessWidget {
+@@ -65,399 +70,503 @@ class ChatView extends StatelessWidget {
            controller.closeThread();
          }
        },
@@ -306361,6 +306363,13 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630d
 +                            ],
 +                            begin: Alignment.topCenter,
 +                            end: Alignment.bottomCenter,
++                          ),
++                        ),
++                        alignment: Alignment.center,
++                        child: Container(
++                          margin: EdgeInsets.all(bottomSheetPadding),
++                          constraints: const BoxConstraints(
++                            maxWidth: FluffyThemes.maxTimelineWidth,
                            ),
 -                          if (controller.selectedEvents.single.status.isSent)
 -                            PopupMenuItem(
@@ -306371,13 +306380,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630d
 -                                  const Icon(
 -                                    Icons.shield_outlined,
 -                                    color: Colors.red,
-+                        ),
-+                        alignment: Alignment.center,
-+                        child: Container(
-+                          margin: EdgeInsets.all(bottomSheetPadding),
-+                          constraints: const BoxConstraints(
-+                            maxWidth: FluffyThemes.maxTimelineWidth,
-+                          ),
 +                          child: controller.room.isExtinct
 +                              ? ElevatedButton.icon(
 +                                  icon: const Icon(Icons.chevron_right),
@@ -306514,9 +306516,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630d
 +          ),
 +        ),
 +      ),
-+    );
-+      ),
-+    );
++    ),
++  );
 +  }
 +}
 +
@@ -307012,8 +307013,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..cad5037be641f35daed88ccf14b2630d
 +            ),
 +          );
 +        },
-+      ),
-+    );
        ),
      );
    }
