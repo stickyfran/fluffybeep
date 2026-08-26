@@ -327807,10 +327807,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6d873354fec20ff9c37cf217a41c0d57
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..b67f73a748f81f384bda42143543a639fc48b190 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..d46a004f2def6d5cde6c93fd396844ced0d80f0b 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -1,338 +1,491 @@
+@@ -1,338 +1,498 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328324,10 +328324,16 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b67f73a748f81f384bda42143543a639
 +              }
 +            }
 +          },
-+          child: CustomScrollView(
-+          controller: widget.controller.scrollController,
-+          slivers: [
-+            ChatListHeader(controller: widget.controller),
++          child: AnimatedSwitcher(
++            duration: const Duration(milliseconds: 250),
++            transitionBuilder: (child, animation) {
++              return FadeTransition(opacity: animation, child: child);
++            },
++            child: CustomScrollView(
++              key: ValueKey('${widget.controller.activeFilter}_${widget.controller.activeTag}'),
++              controller: widget.controller.scrollController,
++              slivers: [
++                ChatListHeader(controller: widget.controller),
 +            SliverList(
 +              delegate: SliverChildListDelegate([
 +                if (widget.controller.isSearchMode) ...[
@@ -328543,6 +328549,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b67f73a748f81f384bda42143543a639
 +                        space: space,
 +                        key: Key('chat_list_item_${room.id}'),
 +                        filter: filter,
++                        isUnreadFilter: widget.controller.activeFilter == ActiveFilter.unread,
 +                        onTap: () => widget.controller.onChatTap(room),
 +                        onLongPress: (context) =>
 +                            widget.controller.chatContextAction(room, context, space),
@@ -328938,10 +328945,10 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..5af180a728ff2fa5dfc0714d7c54090d
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc9034f804 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..c6ff2baca5fc2ba38382090308cec9a5e77cdce7 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
-@@ -1,410 +1,539 @@
+@@ -1,410 +1,555 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329382,6 +329389,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +  final void Function()? onForget;
 +  final void Function() onTap;
 +  final String? filter;
++  final bool isUnreadFilter;
 +
 +  const ChatListItem(
 +    this.room, {
@@ -329391,6 +329399,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +    this.onForget,
 +    this.filter,
 +    this.space,
++    this.isUnreadFilter = false,
 +    super.key,
 +  });
 +
@@ -329399,9 +329408,10 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +}
 +
 +class _ChatListItemState extends State<ChatListItem>
-+    with AutomaticKeepAliveClientMixin {
++    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
 +  Future<void>? _loadHeroUsersFuture;
 +  Future<String>? _calcLocalizedBodyFuture;
++  late AnimationController _sizeController;
 +
 +  @override
 +  bool get wantKeepAlive => false;
@@ -329409,13 +329419,41 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +  @override
 +  void initState() {
 +    super.initState();
++    _sizeController = AnimationController(
++      vsync: this,
++      duration: const Duration(milliseconds: 250),
++      value: 1.0,
++    );
 +    _initHeroFuture();
++  }
++
++  @override
++  void dispose() {
++    _sizeController.dispose();
++    super.dispose();
 +  }
 +
 +  @override
 +  void didChangeDependencies() {
 +    super.didChangeDependencies();
 +    _initLocalizedBodyFuture();
++  }
++
++  Future<void> _markAsReadAnimated() async {
++    if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
++      if (widget.isUnreadFilter) {
++        await _sizeController.reverse();
++      }
++      if (widget.room.markedUnread) {
++        await widget.room.markUnread(false);
++      }
++      final lastEventId = widget.room.lastEvent?.eventId;
++      await widget.room.setReadMarker(
++        lastEventId,
++        mRead: lastEventId,
++        public: AppSettings.sendPublicReadReceipts.value,
++      );
++    }
 +  }
 +
 +  @override
@@ -329650,23 +329688,11 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +                      ),
 +                    ),
 +                  if (!widget.room.isSpace && widget.room.membership != Membership.invite)
-+                    GestureDetector(
-+                      behavior: HitTestBehavior.opaque,
-+                      onTap: () async {
-+                        if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
-+                          if (widget.room.markedUnread) {
-+                            await widget.room.markUnread(false);
-+                          }
-+                          final lastEventId = widget.room.lastEvent?.eventId;
-+                          await widget.room.setReadMarker(
-+                            lastEventId,
-+                            mRead: lastEventId,
-+                            public: AppSettings.sendPublicReadReceipts.value,
-+                          );
-+                        }
-+                      },
++                    InkWell(
++                      borderRadius: BorderRadius.circular(4.0),
++                      onTap: _markAsReadAnimated,
 +                      child: Padding(
-+                        padding: const EdgeInsets.only(left: 4.0),
++                        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
 +                        child: Text(
 +                          (BeeperBridgeUtils.getLastMessageTime(widget.room.id) ??
 +                                  (widget.room.lastEvent != null
@@ -329813,22 +329839,13 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +                          ),
 +                  ),
 +                  const SizedBox(width: 8),
-+                  GestureDetector(
-+                    behavior: HitTestBehavior.opaque,
-+                    onTap: () async {
-+                      if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
-+                        if (widget.room.markedUnread) {
-+                          await widget.room.markUnread(false);
-+                        }
-+                        final lastEventId = widget.room.lastEvent?.eventId;
-+                        await widget.room.setReadMarker(
-+                          lastEventId,
-+                          mRead: lastEventId,
-+                          public: AppSettings.sendPublicReadReceipts.value,
-+                        );
-+                      }
-+                    },
-+                    child: UnreadBubble(room: widget.room),
++                  InkWell(
++                    borderRadius: BorderRadius.circular(12.0),
++                    onTap: _markAsReadAnimated,
++                    child: Padding(
++                      padding: const EdgeInsets.all(4.0),
++                      child: UnreadBubble(room: widget.room),
++                    ),
 +                  ),
 +                ],
 +              ),
@@ -329878,14 +329895,20 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..14fdcb2af88d0d48c59441ba8d1267bc
 +      content = buildContent();
 +    }
 +
-+    return RepaintBoundary(
-+      child: Padding(
-+        padding: const EdgeInsets.symmetric(horizontal: 8),
-+        child: Material(
-+          borderRadius: BorderRadius.circular(AppConfig.borderRadius),
-+          clipBehavior: Clip.hardEdge,
-+          color: backgroundColor,
-+          child: content,
++    return SizeTransition(
++      sizeFactor: CurvedAnimation(
++        parent: _sizeController,
++        curve: Curves.easeOut,
++      ),
++      child: RepaintBoundary(
++        child: Padding(
++          padding: const EdgeInsets.symmetric(horizontal: 8),
++          child: Material(
++            borderRadius: BorderRadius.circular(AppConfig.borderRadius),
++            clipBehavior: Clip.hardEdge,
++            color: backgroundColor,
++            child: content,
++          ),
 +        ),
 +      ),
 +    );
