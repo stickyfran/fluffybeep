@@ -310891,7 +310891,7 @@ index 90f8f79c21dd0b6ef9ab4a21be832feba86c5246..36f42b0cffc5226042ac245d730f19c4
                                : null,
                          ),
 diff --git a/lib/pages/chat/events/video_player.dart b/lib/pages/chat/events/video_player.dart
-index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..06e674ed49e16fc07daff3175e3aeaa0baa0ddc1 100644
+index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc809e6b8e 100644
 --- a/lib/pages/chat/events/video_player.dart
 +++ b/lib/pages/chat/events/video_player.dart
 @@ -4,9 +4,11 @@
@@ -310915,7 +310915,7 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..06e674ed49e16fc07daff3175e3aeaa0
    final Event event;
    final Timeline? timeline;
    final Color? textColor;
-@@ -35,8 +37,33 @@ class EventVideoPlayer extends StatelessWidget {
+@@ -35,15 +37,40 @@ class EventVideoPlayer extends StatelessWidget {
  
    static const String fallbackBlurHash = 'L5H2EC=PM+yV0g-mq.wG9c010J}I';
  
@@ -310949,6 +310949,14 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..06e674ed49e16fc07daff3175e3aeaa0
      final supportsVideoPlayer = PlatformInfos.supportsVideoPlayer;
  
      final blurHash =
+         (event.infoMap as Map<String, dynamic>).tryGet<String>(
+           'xyz.amorgan.blurhash',
+         ) ??
+-        fallbackBlurHash;
++        EventVideoPlayer.fallbackBlurHash;
+     final fileDescription = event.fileDescription;
+     const maxDimension = 300.0;
+     final infoMap = event.content.tryGetMap<String, Object?>('info');
 @@ -85,30 +112,59 @@ class EventVideoPlayer extends StatelessWidget {
                  tag: event.eventId,
                  child: Stack(
@@ -311034,7 +311042,7 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..06e674ed49e16fc07daff3175e3aeaa0
                        child: CircleAvatar(
                          child: supportsVideoPlayer
 diff --git a/lib/pages/chat/input_bar.dart b/lib/pages/chat/input_bar.dart
-index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..7d7c14b1b40b4ff07fa15f85661680bdbd24c99d 100644
+index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e6c46dc2a 100644
 --- a/lib/pages/chat/input_bar.dart
 +++ b/lib/pages/chat/input_bar.dart
 @@ -17,6 +17,7 @@ import 'package:slugify/slugify.dart';
@@ -311052,7 +311060,7 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..7d7c14b1b40b4ff07fa15f85661680bd
 -  List<Map<String, String?>> getSuggestions(TextEditingValue text) {
 +  Future<List<Map<String, String?>>> getSuggestions(TextEditingValue text) async {
 +    await Future.delayed(const Duration(milliseconds: 150));
-+    if (controller.text != text.text) return [];
++    if (controller?.text != text.text) return [];
      if (text.selection.baseOffset != text.selection.extentOffset ||
 -        text.selection.baseOffset < 0) {
 -      return []; // no entries if there is selected text
@@ -321615,35 +321623,42 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +  }
 +}
 diff --git a/lib/pages/chat_list/navi_rail_item.dart b/lib/pages/chat_list/navi_rail_item.dart
-index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..fc887bebfb7601142476c97c23828b1a2f742446 100644
+index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..ba78c8b555688db5a4ae53c286d80a424239dea5 100644
 --- a/lib/pages/chat_list/navi_rail_item.dart
 +++ b/lib/pages/chat_list/navi_rail_item.dart
-@@ -16,6 +16,7 @@ class NaviRailItem extends StatelessWidget {
+@@ -16,17 +16,19 @@ class NaviRailItem extends StatelessWidget {
    final String toolTip;
    final bool isSelected;
    final void Function() onTap;
 +  final void Function()? onLongPress;
    final Widget icon;
    final Widget? selectedIcon;
-   final bool Function(Room)? unreadBadgeFilter;
-@@ -24,6 +25,7 @@ class NaviRailItem extends StatelessWidget {
+-  final bool Function(Room)? unreadBadgeFilter;
++  final int? unreadCount;
+ 
+   const NaviRailItem({
      required this.toolTip,
      required this.isSelected,
      required this.onTap,
 +    this.onLongPress,
      required this.icon,
      this.selectedIcon,
-     this.unreadBadgeFilter,
+-    this.unreadBadgeFilter,
++    this.unreadCount,
+     super.key,
+   });
+   @override
 @@ -79,10 +81,11 @@ class NaviRailItem extends StatelessWidget {
                        child: InkWell(
                          borderRadius: borderRadius,
                          onTap: onTap,
+-                        child: unreadBadgeFilter == null
 +                        onLongPress: onLongPress,
-                         child: unreadBadgeFilter == null
++                        child: unreadCount == null || unreadCount == 0
                              ? icon
                              : UnreadRoomsBadge(
 -                                filter: unreadBadgeFilter,
-+                                unreadCount: unreadCount,
++                                unreadCount: unreadCount ?? 0,
                                  badgePosition: BadgePosition.topEnd(
                                    top: -12,
                                    end: -8,
