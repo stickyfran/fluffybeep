@@ -319006,7 +319006,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..cb69499e9ebf339f684afa2a51c51dab
 +  removeFromLabel,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..ad5f5c63b88e44c89f6b79bc4cd0f78d3eb19544 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..287d47ad47be2c5ba766dd08790157e24a6edec2 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,6 +3,10 @@
@@ -319020,7 +319020,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..ad5f5c63b88e44c89f6b79bc4cd0f78d
  import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/chat_list.dart';
-@@ -10,217 +14,373 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+@@ -10,217 +14,368 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/search_title.dart';
  import 'package:fluffychat/pages/chat_list/space_view.dart';
@@ -319219,13 +319219,8 @@ index 8610b92531be84898e03439fa07f16145a6d552c..ad5f5c63b88e44c89f6b79bc4cd0f78d
 +              }
 +            }
 +          },
-+          child: AnimatedSwitcher(
-+            duration: const Duration(milliseconds: 250),
-+            transitionBuilder: (child, animation) {
-+              return FadeTransition(opacity: animation, child: child);
-+            },
-+            child: CustomScrollView(
-+              key: ValueKey('${widget.controller.activeFilter}_${widget.controller.activeTag}'),
++          child: CustomScrollView(
++              
 +              controller: widget.controller.scrollController,
 +              slivers: [
 +                ChatListHeader(controller: widget.controller),
@@ -319549,7 +319544,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..ad5f5c63b88e44c89f6b79bc4cd0f78d
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +395,35 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +390,35 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
