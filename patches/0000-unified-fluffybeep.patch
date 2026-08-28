@@ -303225,7 +303225,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44483994b8 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..4bc1bd7d6a055d367be714db9c621bc37c74c076 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303470,12 +303470,12 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -303823,7 +303823,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
    }
  
    Future<void> sendFileAction({FileType type = FileType.any}) async {
-@@ -839,56 +1093,98 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -839,56 +1093,92 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -303899,24 +303899,18 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
 +      final mimeType = lookupMimeType(fileName, headerBytes: bytes);
 +      var effectiveMimeType = mimeType;
 +      if (effectiveMimeType == 'audio/ogg' ||
-+          (fileName.endsWith('.ogg') &&
-+              (effectiveMimeType == null || effectiveMimeType == 'audio/ogg'))) {
++          fileName.endsWith('.ogg') || fileName.endsWith('.opus')) {
 +        effectiveMimeType = 'audio/ogg';
-+      } else if (fileName.endsWith('.m4a') || fileName.endsWith('.aac') || effectiveMimeType == 'audio/mp4') {
++      } else if (fileName.endsWith('.m4a') || fileName.endsWith('.aac') || 
++                 effectiveMimeType == 'audio/mp4') {
 +        effectiveMimeType = 'audio/mp4';
-+      } else if (effectiveMimeType == null) {
-+        if (fileName.endsWith('.ogg')) {
-+          effectiveMimeType = 'audio/ogg';
-+        } else {
-+          effectiveMimeType = 'audio/mp4';
-+        }
++      } else {
++        effectiveMimeType ??= 'audio/mp4';
 +      }
 +
-+      final extension = mimeType == null ? null : extensionFromMime(mimeType);
-+      if (extension != null) {
-+        fileName =
-+            'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
-+      }
++      // Don't override the filename extension for voice messages - it was
++      // already set correctly by the recorder based on the actual codec used.
++      // extensionFromMime can return wrong extensions (e.g., .ogx for audio/ogg).
 +
 +      final file = MatrixAudioFile(
 +        bytes: bytes,
@@ -303967,7 +303961,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
    }
  
    void hideEmojiPicker() {
-@@ -940,7 +1236,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -940,7 +1230,7 @@ class ChatController extends State<ChatPageWithRoom>
      Clipboard.setData(ClipboardData(text: _getSelectedEventString()));
      setState(() {
        showEmojiPicker = false;
@@ -303976,7 +303970,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      });
    }
  
-@@ -968,7 +1264,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -968,7 +1258,7 @@ class ChatController extends State<ChatPageWithRoom>
      if (!mounted) return;
      setState(() {
        showEmojiPicker = false;
@@ -303985,7 +303979,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      });
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
-@@ -985,7 +1281,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -985,7 +1275,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -303994,7 +303988,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1044,7 +1340,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1044,7 +1334,7 @@ class ChatController extends State<ChatPageWithRoom>
      );
      setState(() {
        showEmojiPicker = false;
@@ -304003,7 +303997,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      });
    }
  
-@@ -1107,7 +1403,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1107,7 +1397,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304012,7 +304006,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
    }
  
    void sendAgainAction() {
-@@ -1121,13 +1417,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1121,13 +1411,13 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304028,7 +304022,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      });
      inputFocus.requestFocus();
    }
-@@ -1226,7 +1522,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1226,7 +1516,7 @@ class ChatController extends State<ChatPageWithRoom>
    }
  
    void clearSelectedEvents() => setState(() {
@@ -304037,7 +304031,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      showEmojiPicker = false;
    });
  
-@@ -1257,7 +1553,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1257,7 +1547,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304046,7 +304040,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      });
      inputFocus.requestFocus();
    }
-@@ -1323,11 +1619,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1323,11 +1613,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304061,7 +304055,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1426,27 +1722,33 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1426,27 +1716,33 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304110,7 +304104,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..84166feb6afa080c6f51420c4405ca44
      }
  
      _storeInputTimeoutTimer?.cancel();
-@@ -1490,8 +1792,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1490,8 +1786,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -317438,10 +317432,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..0a138183f312dcaec6876e2d25105454edd95488 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2dd738af6dc5d4611e9594cec70548a67332386b 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,291 @@
+@@ -1,222 +1,293 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -317751,10 +317745,12 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..0a138183f312dcaec6876e2d25105454
 +    setState(() {});
 +
 +    try {
-+      // Always use AAC (M4A) for maximum cross-platform compatibility.
-+      // OGG/Opus is not supported by WhatsApp on iOS, causing voice messages
-+      // to be unplayable for iPhone recipients.
-+      const codec = AudioEncoder.aacLc;
++      // Prefer Opus/OGG for WhatsApp compatibility (required for native PTT voice bubbles).
++      // WhatsApp on BOTH Android and iOS uses Opus/OGG internally.
++      // Fall back to AAC only if Opus encoder is not available (older Android, iOS).
++      final codec = await audioRecorder.isEncoderSupported(AudioEncoder.opus)
++          ? AudioEncoder.opus
++          : AudioEncoder.aacLc;
 +      fileName =
 +          'voice_message_${DateTime.now().millisecondsSinceEpoch}.${codec.fileExtension}';
 +      String? path;
