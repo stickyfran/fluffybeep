@@ -305113,10 +305113,16 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..2dc73b26dbade75cd96dce8c62510145
    }
  }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5b16728f5 100644
+index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd832e34990 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
-@@ -9,6 +9,7 @@ import 'package:fluffychat/l10n/l10n.dart';
+@@ -4,11 +4,13 @@
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
+ import 'package:emoji_picker_flutter/locales/default_emoji_set_locale.dart';
++import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+ import 'package:fluffychat/config/setting_keys.dart';
+ import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat/recording_input_row.dart';
  import 'package:fluffychat/pages/chat/recording_view_model.dart';
  import 'package:fluffychat/utils/other_party_can_receive.dart';
@@ -305124,21 +305130,21 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -20,6 +21,24 @@ import '../../config/themes.dart';
+@@ -20,6 +22,24 @@ import '../../config/themes.dart';
  import 'chat.dart';
  import 'input_bar.dart';
  
 +
 +class _EmojiCache {
 +  static Locale? _lastLocale;
-+  static List<dynamic> _cachedEmojis = [];
++  static List<Emoji> _cachedEmojis = [];
 +
-+  static List<dynamic> getEmojis(Locale locale) {
++  static List<Emoji> getEmojis(Locale locale) {
 +    if (_lastLocale == locale && _cachedEmojis.isNotEmpty) {
 +      return _cachedEmojis;
 +    }
 +    _lastLocale = locale;
-+    _cachedEmojis = getDefaultEmojiLocale(locale).fold(
++    _cachedEmojis = getDefaultEmojiLocale(locale).fold<List<Emoji>>(
 +      [],
 +      (emojis, category) => emojis..addAll(category.emoji),
 +    );
@@ -305149,7 +305155,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
  class ChatInputRow extends StatelessWidget {
    final ChatController controller;
  
-@@ -30,10 +49,6 @@ class ChatInputRow extends StatelessWidget {
+@@ -30,10 +50,6 @@ class ChatInputRow extends StatelessWidget {
    @override
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
@@ -305160,7 +305166,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
  
      if (!controller.room.otherPartyCanReceiveMessages) {
        return Center(
-@@ -133,14 +148,23 @@ class ChatInputRow extends StatelessWidget {
+@@ -133,14 +149,23 @@ class ChatInputRow extends StatelessWidget {
                  ]
                : <Widget>[
                    const SizedBox(width: 8),
@@ -305192,7 +305198,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
                      child: PopupMenuButton<AddPopupMenuActions>(
                        useRootNavigator: true,
                        icon: const Icon(Icons.add_circle_outline),
-@@ -260,12 +284,23 @@ class ChatInputRow extends StatelessWidget {
+@@ -260,12 +285,23 @@ class ChatInputRow extends StatelessWidget {
                      width: 48,
                      alignment: Alignment.center,
                      child: IconButton(
@@ -305218,7 +305224,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
                          key: ValueKey(controller.showEmojiPicker),
                        ),
                        onPressed: controller.emojiPickerAction,
-@@ -316,54 +351,100 @@ class ChatInputRow extends StatelessWidget {
+@@ -316,54 +352,100 @@ class ChatInputRow extends StatelessWidget {
                          ),
                          onChanged: controller.onInputBarChanged,
                          suggestionEmojis:
@@ -305346,7 +305352,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
                                style: IconButton.styleFrom(
                                  backgroundColor: theme.bubbleColor,
                                  foregroundColor: theme.onBubbleColor,
-@@ -372,17 +453,20 @@ class ChatInputRow extends StatelessWidget {
+@@ -372,17 +454,20 @@ class ChatInputRow extends StatelessWidget {
                                  hovered ? Icons.mic : Icons.mic_none_outlined,
                                ),
                              ),
@@ -305377,7 +305383,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
                    ),
                  ],
          );
-@@ -391,11 +475,32 @@ class ChatInputRow extends StatelessWidget {
+@@ -391,11 +476,32 @@ class ChatInputRow extends StatelessWidget {
    }
  }
  
@@ -305411,7 +305417,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
    void _popupMenuButtonSelected(String mxid, BuildContext context) {
      final client = Matrix.of(
        context,
-@@ -404,16 +509,16 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -404,16 +510,16 @@ class _ChatAccountPicker extends StatelessWidget {
        Logs().w('Attempted to switch to a non-existing client $mxid');
        return;
      }
@@ -305432,7 +305438,7 @@ index 879717fa9889be421184b768e20bad7417f95114..11d42e17c6f665046ad366efffa256c5
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8d64306fa 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..0b3791fa842ef8d256aa0b3569e9f96e270e4faf 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,13 +16,17 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -305474,8 +305480,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8
 +      valueListenable: controller.selectedEventsNotifier,
 +      builder: (context, selectedEvents, scaffoldChild) => PopScope(
        canPop:
--          controller.selectedEvents.isEmpty &&
-+          selectedEvents.isEmpty &&
+           controller.selectedEvents.isEmpty &&
            !controller.showEmojiPicker &&
            controller.activeThreadId == null,
        onPopInvokedWithResult: (pop, _) async {
@@ -305485,7 +305490,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8
            controller.clearSelectedEvents();
          } else if (controller.showEmojiPicker) {
            controller.emojiPickerAction();
-@@ -65,399 +70,518 @@ class ChatView extends StatelessWidget {
+@@ -65,399 +70,517 @@ class ChatView extends StatelessWidget {
            controller.closeThread();
          }
        },
@@ -305535,7 +305540,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8
 +          ]),
 +          builder: (context, _) =>
 +            controller.showScrollDownButton &&
-+                selectedEvents.isEmpty
++                controller.selectedEvents.isEmpty
 +            ? Padding(
 +                padding: EdgeInsets.only(
 +                  bottom: theme.appBarTheme.toolbarHeight ?? 56,
@@ -305871,7 +305876,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8
 +          ),
 +        ),
 +      ),
-+    ),
 +  );
 +  }
 +}
@@ -305938,11 +305942,11 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..20685c1d3b740a0f379fecaf24d3ecb8
 +                  )
 +                : null,
 +            actionsIconTheme: IconThemeData(
-+              color: selectedEvents.isEmpty
++              color: controller.selectedEvents.isEmpty
 +                  ? null
 +                  : theme.colorScheme.onTertiaryContainer,
 +            ),
-+            backgroundColor: selectedEvents.isEmpty
++            backgroundColor: controller.selectedEvents.isEmpty
 +                ? controller.activeThreadId != null
 +                      ? theme.colorScheme.secondaryContainer
 +                      : theme.colorScheme.surface.withAlpha(240)
@@ -319896,7 +319900,7 @@ index 50318f65751ad5c585ff540d661c0e90821c7ddc..a1fbd56e6cebb58ba4122a22bc275b97
 +  Size get preferredSize => const Size.fromHeight(56);
 +}
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c2906f43d 100644
+index 55d1d7e2b40eb834aca61c4460992f5b396214ea..9303ae51a9e75e4ab509df0fd96efb2f136bb440 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,8 +8,11 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -320395,17 +320399,16 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -254,7 +375,8 @@ class ChatListItem extends StatelessWidget {
+@@ -254,7 +375,7 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
 -                    clipBehavior: Clip.hardEdge,
-+clipBehavior: Clip.none,
 +clipBehavior: Clip.hardEdge,
                      duration: FluffyThemes.animationDuration,
                      curve: FluffyThemes.animationCurve,
                      child: typingText.isNotEmpty
-@@ -266,7 +388,7 @@ class ChatListItem extends StatelessWidget {
+@@ -266,7 +387,7 @@ class ChatListItem extends StatelessWidget {
                                size: 16,
                              ),
                            )
@@ -320414,7 +320417,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -282,7 +404,7 @@ class ChatListItem extends StatelessWidget {
+@@ -282,7 +403,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -320423,7 +320426,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -300,11 +422,11 @@ class ChatListItem extends StatelessWidget {
+@@ -300,11 +421,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -320437,7 +320440,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -313,23 +435,11 @@ class ChatListItem extends StatelessWidget {
+@@ -313,23 +434,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -320463,7 +320466,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -339,14 +449,14 @@ class ChatListItem extends StatelessWidget {
+@@ -339,14 +448,14 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -320482,7 +320485,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                                              )
                                              ?.content
                                              .tryGet<String>('reason') ??
-@@ -359,10 +469,10 @@ class ChatListItem extends StatelessWidget {
+@@ -359,10 +468,10 @@ class ChatListItem extends StatelessWidget {
                                          ) ??
                                          L10n.of(context).noMessagesYet,
                                softWrap: false,
@@ -320495,7 +320498,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                                      ? TextDecoration.lineThrough
                                      : null,
                                ),
-@@ -370,12 +480,19 @@ class ChatListItem extends StatelessWidget {
+@@ -370,12 +479,19 @@ class ChatListItem extends StatelessWidget {
                            ),
                    ),
                    const SizedBox(width: 8),
@@ -320519,7 +320522,7 @@ index 55d1d7e2b40eb834aca61c4460992f5b396214ea..d639c69237461f130aa5cd2470484f7c
                          ? IconButton(
                              tooltip: L10n.of(context).declineInvitation,
                              icon: const Icon(Icons.delete_forever_outlined),
-@@ -392,17 +509,45 @@ class ChatListItem extends StatelessWidget {
+@@ -392,17 +508,45 @@ class ChatListItem extends StatelessWidget {
                                if (!context.mounted) return;
                                await showFutureLoadingDialog(
                                  context: context,
@@ -321623,7 +321626,7 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +  }
 +}
 diff --git a/lib/pages/chat_list/navi_rail_item.dart b/lib/pages/chat_list/navi_rail_item.dart
-index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..ba78c8b555688db5a4ae53c286d80a424239dea5 100644
+index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc4158a226 100644
 --- a/lib/pages/chat_list/navi_rail_item.dart
 +++ b/lib/pages/chat_list/navi_rail_item.dart
 @@ -16,17 +16,19 @@ class NaviRailItem extends StatelessWidget {
@@ -321648,7 +321651,15 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..ba78c8b555688db5a4ae53c286d80a42
      super.key,
    });
    @override
-@@ -79,10 +81,11 @@ class NaviRailItem extends StatelessWidget {
+@@ -35,7 +37,6 @@ class NaviRailItem extends StatelessWidget {
+ 
+     final borderRadius = BorderRadius.circular(AppConfig.borderRadius);
+     final icon = isSelected ? selectedIcon ?? this.icon : this.icon;
+-    final unreadBadgeFilter = this.unreadBadgeFilter;
+     return HoverBuilder(
+       builder: (context, hovered) {
+         return SizedBox(
+@@ -79,10 +80,11 @@ class NaviRailItem extends StatelessWidget {
                        child: InkWell(
                          borderRadius: borderRadius,
                          onTap: onTap,
