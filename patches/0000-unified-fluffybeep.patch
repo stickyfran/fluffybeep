@@ -375902,7 +375902,7 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..1ac3afe76a1ad4e3a40c6d99599f81d2a4176a37 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..084426b429d70bdc3d02fdc3683dfaef756acb7e 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
 @@ -1,130 +1,132 @@
@@ -376066,7 +376066,7 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..1ac3afe76a1ad4e3a40c6d99599f81d2
 +  emoji_picker_flutter: ^4.4.0
 +  file_picker: ^12.0.0-beta.7
 +  file_selector: ^1.1.0
-+  ffmpeg_kit_flutter_new_min: ^2.5.2
++  ffmpeg_kit_flutter_new_min: ^2.1.0
 +  whisper_ggml: ^2.6.0
 +  flutter:
 +    sdk: flutter
