@@ -41,6 +41,12 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: 📝 Accept Android SDK & NDK Licenses
+        run: |
+          yes | flutter doctor --android-licenses || true
+          yes | sdkmanager --licenses || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: 🩹 Apply Fluffybeep Patches
         run: |
           git config --global user.email "fluffybeep@beeper.local"

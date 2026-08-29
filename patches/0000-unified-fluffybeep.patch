@@ -15863,10 +15863,10 @@ index bb9924bc0ce946c16d8bff44efc25818355ac0ca..8f1c22cd5e4b351622c99c9f0b90a2e6
 +    <locale android:name="zh"/>
 +</locale-config>
 diff --git a/android/build.gradle.kts b/android/build.gradle.kts
-index 89176ef44e8c7931fa32322d576e7f3f54d225c9..2f2f3f00fc713f34787b14b52d7b61279d600ddb 100644
+index 89176ef44e8c7931fa32322d576e7f3f54d225c9..af80cafc0a47961fb677ba5230cecda034e00b4e 100644
 --- a/android/build.gradle.kts
 +++ b/android/build.gradle.kts
-@@ -1,21 +1,21 @@
+@@ -1,21 +1,30 @@
 -allprojects {
 -    repositories {
 -        google()
@@ -15904,6 +15904,15 @@ index 89176ef44e8c7931fa32322d576e7f3f54d225c9..2f2f3f00fc713f34787b14b52d7b6127
 +}
 +subprojects {
 +    project.evaluationDependsOn(":app")
++}
++
++subprojects {
++    afterEvaluate {
++        if (project.hasProperty("android")) {
++            val androidExt = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
++            androidExt?.ndkVersion = "27.0.12077973"
++        }
++    }
 +}
 +
 +tasks.register<Delete>("clean") {
