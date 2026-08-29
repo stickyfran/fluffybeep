@@ -305521,7 +305521,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..543615c0aa2238f099647497d75bed5c42f72a87 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a88ed84060 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,13 +16,17 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -305550,7 +305550,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..543615c0aa2238f099647497d75bed5c
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +51,554 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +51,552 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -306026,9 +306026,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..543615c0aa2238f099647497d75bed5c
 +  @override
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
-+    return ValueListenableBuilder<List<Event>>(
-+      valueListenable: widget.controller.selectedEventsNotifier,
-+      builder: (context, selectedEvents, _) => StreamBuilder(
++    return StreamBuilder(
 +      stream: _roomStateStream,
 +      builder: (context, _) => ValueListenableBuilder<String?>(
 +        valueListenable: widget.controller.scrollUpBannerEventIdNotifier,
@@ -312063,7 +312061,7 @@ index a407e433317d442470564fb83b692750acadf075..4b633dfde3cb439924ec6789f32ebda6
 +  }
 +}
 diff --git a/lib/pages/chat/seen_by_row.dart b/lib/pages/chat/seen_by_row.dart
-index 975ee1b0f79f1689118b34da2ef7485fd9b2411f..45947ad434403ddcded2c2fb2678977bf36623f5 100644
+index 975ee1b0f79f1689118b34da2ef7485fd9b2411f..338925683cac53bbe52c22e5a4a59241d6c17c47 100644
 --- a/lib/pages/chat/seen_by_row.dart
 +++ b/lib/pages/chat/seen_by_row.dart
 @@ -4,35 +4,52 @@
@@ -312086,7 +312084,7 @@ index 975ee1b0f79f1689118b34da2ef7485fd9b2411f..45947ad434403ddcded2c2fb2678977b
 +}
 +
 +class _SeenByRowState extends State<SeenByRow> {
-+  late final Stream<SyncUpdate> _syncStream;
++  late final Stream<dynamic> _syncStream;
 +
 +  @override
 +  void initState() {
@@ -316068,7 +316066,7 @@ index f4142a63d007ebeea05cd3becdfe694af8efc1a1..195386cc06f642c4c26fe3c480211a22
 +  Widget build(BuildContext context) => ChatDetailsView(this);
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index 4cda41ca99e87671737299ec8bf160b9a432fae1..c4d5d7a24fe0c061571e561a7ddb716f497c4d70 100644
+index 4cda41ca99e87671737299ec8bf160b9a432fae1..d4fb244ae234df20f817af3c1987bfb1a472751a 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
@@ -316098,7 +316096,7 @@ index 4cda41ca99e87671737299ec8bf160b9a432fae1..c4d5d7a24fe0c061571e561a7ddb716f
 +
 +  List<User>? _cachedMembers;
 +  String? _cachedRoomId;
-+  Stream<bool>? _roomStateStream;
++  Stream<dynamic>? _roomStateStream;
 +
 +  List<User> _getMembers(Room room) {
 +    if (_cachedMembers != null && _cachedRoomId == room.id) {
