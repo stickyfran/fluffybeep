@@ -303229,7 +303229,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9eec44888 100644
+index 74707498c32bda411d06d6c9c086f390f3401135..77125813b34b5c1a72e091cc4d88e2d3e36a7553 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303647,7 +303647,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -552,57 +695,149 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -552,57 +695,148 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -303805,7 +303805,6 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
 +    scrollUpBannerEventIdNotifier.dispose();
 +    _displayChatDetailsColumn.dispose();
 +
-+    MxcImage.clearCache(room.id);
 +    timeline?.cancelSubscriptions();
 +    timeline = null;
      sendController.dispose();
@@ -303819,7 +303818,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      super.dispose();
    }
  
-@@ -671,12 +906,23 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -671,12 +905,23 @@ class ChatController extends State<ChatPageWithRoom>
        selection: const TextSelection.collapsed(offset: 0),
      );
  
@@ -303849,7 +303848,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      });
    }
  
-@@ -839,60 +1085,96 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -839,60 +1084,96 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -303992,7 +303991,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
    }
  
    void emojiPickerAction() {
-@@ -901,12 +1183,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -901,12 +1182,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304007,7 +304006,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      }
    }
  
-@@ -938,10 +1220,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -938,10 +1219,8 @@ class ChatController extends State<ChatPageWithRoom>
  
    void copyEventsAction() {
      Clipboard.setData(ClipboardData(text: _getSelectedEventString()));
@@ -304020,7 +304019,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
    }
  
    Future<void> reportEventAction() async {
-@@ -966,10 +1246,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -966,10 +1245,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304033,7 +304032,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -985,7 +1263,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -985,7 +1262,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304042,7 +304041,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1042,10 +1320,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1042,10 +1319,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304055,7 +304054,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1107,7 +1383,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1107,7 +1382,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304064,7 +304063,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
    }
  
    void sendAgainAction() {
-@@ -1121,14 +1397,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1121,14 +1396,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304082,7 +304081,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      inputFocus.requestFocus();
    }
  
-@@ -1225,10 +1499,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1225,10 +1498,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304096,7 +304095,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1257,7 +1531,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1257,7 +1530,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304105,7 +304104,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      });
      inputFocus.requestFocus();
    }
-@@ -1323,11 +1597,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1323,11 +1596,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304120,7 +304119,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1426,27 +1700,33 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1426,27 +1699,33 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304169,7 +304168,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
      }
  
      _storeInputTimeoutTimer?.cancel();
-@@ -1461,9 +1741,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1461,9 +1740,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304180,7 +304179,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
            return;
          }
        }
-@@ -1490,8 +1768,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1490,8 +1767,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304189,7 +304188,7 @@ index 74707498c32bda411d06d6c9c086f390f3401135..a672420b6e9b95dff504057e68cc9ad9
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1546,14 +1822,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1546,14 +1821,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304869,7 +304868,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..5ffd17aabbbcac4758fed65070286f338cec7546 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..d1c1b2bf791d67b071346076280d3f33bb38aeb3 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305029,11 +305028,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..5ffd17aabbbcac4758fed65070286f33
                      }
                      return Center(
                        child: TextButton.icon(
-@@ -163,83 +180,90 @@ class ChatEventList extends StatelessWidget {
-                 key: ValueKey(event.transactionId ?? event.eventId),
+@@ -164,82 +181,88 @@ class ChatEventList extends StatelessWidget {
                  index: i,
                  controller: controller.scrollController,
--                child: Column(
+                 child: Column(
 -                  mainAxisSize: .min,
 -                  children: [
 -                    if (!isCollapsed && displayDate)
@@ -305053,8 +305051,6 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..5ffd17aabbbcac4758fed65070286f33
 -                                padding: const EdgeInsets.symmetric(
 -                                  horizontal: 8.0,
 -                                  vertical: 2.0,
-+                child: RepaintBoundary(
-+                  child: Column(
 +                    mainAxisSize: .min,
 +                    children: [
 +                      if (!isCollapsed && displayDate)
@@ -305189,7 +305185,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..5ffd17aabbbcac4758fed65070286f33
                );
              },
              childCount: events.length + 2,
-@@ -248,6 +272,8 @@ class ChatEventList extends StatelessWidget {
+@@ -248,6 +271,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
        ),
@@ -305525,7 +305521,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eec651c40c118fb9fe1dca2b02169fe9c65d1b2b 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..543615c0aa2238f099647497d75bed5c42f72a87 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,13 +16,17 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -306022,8 +306018,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eec651c40c118fb9fe1dca2b02169fe9
 +  @override
 +  void initState() {
 +    super.initState();
-+    _roomStateStream = widget.widget.controller.room.client.onRoomState.stream
-+        .where((update) => update.roomId == widget.widget.controller.room.id && _ChatAppBar._ChatAppBar._isUiRelevantStateEvent(update))
++    _roomStateStream = widget.controller.room.client.onRoomState.stream
++        .where((update) => update.roomId == widget.controller.room.id && _ChatAppBar._isUiRelevantStateEvent(update))
 +        .rateLimit(const Duration(seconds: 1));
 +  }
 +
@@ -306031,7 +306027,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eec651c40c118fb9fe1dca2b02169fe9
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
 +    return ValueListenableBuilder<List<Event>>(
-+      valueListenable: widget.widget.controller.selectedEventsNotifier,
++      valueListenable: widget.controller.selectedEventsNotifier,
 +      builder: (context, selectedEvents, _) => StreamBuilder(
 +      stream: _roomStateStream,
 +      builder: (context, _) => ValueListenableBuilder<String?>(
@@ -306432,7 +306428,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..eec651c40c118fb9fe1dca2b02169fe9
 +              child: Column(
 +                mainAxisSize: .min,
 +                children: [
-+                  PinnedEvents(controller),
++                  PinnedEvents(widget.controller),
 +                  if (activeThreadId != null)
 +                    SizedBox(
 +                      height: ChatAppBarListTile.fixedHeight,
@@ -307594,7 +307590,7 @@ index 8be7092de0445a69687123b1a85b914ce30a3797..1a8ea1140e9a39ff1ea6f82319f0046b
 +  }
 +}
 diff --git a/lib/pages/chat/events/html_message.dart b/lib/pages/chat/events/html_message.dart
-index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..14536b482da4ec3127ce048606940db07920046a 100644
+index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..02ac7100fcf900ad81685f504eb3ad675f7c23a1 100644
 --- a/lib/pages/chat/events/html_message.dart
 +++ b/lib/pages/chat/events/html_message.dart
 @@ -22,7 +22,7 @@ import 'package:matrix/matrix.dart';
@@ -307664,6 +307660,15 @@ index 9dd1bdef447f4eddf240fa8ad47c8cbfa32cae90..14536b482da4ec3127ce048606940db0
          if (element == null) {
            return const TextSpan(text: 'Unable to render code block!');
          }
+@@ -399,7 +435,7 @@ class HtmlMessage extends StatelessWidget {
+               uri: mxcUrl,
+               width: actualWidth,
+               height: actualHeight,
+-              isThumbnail: (actualWidth * actualHeight) > (256 * 256),
++              isThumbnail: true,
+             ),
+           ),
+         );
 @@ -582,12 +618,59 @@ class HtmlMessage extends StatelessWidget {
      }
    }
@@ -309803,459 +309808,34 @@ index fc681f16b93d0888c2df7de4303b322352a70915..e174c7748ea016f5190188cbb8e945c3
 +  }
 +}
 diff --git a/lib/pages/chat/events/message_reactions.dart b/lib/pages/chat/events/message_reactions.dart
-index 8d406941bcbd9b604ea2f06a3eace872cab24491..0ea728abb4cda495dc55d9b6c89b284c172db9c4 100644
+index 8d406941bcbd9b604ea2f06a3eace872cab24491..73598b8f1658cc0d10cfb004a04dc8edab92bb92 100644
 --- a/lib/pages/chat/events/message_reactions.dart
 +++ b/lib/pages/chat/events/message_reactions.dart
-@@ -1,224 +1,225 @@
--// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
--// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
--//
--// SPDX-License-Identifier: AGPL-3.0-or-later
--
--import 'package:collection/collection.dart' show IterableExtension;
--import 'package:fluffychat/config/app_config.dart';
--import 'package:fluffychat/widgets/avatar.dart';
--import 'package:fluffychat/widgets/future_loading_dialog.dart';
--import 'package:fluffychat/widgets/matrix.dart';
--import 'package:fluffychat/widgets/mxc_image.dart';
--import 'package:flutter/material.dart';
--import 'package:matrix/matrix.dart';
--
--class MessageReactions extends StatelessWidget {
--  final Event event;
--  final Timeline timeline;
--
--  const MessageReactions(this.event, this.timeline, {super.key});
--
--  @override
--  Widget build(BuildContext context) {
--    final allReactionEvents = event.aggregatedEvents(
--      timeline,
--      RelationshipTypes.reaction,
--    );
--    final reactionMap = <String, _ReactionEntry>{};
--    final client = Matrix.of(context).client;
--
--    for (final e in allReactionEvents) {
--      final key = e.content
--          .tryGetMap<String, Object?>('m.relates_to')
--          ?.tryGet<String>('key');
--      if (key != null) {
--        if (!reactionMap.containsKey(key)) {
--          reactionMap[key] = _ReactionEntry(
--            key: key,
--            count: 0,
--            reacted: false,
--            reactors: [],
--          );
--        }
--        reactionMap[key]!.count++;
--        reactionMap[key]!.reactors!.add(e.senderFromMemoryOrFallback);
--        reactionMap[key]!.reacted |= e.senderId == e.room.client.userID;
--      }
--    }
--
--    final reactionList = reactionMap.values.toList();
--    reactionList.sort((a, b) => b.count - a.count > 0 ? 1 : -1);
--    final ownMessage = event.senderId == event.room.client.userID;
--    return Wrap(
--      spacing: 4.0,
--      runSpacing: 4.0,
--      alignment: ownMessage ? WrapAlignment.end : WrapAlignment.start,
--      children: [
--        ...reactionList.map(
--          (r) => _Reaction(
--            reactionKey: r.key,
--            count: r.count,
--            reacted: r.reacted,
--            onTap: () {
--              if (r.reacted) {
--                final evt = allReactionEvents.firstWhereOrNull(
--                  (e) =>
--                      e.senderId == e.room.client.userID &&
--                      e.content.tryGetMap('m.relates_to')?['key'] == r.key,
--                );
--                if (evt != null) {
--                  showFutureLoadingDialog(
--                    context: context,
--                    future: evt.redactEvent,
--                  );
--                }
--              } else {
--                event.room.sendReaction(event.eventId, r.key);
--              }
--            },
--            onLongPress: () async => await _AdaptableReactorsDialog(
--              client: client,
--              reactionEntry: r,
--            ).show(context),
--          ),
--        ),
--      ],
--    );
--  }
--}
--
--class _Reaction extends StatelessWidget {
--  final String reactionKey;
--  final int count;
--  final bool? reacted;
--  final void Function()? onTap;
--  final void Function()? onLongPress;
--
--  const _Reaction({
--    required this.reactionKey,
--    required this.count,
--    required this.reacted,
--    required this.onTap,
--    required this.onLongPress,
--  });
--
--  @override
--  Widget build(BuildContext context) {
--    final theme = Theme.of(context);
--
--    Widget content;
--    if (reactionKey.startsWith('mxc://')) {
--      content = Row(
--        mainAxisSize: .min,
--        children: <Widget>[
--          MxcImage(
--            uri: Uri.parse(reactionKey),
--            width: 20,
--            height: 20,
--            animated: false,
--            isThumbnail: false,
--          ),
--          if (count > 1) ...[
--            const SizedBox(width: 4),
--            Text(
--              count.toString(),
--              textAlign: TextAlign.center,
--              style: TextStyle(
--                color: theme.colorScheme.onSurface,
--                fontSize: DefaultTextStyle.of(context).style.fontSize,
--              ),
--            ),
--          ],
--        ],
--      );
--    } else {
--      var renderKey = Characters(reactionKey);
--      if (renderKey.length > 10) {
--        renderKey = renderKey.getRange(0, 9) + Characters('…');
--      }
--      content = Text(renderKey.toString(), style: TextStyle(fontSize: 14));
--    }
--    return Badge(
--      isLabelVisible: count > 1,
--      label: Text(count.toString()),
--      textStyle: TextStyle(fontSize: 10),
--      textColor: theme.colorScheme.onPrimary,
--      backgroundColor: theme.colorScheme.primary.withAlpha(200),
--      child: InkWell(
--        onTap: () => onTap != null ? onTap!() : null,
--        onLongPress: () => onLongPress != null ? onLongPress!() : null,
--        borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
--        child: Container(
--          decoration: BoxDecoration(
--            color: theme.colorScheme.secondaryContainer,
--            border: Border.all(
--              color: reacted == true
--                  ? theme.colorScheme.secondary
--                  : theme.colorScheme.secondaryContainer,
--              width: 1,
--            ),
--            borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
--          ),
--          height: 24,
--          padding: const EdgeInsets.symmetric(horizontal: 3),
--          child: content,
--        ),
--      ),
--    );
--  }
--}
--
--class _ReactionEntry {
--  String key;
--  int count;
--  bool reacted;
--  List<User>? reactors;
--
--  _ReactionEntry({
--    required this.key,
--    required this.count,
--    required this.reacted,
--    this.reactors,
--  });
--}
--
--class _AdaptableReactorsDialog extends StatelessWidget {
--  final Client? client;
--  final _ReactionEntry? reactionEntry;
--
--  const _AdaptableReactorsDialog({this.client, this.reactionEntry});
--
--  Future<bool?> show(BuildContext context) => showDialog(
--    context: context,
--    builder: (context) => this,
--    barrierDismissible: true,
--    useRootNavigator: false,
--  );
--
--  @override
--  Widget build(BuildContext context) {
--    final body = SingleChildScrollView(
--      child: Wrap(
--        spacing: 8.0,
--        runSpacing: 4.0,
--        alignment: WrapAlignment.center,
--        children: <Widget>[
--          for (final reactor in reactionEntry!.reactors!)
--            Chip(
--              avatar: Avatar(
--                mxContent: reactor.avatarUrl,
--                name: reactor.displayName,
--                client: client,
--                presenceUserId: reactor.stateKey,
--              ),
--              label: Text(reactor.displayName!),
--            ),
--        ],
--      ),
--    );
--
--    final title = Center(child: Text(reactionEntry!.key));
--
--    return AlertDialog(title: title, content: body);
--  }
--}
-+// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
-+// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
-+import 'package:collection/collection.dart' show IterableExtension;
-+import 'package:fluffychat/config/app_config.dart';
-+import 'package:fluffychat/widgets/avatar.dart';
-+import 'package:fluffychat/widgets/future_loading_dialog.dart';
-+import 'package:fluffychat/widgets/matrix.dart';
-+import 'package:fluffychat/widgets/mxc_image.dart';
-+import 'package:flutter/material.dart';
-+import 'package:matrix/matrix.dart';
-+
-+class MessageReactions extends StatelessWidget {
-+  final Event event;
-+  final Timeline timeline;
+@@ -15,12 +15,13 @@ import 'package:matrix/matrix.dart';
+ class MessageReactions extends StatelessWidget {
+   final Event event;
+   final Timeline timeline;
 +  final List<Event>? cachedReactions;
-+
+ 
+-  const MessageReactions(this.event, this.timeline, {super.key});
 +  const MessageReactions(this.event, this.timeline, {this.cachedReactions, super.key});
-+
-+  @override
-+  Widget build(BuildContext context) {
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final allReactionEvents = event.aggregatedEvents(
 +    final allReactionEvents = cachedReactions ?? event.aggregatedEvents(
-+      timeline,
-+      RelationshipTypes.reaction,
-+    );
-+    final reactionMap = <String, _ReactionEntry>{};
-+    final client = Matrix.of(context).client;
-+
-+    for (final e in allReactionEvents) {
-+      final key = e.content
-+          .tryGetMap<String, Object?>('m.relates_to')
-+          ?.tryGet<String>('key');
-+      if (key != null) {
-+        if (!reactionMap.containsKey(key)) {
-+          reactionMap[key] = _ReactionEntry(
-+            key: key,
-+            count: 0,
-+            reacted: false,
-+            reactors: [],
-+          );
-+        }
-+        reactionMap[key]!.count++;
-+        reactionMap[key]!.reactors!.add(e.senderFromMemoryOrFallback);
-+        reactionMap[key]!.reacted |= e.senderId == e.room.client.userID;
-+      }
-+    }
-+
-+    final reactionList = reactionMap.values.toList();
-+    reactionList.sort((a, b) => b.count - a.count > 0 ? 1 : -1);
-+    final ownMessage = event.senderId == event.room.client.userID;
-+    return Wrap(
-+      spacing: 4.0,
-+      runSpacing: 4.0,
-+      alignment: ownMessage ? WrapAlignment.end : WrapAlignment.start,
-+      children: [
-+        ...reactionList.map(
-+          (r) => _Reaction(
-+            reactionKey: r.key,
-+            count: r.count,
-+            reacted: r.reacted,
-+            onTap: () {
-+              if (r.reacted) {
-+                final evt = allReactionEvents.firstWhereOrNull(
-+                  (e) =>
-+                      e.senderId == e.room.client.userID &&
-+                      e.content.tryGetMap('m.relates_to')?['key'] == r.key,
-+                );
-+                if (evt != null) {
-+                  showFutureLoadingDialog(
-+                    context: context,
-+                    future: evt.redactEvent,
-+                  );
-+                }
-+              } else {
-+                event.room.sendReaction(event.eventId, r.key);
-+              }
-+            },
-+            onLongPress: () async => await _AdaptableReactorsDialog(
-+              client: client,
-+              reactionEntry: r,
-+            ).show(context),
-+          ),
-+        ),
-+      ],
-+    );
-+  }
-+}
-+
-+class _Reaction extends StatelessWidget {
-+  final String reactionKey;
-+  final int count;
-+  final bool? reacted;
-+  final void Function()? onTap;
-+  final void Function()? onLongPress;
-+
-+  const _Reaction({
-+    required this.reactionKey,
-+    required this.count,
-+    required this.reacted,
-+    required this.onTap,
-+    required this.onLongPress,
-+  });
-+
-+  @override
-+  Widget build(BuildContext context) {
-+    final theme = Theme.of(context);
-+
-+    Widget content;
-+    if (reactionKey.startsWith('mxc://')) {
-+      content = Row(
-+        mainAxisSize: .min,
-+        children: <Widget>[
-+          MxcImage(
-+            uri: Uri.parse(reactionKey),
-+            width: 20,
-+            height: 20,
-+            animated: false,
-+            isThumbnail: false,
-+          ),
-+          if (count > 1) ...[
-+            const SizedBox(width: 4),
-+            Text(
-+              count.toString(),
-+              textAlign: TextAlign.center,
-+              style: TextStyle(
-+                color: theme.colorScheme.onSurface,
-+                fontSize: DefaultTextStyle.of(context).style.fontSize,
-+              ),
-+            ),
-+          ],
-+        ],
-+      );
-+    } else {
-+      var renderKey = Characters(reactionKey);
-+      if (renderKey.length > 10) {
-+        renderKey = renderKey.getRange(0, 9) + Characters('…');
-+      }
-+      content = Text(renderKey.toString(), style: TextStyle(fontSize: 14));
-+    }
-+    return Badge(
-+      isLabelVisible: count > 1,
-+      label: Text(count.toString()),
-+      textStyle: TextStyle(fontSize: 10),
-+      textColor: theme.colorScheme.onPrimary,
-+      backgroundColor: theme.colorScheme.primary.withAlpha(200),
-+      child: InkWell(
-+        onTap: () => onTap != null ? onTap!() : null,
-+        onLongPress: () => onLongPress != null ? onLongPress!() : null,
-+        borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
-+        child: Container(
-+          decoration: BoxDecoration(
-+            color: theme.colorScheme.secondaryContainer,
-+            border: Border.all(
-+              color: reacted == true
-+                  ? theme.colorScheme.secondary
-+                  : theme.colorScheme.secondaryContainer,
-+              width: 1,
-+            ),
-+            borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
-+          ),
-+          height: 24,
-+          padding: const EdgeInsets.symmetric(horizontal: 3),
-+          child: content,
-+        ),
-+      ),
-+    );
-+  }
-+}
-+
-+class _ReactionEntry {
-+  String key;
-+  int count;
-+  bool reacted;
-+  List<User>? reactors;
-+
-+  _ReactionEntry({
-+    required this.key,
-+    required this.count,
-+    required this.reacted,
-+    this.reactors,
-+  });
-+}
-+
-+class _AdaptableReactorsDialog extends StatelessWidget {
-+  final Client? client;
-+  final _ReactionEntry? reactionEntry;
-+
-+  const _AdaptableReactorsDialog({this.client, this.reactionEntry});
-+
-+  Future<bool?> show(BuildContext context) => showDialog(
-+    context: context,
-+    builder: (context) => this,
-+    barrierDismissible: true,
-+    useRootNavigator: false,
-+  );
-+
-+  @override
-+  Widget build(BuildContext context) {
-+    final body = SingleChildScrollView(
-+      child: Wrap(
-+        spacing: 8.0,
-+        runSpacing: 4.0,
-+        alignment: WrapAlignment.center,
-+        children: <Widget>[
-+          for (final reactor in reactionEntry!.reactors!)
-+            Chip(
-+              avatar: Avatar(
-+                mxContent: reactor.avatarUrl,
-+                name: reactor.displayName,
-+                client: client,
-+                presenceUserId: reactor.stateKey,
-+              ),
-+              label: Text(reactor.displayName!),
-+            ),
-+        ],
-+      ),
-+    );
-+
-+    final title = Center(child: Text(reactionEntry!.key));
-+
-+    return AlertDialog(title: title, content: body);
-+  }
-+}
+       timeline,
+       RelationshipTypes.reaction,
+     );
+@@ -116,7 +117,7 @@ class _Reaction extends StatelessWidget {
+             width: 20,
+             height: 20,
+             animated: false,
+-            isThumbnail: false,
++            isThumbnail: true,
+           ),
+           if (count > 1) ...[
+             const SizedBox(width: 4),
 diff --git a/lib/pages/chat/events/poll.dart b/lib/pages/chat/events/poll.dart
 index 03f75372e8d89053d508c124302b38d6f1b02181..8b7e047a1179ed3a03f32beae8c641f0c5b4c6c4 100644
 --- a/lib/pages/chat/events/poll.dart
@@ -314039,376 +313619,33 @@ index bcdfdb72eeacc822636ec54067a82b447adb0934..da84294fab05271ba04a8fa277b1c740
 +  }
 +}
 diff --git a/lib/pages/chat/sticker_picker_dialog.dart b/lib/pages/chat/sticker_picker_dialog.dart
-index 1ef49627705507a1a1c5b30c5d3215c23d347990..4d53aff724aaa2f49f2b4d7127f7222e2dec767c 100644
+index 1ef49627705507a1a1c5b30c5d3215c23d347990..2af91b21c96617035735b99364ea0c6dca8e2a4c 100644
 --- a/lib/pages/chat/sticker_picker_dialog.dart
 +++ b/lib/pages/chat/sticker_picker_dialog.dart
-@@ -1,182 +1,184 @@
--// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
--// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
--//
--// SPDX-License-Identifier: AGPL-3.0-or-later
--
--import 'package:fluffychat/config/app_config.dart';
--import 'package:fluffychat/l10n/l10n.dart';
--import 'package:fluffychat/utils/url_launcher.dart';
--import 'package:fluffychat/widgets/mxc_image.dart';
--import 'package:flutter/material.dart';
--import 'package:matrix/matrix.dart';
--
--import '../../widgets/avatar.dart';
--
--class StickerPickerDialog extends StatefulWidget {
--  final Room room;
--  final void Function(ImagePackImageContent) onSelected;
--
--  const StickerPickerDialog({
--    required this.onSelected,
--    required this.room,
--    super.key,
--  });
--
--  @override
--  StickerPickerDialogState createState() => StickerPickerDialogState();
--}
--
--class StickerPickerDialogState extends State<StickerPickerDialog> {
--  String? searchFilter;
--
--  @override
--  Widget build(BuildContext context) {
--    final theme = Theme.of(context);
--
--    final stickerPacks = widget.room.getImagePacks(ImagePackUsage.sticker);
--    final packSlugs = stickerPacks.keys.toList();
--
--    return Material(
--      color: theme.colorScheme.onInverseSurface,
--      child: SafeArea(
--        child: CustomScrollView(
--          slivers: <Widget>[
--            SliverAppBar(
--              floating: true,
--              toolbarHeight: 72,
--              scrolledUnderElevation: 0,
--              backgroundColor: Colors.transparent,
--              automaticallyImplyLeading: false,
--              title: TextField(
--                autofocus: false,
--                decoration: InputDecoration(
--                  filled: true,
--                  fillColor: theme.colorScheme.secondaryContainer,
--                  border: OutlineInputBorder(
--                    borderSide: BorderSide.none,
--                    borderRadius: BorderRadius.circular(99),
--                  ),
--                  contentPadding: EdgeInsets.zero,
--                  hintText: L10n.of(context).search,
--                  hintStyle: TextStyle(
--                    color: theme.colorScheme.onPrimaryContainer,
--                    fontWeight: FontWeight.normal,
--                  ),
--                  floatingLabelBehavior: FloatingLabelBehavior.never,
--                  prefixIcon: const Icon(Icons.search_outlined),
--                ),
--                onChanged: (s) => setState(() => searchFilter = s),
--              ),
--            ),
--            if (packSlugs.isEmpty)
--              SliverFillRemaining(
--                child: Center(
--                  child: Column(
--                    mainAxisSize: .min,
--                    children: [
--                      Text(L10n.of(context).noEmotesFound),
--                      const SizedBox(height: 12),
--                      OutlinedButton.icon(
--                        onPressed: () => UrlLauncher(
--                          context,
--                          AppConfig.howDoIGetStickersTutorial,
--                        ).launchUrl(),
--                        icon: const Icon(Icons.explore_outlined),
--                        label: Text(L10n.of(context).discover),
--                      ),
--                    ],
--                  ),
--                ),
--              )
--            else
--              SliverList.builder(
--                itemCount: packSlugs.length,
--                itemBuilder: (BuildContext context, int packIndex) {
--                  final pack = stickerPacks[packSlugs[packIndex]]!;
--                  final filteredImagePackImageEntried = pack.images.entries
--                      .toList();
--                  if (searchFilter?.isNotEmpty ?? false) {
--                    filteredImagePackImageEntried.removeWhere(
--                      (e) =>
--                          !(e.key.toLowerCase().contains(
--                                searchFilter!.toLowerCase(),
--                              ) ||
--                              (e.value.body?.toLowerCase().contains(
--                                    searchFilter!.toLowerCase(),
--                                  ) ??
--                                  false)),
--                    );
--                  }
--                  final imageKeys = filteredImagePackImageEntried
--                      .map((e) => e.key)
--                      .toList();
--                  if (imageKeys.isEmpty) {
--                    return const SizedBox.shrink();
--                  }
--                  final packName =
--                      pack.pack.displayName ?? packSlugs[packIndex];
--                  return Column(
--                    children: <Widget>[
--                      if (packIndex != 0) const SizedBox(height: 20),
--                      if (packName != 'user')
--                        ListTile(
--                          leading: Avatar(
--                            mxContent: pack.pack.avatarUrl,
--                            name: packName,
--                            client: widget.room.client,
--                          ),
--                          title: Text(packName),
--                        ),
--                      const SizedBox(height: 6),
--                      GridView.builder(
--                        itemCount: imageKeys.length,
--                        gridDelegate:
--                            const SliverGridDelegateWithMaxCrossAxisExtent(
--                              maxCrossAxisExtent: 84,
--                              mainAxisSpacing: 8.0,
--                              crossAxisSpacing: 8.0,
--                            ),
--                        shrinkWrap: true,
--                        physics: const NeverScrollableScrollPhysics(),
--                        itemBuilder: (BuildContext context, int imageIndex) {
--                          final image = pack.images[imageKeys[imageIndex]]!;
--                          return Tooltip(
--                            message: image.body ?? imageKeys[imageIndex],
--                            child: InkWell(
--                              radius: AppConfig.borderRadius,
--                              key: ValueKey(image.url.toString()),
--                              onTap: () {
--                                // copy the image
--                                final imageCopy =
--                                    ImagePackImageContent.fromJson(
--                                      image.toJson().copy(),
--                                    );
--                                // set the body, if it doesn't exist, to the key
--                                imageCopy.body ??= imageKeys[imageIndex];
--                                widget.onSelected(imageCopy);
--                              },
--                              child: AbsorbPointer(
--                                absorbing: true,
--                                child: MxcImage(
--                                  uri: image.url,
--                                  fit: BoxFit.contain,
--                                  width: 128,
--                                  height: 128,
--                                  animated: true,
--                                  isThumbnail: false,
--                                ),
--                              ),
--                            ),
--                          );
--                        },
--                      ),
--                    ],
--                  );
--                },
--              ),
--          ],
--        ),
--      ),
--    );
--  }
--}
-+// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
-+// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
-+import 'package:fluffychat/config/app_config.dart';
-+import 'package:fluffychat/l10n/l10n.dart';
-+import 'package:fluffychat/utils/url_launcher.dart';
-+import 'package:fluffychat/widgets/mxc_image.dart';
-+import 'package:flutter/material.dart';
-+import 'package:matrix/matrix.dart';
-+
-+import '../../widgets/avatar.dart';
-+
-+class StickerPickerDialog extends StatefulWidget {
-+  final Room room;
-+  final void Function(ImagePackImageContent) onSelected;
-+
-+  const StickerPickerDialog({
-+    required this.onSelected,
-+    required this.room,
-+    super.key,
-+  });
-+
-+  @override
-+  StickerPickerDialogState createState() => StickerPickerDialogState();
-+}
-+
-+class StickerPickerDialogState extends State<StickerPickerDialog> {
-+  String? searchFilter;
-+
-+  @override
-+  Widget build(BuildContext context) {
-+    final theme = Theme.of(context);
-+
-+    final stickerPacks = widget.room.getImagePacks(ImagePackUsage.sticker);
-+    final packSlugs = stickerPacks.keys.toList();
-+
-+    return Material(
-+      color: theme.colorScheme.onInverseSurface,
-+      child: SafeArea(
+@@ -39,11 +39,13 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+     return Material(
+       color: theme.colorScheme.onInverseSurface,
+       child: SafeArea(
 +        top: false,
-+        child: CustomScrollView(
-+          slivers: <Widget>[
-+            SliverAppBar(
+         child: CustomScrollView(
+           slivers: <Widget>[
+             SliverAppBar(
 +              primary: false,
-+              floating: true,
+               floating: true,
+-              toolbarHeight: 72,
 +              toolbarHeight: 56,
-+              scrolledUnderElevation: 0,
-+              backgroundColor: Colors.transparent,
-+              automaticallyImplyLeading: false,
-+              title: TextField(
-+                autofocus: false,
-+                decoration: InputDecoration(
-+                  filled: true,
-+                  fillColor: theme.colorScheme.secondaryContainer,
-+                  border: OutlineInputBorder(
-+                    borderSide: BorderSide.none,
-+                    borderRadius: BorderRadius.circular(99),
-+                  ),
-+                  contentPadding: EdgeInsets.zero,
-+                  hintText: L10n.of(context).search,
-+                  hintStyle: TextStyle(
-+                    color: theme.colorScheme.onPrimaryContainer,
-+                    fontWeight: FontWeight.normal,
-+                  ),
-+                  floatingLabelBehavior: FloatingLabelBehavior.never,
-+                  prefixIcon: const Icon(Icons.search_outlined),
-+                ),
-+                onChanged: (s) => setState(() => searchFilter = s),
-+              ),
-+            ),
-+            if (packSlugs.isEmpty)
-+              SliverFillRemaining(
-+                child: Center(
-+                  child: Column(
-+                    mainAxisSize: .min,
-+                    children: [
-+                      Text(L10n.of(context).noEmotesFound),
-+                      const SizedBox(height: 12),
-+                      OutlinedButton.icon(
-+                        onPressed: () => UrlLauncher(
-+                          context,
-+                          AppConfig.howDoIGetStickersTutorial,
-+                        ).launchUrl(),
-+                        icon: const Icon(Icons.explore_outlined),
-+                        label: Text(L10n.of(context).discover),
-+                      ),
-+                    ],
-+                  ),
-+                ),
-+              )
-+            else
-+              SliverList.builder(
-+                itemCount: packSlugs.length,
-+                itemBuilder: (BuildContext context, int packIndex) {
-+                  final pack = stickerPacks[packSlugs[packIndex]]!;
-+                  final filteredImagePackImageEntried = pack.images.entries
-+                      .toList();
-+                  if (searchFilter?.isNotEmpty ?? false) {
-+                    filteredImagePackImageEntried.removeWhere(
-+                      (e) =>
-+                          !(e.key.toLowerCase().contains(
-+                                searchFilter!.toLowerCase(),
-+                              ) ||
-+                              (e.value.body?.toLowerCase().contains(
-+                                    searchFilter!.toLowerCase(),
-+                                  ) ??
-+                                  false)),
-+                    );
-+                  }
-+                  final imageKeys = filteredImagePackImageEntried
-+                      .map((e) => e.key)
-+                      .toList();
-+                  if (imageKeys.isEmpty) {
-+                    return const SizedBox.shrink();
-+                  }
-+                  final packName =
-+                      pack.pack.displayName ?? packSlugs[packIndex];
-+                  return Column(
-+                    children: <Widget>[
-+                      if (packIndex != 0) const SizedBox(height: 20),
-+                      if (packName != 'user')
-+                        ListTile(
-+                          leading: Avatar(
-+                            mxContent: pack.pack.avatarUrl,
-+                            name: packName,
-+                            client: widget.room.client,
-+                          ),
-+                          title: Text(packName),
-+                        ),
-+                      const SizedBox(height: 6),
-+                      GridView.builder(
-+                        itemCount: imageKeys.length,
-+                        gridDelegate:
-+                            const SliverGridDelegateWithMaxCrossAxisExtent(
-+                              maxCrossAxisExtent: 84,
-+                              mainAxisSpacing: 8.0,
-+                              crossAxisSpacing: 8.0,
-+                            ),
-+                        shrinkWrap: true,
-+                        physics: const NeverScrollableScrollPhysics(),
-+                        itemBuilder: (BuildContext context, int imageIndex) {
-+                          final image = pack.images[imageKeys[imageIndex]]!;
-+                          return Tooltip(
-+                            message: image.body ?? imageKeys[imageIndex],
-+                            child: InkWell(
-+                              radius: AppConfig.borderRadius,
-+                              key: ValueKey(image.url.toString()),
-+                              onTap: () {
-+                                // copy the image
-+                                final imageCopy =
-+                                    ImagePackImageContent.fromJson(
-+                                      image.toJson().copy(),
-+                                    );
-+                                // set the body, if it doesn't exist, to the key
-+                                imageCopy.body ??= imageKeys[imageIndex];
-+                                widget.onSelected(imageCopy);
-+                              },
-+                              child: AbsorbPointer(
-+                                absorbing: true,
-+                                child: MxcImage(
-+                                  uri: image.url,
-+                                  fit: BoxFit.contain,
-+                                  width: 128,
-+                                  height: 128,
-+                                  animated: true,
-+                                  isThumbnail: false,
-+                                ),
-+                              ),
-+                            ),
-+                          );
-+                        },
-+                      ),
-+                    ],
-+                  );
-+                },
-+              ),
-+          ],
-+        ),
-+      ),
-+    );
-+  }
-+}
+               scrolledUnderElevation: 0,
+               backgroundColor: Colors.transparent,
+               automaticallyImplyLeading: false,
+@@ -163,7 +165,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+                                   width: 128,
+                                   height: 128,
+                                   animated: true,
+-                                  isThumbnail: false,
++                                  isThumbnail: true,
+                                 ),
+                               ),
+                             ),
 diff --git a/lib/pages/chat/trust_user_key_dialog.dart b/lib/pages/chat/trust_user_key_dialog.dart
 index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b8b15656d 100644
 --- a/lib/pages/chat/trust_user_key_dialog.dart
@@ -316831,7 +316068,7 @@ index f4142a63d007ebeea05cd3becdfe694af8efc1a1..195386cc06f642c4c26fe3c480211a22
 +  Widget build(BuildContext context) => ChatDetailsView(this);
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index 4cda41ca99e87671737299ec8bf160b9a432fae1..8f865ad8980a15de1a32baed0c3b339bcc54ad9d 100644
+index 4cda41ca99e87671737299ec8bf160b9a432fae1..c4d5d7a24fe0c061571e561a7ddb716f497c4d70 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
@@ -316861,7 +316098,7 @@ index 4cda41ca99e87671737299ec8bf160b9a432fae1..8f865ad8980a15de1a32baed0c3b339b
 +
 +  List<User>? _cachedMembers;
 +  String? _cachedRoomId;
-+  Stream<RoomState>? _roomStateStream;
++  Stream<bool>? _roomStateStream;
 +
 +  List<User> _getMembers(Room room) {
 +    if (_cachedMembers != null && _cachedRoomId == room.id) {
@@ -321435,7 +320672,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..8caf25d9fefedd21480163f8a86aa4e0822b730a 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..3c4983f58e97d46be1c1465b6414715f4da05aaa 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,25 @@
@@ -321478,7 +320715,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..8caf25d9fefedd21480163f8a86aa4e0
 +
 +class _SpacesNavigationRailState extends State<SpacesNavigationRail> {
 +  Client? _cachedClient;
-+  Stream<SyncUpdate>? _syncStream;
++  Stream<bool>? _syncStream;
 +  List<_CombinedRailItem>? _cachedCombinedItems;
 +  List<BeeperNetwork>? _cachedVisibleNetworks;
 +  String _lastCombinedHash = '';
@@ -322442,7 +321679,7 @@ index 13d6fe73c0bd33a8ca518f476ecbe5d0397dcf7d..d88172fd98a80acd1ec461a4746644b9
 +  }
 +}
 diff --git a/lib/pages/chat_list/space_view.dart b/lib/pages/chat_list/space_view.dart
-index 70c44860979421b1ee3206c936f170bcd29dcef9..e58bd1f3bd7059b3e8a31d689f460e5e67826211 100644
+index 70c44860979421b1ee3206c936f170bcd29dcef9..993a2c7beea43f2921a68515f2b8db6868a5e8dc 100644
 --- a/lib/pages/chat_list/space_view.dart
 +++ b/lib/pages/chat_list/space_view.dart
 @@ -55,6 +55,8 @@ class SpaceView extends StatefulWidget {
@@ -322450,7 +321687,7 @@ index 70c44860979421b1ee3206c936f170bcd29dcef9..e58bd1f3bd7059b3e8a31d689f460e5e
  
  class _SpaceViewState extends State<SpaceView> {
 +  String? _cachedRoomId;
-+  Stream<SyncUpdate>? _syncStream;
++  Stream<bool>? _syncStream;
    final List<SpaceRoomsChunk$2> _discoveredChildren = [];
    final TextEditingController _filterController = TextEditingController();
    String? _nextBatch;
@@ -328740,334 +327977,18 @@ index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..ef35c1531731e8787d6f0a9289a592ee
 +  Widget build(BuildContext context) => ImageViewerView(this);
 +}
 diff --git a/lib/pages/image_viewer/image_viewer_view.dart b/lib/pages/image_viewer/image_viewer_view.dart
-index defc9a466269fe7558dea21aa6dc278e53560d3a..32c1df4b66c06e3db062c856d5e3e6d43682cc8b 100644
+index defc9a466269fe7558dea21aa6dc278e53560d3a..9172332e48d730af75dd3c6493b13815f3ed1105 100644
 --- a/lib/pages/image_viewer/image_viewer_view.dart
 +++ b/lib/pages/image_viewer/image_viewer_view.dart
-@@ -1,162 +1,162 @@
--// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
--// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
--//
--// SPDX-License-Identifier: AGPL-3.0-or-later
--
--import 'package:fluffychat/l10n/l10n.dart';
--import 'package:fluffychat/pages/image_viewer/video_player.dart';
--import 'package:fluffychat/utils/platform_infos.dart';
--import 'package:fluffychat/widgets/hover_builder.dart';
--import 'package:fluffychat/widgets/mxc_image.dart';
--import 'package:flutter/material.dart';
--import 'package:matrix/matrix.dart';
--
--import 'image_viewer.dart';
--
--class ImageViewerView extends StatelessWidget {
--  final ImageViewerController controller;
--
--  const ImageViewerView(this.controller, {super.key});
--
--  @override
--  Widget build(BuildContext context) {
--    final iconButtonStyle = IconButton.styleFrom(
--      backgroundColor: Colors.black.withAlpha(200),
--      foregroundColor: Colors.white,
--    );
--    return GestureDetector(
--      onTap: () => Navigator.of(context).pop(),
--      child: Scaffold(
--        backgroundColor: Colors.black.withAlpha(128),
--        extendBodyBehindAppBar: true,
--        appBar: AppBar(
--          elevation: 0,
--          leading: IconButton(
--            style: iconButtonStyle,
--            icon: const Icon(Icons.close),
--            onPressed: Navigator.of(context).pop,
--            color: Colors.white,
--            tooltip: L10n.of(context).close,
--          ),
--          backgroundColor: Colors.transparent,
--          actions: [
--            IconButton(
--              style: iconButtonStyle,
--              icon: const Icon(Icons.reply_outlined),
--              onPressed: controller.forwardAction,
--              color: Colors.white,
--              tooltip: L10n.of(context).share,
--            ),
--            const SizedBox(width: 8),
--            IconButton(
--              style: iconButtonStyle,
--              icon: const Icon(Icons.download_outlined),
--              onPressed: () => controller.saveFileAction(context),
--              color: Colors.white,
--              tooltip: L10n.of(context).downloadFile,
--            ),
--            const SizedBox(width: 8),
--            if (PlatformInfos.isMobile)
--              // Use builder context to correctly position the share dialog on iPad
--              Padding(
--                padding: const EdgeInsets.only(right: 8.0),
--                child: Builder(
--                  builder: (context) => IconButton(
--                    style: iconButtonStyle,
--                    onPressed: () => controller.shareFileAction(context),
--                    tooltip: L10n.of(context).share,
--                    color: Colors.white,
--                    icon: Icon(Icons.adaptive.share_outlined),
--                  ),
--                ),
--              ),
--          ],
--        ),
--        body: HoverBuilder(
--          builder: (context, hovered) => Stack(
--            children: [
--              KeyboardListener(
--                focusNode: controller.focusNode,
--                onKeyEvent: controller.onKeyEvent,
--                child: PageView.builder(
--                  scrollDirection: Axis.vertical,
--                  controller: controller.pageController,
--                  itemCount: controller.allEvents.length,
--                  itemBuilder: (context, i) {
--                    final event = controller.allEvents[i];
--                    switch (event.messageType) {
--                      case MessageTypes.Video:
--                        return Padding(
--                          padding: const EdgeInsets.only(top: 52.0),
--                          child: Center(
--                            child: GestureDetector(
--                              // Ignore taps to not go back here:
--                              onTap: () {},
--                              child: EventVideoPlayer(event),
--                            ),
--                          ),
--                        );
--                      case MessageTypes.Image:
--                      case MessageTypes.Sticker:
--                      default:
--                        return InteractiveViewer(
--                          minScale: 1.0,
--                          maxScale: 10.0,
--                          onInteractionEnd: controller.onInteractionEnds,
--                          child: Center(
--                            child: Hero(
--                              tag: event.eventId,
--                              child: GestureDetector(
--                                // Ignore taps to not go back here:
--                                onTap: () {},
--                                child: MxcImage(
--                                  key: ValueKey(event.eventId),
--                                  event: event,
--                                  fit: BoxFit.contain,
--                                  isThumbnail: false,
--                                  animated: true,
--                                ),
--                              ),
--                            ),
--                          ),
--                        );
--                    }
--                  },
--                ),
--              ),
--              if (hovered)
--                Align(
--                  alignment: Alignment.centerRight,
--                  child: Column(
--                    mainAxisSize: .min,
--                    children: [
--                      if (controller.canGoBack)
--                        Padding(
--                          padding: const EdgeInsets.all(12.0),
--                          child: IconButton(
--                            style: iconButtonStyle,
--                            tooltip: L10n.of(context).previous,
--                            icon: const Icon(Icons.arrow_upward_outlined),
--                            onPressed: controller.prevImage,
--                          ),
--                        ),
--                      if (controller.canGoNext)
--                        Padding(
--                          padding: const EdgeInsets.all(12.0),
--                          child: IconButton(
--                            style: iconButtonStyle,
--                            tooltip: L10n.of(context).next,
--                            icon: const Icon(Icons.arrow_downward_outlined),
--                            onPressed: controller.nextImage,
--                          ),
--                        ),
--                    ],
--                  ),
--                ),
--            ],
--          ),
--        ),
--      ),
--    );
--  }
--}
-+// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
-+// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
-+import 'package:fluffychat/l10n/l10n.dart';
-+import 'package:fluffychat/pages/image_viewer/video_player.dart';
-+import 'package:fluffychat/utils/platform_infos.dart';
-+import 'package:fluffychat/widgets/hover_builder.dart';
-+import 'package:fluffychat/widgets/mxc_image.dart';
-+import 'package:flutter/material.dart';
-+import 'package:matrix/matrix.dart';
-+
-+import 'image_viewer.dart';
-+
-+class ImageViewerView extends StatelessWidget {
-+  final ImageViewerController controller;
-+
-+  const ImageViewerView(this.controller, {super.key});
-+
-+  @override
-+  Widget build(BuildContext context) {
-+    final iconButtonStyle = IconButton.styleFrom(
-+      backgroundColor: Colors.black.withAlpha(200),
-+      foregroundColor: Colors.white,
-+    );
-+    return GestureDetector(
-+      onTap: () => Navigator.of(context).pop(),
-+      child: Scaffold(
-+        backgroundColor: Colors.black.withAlpha(128),
-+        extendBodyBehindAppBar: true,
-+        appBar: AppBar(
-+          elevation: 0,
-+          leading: IconButton(
-+            style: iconButtonStyle,
-+            icon: const Icon(Icons.close),
-+            onPressed: Navigator.of(context).pop,
-+            color: Colors.white,
-+            tooltip: L10n.of(context).close,
-+          ),
-+          backgroundColor: Colors.transparent,
-+          actions: [
-+            IconButton(
-+              style: iconButtonStyle,
-+              icon: const Icon(Icons.reply_outlined),
-+              onPressed: controller.forwardAction,
-+              color: Colors.white,
-+              tooltip: L10n.of(context).share,
-+            ),
-+            const SizedBox(width: 8),
-+            IconButton(
-+              style: iconButtonStyle,
-+              icon: const Icon(Icons.download_outlined),
-+              onPressed: () => controller.saveFileAction(context),
-+              color: Colors.white,
-+              tooltip: L10n.of(context).downloadFile,
-+            ),
-+            const SizedBox(width: 8),
-+            if (PlatformInfos.isMobile)
-+              // Use builder context to correctly position the share dialog on iPad
-+              Padding(
-+                padding: const EdgeInsets.only(right: 8.0),
-+                child: Builder(
-+                  builder: (context) => IconButton(
-+                    style: iconButtonStyle,
-+                    onPressed: () => controller.shareFileAction(context),
-+                    tooltip: L10n.of(context).share,
-+                    color: Colors.white,
-+                    icon: Icon(Icons.adaptive.share_outlined),
-+                  ),
-+                ),
-+              ),
-+          ],
-+        ),
-+        body: HoverBuilder(
-+          builder: (context, hovered) => Stack(
-+            children: [
-+              KeyboardListener(
-+                focusNode: controller.focusNode,
-+                onKeyEvent: controller.onKeyEvent,
-+                child: PageView.builder(
-+                  scrollDirection: Axis.vertical,
-+                  controller: controller.pageController,
-+                  itemCount: controller.allEvents.length,
-+                  itemBuilder: (context, i) {
-+                    final event = controller.allEvents[i];
-+                    switch (event.messageType) {
-+                      case MessageTypes.Video:
-+                        return Padding(
-+                          padding: const EdgeInsets.only(top: 52.0),
-+                          child: Center(
-+                            child: GestureDetector(
-+                              // Ignore taps to not go back here:
-+                              onTap: () {},
-+                              child: EventVideoPlayer(event),
-+                            ),
-+                          ),
-+                        );
-+                      case MessageTypes.Image:
-+                      case MessageTypes.Sticker:
-+                      default:
-+                        return InteractiveViewer(
-+                          minScale: 1.0,
-+                          maxScale: 10.0,
-+                          onInteractionEnd: controller.onInteractionEnds,
-+                          child: Center(
-+                            child: Hero(
-+                              tag: event.eventId,
-+                              child: GestureDetector(
-+                                // Ignore taps to not go back here:
-+                                onTap: () {},
-+                                child: MxcImage(
-+                                  key: ValueKey(event.eventId),
-+                                  event: event,
-+                                  fit: BoxFit.contain,
-+                                  isThumbnail: false,
-+                                  animated: true,
-+                                ),
-+                              ),
-+                            ),
-+                          ),
-+                        );
-+                    }
-+                  },
-+                ),
-+              ),
-+              if (hovered)
-+                Align(
-+                  alignment: Alignment.centerRight,
-+                  child: Column(
-+                    mainAxisSize: .min,
-+                    children: [
-+                      if (controller.canGoBack)
-+                        Padding(
-+                          padding: const EdgeInsets.all(12.0),
-+                          child: IconButton(
-+                            style: iconButtonStyle,
-+                            tooltip: L10n.of(context).previous,
-+                            icon: const Icon(Icons.arrow_upward_outlined),
-+                            onPressed: controller.prevImage,
-+                          ),
-+                        ),
-+                      if (controller.canGoNext)
-+                        Padding(
-+                          padding: const EdgeInsets.all(12.0),
-+                          child: IconButton(
-+                            style: iconButtonStyle,
-+                            tooltip: L10n.of(context).next,
-+                            icon: const Icon(Icons.arrow_downward_outlined),
-+                            onPressed: controller.nextImage,
-+                          ),
-+                        ),
-+                    ],
-+                  ),
-+                ),
-+            ],
-+          ),
-+        ),
-+      ),
-+    );
-+  }
-+}
+@@ -111,6 +111,8 @@ class ImageViewerView extends StatelessWidget {
+                                 onTap: () {},
+                                 child: MxcImage(
+                                   key: ValueKey(event.eventId),
++                                  cacheKey: event.eventId,
++                                  cacheName: 'fullscreen',
+                                   event: event,
+                                   fit: BoxFit.contain,
+                                   isThumbnail: false,
 diff --git a/lib/pages/image_viewer/video_player.dart b/lib/pages/image_viewer/video_player.dart
 index 33bb42678f600a7503fe47d58fe5b433ec48abac..45acd482640243637ad1365abf92c27f004aff93 100644
 --- a/lib/pages/image_viewer/video_player.dart
@@ -359584,7 +358505,7 @@ index f19ea49d3c3d719fc7e813eb1e687af7fa43d786..708037e9939581427b4d0ea99aea1716
 +  );
 +}
 diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
-index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..04bc890da64609671f332f4f161ad34a54a3d0fc 100644
+index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..50a56bc7ecfdab73f29e3534b56c4c7856835caf 100644
 --- a/lib/widgets/avatar.dart
 +++ b/lib/widgets/avatar.dart
 @@ -45,9 +45,14 @@ class Avatar extends StatelessWidget {
@@ -359605,7 +358526,7 @@ index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..04bc890da64609671f332f4f161ad34a
  
      final noPic =
          mxContent == null ||
-@@ -76,6 +81,7 @@ class Avatar extends StatelessWidget {
+@@ -76,34 +81,30 @@ class Avatar extends StatelessWidget {
                borderRadius: borderRadius,
                key: ValueKey(mxContent.toString()),
                cacheKey: '${mxContent}_$size',
@@ -359613,10 +358534,13 @@ index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..04bc890da64609671f332f4f161ad34a
                uri: mxContent,
                fit: BoxFit.cover,
                width: size,
-@@ -86,14 +92,17 @@ class Avatar extends StatelessWidget {
-                         color: backgroundColor ?? name?.lightColorAvatar,
-                       ),
-                       alignment: Alignment.center,
+               height: size,
+-              placeholder: (_) => noPic
+-                  ? Container(
+-                      decoration: BoxDecoration(
+-                        color: backgroundColor ?? name?.lightColorAvatar,
+-                      ),
+-                      alignment: Alignment.center,
 -                      child: Text(
 -                        fallbackLetters,
 -                        textAlign: TextAlign.center,
@@ -359625,20 +358549,37 @@ index 8ef1126149582e0d7fa8bdba934e5f3a0d83d686..04bc890da64609671f332f4f161ad34a
 -                          color: textColor ?? Colors.white,
 -                          fontWeight: FontWeight.bold,
 -                          fontSize: (size / 2.5).roundToDouble(),
-+                      child: FittedBox(
-+                        fit: BoxFit.scaleDown,
-+                        child: Text(
-+                          fallbackLetters,
-+                          textAlign: TextAlign.center,
-+                          style: TextStyle(
-+                            fontFamily: 'RobotoMono',
-+                            color: textColor ?? Colors.white,
-+                            fontWeight: FontWeight.bold,
-+                            fontSize: 24,
-+                          ),
-                         ),
-                       ),
-                     )
+-                        ),
+-                      ),
+-                    )
+-                  : Center(
+-                      child: Icon(
+-                        Icons.person_2,
+-                        color: theme.colorScheme.tertiary,
+-                        size: size / 1.5,
+-                      ),
++              placeholder: (_) => Container(
++                decoration: BoxDecoration(
++                  color: backgroundColor ?? name?.lightColorAvatar,
++                ),
++                alignment: Alignment.center,
++                child: FittedBox(
++                  fit: BoxFit.scaleDown,
++                  child: Text(
++                    fallbackLetters,
++                    textAlign: TextAlign.center,
++                    style: TextStyle(
++                      fontFamily: 'RobotoMono',
++                      color: textColor ?? Colors.white,
++                      fontWeight: FontWeight.bold,
++                      fontSize: 24,
+                     ),
++                  ),
++                ),
++              ),
+             ),
+           ),
+         ),
 diff --git a/lib/widgets/blur_hash.dart b/lib/widgets/blur_hash.dart
 index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc656802441 100644
 --- a/lib/widgets/blur_hash.dart
