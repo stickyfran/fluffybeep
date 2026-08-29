@@ -33991,10 +33991,10 @@ index c1b5b915c345fffa623ce1720788138edacc5556..77028fce9b50e675111f05761f9fe831
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..ae8f29a88f69b50cf854a146db1733c3b2616135 100644
+index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..193638f779a88a4383b15bfe7505c209da4971e6 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,215 +1,215 @@
+@@ -1,215 +1,218 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -34287,7 +34287,10 @@ index 040a088f4183ac0c52008fced5c0dfe2eacd0bac..ae8f29a88f69b50cf854a146db1733c3
 +  webNotificationSound<bool>('chat.fluffy.web_notification_sound', true),
 +  chatFilter<String>('chat.fluffy.chat_filter', 'allChats'),
 +  hideRoomsInSpaces<bool>('chat.fluffy.hideRoomsInSpaces', false),
-+  showThumbnailsInTimeline<bool>('chat.fluffy.showThumbnailsInTimeline', true);
++  showThumbnailsInTimeline<bool>('chat.fluffy.showThumbnailsInTimeline', true),
++  whisperModel<String>('chat.fluffy.whisper_model', 'base'),
++  whisperLang<String>('chat.fluffy.whisper_lang', 'es'),
++  whisperPrompt<String>('chat.fluffy.whisper_prompt', 'Transcripción de audio en español rioplatense (Argentina).');
 +
 +  final String key;
 +  final T defaultValue;
@@ -335714,10 +335717,10 @@ index 627a2ed7a0fe8b069cce1b08768ef1d7159a8c64..8a74184d8cbd563106ee874ee9f6a1d5
 +  }
 +}
 diff --git a/lib/pages/settings_chat/settings_chat.dart b/lib/pages/settings_chat/settings_chat.dart
-index c5f91c06d177792d0ce11ceefc714b3aecc33ef3..49261162a0f278b3a2664fd77e1b22acd3fb7aeb 100644
+index c5f91c06d177792d0ce11ceefc714b3aecc33ef3..bf1edc3b21dabf5fd9e0ef155cc5f3d62efbad79 100644
 --- a/lib/pages/settings_chat/settings_chat.dart
 +++ b/lib/pages/settings_chat/settings_chat.dart
-@@ -1,20 +1,20 @@
+@@ -1,20 +1,22 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -335755,14 +335758,16 @@ index c5f91c06d177792d0ce11ceefc714b3aecc33ef3..49261162a0f278b3a2664fd77e1b22ac
 +}
 +
 +class SettingsChatController extends State<SettingsChat> {
++  void refresh() => setState(() {});
++
 +  @override
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index 895d894878b16eac39554882b77600a0d73c4443..3bec7c8847f65e8d5041addd02da83cebe92dc0b 100644
+index 895d894878b16eac39554882b77600a0d73c4443..b1a8418ba99ad4876f592a2829e919d876982335 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,115 +1,115 @@
+@@ -1,115 +1,180 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -335890,6 +335895,7 @@ index 895d894878b16eac39554882b77600a0d73c4443..3bec7c8847f65e8d5041addd02da83ce
 +import 'package:fluffychat/widgets/layouts/max_width_body.dart';
 +import 'package:fluffychat/widgets/matrix.dart';
 +import 'package:fluffychat/widgets/settings_switch_list_tile.dart';
++import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:go_router/go_router.dart';
 +
@@ -335912,7 +335918,7 @@ index 895d894878b16eac39554882b77600a0d73c4443..3bec7c8847f65e8d5041addd02da83ce
 +      body: ListTileTheme(
 +        iconColor: theme.textTheme.bodyLarge!.color,
 +        child: MaxWidthBody(
-+          child: Column(
++          child: ListView(
 +            children: [
 +              SettingsSwitchListTile.adaptive(
 +                title: L10n.of(context).formattedMessages,
@@ -335986,6 +335992,70 @@ index 895d894878b16eac39554882b77600a0d73c4443..3bec7c8847f65e8d5041addd02da83ce
 +                },
 +                setting: AppSettings.experimentalVoip,
 +              ),
++              Divider(color: theme.dividerColor),
++              ListTile(
++                title: Text(
++                  'Transcripción de Audio (Whisper)',
++                  style: TextStyle(
++                    color: theme.colorScheme.secondary,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++              ),
++              ListTile(
++                title: const Text('Modelo de Whisper'),
++                subtitle: const Text('Modelos más grandes son más precisos pero lentos.'),
++                trailing: DropdownButton<String>(
++                  value: AppSettings.whisperModel.value,
++                  items: const [
++                    DropdownMenuItem(value: 'tiny', child: Text('TINY (Rápido)')),
++                    DropdownMenuItem(value: 'base', child: Text('BASE (Normal)')),
++                    DropdownMenuItem(value: 'small', child: Text('SMALL (Preciso)')),
++                    DropdownMenuItem(value: 'medium', child: Text('MEDIUM (Lento)')),
++                  ],
++                  onChanged: (val) {
++                    if (val != null) {
++                      AppSettings.whisperModel.setItem(val);
++                      controller.refresh();
++                    }
++                  },
++                ),
++              ),
++              ListTile(
++                title: const Text('Idioma de transcripción'),
++                trailing: DropdownButton<String>(
++                  value: AppSettings.whisperLang.value,
++                  items: const [
++                    DropdownMenuItem(value: 'es', child: Text('Español')),
++                    DropdownMenuItem(value: 'en', child: Text('Inglés')),
++                    DropdownMenuItem(value: 'auto', child: Text('Automático')),
++                  ],
++                  onChanged: (val) {
++                    if (val != null) {
++                      AppSettings.whisperLang.setItem(val);
++                      controller.refresh();
++                    }
++                  },
++                ),
++              ),
++              ListTile(
++                title: const Text('Prompt de contexto'),
++                subtitle: Text(AppSettings.whisperPrompt.value.isEmpty ? 'Ninguno' : AppSettings.whisperPrompt.value),
++                onTap: () async {
++                  final prompt = await showTextInputDialog(
++                    context: context,
++                    title: 'Prompt de contexto',
++                    initialText: AppSettings.whisperPrompt.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (prompt != null) {
++                    await AppSettings.whisperPrompt.setItem(prompt);
++                    controller.refresh();
++                  }
++                },
++              ),
++              const SizedBox(height: 32),
 +            ],
 +          ),
 +        ),
@@ -354678,10 +354748,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c979674c98b4b
+index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db78283547cf7d12
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,199 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -354696,6 +354766,7 @@ index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c9796
 +import 'package:path_provider/path_provider.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +import 'package:whisper_ggml/whisper_ggml.dart';
++import 'package:fluffychat/config/setting_keys.dart';
 +
 +class TranscriptionService {
 +  static final TranscriptionService _instance =
@@ -354826,8 +354897,6 @@ index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c9796
 +  Future<String> transcribeEvent(
 +    Event event, {
 +    void Function(double progress)? onProgress,
-+    WhisperModel model = WhisperModel.base,
-+    String lang = 'es',
 +  }) async {
 +    // 1. Si ya está transcripto, retornar directamente
 +    final existing = await getTranscription(event.eventId);
@@ -354841,12 +354910,22 @@ index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c9796
 +    // 3. Normalizar a WAV 16kHz mono para mayor precisión y compatibilidad
 +    final wavPath = await _ensure16kWav(rawAudioFile);
 +
-+    // 4. Ejecutar inferencia de Whisper on-device
++    // 4. Leer configuración de Whisper
++    final modelName = AppSettings.whisperModel.value;
++    final lang = AppSettings.whisperLang.value;
++    final prompt = AppSettings.whisperPrompt.value;
++    
++    WhisperModel selectedModel = WhisperModel.base;
++    if (modelName == 'tiny') selectedModel = WhisperModel.tiny;
++    if (modelName == 'small') selectedModel = WhisperModel.small;
++    if (modelName == 'medium') selectedModel = WhisperModel.medium;
++
++    // 5. Ejecutar inferencia de Whisper on-device
 +    final result = await _whisperController.transcribe(
-+      model: model,
++      model: selectedModel,
 +      audioPath: wavPath,
 +      lang: lang,
-+      initialPrompt: 'Transcripción de audio en español rioplatense (Argentina).',
++      initialPrompt: prompt.isNotEmpty ? prompt : null,
 +      onProgress: (percent) {
 +        if (onProgress != null) {
 +          onProgress(percent.toDouble() / 100.0);
@@ -354856,10 +354935,10 @@ index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c9796
 +
 +    final text = result?.transcription.text.trim();
 +    if (text == null || text.isEmpty) {
-+      throw Exception('No se detectó texto en el audio');
++      throw 'No se detectó texto en el audio';
 +    }
 +
-+    // 5. Persistir resultado
++    // 6. Persistir resultado
 +    await saveTranscription(event.eventId, text);
 +
 +    return text;
