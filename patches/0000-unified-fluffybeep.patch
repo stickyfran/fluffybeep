@@ -13921,7 +13921,7 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..4c1e5a2cfec51e0766f4a09b708984383c058067 100644
+index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..ab21bec9d8ead2aba47a78d5de227803783d1328 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
 @@ -1,95 +1,95 @@
@@ -14093,7 +14093,7 @@ index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..4c1e5a2cfec51e0766f4a09b70898438
 +
 +    defaultConfig {
 +        applicationId = "chat.fluffy.fluffychat"
-+        minSdk = flutter.minSdkVersion
++        minSdk = 24
 +        targetSdk = flutter.targetSdkVersion
 +        versionCode = flutter.versionCode
 +        versionName = flutter.versionName
@@ -14116,10 +14116,10 @@ index 0aa18d9b3892bc9fd3e96e5ab3e6299b6e48cf39..4c1e5a2cfec51e0766f4a09b70898438
 +    source = "../.."
 +}
 diff --git a/android/app/proguard-rules.pro b/android/app/proguard-rules.pro
-index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..e7455e7a4a86a9a5642cf418a64ba49e44b2995c 100644
+index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..1494f6d72d248920f1a0f5d3d37dc58f17727d04 100644
 --- a/android/app/proguard-rules.pro
 +++ b/android/app/proguard-rules.pro
-@@ -1 +1,7 @@
+@@ -1 +1,11 @@
 --keep class net.sqlcipher.** { *; }
 \ No newline at end of file
 +-keep class net.sqlcipher.** { *; }
@@ -14129,6 +14129,10 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..e7455e7a4a86a9a5642cf418a64ba49e
 +-dontwarn uniffi.**
 +-keep class org.matrix.** { *; }
 +-dontwarn org.matrix.**
++-keep class com.arthenica.ffmpegkit.** { *; }
++-dontwarn com.arthenica.ffmpegkit.**
++-keep class com.antonkarpenko.ffmpegkit.** { *; }
++-dontwarn com.antonkarpenko.ffmpegkit.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
 index eab308e6325b98080d5caff9a2ac7e8d8090c0a5..9311034041127a24e44647db3a24d9e41085d196 100644
@@ -311572,10 +311576,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2dd738af6dc5d4611e9594cec70548a67332386b 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..74ead8251d8bdf3ddd142c4346ba55e7dbf0e30e 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,293 @@
+@@ -1,222 +1,345 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -311814,6 +311818,8 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2dd738af6dc5d4611e9594cec70548a6
 +import 'package:flutter/cupertino.dart';
 +import 'package:flutter/foundation.dart';
 +import 'package:flutter/material.dart';
++import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
++import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:path/path.dart' as path_lib;
 +import 'package:path_provider/path_provider.dart';
@@ -312052,6 +312058,51 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2dd738af6dc5d4611e9594cec70548a6
 +      // Then verify the file is stable (size stops changing).
 +      await _waitForFileStable(path);
 +
++      var effectivePath = path;
++      var effectiveFileName = fileName ??
++          'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
++
++      // Normalize audio to strict RFC 7845 compliant OGG Opus on mobile.
++      // Android's native MediaRecorder produces non-standard granule positions
++      // that cause WhatsApp iOS to reject voice messages ("This audio is no longer available").
++      // FFmpegKit rewrites the OGG container with standard OpusHead, OpusTags,
++      // 16kHz mono, and valid granule positions compatible with all WhatsApp clients.
++      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
++        try {
++          final tempDir = await getTemporaryDirectory();
++          final normalizedFileName =
++              'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
++          final normalizedPath =
++              path_lib.join(tempDir.path, normalizedFileName);
++
++          final session = await FFmpegKit.execute(
++            '-y -i "$path" -c:a libopus -b:a 24k -ac 1 -ar 16000 "$normalizedPath"',
++          );
++          final returnCode = await session.getReturnCode();
++          if (ReturnCode.isSuccess(returnCode)) {
++            final normalizedFile = File(normalizedPath);
++            if (await normalizedFile.exists() &&
++                await normalizedFile.length() > 0) {
++              Logs().i(
++                'Voice message normalized with FFmpegKit successfully: $normalizedPath',
++              );
++              effectivePath = normalizedPath;
++              effectiveFileName = normalizedFileName;
++            }
++          } else {
++            Logs().w(
++              'FFmpegKit audio normalization failed (return code $returnCode), sending original file',
++            );
++          }
++        } catch (e, s) {
++          Logs().w(
++            'Error normalizing audio with FFmpegKit, sending original file',
++            e,
++            s,
++          );
++        }
++      }
++
 +      const waveCount = AudioPlayerWidget.wavesCount;
 +      final step = amplitudeTimeline.length < waveCount
 +          ? 1
@@ -312062,7 +312113,12 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2dd738af6dc5d4611e9594cec70548a6
 +        waveform.add(sample.clamp(0, 1024));
 +      }
 +
-+      await onSend(path, duration.inMilliseconds, waveform, fileName!);
++      await onSend(
++        effectivePath,
++        duration.inMilliseconds,
++        waveform,
++        effectiveFileName,
++      );
 +    } finally {
 +      cancel();
 +    }
@@ -376694,10 +376750,10 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..cc30a86d4cb1a6a8822fb63c39a11859e7867036 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..63133da66718688d7fc39a2570f265f2389e5e36 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -1,130 +1,130 @@
+@@ -1,130 +1,131 @@
 -# SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -#
@@ -376858,6 +376914,7 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..cc30a86d4cb1a6a8822fb63c39a11859
 +  emoji_picker_flutter: ^4.4.0
 +  file_picker: ^12.0.0-beta.7
 +  file_selector: ^1.1.0
++  ffmpeg_kit_flutter_new_audio: ^2.5.2
 +  flutter:
 +    sdk: flutter
 +  flutter_displaymode: ^0.6.0
