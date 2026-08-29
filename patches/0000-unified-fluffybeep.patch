@@ -307040,10 +307040,33 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32e782a894 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..d825282130a411e07ed3a47379d7f33c019d3d66 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
-@@ -56,6 +56,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -15,6 +15,7 @@ import 'package:fluffychat/utils/localized_exception_extension.dart';
+ import 'package:fluffychat/utils/url_launcher.dart';
+ import 'package:flutter/foundation.dart';
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:flutter_linkify/flutter_linkify.dart';
+ import 'package:just_audio/just_audio.dart';
+ import 'package:matrix/matrix.dart';
+@@ -22,6 +23,7 @@ import 'package:opus_caf_converter_dart/opus_caf_converter_dart.dart';
+ import 'package:path_provider/path_provider.dart';
+ 
+ import '../../../utils/matrix_sdk_extensions/event_extension.dart';
++import '../../../utils/transcription_service.dart';
+ import '../../../widgets/fluffy_chat_app.dart';
+ import '../../../widgets/matrix.dart';
+ 
+@@ -53,9 +55,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+   AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
+   double? _downloadProgress;
+ 
++  String? _transcription;
++  bool _isTranscribing = false;
++  double? _transcriptionProgress;
++
    late final MatrixState matrix;
    List<int>? _waveform;
    String? _durationString;
@@ -307053,7 +307076,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
  
    @override
    void dispose() {
-@@ -70,7 +73,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -70,7 +79,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              MaterialBanner(
                padding: EdgeInsets.zero,
                leading: StreamBuilder(
@@ -307062,7 +307085,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
                  builder: (context, _) => IconButton(
                    onPressed: () {
                      if (audioPlayer.isAtEndPosition) {
-@@ -87,7 +90,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -87,7 +96,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                  ),
                ),
                content: StreamBuilder(
@@ -307071,7 +307094,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
                  builder: (context, _) => GestureDetector(
                    onTap: () => FluffyChatApp.router.go(
                      '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -179,7 +182,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -179,7 +188,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
          await file.writeAsBytes(matrixFile.bytes);
  
          if (Platform.isIOS &&
@@ -307082,7 +307105,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -246,12 +251,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +257,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -307098,7 +307121,82 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -300,15 +306,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +278,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+     return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
+   }
+ 
++  void _loadTranscription() {
++    _transcription =
++        TranscriptionService().getCachedTranscription(widget.event.eventId);
++    if (_transcription == null) {
++      TranscriptionService()
++          .getTranscription(widget.event.eventId)
++          .then((val) {
++        if (val != null && mounted) {
++          setState(() {
++            _transcription = val;
++          });
++        }
++      });
++    }
++  }
++
++  @override
++  void didUpdateWidget(covariant AudioPlayerWidget oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (oldWidget.event.eventId != widget.event.eventId) {
++      _loadTranscription();
++    }
++  }
++
++  Future<void> _transcribeAudio() async {
++    if (_isTranscribing) return;
++    setState(() {
++      _isTranscribing = true;
++      _transcriptionProgress = null;
++    });
++    try {
++      final text = await TranscriptionService().transcribeEvent(
++        widget.event,
++        onProgress: (progress) {
++          if (mounted) {
++            setState(() {
++              _transcriptionProgress = progress;
++            });
++          }
++        },
++      );
++      if (mounted) {
++        setState(() {
++          _transcription = text;
++          _isTranscribing = false;
++        });
++      }
++    } catch (e, s) {
++      Logs().e('Error al transcribir audio', e, s);
++      if (mounted) {
++        setState(() {
++          _isTranscribing = false;
++        });
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(
++            content: Text('Error al transcribir: $e'),
++          ),
++        );
++      }
++    }
++  }
++
+   @override
+   void initState() {
+     super.initState();
+     matrix = Matrix.of(context);
+     _waveform = _getWaveform();
++    _loadTranscription();
+ 
+     if (matrix.voiceMessageEventId.value == widget.event.eventId &&
+         matrix.audioPlayer != null) {
+@@ -300,15 +375,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -307122,6 +307220,172 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..8a66d19569725fc8700a778466513e32
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
+@@ -511,6 +588,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+                       ),
+                     ),
+                   ],
++                  _buildTranscriptionSection(context),
+                 ],
+               ),
+             );
+@@ -519,6 +597,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+       },
+     );
+   }
++
++  Widget _buildTranscriptionSection(BuildContext context) {
++    if (_transcription != null && _transcription!.isNotEmpty) {
++      return Container(
++        margin: const EdgeInsets.only(top: 8),
++        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
++        decoration: BoxDecoration(
++          color: widget.color.withValues(alpha: 0.08),
++          borderRadius: BorderRadius.circular(10),
++          border: Border(
++            left: BorderSide(
++              color: widget.color.withValues(alpha: 0.8),
++              width: 3.5,
++            ),
++          ),
++        ),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.start,
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            Row(
++              mainAxisAlignment: MainAxisAlignment.spaceBetween,
++              children: [
++                Row(
++                  mainAxisSize: MainAxisSize.min,
++                  children: [
++                    Icon(
++                      Icons.format_quote_rounded,
++                      size: 14,
++                      color: widget.color.withValues(alpha: 0.7),
++                    ),
++                    const SizedBox(width: 4),
++                    Text(
++                      'Transcripción',
++                      style: TextStyle(
++                        color: widget.color.withValues(alpha: 0.8),
++                        fontSize: 11,
++                        fontWeight: FontWeight.bold,
++                      ),
++                    ),
++                  ],
++                ),
++                InkWell(
++                  borderRadius: BorderRadius.circular(12),
++                  onTap: () {
++                    Clipboard.setData(ClipboardData(text: _transcription!));
++                    ScaffoldMessenger.of(context).showSnackBar(
++                      const SnackBar(
++                        content: Text('Transcripción copiada al portapapeles'),
++                        duration: Duration(seconds: 2),
++                      ),
++                    );
++                  },
++                  child: Padding(
++                    padding: const EdgeInsets.all(2.0),
++                    child: Icon(
++                      Icons.copy_rounded,
++                      size: 14,
++                      color: widget.color.withValues(alpha: 0.7),
++                    ),
++                  ),
++                ),
++              ],
++            ),
++            const SizedBox(height: 4),
++            SelectableText(
++              _transcription!,
++              style: TextStyle(
++                color: widget.color,
++                fontSize: widget.fontSize - 1.5,
++                height: 1.3,
++                fontStyle: FontStyle.italic,
++              ),
++            ),
++          ],
++        ),
++      );
++    }
++
++    if (_isTranscribing) {
++      return Container(
++        margin: const EdgeInsets.only(top: 6),
++        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
++        decoration: BoxDecoration(
++          color: widget.color.withValues(alpha: 0.08),
++          borderRadius: BorderRadius.circular(16),
++        ),
++        child: Row(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            SizedBox(
++              width: 12,
++              height: 12,
++              child: CircularProgressIndicator(
++                strokeWidth: 2,
++                color: widget.color,
++                value: _transcriptionProgress,
++              ),
++            ),
++            const SizedBox(width: 8),
++            Text(
++              _transcriptionProgress != null
++                  ? 'Transcribiendo (${(_transcriptionProgress! * 100).toInt()}%)...'
++                  : 'Transcribiendo audio...',
++              style: TextStyle(
++                color: widget.color,
++                fontSize: 11,
++              ),
++            ),
++          ],
++        ),
++      );
++    }
++
++    return Padding(
++      padding: const EdgeInsets.only(top: 6),
++      child: Align(
++        alignment: Alignment.centerLeft,
++        child: Material(
++          color: widget.color.withValues(alpha: 0.08),
++          borderRadius: BorderRadius.circular(16),
++          child: InkWell(
++            borderRadius: BorderRadius.circular(16),
++            onTap: _transcribeAudio,
++            child: Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
++              child: Row(
++                mainAxisSize: MainAxisSize.min,
++                children: [
++                  Icon(
++                    Icons.subtitles_outlined,
++                    size: 13,
++                    color: widget.color,
++                  ),
++                  const SizedBox(width: 5),
++                  Text(
++                    'Transcribir',
++                    style: TextStyle(
++                      color: widget.color,
++                      fontSize: 11,
++                      fontWeight: FontWeight.w600,
++                    ),
++                  ),
++                ],
++              ),
++            ),
++          ),
++        ),
++      ),
++    );
++  }
+ }
+ 
+ extension on AudioPlayer {
 diff --git a/lib/pages/chat/events/cute_events.dart b/lib/pages/chat/events/cute_events.dart
 index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..2096440d061103ddd1fca7df756ffd6e29c35f4c 100644
 --- a/lib/pages/chat/events/cute_events.dart
@@ -311312,7 +311576,7 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..74ead8251d8bdf3ddd142c4346ba55e7dbf0e30e 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..12d46d568b2a24787617344393bf4ebde84db5a4 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
 @@ -1,222 +1,345 @@
@@ -311554,8 +311818,8 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..74ead8251d8bdf3ddd142c4346ba55e7
 +import 'package:flutter/cupertino.dart';
 +import 'package:flutter/foundation.dart';
 +import 'package:flutter/material.dart';
-+import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
-+import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
++import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
++import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:path/path.dart' as path_lib;
 +import 'package:path_provider/path_provider.dart';
@@ -354412,6 +354676,202 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +    }
 +  }
 +}
+diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..800a5d6dbe8564591f3b8ff8a75c979674c98b4b
+--- /dev/null
++++ b/lib/utils/transcription_service.dart
+@@ -0,0 +1,190 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:async';
++import 'dart:io';
++
++import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
++import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
++import 'package:flutter/foundation.dart';
++import 'package:matrix/matrix.dart';
++import 'package:path_provider/path_provider.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:whisper_ggml/whisper_ggml.dart';
++
++class TranscriptionService {
++  static final TranscriptionService _instance =
++      TranscriptionService._internal();
++  factory TranscriptionService() => _instance;
++  TranscriptionService._internal();
++
++  final WhisperController _whisperController = WhisperController();
++  final Map<String, String> _memoryCache = {};
++  SharedPreferences? _prefs;
++
++  static const String _prefPrefix = 'audio_transcription_';
++
++  Future<void> _initPrefs() async {
++    _prefs ??= await SharedPreferences.getInstance();
++  }
++
++  /// Retorna la transcripción desde la caché en memoria si ya fue cargada.
++  String? getCachedTranscription(String eventId) {
++    if (_memoryCache.containsKey(eventId)) {
++      return _memoryCache[eventId];
++    }
++    final fromPrefs = _prefs?.getString('$_prefPrefix$eventId');
++    if (fromPrefs != null && fromPrefs.isNotEmpty) {
++      _memoryCache[eventId] = fromPrefs;
++      return fromPrefs;
++    }
++    return null;
++  }
++
++  /// Obtiene la transcripción persistida de forma asíncrona.
++  Future<String?> getTranscription(String eventId) async {
++    final cached = getCachedTranscription(eventId);
++    if (cached != null) return cached;
++    await _initPrefs();
++    final stored = _prefs?.getString('$_prefPrefix$eventId');
++    if (stored != null && stored.isNotEmpty) {
++      _memoryCache[eventId] = stored;
++      return stored;
++    }
++    return null;
++  }
++
++  /// Guarda la transcripción en memoria y en almacenamiento persistente.
++  Future<void> saveTranscription(String eventId, String text) async {
++    final cleanText = text.trim();
++    if (cleanText.isEmpty) return;
++    _memoryCache[eventId] = cleanText;
++    await _initPrefs();
++    await _prefs?.setString('$_prefPrefix$eventId', cleanText);
++  }
++
++  /// Elimina una transcripción guardada.
++  Future<void> deleteTranscription(String eventId) async {
++    _memoryCache.remove(eventId);
++    await _initPrefs();
++    await _prefs?.remove('$_prefPrefix$eventId');
++  }
++
++  /// Obtiene o descarga el archivo de audio local correspondiente al evento Matrix.
++  Future<File> getAudioFileForEvent(Event event) async {
++    final attachmentUrl = event.attachmentOrThumbnailMxcUrl();
++    final tempDir = await getTemporaryDirectory();
++    final filePrefix = attachmentUrl != null
++        ? Uri.encodeComponent(attachmentUrl.pathSegments.last)
++        : event.eventId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
++
++    try {
++      final existingFiles = tempDir.listSync().whereType<File>().where((f) {
++        final name = f.uri.pathSegments.last;
++        return name.contains(filePrefix) &&
++            !name.endsWith('.16k.wav') &&
++            (name.endsWith('.ogg') ||
++                name.endsWith('.opus') ||
++                name.endsWith('.mp3') ||
++                name.endsWith('.m4a') ||
++                name.endsWith('.wav') ||
++                name.endsWith('.caf'));
++      }).toList();
++
++      if (existingFiles.isNotEmpty &&
++          existingFiles.first.existsSync() &&
++          existingFiles.first.lengthSync() > 0) {
++        return existingFiles.first;
++      }
++    } catch (_) {}
++
++    final matrixFile = await event.downloadAndDecryptAttachment();
++    final fileName = '${filePrefix}_${matrixFile.name}';
++    final file = File('${tempDir.path}/$fileName');
++    await file.writeAsBytes(matrixFile.bytes);
++    return file;
++  }
++
++  /// Convierte el audio a formato WAV 16kHz mono para procesamiento óptimo con Whisper.
++  Future<String> _ensure16kWav(File sourceAudio) async {
++    if (sourceAudio.path.endsWith('.16k.wav') && await sourceAudio.exists()) {
++      return sourceAudio.path;
++    }
++    final tempDir = await getTemporaryDirectory();
++    final wavName = '${sourceAudio.uri.pathSegments.last}.16k.wav';
++    final wavPath = '${tempDir.path}/$wavName';
++    final wavFile = File(wavPath);
++    if (await wavFile.exists() && await wavFile.length() > 0) {
++      return wavPath;
++    }
++
++    if (!kIsWeb) {
++      try {
++        final session = await FFmpegKit.execute(
++          '-y -i "${sourceAudio.path}" -ar 16000 -ac 1 -c:a pcm_s16le "$wavPath"',
++        );
++        final returnCode = await session.getReturnCode();
++        if (ReturnCode.isSuccess(returnCode) &&
++            await wavFile.exists() &&
++            await wavFile.length() > 0) {
++          return wavPath;
++        }
++      } catch (e) {
++        Logs().w('Error al convertir audio a WAV 16k con FFmpegKit: $e');
++      }
++    }
++
++    return sourceAudio.path;
++  }
++
++  /// Transcribe un mensaje de audio utilizando Whisper GGML on-device.
++  Future<String> transcribeEvent(
++    Event event, {
++    void Function(double progress)? onProgress,
++    WhisperModel model = WhisperModel.base,
++    String lang = 'es',
++  }) async {
++    // 1. Si ya está transcripto, retornar directamente
++    final existing = await getTranscription(event.eventId);
++    if (existing != null && existing.isNotEmpty) {
++      return existing;
++    }
++
++    // 2. Obtener archivo de audio
++    final rawAudioFile = await getAudioFileForEvent(event);
++
++    // 3. Normalizar a WAV 16kHz mono para mayor precisión y compatibilidad
++    final wavPath = await _ensure16kWav(rawAudioFile);
++
++    // 4. Ejecutar inferencia de Whisper on-device
++    final result = await _whisperController.transcribe(
++      model: model,
++      audioPath: wavPath,
++      lang: lang,
++      initialPrompt: 'Transcripción de audio en español rioplatense (Argentina).',
++      onProgress: (percent) {
++        if (onProgress != null) {
++          onProgress(percent.toDouble() / 100.0);
++        }
++      },
++    );
++
++    final text = result?.transcription.text.trim();
++    if (text == null || text.isEmpty) {
++      throw Exception('No se detectó texto en el audio');
++    }
++
++    // 5. Persistir resultado
++    await saveTranscription(event.eventId, text);
++
++    return text;
++  }
++
++  /// Libera el modelo de la memoria RAM si es necesario
++  Future<void> releaseModel() async {
++    try {
++      await _whisperController.releaseModel();
++    } catch (_) {}
++  }
++}
 diff --git a/lib/utils/uia_request_manager.dart b/lib/utils/uia_request_manager.dart
 index 3b99cce0ab5300b080e150d6ac85daaa40327163..84affe890ba121cf28b9986f508e2b45d1cc0473 100644
 --- a/lib/utils/uia_request_manager.dart
@@ -375442,10 +375902,10 @@ index 79cb6b0618dd5658ee20a1388a9dd3ae47a4e470..9104808de2f0334c98628ccf890ee35e
 +  dart: ">=3.12.0 <4.0.0"
 +  flutter: ">=3.44.0"
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..63133da66718688d7fc39a2570f265f2389e5e36 100644
+index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..1ac3afe76a1ad4e3a40c6d99599f81d2a4176a37 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -1,130 +1,131 @@
+@@ -1,130 +1,132 @@
 -# SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -#
@@ -375606,7 +376066,8 @@ index 0446ce14f90835e7a1606f2ad41d6aca2733e9c4..63133da66718688d7fc39a2570f265f2
 +  emoji_picker_flutter: ^4.4.0
 +  file_picker: ^12.0.0-beta.7
 +  file_selector: ^1.1.0
-+  ffmpeg_kit_flutter_new_audio: ^2.5.2
++  ffmpeg_kit_flutter_new_min: ^2.5.2
++  whisper_ggml: ^2.6.0
 +  flutter:
 +    sdk: flutter
 +  flutter_displaymode: ^0.6.0
