@@ -335764,7 +335764,7 @@ index c5f91c06d177792d0ce11ceefc714b3aecc33ef3..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index 895d894878b16eac39554882b77600a0d73c4443..b1a8418ba99ad4876f592a2829e919d876982335 100644
+index 895d894878b16eac39554882b77600a0d73c4443..3d6cbea9e85c82537543c35f7f1efbe2f9f33558 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
 @@ -1,115 +1,180 @@
@@ -335918,7 +335918,7 @@ index 895d894878b16eac39554882b77600a0d73c4443..b1a8418ba99ad4876f592a2829e919d8
 +      body: ListTileTheme(
 +        iconColor: theme.textTheme.bodyLarge!.color,
 +        child: MaxWidthBody(
-+          child: ListView(
++          child: Column(
 +            children: [
 +              SettingsSwitchListTile.adaptive(
 +                title: L10n.of(context).formattedMessages,
