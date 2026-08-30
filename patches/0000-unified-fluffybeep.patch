@@ -316394,14 +316394,15 @@ index f4142a6..195386c 100644
 +}
 diff --git a/lib/pages/chat_details/chat_details_media_tabs.dart b/lib/pages/chat_details/chat_details_media_tabs.dart
 new file mode 100644
-index 0000000..6290727
+index 0000000..f0ec32c
 --- /dev/null
 +++ b/lib/pages/chat_details/chat_details_media_tabs.dart
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,305 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_files_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_images_tab.dart';
 +import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:url_launcher/url_launcher.dart' as url_launcher;
 +import 'package:fluffychat/pages/chat_search/search_footer.dart';
@@ -316429,6 +316430,12 @@ index 0000000..6290727
 +  bool _filesEndReached = false;
 +  DateTime? _filesSearchedUntil;
 +
++  final List<Event> _audiosEvents = [];
++  String? _audiosNextBatch;
++  bool _audiosLoading = false;
++  bool _audiosEndReached = false;
++  DateTime? _audiosSearchedUntil;
++
 +  final List<Event> _linksEvents = [];
 +  String? _linksNextBatch;
 +  bool _linksLoading = false;
@@ -316438,7 +316445,7 @@ index 0000000..6290727
 +  @override
 +  void initState() {
 +    super.initState();
-+    _tabController = TabController(length: 3, vsync: this);
++    _tabController = TabController(length: 4, vsync: this);
 +    _tabController.addListener(_onTabChanged);
 +    _loadMedia();
 +  }
@@ -316454,7 +316461,9 @@ index 0000000..6290727
 +      _loadMedia();
 +    } else if (_tabController.index == 1 && _filesEvents.isEmpty && !_filesLoading && !_filesEndReached) {
 +      _loadFiles();
-+    } else if (_tabController.index == 2 && _linksEvents.isEmpty && !_linksLoading && !_linksEndReached) {
++    } else if (_tabController.index == 2 && _audiosEvents.isEmpty && !_audiosLoading && !_audiosEndReached) {
++      _loadAudios();
++    } else if (_tabController.index == 3 && _linksEvents.isEmpty && !_linksLoading && !_linksEndReached) {
 +      _loadLinks();
 +    }
 +  }
@@ -316485,7 +316494,15 @@ index 0000000..6290727
 +    setState(() => _filesLoading = true);
 +    try {
 +      final res = await widget.room.searchEvents(
-+        searchFunc: (e) => e.messageType == MessageTypes.File || e.messageType == MessageTypes.Audio,
++        searchFunc: (e) {
++          if (e.messageType != MessageTypes.File) return false;
++          final body = e.body.toLowerCase();
++          return !body.endsWith('.ogg') &&
++              !body.endsWith('.opus') &&
++              !body.endsWith('.mp3') &&
++              !body.endsWith('.m4a') &&
++              !body.endsWith('.wav');
++        },
 +        nextBatch: _filesNextBatch,
 +      );
 +      if (mounted) {
@@ -316498,6 +316515,38 @@ index 0000000..6290727
 +      }
 +    } finally {
 +      if (mounted) setState(() => _filesLoading = false);
++    }
++  }
++
++  Future<void> _loadAudios() async {
++    if (_audiosLoading || _audiosEndReached) return;
++    setState(() => _audiosLoading = true);
++    try {
++      final res = await widget.room.searchEvents(
++        searchFunc: (e) {
++          if (e.messageType == MessageTypes.Audio) return true;
++          if (e.messageType == MessageTypes.File) {
++            final body = e.body.toLowerCase();
++            return body.endsWith('.ogg') ||
++                body.endsWith('.opus') ||
++                body.endsWith('.mp3') ||
++                body.endsWith('.m4a') ||
++                body.endsWith('.wav');
++          }
++          return false;
++        },
++        nextBatch: _audiosNextBatch,
++      );
++      if (mounted) {
++        setState(() {
++          _audiosEvents.addAll(res.events);
++          _audiosNextBatch = res.nextBatch;
++          _audiosEndReached = res.nextBatch == null || res.events.isEmpty;
++          _audiosSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
++        });
++      }
++    } finally {
++      if (mounted) setState(() => _audiosLoading = false);
 +    }
 +  }
 +
@@ -316535,9 +316584,12 @@ index 0000000..6290727
 +          controller: _tabController,
 +          labelColor: Theme.of(context).colorScheme.primary,
 +          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
++          isScrollable: true,
++          tabAlignment: TabAlignment.start,
 +          tabs: [
 +            Tab(text: L10n.of(context).gallery),
 +            Tab(text: L10n.of(context).files),
++            const Tab(text: 'Audios'),
 +            const Tab(text: 'Links'),
 +          ],
 +        ),
@@ -316562,7 +316614,16 @@ index 0000000..6290727
 +                isLoading: _filesLoading,
 +                searchedUntil: _filesSearchedUntil,
 +              ),
++              ChatSearchFilesTab(
++                room: widget.room,
++                events: _audiosEvents,
++                onStartSearch: _loadAudios,
++                endReached: _audiosEndReached,
++                isLoading: _audiosLoading,
++                searchedUntil: _audiosSearchedUntil,
++              ),
 +              _LinksTab(
++                room: widget.room,
 +                events: _linksEvents,
 +                onStartSearch: _loadLinks,
 +                endReached: _linksEndReached,
@@ -316578,12 +316639,14 @@ index 0000000..6290727
 +}
 +
 +class _LinksTab extends StatelessWidget {
++  final Room room;
 +  final List<Event> events;
 +  final void Function() onStartSearch;
 +  final bool endReached, isLoading;
 +  final DateTime? searchedUntil;
 +
 +  const _LinksTab({
++    required this.room,
 +    required this.events,
 +    required this.onStartSearch,
 +    required this.endReached,
@@ -316626,6 +316689,13 @@ index 0000000..6290727
 +            body.replaceAll(urlStr, '').trim(),
 +            maxLines: 1,
 +            overflow: TextOverflow.ellipsis,
++          ),
++          trailing: IconButton(
++            icon: const Icon(Icons.forum_outlined),
++            tooltip: 'Ir al mensaje',
++            onPressed: () => context.go(
++              '/rooms/${room.id}?event=${event.eventId}',
++            ),
 +          ),
 +          onTap: () => url_launcher.launchUrl(Uri.parse(urlStr)),
 +        );
@@ -320737,10 +320807,10 @@ index 55d1d7e..3dd37de 100644
        ),
      );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
-index 0db2f74..1f1b5b8 100644
+index 0db2f74..8f52750 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
 +++ b/lib/pages/chat_list/chat_list_view.dart
-@@ -1,114 +1,129 @@
+@@ -1,114 +1,141 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -320867,6 +320937,7 @@ index 0db2f74..1f1b5b8 100644
 +import 'package:fluffychat/pages/chat_list/navigation_rail.dart';
 +import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
 +import 'package:fluffychat/pages/chat_list/search_chat_fab.dart';
++import 'package:fluffychat/pages/chat_list/client_chooser_button.dart';
 +import 'package:flutter/material.dart';
 +
 +import 'chat_list_body.dart';
@@ -320926,52 +320997,63 @@ index 0db2f74..1f1b5b8 100644
 +              excludeFromSemantics: true,
 +              behavior: HitTestBehavior.translucent,
 +              child: Scaffold(
-+                backgroundColor: oneColumnSpacesMode
-+                    ? Theme.of(context).colorScheme.surfaceContainer
-+                    : null,
-+                body: SafeArea(
-+                  top: oneColumnSpacesMode,
-+                  bottom: false,
-+                  left: false,
-+                  right: false,
-+                  child: Material(
-+                    clipBehavior: oneColumnSpacesMode
-+                        ? Clip.hardEdge
-+                        : Clip.none,
-+                    borderRadius: oneColumnSpacesMode
-+                        ? BorderRadius.only(
-+                            topLeft: Radius.circular(AppConfig.borderRadius),
-+                          )
-+                        : null,
-+                    color: oneColumnSpacesMode
-+                        ? Theme.of(context).colorScheme.surface
-+                        : null,
-+                    child: ChatListViewBody(controller),
-+                  ),
++              body: SafeArea(
++                top: oneColumnSpacesMode,
++                bottom: false,
++                left: false,
++                right: false,
++                child: Material(
++                  clipBehavior: oneColumnSpacesMode
++                      ? Clip.hardEdge
++                      : Clip.none,
++                  borderRadius: oneColumnSpacesMode
++                      ? BorderRadius.only(
++                          topLeft: Radius.circular(AppConfig.borderRadius),
++                        )
++                      : null,
++                  color: oneColumnSpacesMode
++                      ? Theme.of(context).colorScheme.surface
++                      : null,
++                  child: ChatListViewBody(controller),
 +                ),
-+                floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-+                floatingActionButton: controller.activeSpaceId == null && !FluffyThemes.isColumnMode(context)
-+                    ? Padding(
-+                        padding: const EdgeInsets.symmetric(horizontal: 16),
-+                        child: Row(
-+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-+                          children: [
-+                            if (AppSettings.searchStyle.value == 'bottom_fab')
-+                              SearchChatFab(
-+                                controller: controller,
-+                                extended: false,
-+                              )
-+                            else
-+                              const SizedBox.shrink(),
-+                            if (!controller.isSearchMode)
-+                              ValueListenableBuilder(
-+                                valueListenable: controller.scrolledToTop,
-+                                builder: (context, scrolledToTop, _) => StartChatFab(
-+                                  extended: scrolledToTop && !AppSettings.displayNavigationRail.value,
++              ),
++              floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
++              floatingActionButton: controller.activeSpaceId == null && !FluffyThemes.isColumnMode(context)
++                  ? Padding(
++                      padding: const EdgeInsets.symmetric(horizontal: 16),
++                      child: Row(
++                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                        crossAxisAlignment: CrossAxisAlignment.end,
++                        children: [
++                          if (AppSettings.searchStyle.value == 'bottom_fab' && !controller.isSearchMode)
++                            FloatingActionButton.small(
++                              heroTag: 'profile_avatar_fab',
++                              elevation: 3,
++                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
++                              child: ClientChooserButton(controller),
++                              onPressed: null,
++                            )
++                          else
++                            const SizedBox.shrink(),
++                          Row(
++                            mainAxisSize: MainAxisSize.min,
++                            crossAxisAlignment: CrossAxisAlignment.end,
++                            children: [
++                              if (!controller.isSearchMode)
++                                ValueListenableBuilder(
++                                  valueListenable: controller.scrolledToTop,
++                                  builder: (context, scrolledToTop, _) => StartChatFab(
++                                    extended: scrolledToTop && !AppSettings.displayNavigationRail.value,
++                                  ),
 +                                ),
-+                              )
-+                            else
-+                              const SizedBox.shrink(),
++                              if (AppSettings.searchStyle.value == 'bottom_fab') ...[
++                                if (!controller.isSearchMode) const SizedBox(width: 12),
++                                SearchChatFab(
++                                  controller: controller,
++                                  extended: false,
++                                ),
++                              ],
++                            ),
 +                          ],
 +                        ),
 +                      )
@@ -324608,10 +324690,10 @@ index 5631170..ce15729 100644
 +  }
 +}
 diff --git a/lib/pages/chat_search/chat_search_files_tab.dart b/lib/pages/chat_search/chat_search_files_tab.dart
-index e0bc810..02dc665 100644
+index e0bc810..a883701 100644
 --- a/lib/pages/chat_search/chat_search_files_tab.dart
 +++ b/lib/pages/chat_search/chat_search_files_tab.dart
-@@ -1,112 +1,112 @@
+@@ -1,112 +1,120 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -324735,6 +324817,7 @@ index e0bc810..02dc665 100644
 +import 'package:fluffychat/utils/date_time_extension.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 +import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart';
 +
 +class ChatSearchFilesTab extends StatelessWidget {
@@ -324825,6 +324908,13 @@ index e0bc810..02dc665 100644
 +                      overflow: TextOverflow.ellipsis,
 +                    ),
 +                    subtitle: Text('$sizeString | $filetype'),
++                    trailing: IconButton(
++                      icon: const Icon(Icons.forum_outlined),
++                      tooltip: 'Ir al mensaje',
++                      onPressed: () => context.go(
++                        '/rooms/${room.id}?event=${event.eventId}',
++                      ),
++                    ),
 +                    onTap: () => event.saveFile(context),
 +                  ),
 +                ),
@@ -324837,10 +324927,10 @@ index e0bc810..02dc665 100644
 +  }
 +}
 diff --git a/lib/pages/chat_search/chat_search_images_tab.dart b/lib/pages/chat_search/chat_search_images_tab.dart
-index ff8ed41..a156391 100644
+index ff8ed41..8a53bfd 100644
 --- a/lib/pages/chat_search/chat_search_images_tab.dart
 +++ b/lib/pages/chat_search/chat_search_images_tab.dart
-@@ -1,129 +1,129 @@
+@@ -1,129 +1,133 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -325075,7 +325165,11 @@ index ff8ed41..a156391 100644
 +                return InkWell(
 +                  onTap: () => showDialog(
 +                    context: context,
-+                    builder: (_) => ImageViewer(event, outerContext: context),
++                    builder: (_) => ImageViewer(
++                      event,
++                      outerContext: context,
++                      events: events,
++                    ),
 +                  ),
 +                  borderRadius: borderRadius,
 +                  child: Material(
@@ -328957,7 +329051,7 @@ index 9b83db8..8673ab1 100644
 +  return offsets;
 +}
 diff --git a/lib/pages/image_viewer/image_viewer.dart b/lib/pages/image_viewer/image_viewer.dart
-index 5ac09c7..ef35c15 100644
+index 5ac09c7..df2e77b 100644
 --- a/lib/pages/image_viewer/image_viewer.dart
 +++ b/lib/pages/image_viewer/image_viewer.dart
 @@ -1,134 +1,134 @@
@@ -329114,12 +329208,14 @@ index 5ac09c7..ef35c15 100644
 +class ImageViewer extends StatefulWidget {
 +  final Event event;
 +  final Timeline? timeline;
++  final List<Event>? events;
 +  final BuildContext outerContext;
 +
 +  const ImageViewer(
 +    this.event, {
 +    required this.outerContext,
 +    this.timeline,
++    this.events,
 +    super.key,
 +  });
 +
@@ -329133,7 +329229,7 @@ index 5ac09c7..ef35c15 100644
 +  @override
 +  void initState() {
 +    super.initState();
-+    allEvents =
++    allEvents = widget.events ??
 +        widget.timeline?.events
 +            .where(
 +              (event) => {
@@ -329142,8 +329238,6 @@ index 5ac09c7..ef35c15 100644
 +                if (PlatformInfos.supportsVideoPlayer) MessageTypes.Video,
 +              }.contains(event.messageType),
 +            )
-+            .toList()
-+            .reversed
 +            .toList() ??
 +        [widget.event];
 +    var index = allEvents.indexWhere(
@@ -329230,10 +329324,39 @@ index 5ac09c7..ef35c15 100644
 +  Widget build(BuildContext context) => ImageViewerView(this);
 +}
 diff --git a/lib/pages/image_viewer/image_viewer_view.dart b/lib/pages/image_viewer/image_viewer_view.dart
-index defc9a4..9172332 100644
+index defc9a4..6f474f2 100644
 --- a/lib/pages/image_viewer/image_viewer_view.dart
 +++ b/lib/pages/image_viewer/image_viewer_view.dart
-@@ -111,6 +111,8 @@ class ImageViewerView extends StatelessWidget {
+@@ -9,6 +9,7 @@ import 'package:fluffychat/utils/platform_infos.dart';
+ import 'package:fluffychat/widgets/hover_builder.dart';
+ import 'package:fluffychat/widgets/mxc_image.dart';
+ import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+ import 'image_viewer.dart';
+@@ -40,6 +41,20 @@ class ImageViewerView extends StatelessWidget {
+           ),
+           backgroundColor: Colors.transparent,
+           actions: [
++            IconButton(
++              style: iconButtonStyle,
++              icon: const Icon(Icons.forum_outlined),
++              onPressed: () {
++                final room = controller.currentEvent.room;
++                Navigator.of(context).pop();
++                controller.widget.outerContext.go(
++                  '/rooms/${room.id}?event=${controller.currentEvent.eventId}',
++                );
++              },
++              color: Colors.white,
++              tooltip: 'Ir al mensaje',
++            ),
++            const SizedBox(width: 8),
+             IconButton(
+               style: iconButtonStyle,
+               icon: const Icon(Icons.reply_outlined),
+@@ -111,6 +126,8 @@ class ImageViewerView extends StatelessWidget {
                                  onTap: () {},
                                  child: MxcImage(
                                    key: ValueKey(event.eventId),
@@ -336752,10 +336875,10 @@ index c5f91c0..bf1edc3 100644
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index 895d894..3d6cbea 100644
+index 895d894..cad0928 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,115 +1,180 @@
+@@ -1,115 +1,193 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -336942,6 +337065,19 @@ index 895d894..3d6cbea 100644
 +              SettingsSwitchListTile.adaptive(
 +                title: L10n.of(context).showThumbnailsInTimeline,
 +                setting: AppSettings.showThumbnailsInTimeline,
++              ),
++              ValueListenableBuilder<String>(
++                valueListenable: AppSettings.searchStyle,
++                builder: (context, value, _) => SwitchListTile.adaptive(
++                  title: const Text('Búsqueda flotante (Bottom FAB)'),
++                  subtitle: const Text(
++                    'Muestra la barra de búsqueda y opciones de perfil como botones flotantes en la parte inferior',
++                  ),
++                  value: value == 'bottom_fab',
++                  onChanged: (enabled) {
++                    AppSettings.searchStyle.value = enabled ? 'bottom_fab' : 'top_bar';
++                  },
++                ),
 +              ),
 +              Divider(color: theme.dividerColor),
 +              ListTile(
@@ -355736,10 +355872,10 @@ index 13c71ba..84f054c 100644
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000..9c0e975
+index 0000000..4e3b20f
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,248 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -355816,37 +355952,21 @@ index 0000000..9c0e975
 +
 +  /// Obtiene o descarga el archivo de audio local correspondiente al evento Matrix.
 +  Future<File> getAudioFileForEvent(Event event) async {
-+    final attachmentUrl = event.attachmentOrThumbnailMxcUrl();
 +    final tempDir = await getTemporaryDirectory();
-+    final filePrefix = attachmentUrl != null
-+        ? Uri.encodeComponent(attachmentUrl.pathSegments.last)
-+        : event.eventId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
++    final safeId = event.eventId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
++    final rawAudioPath = '${tempDir.path}/audio_$safeId.raw';
++    final rawAudioFile = File(rawAudioPath);
 +
-+    try {
-+      final existingFiles = tempDir.listSync().whereType<File>().where((f) {
-+        final name = f.uri.pathSegments.last;
-+        return name.contains(filePrefix) &&
-+            !name.endsWith('.16k.wav') &&
-+            (name.endsWith('.ogg') ||
-+                name.endsWith('.opus') ||
-+                name.endsWith('.mp3') ||
-+                name.endsWith('.m4a') ||
-+                name.endsWith('.wav') ||
-+                name.endsWith('.caf'));
-+      }).toList();
-+
-+      if (existingFiles.isNotEmpty &&
-+          existingFiles.first.existsSync() &&
-+          existingFiles.first.lengthSync() > 0) {
-+        return existingFiles.first;
-+      }
-+    } catch (_) {}
++    if (await rawAudioFile.exists() && await rawAudioFile.length() > 0) {
++      return rawAudioFile;
++    }
 +
 +    final matrixFile = await event.downloadAndDecryptAttachment();
-+    final fileName = '${filePrefix}_${matrixFile.name}';
-+    final file = File('${tempDir.path}/$fileName');
-+    await file.writeAsBytes(matrixFile.bytes);
-+    return file;
++    if (matrixFile.bytes.isEmpty) {
++      throw 'El archivo de audio descargado está vacío';
++    }
++    await rawAudioFile.writeAsBytes(matrixFile.bytes);
++    return rawAudioFile;
 +  }
 +
 +  /// Convierte el audio a formato WAV 16kHz mono para procesamiento óptimo con Whisper.
@@ -355885,13 +356005,10 @@ index 0000000..9c0e975
 +          null,
 +        );
 +        Logs().d('FFmpeg output: $logs');
-+        
-+        // Fallback: Si FFmpeg falla, a veces Whisper puede leer el original (depende del build)
-+        Logs().w('Usando archivo original como fallback: ${sourceAudio.path}');
-+        return sourceAudio.path;
++        throw 'FFmpeg falló al procesar el formato de audio (código: $returnCode)';
 +      } catch (e) {
 +        Logs().e('Error al convertir audio a WAV 16k: $e', null, null);
-+        return sourceAudio.path; // Fallback en caso de error
++        rethrow;
 +      }
 +    }
 +
@@ -355958,33 +356075,46 @@ index 0000000..9c0e975
 +      'Iniciando transcripción. Modelo: $modelName, Lang: $lang, '
 +      'Audio: $wavPath',
 +    );
-+    final result = await _whisperController.transcribe(
-+      model: selectedModel,
-+      audioPath: wavPath,
-+      lang: lang,
-+      initialPrompt: prompt.isNotEmpty ? prompt : null,
-+      onProgress: (percent) {
-+        if (onProgress != null) {
-+          onProgress(percent.toDouble() / 100.0);
-+        }
-+      },
-+    );
++    
++    dynamic result;
++    try {
++      result = await _whisperController.transcribe(
++        model: selectedModel,
++        audioPath: wavPath,
++        lang: lang,
++        initialPrompt: prompt.isNotEmpty ? prompt : null,
++        onProgress: (percent) {
++          if (onProgress != null) {
++            onProgress(percent.toDouble() / 100.0);
++          }
++        },
++      );
++    } catch (e, s) {
++      Logs().e('Error al ejecutar Whisper', e, s);
++      throw 'Error en motor Whisper: $e';
++    }
 +
-+    final rawText = result?.transcription.text ?? '';
++    if (result == null) {
++      throw 'Whisper no pudo inicializar o descargar el modelo $modelName';
++    }
++
++    final rawText = result.transcription.text ?? '';
 +    Logs().d('Whisper resultado bruto: "$rawText"');
 +    final text = _filterWhisperNoise(rawText);
-+    if (text.isEmpty) {
++    
++    final finalText = text.isNotEmpty ? text : (rawText.trim().isNotEmpty ? rawText.trim() : '');
++    if (finalText.isEmpty) {
 +      Logs().w(
 +        'Transcripción vacía. Texto bruto fue: "$rawText". '
 +        'Audio: $wavPath',
 +      );
-+      throw 'No se detectó texto en el audio';
++      throw 'No se detectó voz clara en el audio';
 +    }
 +
 +    // 6. Persistir resultado
-+    await saveTranscription(event.eventId, text);
++    await saveTranscription(event.eventId, finalText);
 +
-+    return text;
++    return finalText;
 +  }
 +
 +  /// Libera el modelo de la memoria RAM si es necesario
