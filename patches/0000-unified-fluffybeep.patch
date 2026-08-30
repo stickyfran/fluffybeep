@@ -303233,7 +303233,7 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..7712581 100644
+index 7470749..bd79859 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303822,7 +303822,17 @@ index 7470749..7712581 100644
      super.dispose();
    }
  
-@@ -671,12 +905,23 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -666,17 +900,33 @@ class ChatController extends State<ChatPageWithRoom>
+       parseCommands: parseCommands,
+       threadRootEventId: activeThreadId,
+     );
++
++    if (PlatformInfos.isMobile) {
++      final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++      FlutterLocalNotificationsPlugin().cancel(notifId);
++    }
+     sendController.value = TextEditingValue(
+       text: pendingText,
        selection: const TextSelection.collapsed(offset: 0),
      );
  
@@ -303852,7 +303862,7 @@ index 7470749..7712581 100644
      });
    }
  
-@@ -839,60 +1084,96 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -839,60 +1089,100 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -303949,6 +303959,10 @@ index 7470749..7712581 100644
 -      return;
 +
 +      try {
++        if (PlatformInfos.isMobile) {
++          final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++          FlutterLocalNotificationsPlugin().cancel(notifId);
++        }
 +        await room.sendFileEvent(
 +          file,
 +          inReplyTo: replyEvent,
@@ -303995,7 +304009,7 @@ index 7470749..7712581 100644
    }
  
    void emojiPickerAction() {
-@@ -901,12 +1182,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -901,12 +1191,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304010,7 +304024,7 @@ index 7470749..7712581 100644
      }
    }
  
-@@ -938,10 +1219,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -938,10 +1228,8 @@ class ChatController extends State<ChatPageWithRoom>
  
    void copyEventsAction() {
      Clipboard.setData(ClipboardData(text: _getSelectedEventString()));
@@ -304023,7 +304037,7 @@ index 7470749..7712581 100644
    }
  
    Future<void> reportEventAction() async {
-@@ -966,10 +1245,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -966,10 +1254,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304036,7 +304050,7 @@ index 7470749..7712581 100644
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -985,7 +1262,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -985,7 +1271,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304045,7 +304059,7 @@ index 7470749..7712581 100644
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1042,10 +1319,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1042,10 +1328,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304058,7 +304072,7 @@ index 7470749..7712581 100644
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1107,7 +1382,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1107,7 +1391,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304067,7 +304081,7 @@ index 7470749..7712581 100644
    }
  
    void sendAgainAction() {
-@@ -1121,14 +1396,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1121,14 +1405,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304085,7 +304099,7 @@ index 7470749..7712581 100644
      inputFocus.requestFocus();
    }
  
-@@ -1225,10 +1498,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1225,10 +1507,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304099,7 +304113,7 @@ index 7470749..7712581 100644
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1257,7 +1530,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1257,7 +1539,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304108,7 +304122,7 @@ index 7470749..7712581 100644
      });
      inputFocus.requestFocus();
    }
-@@ -1323,11 +1596,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1323,11 +1605,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304123,7 +304137,7 @@ index 7470749..7712581 100644
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1426,27 +1699,33 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1426,27 +1708,33 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304172,7 +304186,7 @@ index 7470749..7712581 100644
      }
  
      _storeInputTimeoutTimer?.cancel();
-@@ -1461,9 +1740,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1461,9 +1749,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304183,7 +304197,7 @@ index 7470749..7712581 100644
            return;
          }
        }
-@@ -1490,8 +1767,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1490,8 +1776,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304192,7 +304206,7 @@ index 7470749..7712581 100644
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1546,14 +1821,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1546,14 +1830,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -312465,10 +312479,10 @@ index 975ee1b..3389256 100644
                  : Alignment.topLeft,
              padding: const EdgeInsets.only(
 diff --git a/lib/pages/chat/send_file_dialog.dart b/lib/pages/chat/send_file_dialog.dart
-index 13fee98..6ceed4b 100644
+index 13fee98..45a18bd 100644
 --- a/lib/pages/chat/send_file_dialog.dart
 +++ b/lib/pages/chat/send_file_dialog.dart
-@@ -1,419 +1,425 @@
+@@ -1,419 +1,430 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -312902,6 +312916,7 @@ index 13fee98..6ceed4b 100644
 +import 'package:fluffychat/utils/other_party_can_receive.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:fluffychat/utils/size_string.dart';
++import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/adaptive_dialog_action.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/dialog_text_field.dart';
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -312999,6 +313014,10 @@ index 13fee98..6ceed4b 100644
 +        final label = _labelTextController.text.trim();
 +
 +        try {
++          if (PlatformInfos.isMobile) {
++            final notifId = '${widget.room.client.clientName}_${widget.room.id}'.hashCode;
++            FlutterLocalNotificationsPlugin().cancel(notifId);
++          }
 +          await widget.room.sendFileEvent(
 +            file,
 +            thumbnail: thumbnail,
@@ -313314,10 +313333,10 @@ index 13fee98..6ceed4b 100644
 +  }
 +}
 diff --git a/lib/pages/chat/send_location_dialog.dart b/lib/pages/chat/send_location_dialog.dart
-index ae29235..d5c0b14 100644
+index ae29235..2418e02 100644
 --- a/lib/pages/chat/send_location_dialog.dart
 +++ b/lib/pages/chat/send_location_dialog.dart
-@@ -1,136 +1,136 @@
+@@ -1,136 +1,144 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -313469,6 +313488,8 @@ index ae29235..d5c0b14 100644
 +import 'package:flutter/material.dart';
 +import 'package:geolocator/geolocator.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:flutter_local_notifications/flutter_local_notifications.dart';
++import 'package:fluffychat/utils/platform_infos.dart';
 +
 +class SendLocationDialog extends StatefulWidget {
 +  final Room room;
@@ -313540,7 +313561,13 @@ index ae29235..d5c0b14 100644
 +        'geo:${position!.latitude},${position!.longitude};u=${position!.accuracy}';
 +    await showFutureLoadingDialog(
 +      context: context,
-+      future: () => widget.room.sendLocation(body, uri),
++      future: () async {
++        if (PlatformInfos.isMobile) {
++          final notifId = '${widget.room.client.clientName}_${widget.room.id}'.hashCode;
++          FlutterLocalNotificationsPlugin().cancel(notifId);
++        }
++        await widget.room.sendLocation(body, uri);
++      },
 +    );
 +    if (!mounted) return;
 +    Navigator.of(context, rootNavigator: false).pop();
@@ -345594,7 +345621,7 @@ index 398e13b..6f30258 100644
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47d..b9a8ad7 100644
+index 5ead47d..f650f2a 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
 @@ -1,471 +1,595 @@
@@ -346626,7 +346653,7 @@ index 5ead47d..b9a8ad7 100644
 +        l10n: l10n,
 +        activeRoomId: matrix?.activeRoomId,
 +        flutterLocalNotificationsPlugin: _flutterLocalNotificationsPlugin,
-+        useNotificationActions: false,
++        useNotificationActions: true,
 +      );
 +      await FileLogger.log('[UnifiedPush] Finished pushHelper sync successfully');
 +    } catch (e, s) {
