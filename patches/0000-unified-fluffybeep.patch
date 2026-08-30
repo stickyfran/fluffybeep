@@ -354748,10 +354748,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db78283547cf7d12
+index 0000000000000000000000000000000000000000..718e0a97e98764fcf219cd3fdb5f55e990df5d44
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,248 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -354871,11 +354871,15 @@ index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db782835
 +    final wavPath = '${tempDir.path}/$wavName';
 +    final wavFile = File(wavPath);
 +    if (await wavFile.exists() && await wavFile.length() > 0) {
++      Logs().d('WAV 16k ya existe en caché: $wavPath');
 +      return wavPath;
 +    }
 +
 +    if (!kIsWeb) {
 +      try {
++        Logs().d(
++          'Convirtiendo audio a WAV 16kHz: ${sourceAudio.path} → $wavPath',
++        );
 +        final session = await FFmpegKit.execute(
 +          '-y -i "${sourceAudio.path}" -ar 16000 -ac 1 -c:a pcm_s16le "$wavPath"',
 +        );
@@ -354883,14 +354887,49 @@ index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db782835
 +        if (ReturnCode.isSuccess(returnCode) &&
 +            await wavFile.exists() &&
 +            await wavFile.length() > 0) {
++          Logs().d('Conversión exitosa: $wavPath');
 +          return wavPath;
 +        }
++        final logs = await session.getAllLogsAsString();
++        Logs().e(
++          'FFmpegKit falló al convertir audio. RC=$returnCode',
++          null,
++          null,
++        );
++        Logs().d('FFmpeg output: $logs');
++        throw 'No se pudo convertir el audio a WAV 16kHz. '
++            'Código de retorno FFmpeg: $returnCode';
 +      } catch (e) {
-+        Logs().w('Error al convertir audio a WAV 16k con FFmpegKit: $e');
++        Logs().e('Error al convertir audio a WAV 16k: $e', null, null);
++        rethrow;
 +      }
 +    }
 +
 +    return sourceAudio.path;
++  }
++
++  /// Filtra el texto devuelto por Whisper: remueve tokens de ruido/silencio
++  /// que el modelo produce cuando no detecta voz real.
++  String _filterWhisperNoise(String text) {
++    final trimmed = text.trim();
++    // Tokens que Whisper genera para silencio, ruido, música, etc.
++    final noisePatterns = RegExp(
++      r'^\s*(\[.*?\]|\(.*?\))\s*$',
++      multiLine: false,
++    );
++    // Si el texto completo es un solo token de ruido, está vacío
++    if (noisePatterns.hasMatch(trimmed)) return '';
++    // Si el texto solo contiene estos tokens repetidos, también descartarlo
++    final cleaned = trimmed
++        .replaceAll(RegExp(r'\[BLANK_AUDIO\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[música\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[music\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[silencio\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[silence\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[ruido\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\[noise\]', caseSensitive: false), '')
++        .trim();
++    return cleaned;
 +  }
 +
 +  /// Transcribe un mensaje de audio utilizando Whisper GGML on-device.
@@ -354921,6 +354960,10 @@ index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db782835
 +    if (modelName == 'medium') selectedModel = WhisperModel.medium;
 +
 +    // 5. Ejecutar inferencia de Whisper on-device
++    Logs().d(
++      'Iniciando transcripción. Modelo: $modelName, Lang: $lang, '
++      'Audio: $wavPath',
++    );
 +    final result = await _whisperController.transcribe(
 +      model: selectedModel,
 +      audioPath: wavPath,
@@ -354933,8 +354976,14 @@ index 0000000000000000000000000000000000000000..1aed6cefeb1a68328bbc0437db782835
 +      },
 +    );
 +
-+    final text = result?.transcription.text.trim();
-+    if (text == null || text.isEmpty) {
++    final rawText = result?.transcription.text ?? '';
++    Logs().d('Whisper resultado bruto: "$rawText"');
++    final text = _filterWhisperNoise(rawText);
++    if (text.isEmpty) {
++      Logs().w(
++        'Transcripción vacía. Texto bruto fue: "$rawText". '
++        'Audio: $wavPath',
++      );
 +      throw 'No se detectó texto en el audio';
 +    }
 +
