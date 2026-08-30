@@ -303233,7 +303233,7 @@ index 91939e9..9af3f36 100644
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index 7470749..bd79859 100644
+index 7470749..ba0a64f 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303829,7 +303829,7 @@ index 7470749..bd79859 100644
 +
 +    if (PlatformInfos.isMobile) {
 +      final notifId = '${room.client.clientName}_${room.id}'.hashCode;
-+      FlutterLocalNotificationsPlugin().cancel(notifId);
++      FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +    }
      sendController.value = TextEditingValue(
        text: pendingText,
@@ -303961,7 +303961,7 @@ index 7470749..bd79859 100644
 +      try {
 +        if (PlatformInfos.isMobile) {
 +          final notifId = '${room.client.clientName}_${room.id}'.hashCode;
-+          FlutterLocalNotificationsPlugin().cancel(notifId);
++          FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +        }
 +        await room.sendFileEvent(
 +          file,
@@ -312479,7 +312479,7 @@ index 975ee1b..3389256 100644
                  : Alignment.topLeft,
              padding: const EdgeInsets.only(
 diff --git a/lib/pages/chat/send_file_dialog.dart b/lib/pages/chat/send_file_dialog.dart
-index 13fee98..45a18bd 100644
+index 13fee98..31e8c89 100644
 --- a/lib/pages/chat/send_file_dialog.dart
 +++ b/lib/pages/chat/send_file_dialog.dart
 @@ -1,419 +1,430 @@
@@ -313016,7 +313016,7 @@ index 13fee98..45a18bd 100644
 +        try {
 +          if (PlatformInfos.isMobile) {
 +            final notifId = '${widget.room.client.clientName}_${widget.room.id}'.hashCode;
-+            FlutterLocalNotificationsPlugin().cancel(notifId);
++            FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +          }
 +          await widget.room.sendFileEvent(
 +            file,
@@ -313333,7 +313333,7 @@ index 13fee98..45a18bd 100644
 +  }
 +}
 diff --git a/lib/pages/chat/send_location_dialog.dart b/lib/pages/chat/send_location_dialog.dart
-index ae29235..2418e02 100644
+index ae29235..ae79e6c 100644
 --- a/lib/pages/chat/send_location_dialog.dart
 +++ b/lib/pages/chat/send_location_dialog.dart
 @@ -1,136 +1,144 @@
@@ -313564,7 +313564,7 @@ index ae29235..2418e02 100644
 +      future: () async {
 +        if (PlatformInfos.isMobile) {
 +          final notifId = '${widget.room.client.clientName}_${widget.room.id}'.hashCode;
-+          FlutterLocalNotificationsPlugin().cancel(notifId);
++          FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +        }
 +        await widget.room.sendLocation(body, uri);
 +      },
@@ -352308,10 +352308,10 @@ index d21dc9a..6a431ce 100644
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc..c5ac176 100644
+index f056efc..2826aed 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,277 @@
+@@ -1,210 +1,278 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352541,6 +352541,7 @@ index f056efc..c5ac176 100644
 +import 'package:matrix/matrix.dart';
 +import 'package:url_launcher/url_launcher.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/platform_infos.dart';
 +
 +import '../config/app_config.dart';
 +import '../config/setting_keys.dart';
@@ -352760,7 +352761,7 @@ index f056efc..c5ac176 100644
 +
 +          if (PlatformInfos.isMobile) {
 +            final notifId = '${room.client.clientName}_${room.id}'.hashCode;
-+            await FlutterLocalNotificationsPlugin().cancel(notifId);
++            await FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +          }
 +        case FluffyChatNotificationActions.mute:
 +          await room.setPushRuleState(PushRuleState.mentionsOnly);
