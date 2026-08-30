@@ -316634,7 +316634,7 @@ index 0000000..6290727
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index 4cda41c..4b65b0d 100644
+index 4cda41c..3faaebc 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
@@ -316750,7 +316750,7 @@ index 4cda41c..4b65b0d 100644
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -90,262 +124,263 @@ class ChatDetailsView extends StatelessWidget {
+@@ -90,262 +124,275 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -317089,7 +317089,17 @@ index 4cda41c..4b65b0d 100644
 +                                      icon: const Icon(Icons.edit_outlined),
 +                                    )
 +                                  : null,
-+                        ),
+                         ),
+-                        if (!room.isDirectChat && room.canInvite)
+-                          ListTile(
+-                            title: Text(L10n.of(context).inviteContact),
+-                            leading: CircleAvatar(
+-                              backgroundColor:
+-                                  theme.colorScheme.primaryContainer,
+-                              foregroundColor:
+-                                  theme.colorScheme.onPrimaryContainer,
+-                              radius: Avatar.defaultSize / 2,
+-                              child: const Icon(Icons.add_outlined),
 +                        Padding(
 +                          padding: const EdgeInsets.symmetric(
 +                            horizontal: 16.0,
@@ -317114,47 +317124,14 @@ index 4cda41c..4b65b0d 100644
 +                              color: theme.textTheme.bodyMedium!.color,
 +                              decorationColor:
 +                                  theme.textTheme.bodyMedium!.color,
-+                            ),
+                             ),
+-                            trailing: const Icon(Icons.chevron_right_outlined),
+-                            onTap: () => context.go('/rooms/${room.id}/invite'),
 +                            onOpen: (url) =>
 +                                UrlLauncher(context, url.url).launchUrl(),
-+                          ),
+                           ),
 +                        ),
 +                        const SizedBox(height: 16),
-+                      ],
-+                      if (!room.isDirectChat) ...[
-+                        Divider(color: theme.dividerColor),
-+                        ListTile(
-+                          onTap: () => context.push(
-+                            '/rooms/${controller.roomId!}/details/access',
-+                          ),
-+                          title: Text(L10n.of(context).accessAndVisibility),
-+                          trailing: const Icon(Icons.chevron_right_outlined),
-+                        ),
-+                        ListTile(
-+                          onTap: () => context.push(
-+                            '/rooms/${controller.roomId!}/details/permissions',
-+                          ),
-+                          title: Text(L10n.of(context).chatPermissions),
-+                          trailing: const Icon(Icons.chevron_right_outlined),
-                         ),
--                        if (!room.isDirectChat && room.canInvite)
-+                        if (room.client.canChangeEmotes)
-                           ListTile(
--                            title: Text(L10n.of(context).inviteContact),
--                            leading: CircleAvatar(
--                              backgroundColor:
--                                  theme.colorScheme.primaryContainer,
--                              foregroundColor:
--                                  theme.colorScheme.onPrimaryContainer,
--                              radius: Avatar.defaultSize / 2,
--                              child: const Icon(Icons.add_outlined),
-+                            onTap: () => context.push(
-+                              '/rooms/${controller.roomId!}/details/emotes',
-                             ),
-+                            title: Text(L10n.of(context).emotes),
-                             trailing: const Icon(Icons.chevron_right_outlined),
--                            onTap: () => context.go('/rooms/${room.id}/invite'),
-                           ),
                        ],
 -                    )
 -                  : i < members.length + 1
@@ -317163,6 +317140,49 @@ index 4cda41c..4b65b0d 100644
 -                      title: Text(
 -                        L10n.of(context).loadCountMoreParticipants(
 -                          (actualMembersCount - members.length),
++                      if (!room.isDirectChat) ...[
++                        Divider(color: theme.dividerColor),
++                        ListTile(
++                          leading: CircleAvatar(
++                            backgroundColor:
++                                theme.colorScheme.surfaceContainer,
++                            foregroundColor: iconColor,
++                            child: const Icon(
++                              Icons.admin_panel_settings_outlined,
++                            ),
++                          ),
++                          title: Text(L10n.of(context).accessAndVisibility),
++                          subtitle: Text(
++                            L10n.of(context).accessAndVisibilityDescription,
++                          ),
++                          onTap: () => context.push(
++                            '/rooms/${room.id}/details/access',
++                          ),
++                          trailing: const Icon(Icons.chevron_right_outlined),
+                         ),
+-                      ),
+-                      leading: CircleAvatar(
+-                        backgroundColor: theme.scaffoldBackgroundColor,
+-                        child: const Icon(
+-                          Icons.group_outlined,
+-                          color: Colors.grey,
++                        ListTile(
++                          title: Text(L10n.of(context).chatPermissions),
++                          subtitle: Text(
++                            L10n.of(context).whoCanPerformWhichAction,
++                          ),
++                          leading: CircleAvatar(
++                            backgroundColor:
++                                theme.colorScheme.surfaceContainer,
++                            foregroundColor: iconColor,
++                            child: const Icon(Icons.tune_outlined),
++                          ),
++                          trailing: const Icon(Icons.chevron_right_outlined),
++                          onTap: () => context.push(
++                            '/rooms/${room.id}/details/permissions',
++                          ),
++                        ),
++                      ],
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -317175,11 +317195,10 @@ index 4cda41c..4b65b0d 100644
 +                          ),
                          ),
                        ),
--                      leading: CircleAvatar(
--                        backgroundColor: theme.scaffoldBackgroundColor,
--                        child: const Icon(
--                          Icons.group_outlined,
--                          color: Colors.grey,
+-                      onTap: () => context.push(
+-                        '/rooms/${controller.roomId!}/details/members',
+-                      ),
+-                      trailing: const Icon(Icons.chevron_right_outlined),
 +                      if (!room.isDirectChat && room.canInvite)
 +                        ListTile(
 +                          title: Text(L10n.of(context).inviteContact),
@@ -317193,12 +317212,7 @@ index 4cda41c..4b65b0d 100644
 +                          ),
 +                          trailing: const Icon(Icons.chevron_right_outlined),
 +                          onTap: () => context.go('/rooms/${room.id}/invite'),
-                         ),
--                      ),
--                      onTap: () => context.push(
--                        '/rooms/${controller.roomId!}/details/members',
--                      ),
--                      trailing: const Icon(Icons.chevron_right_outlined),
++                        ),
 +                    ],
 +                  );
 +                }
