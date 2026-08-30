@@ -316394,10 +316394,10 @@ index f4142a6..195386c 100644
 +}
 diff --git a/lib/pages/chat_details/chat_details_media_tabs.dart b/lib/pages/chat_details/chat_details_media_tabs.dart
 new file mode 100644
-index 0000000..f44623f
+index 0000000..6290727
 --- /dev/null
 +++ b/lib/pages/chat_details/chat_details_media_tabs.dart
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,235 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_files_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_images_tab.dart';
@@ -316469,12 +316469,10 @@ index 0000000..f44623f
 +      );
 +      if (mounted) {
 +        setState(() {
-+          _mediaEvents.addAll(res.results);
++          _mediaEvents.addAll(res.events);
 +          _mediaNextBatch = res.nextBatch;
-+          _mediaEndReached = res.nextBatch == null || res.results.isEmpty;
-+          if (res.results.isNotEmpty) {
-+            _mediaSearchedUntil = res.results.last.originServerTs;
-+          }
++          _mediaEndReached = res.nextBatch == null || res.events.isEmpty;
++          _mediaSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
 +        });
 +      }
 +    } finally {
@@ -316492,12 +316490,10 @@ index 0000000..f44623f
 +      );
 +      if (mounted) {
 +        setState(() {
-+          _filesEvents.addAll(res.results);
++          _filesEvents.addAll(res.events);
 +          _filesNextBatch = res.nextBatch;
-+          _filesEndReached = res.nextBatch == null || res.results.isEmpty;
-+          if (res.results.isNotEmpty) {
-+            _filesSearchedUntil = res.results.last.originServerTs;
-+          }
++          _filesEndReached = res.nextBatch == null || res.events.isEmpty;
++          _filesSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
 +        });
 +      }
 +    } finally {
@@ -316519,12 +316515,10 @@ index 0000000..f44623f
 +      );
 +      if (mounted) {
 +        setState(() {
-+          _linksEvents.addAll(res.results);
++          _linksEvents.addAll(res.events);
 +          _linksNextBatch = res.nextBatch;
-+          _linksEndReached = res.nextBatch == null || res.results.isEmpty;
-+          if (res.results.isNotEmpty) {
-+            _linksSearchedUntil = res.results.last.originServerTs;
-+          }
++          _linksEndReached = res.nextBatch == null || res.events.isEmpty;
++          _linksSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
 +        });
 +      }
 +    } finally {
@@ -316542,8 +316536,8 @@ index 0000000..f44623f
 +          labelColor: Theme.of(context).colorScheme.primary,
 +          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
 +          tabs: [
-+            Tab(text: L10n.of(context).chatSearchImagesTab),
-+            Tab(text: L10n.of(context).chatSearchFilesTab),
++            Tab(text: L10n.of(context).gallery),
++            Tab(text: L10n.of(context).files),
 +            const Tab(text: 'Links'),
 +          ],
 +        ),
