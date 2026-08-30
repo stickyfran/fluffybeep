@@ -355869,10 +355869,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..45b528b6790153266569b47d03f16b4a226952b8
+index 0000000000000000000000000000000000000000..b483f31c729d52a24a3ce64619d8391a12302234
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,321 @@
+@@ -0,0 +1,327 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -356070,7 +356070,8 @@ index 0000000000000000000000000000000000000000..45b528b6790153266569b47d03f16b4a
 +      }
 +      await sink.flush();
 +      await sink.close();
-+      Logs().d('Modelo $modelName descargado exitosamente');
++      final len = await modelFile.length();
++      Logs().d('Modelo $modelName descargado exitosamente. Tamaño: ${(len / (1024 * 1024)).toStringAsFixed(2)} MB');
 +    } catch (e) {
 +      if (await modelFile.exists()) {
 +        await modelFile.delete();
@@ -356148,17 +356149,22 @@ index 0000000000000000000000000000000000000000..45b528b6790153266569b47d03f16b4a
 +    
 +    dynamic result;
 +    try {
++      final startTime = DateTime.now();
++      Logs().d('Ejecutando _whisperController.transcribe...');
 +      result = await _whisperController.transcribe(
 +        model: selectedModel,
 +        audioPath: wavPath,
 +        lang: lang,
 +        initialPrompt: prompt.isNotEmpty ? prompt : null,
 +        onProgress: (percent) {
++          Logs().v('Whisper progreso: $percent%');
 +          if (onProgress != null) {
 +            onProgress(percent.toDouble() / 100.0);
 +          }
 +        },
 +      );
++      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
++      Logs().d('Transcripción completada en ${elapsed}ms. Result: ${result != null}');
 +    } catch (e, s) {
 +      Logs().e('Error al ejecutar Whisper', e, s);
 +      throw 'Error en motor Whisper: $e';
@@ -366511,10 +366517,10 @@ index f773b6f98fdae014dc2023439368ac118422087a..6b8ab8dfcdf6de94dc537a3a7e7702ba
 +  }
 +}
 diff --git a/lib/widgets/share_scaffold_dialog.dart b/lib/widgets/share_scaffold_dialog.dart
-index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a97aff9534 100644
+index 6523d42ac219218f5d126aac16a09a611d102e93..6a609b3f353ae0f6bf18edcc03e981e2ef6163cc 100644
 --- a/lib/widgets/share_scaffold_dialog.dart
 +++ b/lib/widgets/share_scaffold_dialog.dart
-@@ -1,215 +1,214 @@
+@@ -1,215 +1,221 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -366746,6 +366752,7 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a9
 +import 'package:flutter/material.dart';
 +import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +
 +abstract class ShareItem {}
 +
@@ -366824,6 +366831,13 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a9
 +              room.membership == Membership.join,
 +        )
 +        .toList();
++
++    rooms.sort((a, b) {
++      final aTs = BeeperBridgeUtils.getCachedLastTimestamp(a.id) ?? a.lastEvent?.originServerTs.millisecondsSinceEpoch ?? 0;
++      final bTs = BeeperBridgeUtils.getCachedLastTimestamp(b.id) ?? b.lastEvent?.originServerTs.millisecondsSinceEpoch ?? 0;
++      return bTs.compareTo(aTs);
++    });
++
 +    final filter = _filterController.text.trim().toLowerCase();
 +    return Scaffold(
 +      appBar: AppBar(
@@ -366870,9 +366884,8 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a9
 +            itemCount: rooms.length,
 +            itemBuilder: (context, i) {
 +              final room = rooms[i];
-+              final displayname = room.getLocalizedDisplayname(
-+                MatrixLocals(L10n.of(context)),
-+              );
++              final beeperData = BeeperBridgeUtils.getBeeperData(room, MatrixLocals(L10n.of(context)));
++              final displayname = beeperData.name;
 +              final value = selectedRoomId == room.id;
 +              final filterOut = !displayname.toLowerCase().contains(filter);
 +              if (!value && filterOut) {
@@ -366891,7 +366904,7 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..838172c45e09ef896414c90fdf0cc0a9
 +                    ),
 +                  ),
 +                  secondary: Avatar(
-+                    mxContent: room.avatar,
++                    mxContent: beeperData.avatarUrl,
 +                    name: displayname,
 +                    size: Avatar.defaultSize * 0.75,
 +                  ),
