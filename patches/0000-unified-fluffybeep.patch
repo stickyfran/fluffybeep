@@ -366517,10 +366517,10 @@ index f773b6f98fdae014dc2023439368ac118422087a..6b8ab8dfcdf6de94dc537a3a7e7702ba
 +  }
 +}
 diff --git a/lib/widgets/share_scaffold_dialog.dart b/lib/widgets/share_scaffold_dialog.dart
-index 6523d42ac219218f5d126aac16a09a611d102e93..6a609b3f353ae0f6bf18edcc03e981e2ef6163cc 100644
+index 6523d42ac219218f5d126aac16a09a611d102e93..836401debbce6e51de2c1ad83a4c4de4604d6438 100644
 --- a/lib/widgets/share_scaffold_dialog.dart
 +++ b/lib/widgets/share_scaffold_dialog.dart
-@@ -1,215 +1,221 @@
+@@ -1,215 +1,224 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -366884,8 +366884,11 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..6a609b3f353ae0f6bf18edcc03e981e2
 +            itemCount: rooms.length,
 +            itemBuilder: (context, i) {
 +              final room = rooms[i];
-+              final beeperData = BeeperBridgeUtils.getBeeperData(room, MatrixLocals(L10n.of(context)));
-+              final displayname = beeperData.name;
++              final beeperData = BeeperBridgeUtils.getRoomData(room);
++              final displayname = beeperData.displayName ??
++                  room.getLocalizedDisplayname(
++                    MatrixLocals(L10n.of(context)),
++                  );
 +              final value = selectedRoomId == room.id;
 +              final filterOut = !displayname.toLowerCase().contains(filter);
 +              if (!value && filterOut) {
@@ -366904,7 +366907,7 @@ index 6523d42ac219218f5d126aac16a09a611d102e93..6a609b3f353ae0f6bf18edcc03e981e2
 +                    ),
 +                  ),
 +                  secondary: Avatar(
-+                    mxContent: beeperData.avatarUrl,
++                    mxContent: beeperData.avatarUrl ?? room.avatar,
 +                    name: displayname,
 +                    size: Avatar.defaultSize * 0.75,
 +                  ),
