@@ -320807,10 +320807,10 @@ index 55d1d7e..3dd37de 100644
        ),
      );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
-index 0db2f74..8f52750 100644
+index 0db2f74..3badc49 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
 +++ b/lib/pages/chat_list/chat_list_view.dart
-@@ -1,114 +1,141 @@
+@@ -1,114 +1,142 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -321053,10 +321053,11 @@ index 0db2f74..8f52750 100644
 +                                  extended: false,
 +                                ),
 +                              ],
-+                            ),
-+                          ],
-+                        ),
-+                      )
++                            ],
++                          ),
++                        ],
++                      ),
++                    )
 +                    : const SizedBox.shrink(),
 +              ),
 +            ),
@@ -336875,7 +336876,7 @@ index c5f91c0..bf1edc3 100644
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index 895d894..cad0928 100644
+index 895d894..681e91c 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
 @@ -1,115 +1,193 @@
@@ -337066,16 +337067,16 @@ index 895d894..cad0928 100644
 +                title: L10n.of(context).showThumbnailsInTimeline,
 +                setting: AppSettings.showThumbnailsInTimeline,
 +              ),
-+              ValueListenableBuilder<String>(
-+                valueListenable: AppSettings.searchStyle,
-+                builder: (context, value, _) => SwitchListTile.adaptive(
++              StatefulBuilder(
++                builder: (context, setTileState) => SwitchListTile.adaptive(
 +                  title: const Text('Búsqueda flotante (Bottom FAB)'),
 +                  subtitle: const Text(
 +                    'Muestra la barra de búsqueda y opciones de perfil como botones flotantes en la parte inferior',
 +                  ),
-+                  value: value == 'bottom_fab',
-+                  onChanged: (enabled) {
-+                    AppSettings.searchStyle.value = enabled ? 'bottom_fab' : 'top_bar';
++                  value: AppSettings.searchStyle.value == 'bottom_fab',
++                  onChanged: (enabled) async {
++                    await AppSettings.searchStyle.setItem(enabled ? 'bottom_fab' : 'top_bar');
++                    setTileState(() {});
 +                  },
 +                ),
 +              ),
