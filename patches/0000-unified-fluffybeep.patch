@@ -320794,10 +320794,10 @@ index 55d1d7e..3dd37de 100644
        ),
      );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
-index 0db2f74..4c348e3 100644
+index 0db2f74..77e4815 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
 +++ b/lib/pages/chat_list/chat_list_view.dart
-@@ -1,114 +1,145 @@
+@@ -1,114 +1,147 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -321012,13 +321012,15 @@ index 0db2f74..4c348e3 100644
 +                          ? Row(
 +                              crossAxisAlignment: CrossAxisAlignment.end,
 +                              children: [
-+                                ValueListenableBuilder(
-+                                  valueListenable: controller.scrolledToTop,
-+                                  builder: (context, scrolledToTop, _) => StartChatFab(
-+                                    extended: false,
++                                if (!AppSettings.displayNavigationRail.value) ...[
++                                  ValueListenableBuilder(
++                                    valueListenable: controller.scrolledToTop,
++                                    builder: (context, scrolledToTop, _) => StartChatFab(
++                                      extended: false,
++                                    ),
 +                                  ),
-+                                ),
-+                                const SizedBox(width: 8),
++                                  const SizedBox(width: 8),
++                                ],
 +                                Expanded(
 +                                  child: SearchChatFab(
 +                                    controller: controller,
@@ -321926,10 +321928,10 @@ index 7ff17ad..da393b9 100644
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a649171..3c4983f 100644
+index a649171..e7649ee 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
-@@ -3,20 +3,25 @@
+@@ -3,20 +3,26 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -321939,6 +321941,7 @@ index a649171..3c4983f 100644
 +import 'package:shared_preferences/shared_preferences.dart';
 +
  import 'package:fluffychat/config/app_config.dart';
++import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/config/themes.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/navi_rail_item.dart';
@@ -321959,7 +321962,7 @@ index a649171..3c4983f 100644
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,23 +33,496 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,23 +34,496 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -322462,7 +322465,7 @@ index a649171..3c4983f 100644
  
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
-@@ -54,14 +532,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +533,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -322481,7 +322484,7 @@ index a649171..3c4983f 100644
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -71,53 +549,214 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -71,57 +550,218 @@ class SpacesNavigationRail extends StatelessWidget {
                                child: Icon(Icons.forum),
                              ),
                              toolTip: L10n.of(context).chats,
@@ -322730,7 +322733,12 @@ index a649171..3c4983f 100644
                        },
                      ),
                    ),
-@@ -135,3 +774,54 @@ class SpacesNavigationRail extends StatelessWidget {
+-                  if (FluffyThemes.isColumnMode(context))
++                  if (FluffyThemes.isColumnMode(context) || AppSettings.searchStyle.value == 'bottom_fab')
+                     Padding(
+                       padding: const EdgeInsets.all(12.0),
+                       child: StartChatFab(),
+@@ -135,3 +775,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
