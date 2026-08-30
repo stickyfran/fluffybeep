@@ -319884,7 +319884,7 @@ index 8610b92..f793901 100644
  }
  
 diff --git a/lib/pages/chat_list/chat_list_header.dart b/lib/pages/chat_list/chat_list_header.dart
-index 50318f6..e204fa3 100644
+index 50318f6..305e478 100644
 --- a/lib/pages/chat_list/chat_list_header.dart
 +++ b/lib/pages/chat_list/chat_list_header.dart
 @@ -14,7 +14,7 @@ import 'package:matrix/matrix.dart';
@@ -319896,7 +319896,7 @@ index 50318f6..e204fa3 100644
    final ChatListController controller;
    final bool globalSearch;
  
-@@ -24,10 +24,26 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -24,10 +24,30 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
      this.globalSearch = true,
    });
  
@@ -319920,10 +319920,14 @@ index 50318f6..e204fa3 100644
 +      _cachedClient = client;
 +      _syncStatusStream = client.onSyncStatus.stream.distinct((a, b) => a.status == b.status);
 +    }
++
++    if (AppSettings.searchStyle.value == 'bottom_fab') {
++      return const SliverToBoxAdapter(child: SizedBox.shrink());
++    }
  
      return SliverAppBar(
        floating: true,
-@@ -37,7 +53,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -37,7 +57,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
        backgroundColor: Colors.transparent,
        automaticallyImplyLeading: false,
        title: StreamBuilder(
@@ -319932,55 +319936,11 @@ index 50318f6..e204fa3 100644
          builder: (context, snapshot) {
            final status =
                client.onSyncStatus.value ??
-@@ -46,12 +62,57 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -46,12 +66,13 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                client.onSync.value != null &&
                status.status != SyncStatus.error &&
                client.prevBatch != null;
 +          
-+          if (AppSettings.searchStyle.value == 'bottom_fab') {
-+            return Row(
-+              children: [
-+                if (!FluffyThemes.isColumnMode(context) &&
-+                    widget.controller.spaces.isNotEmpty &&
-+                    !AppSettings.displayNavigationRail.value)
-+                  IconButton(
-+                    tooltip: L10n.of(context).displayNavigationRail,
-+                    onPressed: widget.controller.openNavrail,
-+                    icon: Icon(
-+                      Icons.menu,
-+                      color: theme.colorScheme.onSurface,
-+                    ),
-+                  ),
-+                const SizedBox(width: 8),
-+                Expanded(
-+                  child: !hide
-+                      ? Row(
-+                          children: [
-+                            SizedBox(
-+                              width: 16,
-+                              height: 16,
-+                              child: CircularProgressIndicator.adaptive(
-+                                strokeWidth: 2,
-+                                value: status.progress,
-+                              ),
-+                            ),
-+                            const SizedBox(width: 12),
-+                            Text(
-+                              status.calcLocalizedString(context),
-+                              style: TextStyle(
-+                                fontSize: 16,
-+                                color: theme.colorScheme.onSurface,
-+                              ),
-+                            ),
-+                          ],
-+                        )
-+                      : const SizedBox.shrink(),
-+                ),
-+                ClientChooserButton(widget.controller),
-+              ],
-+            );
-+          }
-+
            return TextField(
 -            controller: controller.searchController,
 -            focusNode: controller.searchFocusNode,
@@ -319993,7 +319953,7 @@ index 50318f6..e204fa3 100644
              decoration: InputDecoration(
                filled: true,
                fillColor: theme.colorScheme.secondaryContainer,
-@@ -68,19 +129,19 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -68,19 +89,19 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                ),
  
                prefixIcon: hide
@@ -320017,7 +319977,7 @@ index 50318f6..e204fa3 100644
                              icon: Icon(
                                Icons.search_outlined,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -88,7 +149,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -88,7 +109,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                            )
                          : IconButton(
                              tooltip: L10n.of(context).displayNavigationRail,
@@ -320026,7 +319986,7 @@ index 50318f6..e204fa3 100644
                              icon: Icon(
                                Icons.menu,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -104,8 +165,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -104,8 +125,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                          ),
                        ),
                      ),
@@ -320037,7 +319997,7 @@ index 50318f6..e204fa3 100644
                          ? const Padding(
                              padding: EdgeInsets.symmetric(
                                vertical: 10.0,
-@@ -119,7 +180,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -119,7 +140,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                            )
                          : TextButton.icon(
@@ -320046,7 +320006,7 @@ index 50318f6..e204fa3 100644
                              style: TextButton.styleFrom(
                                shape: RoundedRectangleBorder(
                                  borderRadius: BorderRadius.circular(99),
-@@ -128,12 +189,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -128,12 +149,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                              icon: const Icon(Icons.edit_outlined, size: 16),
                              label: Text(
@@ -320061,7 +320021,7 @@ index 50318f6..e204fa3 100644
              ),
            );
          },
-@@ -141,6 +202,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -141,6 +162,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
      );
    }
  
@@ -320807,10 +320767,10 @@ index 55d1d7e..3dd37de 100644
        ),
      );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
-index 0db2f74..3badc49 100644
+index 0db2f74..4c348e3 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
 +++ b/lib/pages/chat_list/chat_list_view.dart
-@@ -1,114 +1,142 @@
+@@ -1,114 +1,145 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -321021,42 +320981,45 @@ index 0db2f74..3badc49 100644
 +              floatingActionButton: controller.activeSpaceId == null && !FluffyThemes.isColumnMode(context)
 +                  ? Padding(
 +                      padding: const EdgeInsets.symmetric(horizontal: 16),
-+                      child: Row(
-+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-+                        crossAxisAlignment: CrossAxisAlignment.end,
-+                        children: [
-+                          if (AppSettings.searchStyle.value == 'bottom_fab' && !controller.isSearchMode)
-+                            FloatingActionButton.small(
-+                              heroTag: 'profile_avatar_fab',
-+                              elevation: 3,
-+                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-+                              child: ClientChooserButton(controller),
-+                              onPressed: null,
++                      child: AppSettings.searchStyle.value == 'bottom_fab'
++                          ? Row(
++                              crossAxisAlignment: CrossAxisAlignment.end,
++                              children: [
++                                ValueListenableBuilder(
++                                  valueListenable: controller.scrolledToTop,
++                                  builder: (context, scrolledToTop, _) => StartChatFab(
++                                    extended: false,
++                                  ),
++                                ),
++                                const SizedBox(width: 8),
++                                Expanded(
++                                  child: SearchChatFab(
++                                    controller: controller,
++                                    extended: true,
++                                  ),
++                                ),
++                                const SizedBox(width: 8),
++                                FloatingActionButton(
++                                  heroTag: 'profile_avatar_fab',
++                                  elevation: 6,
++                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
++                                  onPressed: () {},
++                                  child: ClientChooserButton(controller),
++                                ),
++                              ],
 +                            )
-+                          else
-+                            const SizedBox.shrink(),
-+                          Row(
-+                            mainAxisSize: MainAxisSize.min,
-+                            crossAxisAlignment: CrossAxisAlignment.end,
-+                            children: [
-+                              if (!controller.isSearchMode)
++                          : Row(
++                              mainAxisAlignment: MainAxisAlignment.end,
++                              crossAxisAlignment: CrossAxisAlignment.end,
++                              children: [
 +                                ValueListenableBuilder(
 +                                  valueListenable: controller.scrolledToTop,
 +                                  builder: (context, scrolledToTop, _) => StartChatFab(
 +                                    extended: scrolledToTop && !AppSettings.displayNavigationRail.value,
 +                                  ),
 +                                ),
-+                              if (AppSettings.searchStyle.value == 'bottom_fab') ...[
-+                                if (!controller.isSearchMode) const SizedBox(width: 12),
-+                                SearchChatFab(
-+                                  controller: controller,
-+                                  extended: false,
-+                                ),
 +                              ],
-+                            ],
-+                          ),
-+                        ],
-+                      ),
++                            ),
 +                    )
 +                    : const SizedBox.shrink(),
 +              ),
@@ -322797,10 +322760,10 @@ index a649171..3c4983f 100644
 +}
 diff --git a/lib/pages/chat_list/search_chat_fab.dart b/lib/pages/chat_list/search_chat_fab.dart
 new file mode 100644
-index 0000000..571c46a
+index 0000000..5780cab
 --- /dev/null
 +++ b/lib/pages/chat_list/search_chat_fab.dart
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,52 @@
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_list/chat_list.dart';
@@ -322823,47 +322786,33 @@ index 0000000..571c46a
 +class _SearchChatFabState extends State<SearchChatFab> {
 +  @override
 +  Widget build(BuildContext context) {
-+    return AnimatedContainer(
-+      duration: FluffyThemes.animationDuration,
-+      curve: FluffyThemes.animationCurve,
-+      width: widget.controller.isSearchMode ? MediaQuery.sizeOf(context).width - 100 : null,
-+      child: widget.controller.isSearchMode 
-+        ? Material(
-+            elevation: 6,
-+            borderRadius: BorderRadius.circular(28),
-+            color: Theme.of(context).colorScheme.primaryContainer,
-+            child: TextField(
-+              controller: widget.controller.searchController,
-+              focusNode: widget.controller.searchFocusNode,
-+              autofocus: true,
-+              onChanged: widget.controller.onSearchEnter,
-+              decoration: InputDecoration(
-+                hintText: L10n.of(context).search,
-+                prefixIcon: const Icon(Icons.search),
-+                suffixIcon: IconButton(
++    return Material(
++      elevation: 6,
++      borderRadius: BorderRadius.circular(28),
++      color: Theme.of(context).colorScheme.surfaceContainerHigh,
++      child: TextField(
++        controller: widget.controller.searchController,
++        focusNode: widget.controller.searchFocusNode,
++        autofocus: false,
++        onChanged: widget.controller.onSearchEnter,
++        onTap: () {
++          if (!widget.controller.isSearchMode) {
++            widget.controller.startSearch();
++          }
++        },
++        decoration: InputDecoration(
++          hintText: L10n.of(context).searchChatsRooms,
++          prefixIcon: const Icon(Icons.search),
++          suffixIcon: widget.controller.isSearchMode
++              ? IconButton(
 +                  icon: const Icon(Icons.close),
 +                  onPressed: widget.controller.cancelSearch,
-+                ),
-+                border: InputBorder.none,
-+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-+              ),
-+            ),
-+          )
-+        : FloatingActionButton.extended(
-+            heroTag: 'search_chat_fab',
-+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-+            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-+            onPressed: widget.controller.startSearch,
-+            extendedIconLabelSpacing: widget.extended ? 10 : 0,
-+            extendedPadding: widget.extended ? null : const EdgeInsets.symmetric(horizontal: 16),
-+            label: AnimatedSize(
-+              alignment: Alignment.centerLeft,
-+              duration: FluffyThemes.animationDuration,
-+              curve: FluffyThemes.animationCurve,
-+              child: widget.extended ? Text(L10n.of(context).search) : const SizedBox.shrink(),
-+            ),
-+            icon: const Icon(Icons.search),
-+          ),
++                )
++              : null,
++          border: InputBorder.none,
++          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
++        ),
++      ),
 +    );
 +  }
 +}
@@ -352332,10 +352281,10 @@ index d21dc9a..6a431ce 100644
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc..429d766 100644
+index f056efc..c5ac176 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,266 @@
+@@ -1,210 +1,277 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352775,6 +352724,17 @@ index f056efc..429d766 100644
 +            parseCommands: false,
 +            displayPendingEvent: false,
 +          );
++          
++          await room.setReadMarker(
++            payload.eventId ?? room.lastEvent?.eventId ?? '',
++            mRead: payload.eventId ?? room.lastEvent?.eventId ?? '',
++            public: AppSettings.sendPublicReadReceipts.value,
++          );
++
++          if (PlatformInfos.isMobile) {
++            final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++            await FlutterLocalNotificationsPlugin().cancel(notifId);
++          }
 +        case FluffyChatNotificationActions.mute:
 +          await room.setPushRuleState(PushRuleState.mentionsOnly);
 +        case FluffyChatNotificationActions.open:
@@ -355873,10 +355833,10 @@ index 13c71ba..84f054c 100644
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000..4e3b20f
+index 0000000..277702d
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,300 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -355887,6 +355847,7 @@ index 0000000..4e3b20f
 +import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 +import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 +import 'package:flutter/foundation.dart';
++import 'package:http/http.dart' as http;
 +import 'package:matrix/matrix.dart';
 +import 'package:path_provider/path_provider.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
@@ -356016,6 +355977,54 @@ index 0000000..4e3b20f
 +    return sourceAudio.path;
 +  }
 +
++  /// Descarga el modelo de HuggingFace si no existe localmente
++  Future<void> _ensureModel(String modelName, {void Function(double)? onProgress}) async {
++    final docsDir = await getApplicationDocumentsDirectory();
++    final modelFileName = 'ggml-$modelName.bin';
++    final modelFile = File('${docsDir.path}/$modelFileName');
++
++    if (await modelFile.exists() && await modelFile.length() > 1024 * 1024) {
++      Logs().d('Modelo $modelName ya existe en ${modelFile.path}');
++      return;
++    }
++
++    Logs().d('Descargando modelo $modelName desde HuggingFace...');
++    final url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelFileName';
++    
++    final client = http.Client();
++    try {
++      final request = http.Request('GET', Uri.parse(url));
++      final response = await client.send(request);
++      
++      if (response.statusCode != 200) {
++        throw 'Error HTTP ${response.statusCode} al descargar modelo';
++      }
++
++      final contentLength = response.contentLength ?? 0;
++      int downloaded = 0;
++      final sink = modelFile.openWrite();
++      
++      await for (final chunk in response.stream) {
++        sink.add(chunk);
++        downloaded += chunk.length;
++        if (contentLength > 0 && onProgress != null) {
++          onProgress(downloaded / contentLength);
++        }
++      }
++      await sink.flush();
++      await sink.close();
++      Logs().d('Modelo $modelName descargado exitosamente');
++    } catch (e) {
++      if (await modelFile.exists()) {
++        await modelFile.delete();
++      }
++      Logs().e('Error descargando modelo: $e', null, null);
++      throw 'No se pudo descargar el modelo $modelName: $e';
++    } finally {
++      client.close();
++    }
++  }
++
 +  /// Filtra el texto devuelto por Whisper: remueve tokens de ruido/silencio
 +  /// que el modelo produce cuando no detecta voz real.
 +  String _filterWhisperNoise(String text) {
@@ -356070,6 +356079,9 @@ index 0000000..4e3b20f
 +    if (modelName == 'tiny') selectedModel = WhisperModel.tiny;
 +    if (modelName == 'small') selectedModel = WhisperModel.small;
 +    if (modelName == 'medium') selectedModel = WhisperModel.medium;
++
++    // 4.5. Ensure model is downloaded
++    await _ensureModel(modelName, onProgress: onProgress);
 +
 +    // 5. Ejecutar inferencia de Whisper on-device
 +    Logs().d(
