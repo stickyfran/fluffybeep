@@ -13987,10 +13987,10 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 8ebf61d428332c89de5bc6b78b58490b19645655..ab21bec9d8ead2aba47a78d5de227803783d1328 100644
+index 8ebf61d428332c89de5bc6b78b58490b19645655..91a162f6218d3cf8bf7c82df79bb615b6375a7db 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
-@@ -1,96 +1,95 @@
+@@ -1,96 +1,96 @@
 -import java.util.Properties
 -import java.io.FileInputStream
 -
@@ -14124,7 +14124,8 @@ index 8ebf61d428332c89de5bc6b78b58490b19645655..ab21bec9d8ead2aba47a78d5de227803
 +
 +android {
 +    namespace = "chat.fluffy.fluffychat"
-+    compileSdk = flutter.compileSdkVersion
++    // Workaround for https://github.com/juliansteenbakker/flutter_secure_storage/issues/1224
++    compileSdk = 37
 +    ndkVersion = flutter.ndkVersion
 +
 +    compileOptions {
