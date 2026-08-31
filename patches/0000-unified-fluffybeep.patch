@@ -311653,10 +311653,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..12d46d568b2a24787617344393bf4ebde84db5a4 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..438c5c5c778984b7d2a1f58dfebccd293ef78d55 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,345 @@
+@@ -1,222 +1,375 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -312139,37 +312139,67 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..12d46d568b2a24787617344393bf4ebd
 +      var effectiveFileName = fileName ??
 +          'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
 +
-+      // Normalize audio to strict RFC 7845 compliant OGG Opus on mobile.
++      // Normalize audio to strict RFC 7845 compliant OGG Opus or AAC m4a on mobile.
 +      // Android's native MediaRecorder produces non-standard granule positions
 +      // that cause WhatsApp iOS to reject voice messages ("This audio is no longer available").
-+      // FFmpegKit rewrites the OGG container with standard OpusHead, OpusTags,
-+      // 16kHz mono, and valid granule positions compatible with all WhatsApp clients.
++      // FFmpegKit rewrites the container with valid metadata, 16kHz mono,
++      // compatible with all WhatsApp, Matrix, and Telegram clients on both iOS and Android.
 +      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
 +        try {
 +          final tempDir = await getTemporaryDirectory();
-+          final normalizedFileName =
++          final normalizedOggFileName =
 +              'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
-+          final normalizedPath =
-+              path_lib.join(tempDir.path, normalizedFileName);
++          final normalizedOggPath =
++              path_lib.join(tempDir.path, normalizedOggFileName);
 +
-+          final session = await FFmpegKit.execute(
-+            '-y -i "$path" -c:a libopus -b:a 24k -ac 1 -ar 16000 "$normalizedPath"',
++          // Tier 1: Try external libopus encoder
++          var session = await FFmpegKit.execute(
++            '-y -i "$path" -c:a libopus -b:a 24k -ac 1 -ar 16000 "$normalizedOggPath"',
 +          );
-+          final returnCode = await session.getReturnCode();
++          var returnCode = await session.getReturnCode();
++
++          // Tier 2: Try native FFmpeg opus encoder if libopus is not linked
++          if (!ReturnCode.isSuccess(returnCode)) {
++            session = await FFmpegKit.execute(
++              '-y -i "$path" -c:a opus -strict -2 -b:a 24k -ac 1 -ar 16000 "$normalizedOggPath"',
++            );
++            returnCode = await session.getReturnCode();
++          }
++
 +          if (ReturnCode.isSuccess(returnCode)) {
-+            final normalizedFile = File(normalizedPath);
++            final normalizedFile = File(normalizedOggPath);
 +            if (await normalizedFile.exists() &&
 +                await normalizedFile.length() > 0) {
 +              Logs().i(
-+                'Voice message normalized with FFmpegKit successfully: $normalizedPath',
++                'Voice message normalized with FFmpegKit (Opus): $normalizedOggPath',
 +              );
-+              effectivePath = normalizedPath;
-+              effectiveFileName = normalizedFileName;
++              effectivePath = normalizedOggPath;
++              effectiveFileName = normalizedOggFileName;
 +            }
 +          } else {
-+            Logs().w(
-+              'FFmpegKit audio normalization failed (return code $returnCode), sending original file',
++            // Tier 3: If Opus encoding is unavailable in ffmpeg-kit-min, encode to AAC (m4a)
++            // which is built-in to all FFmpeg builds and 100% playable by WhatsApp on iOS & Android.
++            final aacFileName =
++                'voice_message_${DateTime.now().millisecondsSinceEpoch}.m4a';
++            final aacPath = path_lib.join(tempDir.path, aacFileName);
++            session = await FFmpegKit.execute(
++              '-y -i "$path" -c:a aac -b:a 32k -ac 1 -ar 16000 "$aacPath"',
 +            );
++            returnCode = await session.getReturnCode();
++            if (ReturnCode.isSuccess(returnCode)) {
++              final aacFile = File(aacPath);
++              if (await aacFile.exists() && await aacFile.length() > 0) {
++                Logs().i(
++                  'Voice message normalized with FFmpegKit (AAC): $aacPath',
++                );
++                effectivePath = aacPath;
++                effectiveFileName = aacFileName;
++              }
++            } else {
++              Logs().w(
++                'FFmpegKit audio normalization failed (return code $returnCode), sending original file',
++              );
++            }
 +          }
 +        } catch (e, s) {
 +          Logs().w(
@@ -352316,10 +352346,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..2826aedb80e1eef241e9404ca2610160dbe6f231 100644
+index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..7f847ae8ac10f1de29c84663d1e04d6834e0b0b9 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,210 +1,278 @@
+@@ -1,210 +1,290 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352639,6 +352669,8 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..2826aedb80e1eef241e9404ca2610160
 +  }
 +  try {
 +    await notificationTap(notificationResponse, clients: [client]);
++  } catch (e, s) {
++    Logs().e('Error handling notification tap in background', e, s);
 +  } finally {
 +    await client.dispose(closeDatabase: false);
 +    pushIsolateReceivePort.sendPort.send('DONE');
@@ -352742,11 +352774,18 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..2826aedb80e1eef241e9404ca2610160
 +      }
 +      switch (actionType) {
 +        case FluffyChatNotificationActions.markAsRead:
-+          await room.setReadMarker(
-+            payload.eventId ?? room.lastEvent!.eventId,
-+            mRead: payload.eventId ?? room.lastEvent!.eventId,
-+            public: AppSettings.sendPublicReadReceipts.value,
-+          );
++          final eventId = payload.eventId ?? room.lastEvent?.eventId;
++          if (eventId != null && eventId.isNotEmpty) {
++            await room.setReadMarker(
++              eventId,
++              mRead: eventId,
++              public: AppSettings.sendPublicReadReceipts.value,
++            );
++          }
++          if (PlatformInfos.isMobile) {
++            final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++            await FlutterLocalNotificationsPlugin().cancel(id: notifId);
++          }
 +        case FluffyChatNotificationActions.reply:
 +          final input = notificationResponse.input;
 +          if (input == null || input.isEmpty) {
@@ -352761,11 +352800,14 @@ index f056efc83d481128a2cb6eb1f3d31ba2082c13f3..2826aedb80e1eef241e9404ca2610160
 +            displayPendingEvent: false,
 +          );
 +          
-+          await room.setReadMarker(
-+            payload.eventId ?? room.lastEvent?.eventId ?? '',
-+            mRead: payload.eventId ?? room.lastEvent?.eventId ?? '',
-+            public: AppSettings.sendPublicReadReceipts.value,
-+          );
++          final replyEventId = payload.eventId ?? room.lastEvent?.eventId;
++          if (replyEventId != null && replyEventId.isNotEmpty) {
++            await room.setReadMarker(
++              replyEventId,
++              mRead: replyEventId,
++              public: AppSettings.sendPublicReadReceipts.value,
++            );
++          }
 +
 +          if (PlatformInfos.isMobile) {
 +            final notifId = '${room.client.clientName}_${room.id}'.hashCode;
@@ -355869,10 +355911,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..b483f31c729d52a24a3ce64619d8391a12302234
+index 0000000000000000000000000000000000000000..6c6bcc7972388ba874c24ab097a28addce0632d7
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,327 @@
+@@ -0,0 +1,415 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -355952,17 +355994,36 @@ index 0000000000000000000000000000000000000000..b483f31c729d52a24a3ce64619d8391a
 +  Future<File> getAudioFileForEvent(Event event) async {
 +    final tempDir = await getTemporaryDirectory();
 +    final safeId = event.eventId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-+    final rawAudioPath = '${tempDir.path}/audio_$safeId.raw';
++
++    final matrixFile = await event.downloadAndDecryptAttachment();
++    if (matrixFile.bytes.isEmpty) {
++      throw 'El archivo de audio descargado está vacío';
++    }
++
++    var ext = 'ogg';
++    final lowerName = matrixFile.name.toLowerCase();
++    if (lowerName.contains('.')) {
++      ext = lowerName.split('.').last;
++    } else if (matrixFile.mimeType.contains('mp4') ||
++        matrixFile.mimeType.contains('m4a') ||
++        matrixFile.mimeType.contains('aac')) {
++      ext = 'm4a';
++    } else if (matrixFile.mimeType.contains('mp3') ||
++        matrixFile.mimeType.contains('mpeg')) {
++      ext = 'mp3';
++    } else if (matrixFile.mimeType.contains('wav')) {
++      ext = 'wav';
++    } else if (matrixFile.mimeType.contains('flac')) {
++      ext = 'flac';
++    }
++
++    final rawAudioPath = '${tempDir.path}/audio_${safeId}.$ext';
 +    final rawAudioFile = File(rawAudioPath);
 +
 +    if (await rawAudioFile.exists() && await rawAudioFile.length() > 0) {
 +      return rawAudioFile;
 +    }
 +
-+    final matrixFile = await event.downloadAndDecryptAttachment();
-+    if (matrixFile.bytes.isEmpty) {
-+      throw 'El archivo de audio descargado está vacío';
-+    }
 +    await rawAudioFile.writeAsBytes(matrixFile.bytes);
 +    return rawAudioFile;
 +  }
@@ -356013,54 +356074,119 @@ index 0000000000000000000000000000000000000000..b483f31c729d52a24a3ce64619d8391a
 +    return sourceAudio.path;
 +  }
 +
-+  /// Descarga el modelo de HuggingFace si no existe localmente
-+  Future<void> _ensureModel(String modelName, {void Function(double)? onProgress}) async {
-+    final docsDir = await getApplicationDocumentsDirectory();
++  /// Descarga el modelo de HuggingFace si no existe localmente o lo busca en almacenamiento local/externo
++  Future<void> _ensureModel(
++    String modelName, {
++    void Function(double)? onProgress,
++  }) async {
++    final modelDir = await WhisperController.getModelDir();
 +    final modelFileName = 'ggml-$modelName.bin';
-+    final modelFile = File('${docsDir.path}/$modelFileName');
++    final modelFile = File('$modelDir/$modelFileName');
++
++    // Asegurar que el directorio de destino exista
++    await modelFile.parent.create(recursive: true);
 +
 +    if (await modelFile.exists() && await modelFile.length() > 1024 * 1024) {
 +      Logs().d('Modelo $modelName ya existe en ${modelFile.path}');
 +      return;
 +    }
 +
++    // Verificar nombre alternativo sin prefijo en modelDir
++    final altModelFile = File('$modelDir/$modelName.bin');
++    if (await altModelFile.exists() && await altModelFile.length() > 1024 * 1024) {
++      try {
++        await altModelFile.copy(modelFile.path);
++        Logs().d('Modelo copiado desde ${altModelFile.path} a ${modelFile.path}');
++        return;
++      } catch (e) {
++        Logs().e('Error copiando modelo alternativo: $e');
++      }
++    }
++
++    // Verificar directorios candidatos locales y de almacenamiento externo
++    final candidateDirs = <String>[];
++    try {
++      final docDir = await getApplicationDocumentsDirectory();
++      candidateDirs.add(docDir.path);
++    } catch (_) {}
++    try {
++      final tempDir = await getTemporaryDirectory();
++      candidateDirs.add(tempDir.path);
++    } catch (_) {}
++    try {
++      final extDir = await getExternalStorageDirectory();
++      if (extDir != null) {
++        candidateDirs.add(extDir.path);
++        candidateDirs.add('${extDir.path}/Download');
++        candidateDirs.add('${extDir.path}/files');
++        candidateDirs.add('${extDir.path}/files/support');
++      }
++    } catch (_) {}
++
 +    if (!kIsWeb && Platform.isAndroid) {
-+      final possiblePaths = [
-+        '/sdcard/Android/data/chat.fluffy.fluffychat/files/$modelFileName',
-+        '/sdcard/Download/$modelFileName',
-+      ];
-+      
-+      for (final path in possiblePaths) {
-+        final extFile = File(path);
++      candidateDirs.addAll([
++        '/sdcard/Download',
++        '/sdcard/Download/whisper',
++        '/sdcard/Android/data/chat.fluffy.fluffychat/files',
++        '/sdcard/Android/data/chat.fluffy.fluffychat/files/support',
++        '/sdcard/Android/data/chat.fluffy.fluffychat/files/models',
++        '/sdcard/Android/data/chat.fluffy.fluffychat/cache',
++        '/storage/emulated/0/Download',
++        '/storage/emulated/0/Download/whisper',
++        '/storage/emulated/0/Android/data/chat.fluffy.fluffychat/files',
++        '/storage/emulated/0/Android/data/chat.fluffy.fluffychat/files/support',
++        '/storage/emulated/0/Android/data/chat.fluffy.fluffychat/files/models',
++        '/storage/emulated/0/Android/data/chat.fluffy.fluffychat/cache',
++      ]);
++    }
++
++    final fileNamesToCheck = [
++      modelFileName,
++      '$modelName.bin',
++      'ggml-$modelName-q5_0.bin',
++      'ggml-$modelName-q5_1.bin',
++    ];
++
++    for (final dirPath in candidateDirs) {
++      for (final name in fileNamesToCheck) {
++        final extFile = File('$dirPath/$name');
 +        if (await extFile.exists() && await extFile.length() > 1024 * 1024) {
-+          Logs().d('Modelo $modelName encontrado en $path. Copiando a local...');
++          Logs().i(
++            'Modelo $modelName encontrado en ${extFile.path} (${(await extFile.length() / (1024 * 1024)).toStringAsFixed(1)} MB). Copiando a ${modelFile.path}...',
++          );
 +          try {
 +            await extFile.copy(modelFile.path);
-+            Logs().d('Modelo copiado exitosamente desde $path');
-+            return;
-+          } catch (e) {
-+            Logs().e('Error copiando modelo desde $path: $e', null, null);
++            if (await modelFile.exists() &&
++                await modelFile.length() > 1024 * 1024) {
++              Logs().i('Modelo copiado exitosamente desde ${extFile.path}');
++              return;
++            }
++          } catch (e, s) {
++            Logs().e('Error copiando modelo desde ${extFile.path}: $e', e, s);
 +          }
 +        }
 +      }
 +    }
 +
-+    Logs().d('Descargando modelo $modelName desde HuggingFace...');
-+    final url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelFileName';
-+    
++    Logs().d(
++      'Descargando modelo $modelName desde HuggingFace a ${modelFile.path}...',
++    );
++    final url =
++        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$modelFileName';
++
 +    final client = http.Client();
 +    try {
 +      final request = http.Request('GET', Uri.parse(url));
 +      final response = await client.send(request);
-+      
++
 +      if (response.statusCode != 200) {
 +        throw 'Error HTTP ${response.statusCode} al descargar modelo';
 +      }
 +
 +      final contentLength = response.contentLength ?? 0;
-+      int downloaded = 0;
++      var downloaded = 0;
 +      final sink = modelFile.openWrite();
-+      
++
 +      await for (final chunk in response.stream) {
 +        sink.add(chunk);
 +        downloaded += chunk.length;
@@ -356071,12 +356197,16 @@ index 0000000000000000000000000000000000000000..b483f31c729d52a24a3ce64619d8391a
 +      await sink.flush();
 +      await sink.close();
 +      final len = await modelFile.length();
-+      Logs().d('Modelo $modelName descargado exitosamente. Tamaño: ${(len / (1024 * 1024)).toStringAsFixed(2)} MB');
-+    } catch (e) {
++      Logs().d(
++        'Modelo $modelName descargado exitosamente. Tamaño: ${(len / (1024 * 1024)).toStringAsFixed(2)} MB',
++      );
++    } catch (e, s) {
 +      if (await modelFile.exists()) {
-+        await modelFile.delete();
++        try {
++          await modelFile.delete();
++        } catch (_) {}
 +      }
-+      Logs().e('Error descargando modelo: $e', null, null);
++      Logs().e('Error descargando modelo: $e', e, s);
 +      throw 'No se pudo descargar el modelo $modelName: $e';
 +    } finally {
 +      client.close();
