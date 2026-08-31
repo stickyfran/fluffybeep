@@ -40,3 +40,13 @@ Created a new settings page at `lib/pages/settings/patches_settings.dart` and in
 - **Patch Validation**: Successfully ran `../patches/patch-manager.sh validate`. Output:
   `[INFO] ✅ Patch validates successfully against upstream base.`
 - **Git Commit**: All modifications committed cleanly to `fluffychat_src/` and patch regenerated with Python binary write.
+
+### 5. Phase 2 Optimizations (Jank, CPU & Push Race Conditions)
+- **UnifiedPush Setup Race Condition (`background_push.dart`)**:
+  - Added a `_isSettingUpPusher` mutex lock to `setupPusher` to prevent concurrent POST requests to the server during startup (caused when the distributor callback and manual startup flow collide).
+- **Chat ListView Background Rebuilds (`chat_list.dart`)**:
+  - `_invalidateRoomCache` now suppresses `roomCacheNotifier` updates when the current active route (`PerformanceLoggerObserver.currentRouteNotifier.value`) is not `/rooms`. This prevents 2800+ rooms from sorting and triggering a `ChatListViewBody` rebuild in the background while inside a chat room or settings menu.
+  - Flushed the pending state via `_onRouteChange` when navigating back to the main list.
+  - Increased `_roomCacheDebounceTimer` from 300ms to 500ms for slightly better event batching during sync spikes.
+- **Message List Rendering Overload (`chat_event_list.dart`)**:
+  - Reduced `cacheExtent` of the `CustomScrollView` from 1500 to 500. This significantly lowers the amount of off-screen DOM nodes rendered, alleviating CPU/Raster thread pressure when scrolling or receiving messages.

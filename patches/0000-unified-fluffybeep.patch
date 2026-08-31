@@ -304886,7 +304886,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..d1c1b2bf791d67b071346076280d3f33bb38aeb3 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c768009c15 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -304951,7 +304951,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d1c1b2bf791d67b071346076280d3f33
 -            right: horizontalPadding,
 +    return FontSizeScaler(
 +      child: CustomScrollView(
-+        cacheExtent: 1500,
++        cacheExtent: 500,
 +        reverse: true,
 +        controller: controller.scrollController,
 +        keyboardDismissBehavior: PlatformInfos.isIOS
@@ -318344,7 +318344,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782a73d2cbc 100644
+index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..6dd70dd328edc06fc9bcb05cd80b0db882d70d21 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -318421,7 +318421,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -149,12 +166,312 @@ class ChatListController extends State<ChatList>
+@@ -149,12 +166,311 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -318675,13 +318675,12 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
 +
-+    // In single-column mode (mobile), if a chat is active or another screen (e.g. Settings)
-+    // is covering the ChatListViewBody, suppress the rebuild to avoid wasting build budget
-+    // on an invisible widget. Mark a pending flush so that when the user returns to /rooms
-+    // we notify immediately.
++    // In single-column mode (mobile), if the chat list is covered by any other
++    // route, suppress the rebuild to avoid wasting build budget.
++    // Mark a pending flush so that when the user returns to /rooms we notify.
 +    final isSingleColumn = !FluffyThemes.isColumnMode(context);
-+    final chatCoveringList = isSingleColumn && widget.activeChat != null;
-+    if (chatCoveringList) {
++    final isCovered = isSingleColumn && PerformanceLoggerObserver.currentRouteNotifier.value != '/rooms';
++    if (isCovered) {
 +      _pendingRoomCacheNotify = true;
 +    } else {
 +      _pendingRoomCacheNotify = false;
@@ -318738,7 +318737,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -163,92 +480,28 @@ class ChatListController extends State<ChatList>
+@@ -163,92 +479,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -318845,7 +318844,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -257,13 +510,20 @@ class ChatListController extends State<ChatList>
+@@ -257,13 +509,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -318872,7 +318871,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
    }
  
    void openNavrail() {
-@@ -284,13 +544,17 @@ class ChatListController extends State<ChatList>
+@@ -284,13 +543,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -318896,7 +318895,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -298,6 +562,13 @@ class ChatListController extends State<ChatList>
+@@ -298,6 +561,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -318910,7 +318909,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -379,64 +650,136 @@ class ChatListController extends State<ChatList>
+@@ -379,64 +649,139 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -318928,7 +318927,10 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
 +  }
 +
 +  void _onRouteChange() {
-+    // Left intentionally blank. We removed the currentRoute check.
++    if (PerformanceLoggerObserver.currentRouteNotifier.value == '/rooms' && _pendingRoomCacheNotify) {
++      _pendingRoomCacheNotify = false;
++      roomCacheNotifier.value++;
++    }
 +  }
 +
 +  @override
@@ -319049,7 +319051,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
 +            }
 +            
 +            _roomCacheDebounceTimer?.cancel();
-+            _roomCacheDebounceTimer = Timer(const Duration(milliseconds: 300), () {
++            _roomCacheDebounceTimer = Timer(const Duration(milliseconds: 500), () {
 +              if (!mounted) return;
 +              final batch = Set<String>.from(_pendingChangedRoomIds);
 +              _pendingChangedRoomIds.clear();
@@ -319083,7 +319085,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
      _clientStream.close();
      super.dispose();
    }
-@@ -530,13 +873,13 @@ class ChatListController extends State<ChatList>
+@@ -530,13 +875,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -319099,7 +319101,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -643,19 +986,18 @@ class ChatListController extends State<ChatList>
+@@ -643,19 +988,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -319131,7 +319133,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -679,6 +1021,28 @@ class ChatListController extends State<ChatList>
+@@ -679,6 +1023,28 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -319160,7 +319162,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
          ],
        );
      }
-@@ -699,7 +1063,30 @@ class ChatListController extends State<ChatList>
+@@ -699,7 +1065,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -319192,7 +319194,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
          );
          return;
        case ChatContextAction.mute:
-@@ -800,13 +1187,120 @@ class ChatListController extends State<ChatList>
+@@ -800,13 +1189,120 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -319314,7 +319316,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
      }
    }
  
-@@ -863,6 +1357,7 @@ class ChatListController extends State<ChatList>
+@@ -863,6 +1359,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -319322,7 +319324,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -913,10 +1408,9 @@ class ChatListController extends State<ChatList>
+@@ -913,10 +1410,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -319336,7 +319338,7 @@ index 6ceba8bae42a71554113c5bcabb0ac51588bbfdb..216a2d9a081ffa59544feca19c7b5782
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1038,4 +1532,6 @@ enum ChatContextAction {
+@@ -1038,4 +1534,6 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -345659,10 +345661,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..f650f2a26b054ccda18eb9ed3be22c009acc6945 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..9ebb61884691ce069a39e975d74da734b13de4ba 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,595 @@
+@@ -1,471 +1,605 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -346293,6 +346295,8 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..f650f2a26b054ccda18eb9ed3be22c00
 +    return instance;
 +  }
 +
++  static bool _isSettingUpPusher = false;
++
 +  /// Makes sure that there is exactly ONE pusher with these settings for this
 +  /// client and deletes all other pushers if not.
 +  Future<void> setupPusher({
@@ -346301,7 +346305,13 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..f650f2a26b054ccda18eb9ed3be22c00
 +    String? token,
 +    bool useDeviceSpecificAppId = false,
 +  }) async {
-+    await FileLogger.log('[UnifiedPush] setupPusher started for client: ${client.clientName}, useDeviceSpecificAppId: $useDeviceSpecificAppId');
++    if (_isSettingUpPusher) {
++      await FileLogger.log('[UnifiedPush] setupPusher already in progress. Skipping duplicate call.');
++      return;
++    }
++    _isSettingUpPusher = true;
++    try {
++      await FileLogger.log('[UnifiedPush] setupPusher started for client: ${client.clientName}, useDeviceSpecificAppId: $useDeviceSpecificAppId');
 +    if (PlatformInfos.isIOS) {
 +      //<GOOGLE_SERVICES>await firebase.requestPermission();
 +    }
@@ -346417,6 +346427,8 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..f650f2a26b054ccda18eb9ed3be22c00
 +    } catch (e, s) {
 +      Logs().e('[Push] Unable to set pushers', e, s);
 +      await FileLogger.log('[UnifiedPush] CRITICAL: postPusher failed! Error: $e\nStacktrace:\n$s');
++    } finally {
++      _isSettingUpPusher = false;
 +    }
 +  }
 +
