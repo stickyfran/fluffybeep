@@ -313650,10 +313650,10 @@ index ae29235a90cafff870b92fbc729f7413e68e00ab..ae79e6c6ba80f13b9cdb03586b67cd4e
 +  }
 +}
 diff --git a/lib/pages/chat/start_poll_bottom_sheet.dart b/lib/pages/chat/start_poll_bottom_sheet.dart
-index bcdfdb72eeacc822636ec54067a82b447adb0934..e165f2b4b8d3fea5d893b5b8a9a71b52e270c4b1 100644
+index bcdfdb72eeacc822636ec54067a82b447adb0934..e4747e0068964d728ac3259387ce63fcc8b8506a 100644
 --- a/lib/pages/chat/start_poll_bottom_sheet.dart
 +++ b/lib/pages/chat/start_poll_bottom_sheet.dart
-@@ -1,174 +1,227 @@
+@@ -1,174 +1,226 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -313929,10 +313929,9 @@ index bcdfdb72eeacc822636ec54067a82b447adb0934..e165f2b4b8d3fea5d893b5b8a9a71b52
 +        },
 +      };
 +
-+      await widget.room.client.sendEvent(
-+        widget.room.id,
-+        'org.matrix.msc3381.poll.start',
++      await widget.room.sendEvent(
 +        content,
++        type: 'org.matrix.msc3381.poll.start',
 +        txid: _txid,
 +      );
 +      if (!mounted) return;
