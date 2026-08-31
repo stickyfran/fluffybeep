@@ -308592,7 +308592,7 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6ae6f6a361 100644
+index 930de3b285d3ff17843ed7075749aaf3943de5a8..19cff2bc8bfe3d1935a31f6834b4f1c2375de4e3 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -14,13 +14,14 @@ import 'package:fluffychat/utils/date_time_extension.dart';
@@ -308724,15 +308724,16 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
      final theme = Theme.of(context);
  
      if (!{
-@@ -89,6 +165,7 @@ class Message extends StatelessWidget {
+@@ -89,6 +165,8 @@ class Message extends StatelessWidget {
        EventTypes.Sticker,
        EventTypes.CallInvite,
        PollEventContent.startType,
++      'org.matrix.msc3381.poll.start',
 +      EventTypes.Encrypted,
      }.contains(event.type)) {
        if (event.type.startsWith('m.call.')) {
          return const SizedBox.shrink();
-@@ -186,24 +263,27 @@ class Message extends StatelessWidget {
+@@ -186,24 +264,27 @@ class Message extends StatelessWidget {
        );
      }
  
@@ -308773,7 +308774,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
      final sender = event.senderFromMemoryOrFallback;
  
      final wallpaperTextShadow = !wallpaperMode
-@@ -259,15 +339,26 @@ class Message extends StatelessWidget {
+@@ -259,15 +340,26 @@ class Message extends StatelessWidget {
                        borderRadius: BorderRadius.circular(
                          AppConfig.borderRadius / 2,
                        ),
@@ -308808,7 +308809,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                        ),
                      ),
                    ),
-@@ -282,36 +373,38 @@ class Message extends StatelessWidget {
+@@ -282,36 +374,38 @@ class Message extends StatelessWidget {
                            child: IconButton(
                              padding: EdgeInsets.zero,
                              tooltip: L10n.of(context).select,
@@ -308871,7 +308872,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                          ),
                        Expanded(
                          child: Column(
-@@ -344,12 +437,9 @@ class Message extends StatelessWidget {
+@@ -344,12 +438,9 @@ class Message extends StatelessWidget {
                                        ),
                                      ),
                                    if ((!nextEventSameSender) && !ownMessage)
@@ -308887,7 +308888,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                          return ConstrainedBox(
                                            constraints: BoxConstraints(
                                              maxWidth: 200,
-@@ -428,9 +518,8 @@ class Message extends StatelessWidget {
+@@ -428,9 +519,8 @@ class Message extends StatelessWidget {
                                                  ) !=
                                                  null)
                                                FutureBuilder<Event?>(
@@ -308899,7 +308900,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                                  builder: (BuildContext context, snapshot) {
                                                    final replyEvent =
                                                        snapshot.hasData
-@@ -507,7 +596,8 @@ class Message extends StatelessWidget {
+@@ -507,7 +597,8 @@ class Message extends StatelessWidget {
                              ),
  
                              AnimatedSize(
@@ -308909,7 +308910,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                curve: FluffyThemes.animationCurve,
                                alignment: Alignment.bottomCenter,
                                child: !hasReactions
-@@ -521,7 +611,11 @@ class Message extends StatelessWidget {
+@@ -521,7 +612,11 @@ class Message extends StatelessWidget {
                                          left: 8.0,
                                          right: ownMessage ? 0 : 12.0,
                                        ),
@@ -308922,7 +308923,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                      ),
                              ),
                              Row(
-@@ -603,7 +697,8 @@ class Message extends StatelessWidget {
+@@ -603,7 +698,8 @@ class Message extends StatelessWidget {
                                    ? Alignment.bottomRight
                                    : Alignment.bottomLeft,
                                child: AnimatedSize(
@@ -308932,7 +308933,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                  curve: FluffyThemes.animationCurve,
                                  child: showReactionPicker
                                      ? Padding(
-@@ -624,22 +719,20 @@ class Message extends StatelessWidget {
+@@ -624,22 +720,20 @@ class Message extends StatelessWidget {
                                                    (emoji) => IconButton(
                                                      padding: EdgeInsets.zero,
                                                      icon: Center(
@@ -308968,7 +308969,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                                                      ),
                                                      onPressed:
                                                          sentReactions.contains(
-@@ -786,7 +879,8 @@ class Message extends StatelessWidget {
+@@ -786,7 +880,8 @@ class Message extends StatelessWidget {
                ),
                if (enterThread != null)
                  AnimatedSize(
@@ -308978,7 +308979,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                    curve: FluffyThemes.animationCurve,
                    alignment: Alignment.bottomCenter,
                    child: threadChildren.isEmpty
-@@ -847,9 +941,52 @@ class Message extends StatelessWidget {
+@@ -847,9 +942,52 @@ class Message extends StatelessWidget {
                        ),
                        child: Text(
                          L10n.of(context).readUpToHere,
@@ -309032,7 +309033,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
                      Expanded(
                        child: Divider(
                          color: theme.colorScheme.surfaceContainerHighest,
-@@ -881,61 +1018,26 @@ class BubbleBackground extends StatelessWidget {
+@@ -881,61 +1019,26 @@ class BubbleBackground extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -309108,7 +309109,7 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
  class _AnimateIn extends StatefulWidget {
    final bool animateIn;
    final Widget child;
-@@ -960,7 +1062,8 @@ class __AnimateInState extends State<_AnimateIn> {
+@@ -960,7 +1063,8 @@ class __AnimateInState extends State<_AnimateIn> {
      }
  
      return AnimatedSize(
@@ -309119,10 +309120,10 @@ index 930de3b285d3ff17843ed7075749aaf3943de5a8..16c0d0804d350e8f940d8a94c8cdfe6a
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..52a024b565f1e3884fb53b5ed549c363ce8a5cdb 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a84565ae2a512afdeb39584e6075b8d6d5e9f7a1 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,446 @@
+@@ -1,324 +1,447 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309792,6 +309793,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..52a024b565f1e3884fb53b5ed549c363
 +            );
 +        }
 +      case PollEventContent.startType:
++      case 'org.matrix.msc3381.poll.start':
 +        if (event.redacted) {
 +          return RedactionWidget(
 +            event: event,
@@ -313648,10 +313650,10 @@ index ae29235a90cafff870b92fbc729f7413e68e00ab..ae79e6c6ba80f13b9cdb03586b67cd4e
 +  }
 +}
 diff --git a/lib/pages/chat/start_poll_bottom_sheet.dart b/lib/pages/chat/start_poll_bottom_sheet.dart
-index bcdfdb72eeacc822636ec54067a82b447adb0934..da84294fab05271ba04a8fa277b1c740bee84d6f 100644
+index bcdfdb72eeacc822636ec54067a82b447adb0934..e165f2b4b8d3fea5d893b5b8a9a71b52e270c4b1 100644
 --- a/lib/pages/chat/start_poll_bottom_sheet.dart
 +++ b/lib/pages/chat/start_poll_bottom_sheet.dart
-@@ -1,174 +1,174 @@
+@@ -1,174 +1,227 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -313831,6 +313833,8 @@ index bcdfdb72eeacc822636ec54067a82b447adb0934..da84294fab05271ba04a8fa277b1c740
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:convert';
++
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
 +import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -313866,18 +313870,69 @@ index bcdfdb72eeacc822636ec54067a82b447adb0934..da84294fab05271ba04a8fa277b1c740
 +    try {
 +      var id = 0;
 +      _txid ??= widget.room.client.generateUniqueTransactionId();
-+      await widget.room.startPoll(
-+        question: _bodyController.text.trim(),
-+        answers: _answers
-+            .map(
-+              (answerController) => PollAnswer(
-+                id: (++id).toString(),
-+                mText: answerController.text.trim(),
-+              ),
-+            )
-+            .toList(),
-+        kind: _pollKind,
-+        maxSelections: _allowMultipleAnswers ? _answers.length : 1,
++      final question = _bodyController.text.trim();
++      final answerTexts = _answers.map((a) => a.text.trim()).toList();
++      final maxSelections = _allowMultipleAnswers ? _answers.length : 1;
++      
++      var plainBody = "$question\n\n";
++      var htmlBody = "<p>${const HtmlEscape().convert(question)}</p><ol>";
++      
++      final answersJson = [];
++      for (int i = 0; i < answerTexts.length; i++) {
++        final text = answerTexts[i];
++        plainBody += "${i + 1}. $text\n\n";
++        htmlBody += "<li>${const HtmlEscape().convert(text)}</li>";
++        
++        answersJson.add({
++          "id": "answer_$i",
++          "org.matrix.msc1767.text": text,
++        });
++      }
++      plainBody += "\n(This message is a poll. Please open WhatsApp to vote.)";
++      htmlBody += "</ol><p>(This message is a poll. Please open WhatsApp to vote.)</p>";
++      
++      final content = {
++        "body": plainBody,
++        "format": "org.matrix.custom.html",
++        "formatted_body": htmlBody,
++        "msgtype": "m.text",
++        "fi.mau.whatsapp.poll": {
++          "option_names": answerTexts,
++          "selectable_options_count": maxSelections,
++        },
++        "org.matrix.msc1767.message": [
++          {"body": htmlBody, "mimetype": "text/html"},
++          {"body": plainBody, "mimetype": "text/plain"},
++        ],
++        // Also send standard m.poll.start format just in case the bridge expects that now,
++        // and org.matrix.msc3381.poll.start for compatibility with older Beeper bridge versions.
++        "m.poll.start": {
++          "answers": answersJson,
++          "kind": _pollKind == PollKind.disclosed 
++              ? "m.poll.disclosed" 
++              : "m.poll.undisclosed",
++          "max_selections": maxSelections,
++          "question": {
++            "body": question,
++            "msgtype": "m.text",
++          },
++        },
++        "org.matrix.msc3381.poll.start": {
++          "answers": answersJson,
++          "kind": _pollKind == PollKind.disclosed 
++              ? "org.matrix.msc3381.poll.disclosed" 
++              : "org.matrix.msc3381.poll.undisclosed",
++          "max_selections": maxSelections,
++          "question": {
++            "org.matrix.msc1767.text": question,
++          },
++        },
++      };
++
++      await widget.room.client.sendEvent(
++        widget.room.id,
++        'org.matrix.msc3381.poll.start',
++        content,
 +        txid: _txid,
 +      );
 +      if (!mounted) return;
