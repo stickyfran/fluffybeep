@@ -301101,10 +301101,10 @@ index 777155b94aebef3bc005683305d08bff09f2fa19..0fa2a8e473c5c702f9d517144706c8d7
 +  }
 +}
 diff --git a/lib/pages/bootstrap/view_model/bootstrap_state.dart b/lib/pages/bootstrap/view_model/bootstrap_state.dart
-index f8d5fa7779042475b4fa8167afccaac3781b8549..f1b16b9a8de562f6c7bccce58f0ec0f5737261cf 100644
+index f8d5fa7779042475b4fa8167afccaac3781b8549..5e797c4fb454053fcc719cb25dc25fae5d531ab6 100644
 --- a/lib/pages/bootstrap/view_model/bootstrap_state.dart
 +++ b/lib/pages/bootstrap/view_model/bootstrap_state.dart
-@@ -1,35 +1,34 @@
+@@ -1,35 +1,35 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -301151,6 +301151,7 @@ index f8d5fa7779042475b4fa8167afccaac3781b8549..f1b16b9a8de562f6c7bccce58f0ec0f5
 +class BootstrapViewModelState {
 +  String? recoveryKey;
 +  bool isLoading = false;
++  Object? unlockWithError;
 +  ({
 +    bool connected,
 +    bool crossSigningEnabled,
