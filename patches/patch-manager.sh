@@ -3,9 +3,9 @@
 # patch-manager.sh
 # Administers patches for Fluffychat to add Beeper bridge support.
 #
-# UPSTREAM BASE COMMIT: 259bc72fb897e99303058712fcdfaee033bd4d33
+# UPSTREAM BASE COMMIT: c9c58c24f04304cc2ec263d891073805468383b8
 # This is the exact commit of krille-chan/fluffychat used in the CI workflow.
-# The unified patch is always generated as: git diff 259bc72 HEAD
+# The unified patch is always generated as: git diff c9c58c24f HEAD
 # NEVER use plain `git diff` (unstaged only) — it will miss committed changes.
 
 set -e
@@ -21,7 +21,7 @@ else
     FLUFFYCHAT_DIR="$ROOT_DIR"
 fi
 NEW_FILES_DIR="$PATCHES_DIR/NEW_FILES"
-UPSTREAM_BASE="259bc72fb897e99303058712fcdfaee033bd4d33"
+UPSTREAM_BASE="c9c58c24f04304cc2ec263d891073805468383b8"
 
 # Colors for output
 GREEN='\033[0;32m'
