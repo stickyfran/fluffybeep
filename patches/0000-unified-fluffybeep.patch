@@ -14207,6 +14207,18 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..1494f6d72d248920f1a0f5d3d37dc58f
 +-keep class com.antonkarpenko.ffmpegkit.** { *; }
 +-dontwarn com.antonkarpenko.ffmpegkit.**
 \ No newline at end of file
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index a63fd498ebbe29fc828e0d980ef50460acfd83d5..e9cb24443ef7bf21ac4e2a913f182276169bdf01 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -20,6 +20,7 @@
+     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
++    <uses-permission android:name="android.permission.READ_CONTACTS" />
+ 
+     <!-- To make app compatible with tablets -->
+     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
 index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316752792b6 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
@@ -304404,7 +304416,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c768009c15 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..f8cbb47827ed62421e174e59d127f21695aa84cd 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -304417,30 +304429,42 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:flutter/cupertino.dart';
  import 'package:flutter/material.dart';
-@@ -22,6 +24,7 @@ import 'package:scroll_to_index/scroll_to_index.dart';
+@@ -21,62 +23,68 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
+ import 'package:scroll_to_index/scroll_to_index.dart';
  
  import '../../config/app_config.dart';
++import '../../utils/beeper_merge_utils.dart';
  import '../../utils/date_time_extension.dart';
 +import '../../widgets/font_size_scaler.dart';
  
  class ChatEventList extends StatelessWidget {
    final ChatController controller;
-@@ -30,6 +33,7 @@ class ChatEventList extends StatelessWidget {
+ 
+-  const ChatEventList({super.key, required this.controller});
++  const ChatEventList({required this.controller, super.key});
  
    @override
    Widget build(BuildContext context) {
-+    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (events=${controller.filteredEvents.length}, room=${controller.room.id})');
++    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (roomId=${controller.room.id})');
      final timeline = controller.timeline;
- 
+-
      if (timeline == null) {
-@@ -41,42 +45,38 @@ class ChatEventList extends StatelessWidget {
+-      return const Center(child: CupertinoActivityIndicator());
++      return const Center(
++        child: CircularProgressIndicator.adaptive(strokeWidth: 2),
++      );
+     }
+     final theme = Theme.of(context);
  
-     final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
+     final colors = [theme.secondaryBubbleColor, theme.bubbleColor];
  
+-    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
+-
 -    final events = timeline.events.filterByVisibleInGui(
 -      threadId: controller.activeThreadId,
 -    );
--
++    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
+ 
 -    // create a map of eventId --> index to greatly improve performance of
 -    // ListView's findChildIndexCallback
 -    final thisEventsKeyMap = <String, int>{};
@@ -304467,6 +304491,9 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
 -                    (72 + (FluffyThemes.isColumnMode(context) ? 16 : 0))),
 -            left: horizontalPadding,
 -            right: horizontalPadding,
++    final hasMergedSiblings =
++        BeeperMergeUtils.getSiblingRooms(controller.room.id).length >= 2;
++
 +    return FontSizeScaler(
 +      child: CustomScrollView(
 +        cacheExtent: 500,
@@ -304480,7 +304507,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
 +            child: ValueListenableBuilder<double>(
 +              valueListenable: controller.inputBarHeightNotifier,
 +              builder: (context, inputBarHeight, _) => SizedBox(
-+                height: 8 + inputBarHeight + (FluffyThemes.isColumnMode(context) ? 16 : 0),
++                height: 8 +
++                    inputBarHeight +
++                    (hasMergedSiblings ? 76.0 : 0.0) +
++                    (FluffyThemes.isColumnMode(context) ? 16 : 0),
 +              ),
 +            ),
            ),
@@ -304503,7 +304533,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
                // Footer to display typing indicator and read receipts:
                if (i == 0) {
                  if (timeline.canRequestFuture) {
-@@ -92,13 +92,36 @@ class ChatEventList extends StatelessWidget {
+@@ -92,13 +100,36 @@ class ChatEventList extends StatelessWidget {
                      ),
                    );
                  }
@@ -304547,7 +304577,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
                  );
                }
  
-@@ -110,14 +133,8 @@ class ChatEventList extends StatelessWidget {
+@@ -110,14 +141,8 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -304564,7 +304594,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
                      }
                      return Center(
                        child: TextButton.icon(
-@@ -164,82 +181,88 @@ class ChatEventList extends StatelessWidget {
+@@ -164,82 +189,88 @@ class ChatEventList extends StatelessWidget {
                  index: i,
                  controller: controller.scrollController,
                  child: Column(
@@ -304721,7 +304751,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..758dc27f4673aa5202fc4926d61af3c7
                );
              },
              childCount: events.length + 2,
-@@ -248,6 +271,8 @@ class ChatEventList extends StatelessWidget {
+@@ -248,6 +279,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
        ),
@@ -305057,10 +305087,10 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a88ed84060 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423153b8e15 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -16,13 +16,17 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
+@@ -16,17 +16,23 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
  import 'package:fluffychat/pages/chat/pinned_events.dart';
  import 'package:fluffychat/pages/chat/reply_display.dart';
  import 'package:fluffychat/utils/account_config.dart';
@@ -305077,8 +305107,14 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a8
 +import 'package:url_launcher/url_launcher.dart';
  
  import '../../utils/stream_extension.dart';
++import '../../utils/beeper_merge_utils.dart';
  import 'chat_emoji_picker.dart';
-@@ -37,6 +41,7 @@ class ChatView extends StatelessWidget {
+ import 'chat_input_row.dart';
++import 'merged_contact_switcher.dart';
+ 
+ enum _EventContextAction { info, report }
+ 
+@@ -37,6 +43,7 @@ class ChatView extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -305086,7 +305122,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a8
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +51,552 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +53,561 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -305335,6 +305371,15 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a8
 -                                Text(L10n.of(context).messageInfo),
 -                              ],
 -                            ),
++                    ),
++                  ),
++                  ValueListenableBuilder<double>(
++                    valueListenable: controller.inputBarHeightNotifier,
++                    builder: (context, inputBarHeight, _) => Positioned(
++                      bottom: inputBarHeight,
++                      left: 0,
++                      right: 0,
++                      child: MergedContactSwitcher(currentRoom: controller.room),
 +                    ),
 +                  ),
 +                  Positioned(
@@ -305779,6 +305824,15 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a8
 -                              imageFilter: ui.ImageFilter.blur(
 -                                sigmaX: accountConfig.wallpaperBlur ?? 0.0,
 -                                sigmaY: accountConfig.wallpaperBlur ?? 0.0,
+-                              ),
+-                              child: MxcImage(
+-                                cacheKey: accountConfig.wallpaperUrl.toString(),
+-                                uri: accountConfig.wallpaperUrl,
+-                                fit: BoxFit.cover,
+-                                height: MediaQuery.sizeOf(context).height,
+-                                width: MediaQuery.sizeOf(context).width,
+-                                isThumbnail: false,
+-                                placeholder: (_) => Container(),
 +                      if (selectedEvents.single.status.isSent)
 +                        PopupMenuItem(
 +                          value: _EventContextAction.report,
@@ -305789,15 +305843,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..c5da3f30117f061629daa0ff72cab0a8
 +                                Icons.shield_outlined,
 +                                color: Colors.red,
                                ),
--                              child: MxcImage(
--                                cacheKey: accountConfig.wallpaperUrl.toString(),
--                                uri: accountConfig.wallpaperUrl,
--                                fit: BoxFit.cover,
--                                height: MediaQuery.sizeOf(context).height,
--                                width: MediaQuery.sizeOf(context).width,
--                                isThumbnail: false,
--                                placeholder: (_) => Container(),
--                              ),
 -                            ),
 +                              const SizedBox(width: 12),
 +                              Text(L10n.of(context).reportMessage),
@@ -310800,6 +310845,181 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e
          child: TextField(
            controller: controller,
            focusNode: focusNode,
+diff --git a/lib/pages/chat/merged_contact_switcher.dart b/lib/pages/chat/merged_contact_switcher.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..19fd1d803b00cfff5871f198e182a64ce3a26dda
+--- /dev/null
++++ b/lib/pages/chat/merged_contact_switcher.dart
+@@ -0,0 +1,169 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
++import 'package:matrix/matrix.dart';
++import '../../config/themes.dart';
++import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/beeper_merge_utils.dart';
++import '../../widgets/avatar.dart';
++import '../merge_contact_picker/merge_contact_picker.dart';
++
++class MergedContactSwitcher extends StatelessWidget {
++  final Room currentRoom;
++
++  const MergedContactSwitcher({
++    super.key,
++    required this.currentRoom,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    final siblings = BeeperMergeUtils.getSiblingRooms(currentRoom.id);
++    if (siblings.length < 2) return const SizedBox.shrink();
++
++    final theme = Theme.of(context);
++
++    return Container(
++      height: 76,
++      decoration: BoxDecoration(
++        color: theme.colorScheme.surfaceContainer.withValues(alpha: 0.95),
++        border: Border(
++          top: BorderSide(
++            color: theme.dividerColor.withValues(alpha: 0.5),
++            width: 0.5,
++          ),
++          bottom: BorderSide(
++            color: theme.dividerColor.withValues(alpha: 0.5),
++            width: 0.5,
++          ),
++        ),
++      ),
++      child: ListView.builder(
++        scrollDirection: Axis.horizontal,
++        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
++        itemCount: siblings.length + 1,
++        itemBuilder: (context, index) {
++          if (index == siblings.length) {
++            // "+" Add account button
++            return Center(
++              child: Padding(
++                padding: const EdgeInsets.only(left: 4, right: 8),
++                child: IconButton.filledTonal(
++                  icon: const Icon(Icons.add, size: 20),
++                  tooltip: 'Vincular otra cuenta',
++                  onPressed: () {
++                    showMergeContactPicker(context, currentRoom);
++                  },
++                ),
++              ),
++            );
++          }
++
++          final room = siblings[index];
++          final isActive = room.id == currentRoom.id;
++          final beeperData = BeeperBridgeUtils.getRoomData(room);
++          final network = BeeperBridgeUtils.getRoomNetwork(room);
++          final displayname = beeperData.displayName ?? room.name;
++          final hasUnread = room.isUnreadOrInvited || room.notificationCount > 0;
++
++          return Padding(
++            padding: const EdgeInsets.only(right: 12),
++            child: Material(
++              color: Colors.transparent,
++              child: InkWell(
++                borderRadius: BorderRadius.circular(12),
++                onTap: isActive ? null : () => context.go('/rooms/${room.id}'),
++                child: AnimatedContainer(
++                  duration: FluffyThemes.animationDuration,
++                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
++                  decoration: BoxDecoration(
++                    borderRadius: BorderRadius.circular(12),
++                    color: isActive
++                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.6)
++                        : Colors.transparent,
++                    border: isActive
++                        ? Border.all(
++                            color: theme.colorScheme.primary.withValues(alpha: 0.8),
++                            width: 1.5,
++                          )
++                        : Border.all(color: Colors.transparent, width: 1.5),
++                  ),
++                  child: Column(
++                    mainAxisSize: MainAxisSize.min,
++                    mainAxisAlignment: MainAxisAlignment.center,
++                    children: [
++                      Stack(
++                        clipBehavior: Clip.none,
++                        children: [
++                          Avatar(
++                            mxContent: beeperData.avatarUrl,
++                            name: displayname,
++                            size: 34,
++                          ),
++                          if (network != null)
++                            Positioned(
++                              bottom: -2,
++                              right: -2,
++                              child: Container(
++                                width: 12,
++                                height: 12,
++                                decoration: BoxDecoration(
++                                  shape: BoxShape.circle,
++                                  color: Color(network.colorHex),
++                                  border: Border.all(
++                                    color: theme.colorScheme.surface,
++                                    width: 1.5,
++                                  ),
++                                ),
++                              ),
++                            ),
++                          if (hasUnread && !isActive)
++                            Positioned(
++                              top: -2,
++                              right: -2,
++                              child: Container(
++                                width: 10,
++                                height: 10,
++                                decoration: BoxDecoration(
++                                  shape: BoxShape.circle,
++                                  color: theme.colorScheme.error,
++                                  border: Border.all(
++                                    color: theme.colorScheme.surface,
++                                    width: 1.5,
++                                  ),
++                                ),
++                              ),
++                            ),
++                        ],
++                      ),
++                      const SizedBox(height: 3),
++                      SizedBox(
++                        width: 58,
++                        child: Text(
++                          network?.name ?? 'Chat',
++                          maxLines: 1,
++                          textAlign: TextAlign.center,
++                          overflow: TextOverflow.ellipsis,
++                          style: TextStyle(
++                            fontSize: 10,
++                            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
++                            color: isActive
++                                ? theme.colorScheme.onPrimaryContainer
++                                : theme.colorScheme.onSurfaceVariant,
++                          ),
++                        ),
++                      ),
++                    ],
++                  ),
++                ),
++              ),
++            ),
++          );
++        },
++      ),
++    );
++  }
++}
 diff --git a/lib/pages/chat/pinned_events.dart b/lib/pages/chat/pinned_events.dart
 index 0b8dc33f50384162f195fcf8251ef86b45f47a8e..7cbbc7163f8ee0ea18304372bece0e1d555ff373 100644
 --- a/lib/pages/chat/pinned_events.dart
@@ -317166,10 +317386,10 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12407f6e4b 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd1129349639aea 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
-@@ -3,36 +3,61 @@
+@@ -3,36 +3,63 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -317181,6 +317401,8 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
  import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 -import 'package:fluffychat/utils/verified_room_extension.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/beeper_merge_utils.dart';
++import '../merge_contact_picker/merge_contact_picker.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
 -import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -317237,7 +317459,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
      if (room == null) {
        return Scaffold(
          appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
-@@ -42,25 +67,30 @@ class ChatDetailsView extends StatelessWidget {
+@@ -42,25 +69,30 @@ class ChatDetailsView extends StatelessWidget {
        );
      }
  
@@ -317278,7 +317500,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
          return Scaffold(
            appBar: AppBar(
              leading:
-@@ -79,8 +109,10 @@ class ChatDetailsView extends StatelessWidget {
+@@ -79,8 +111,10 @@ class ChatDetailsView extends StatelessWidget {
                  IconButton(
                    tooltip: L10n.of(context).share,
                    icon: const Icon(Icons.qr_code_rounded),
@@ -317291,7 +317513,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -92,278 +124,275 @@ class ChatDetailsView extends StatelessWidget {
+@@ -92,278 +126,295 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -317743,6 +317965,28 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
 -                          (actualMembersCount - members.length),
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
++                        leading: CircleAvatar(
++                          backgroundColor: theme.colorScheme.surfaceContainer,
++                          foregroundColor: iconColor,
++                          child: const Icon(Icons.merge_type_outlined),
++                        ),
++                        title: Text(
++                          BeeperMergeUtils.isRoomMerged(room.id)
++                              ? 'Contacto fusionado (${BeeperMergeUtils.getSiblingRooms(room.id).length} chats)'
++                              : 'Fusionar con otras cuentas...',
+                         ),
++                        subtitle: Text(
++                          BeeperMergeUtils.isRoomMerged(room.id)
++                              ? 'Gestionar chats vinculados de este contacto'
++                              : 'Unir cuentas de WhatsApp o Instagram de este contacto',
++                        ),
++                        trailing: const Icon(Icons.chevron_right_outlined),
++                        onTap: () => showMergeContactPicker(context, room),
+                       ),
+-                      onTap: () => context.push(
+-                        '/rooms/${controller.roomId!}/details/members',
++                      Divider(color: theme.dividerColor),
++                      ListTile(
 +                        title: Text(
 +                          L10n.of(
 +                            context,
@@ -317751,11 +317995,8 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
 +                            color: theme.colorScheme.secondary,
 +                            fontWeight: FontWeight.bold,
 +                          ),
-                         ),
++                        ),
                        ),
--                      onTap: () => context.push(
--                        '/rooms/${controller.roomId!}/details/members',
--                      ),
 -                      trailing: const Icon(Icons.chevron_right_outlined),
 +                      if (!room.isDirectChat && room.canInvite)
 +                        ListTile(
@@ -317811,7 +318052,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..3faaebce3e3891509f1d55c49969ed12
              ),
            ),
          );
-@@ -371,48 +400,3 @@ class ChatDetailsView extends StatelessWidget {
+@@ -371,48 +422,3 @@ class ChatDetailsView extends StatelessWidget {
      );
    }
  }
@@ -318834,7 +319075,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d30502b8ab3e2 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734dd9c064b 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -318863,11 +319104,15 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
  import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
  import 'package:go_router/go_router.dart';
  import 'package:matrix/matrix.dart' as sdk;
-@@ -32,7 +37,13 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+@@ -32,7 +37,17 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
  
  import '../../../utils/account_bundles.dart';
  import '../../config/setting_keys.dart';
 +import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/beeper_merge_utils.dart';
++import '../../utils/beeper_phone_contacts.dart';
++import '../merge_contact_picker/merge_contact_picker.dart';
++import 'merged_contact_list_item.dart';
 +import '../../utils/stream_extension.dart';
 +import '../../utils/room_sort_isolate.dart';
  import '../../utils/url_launcher.dart';
@@ -318877,7 +319122,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
  import '../../widgets/matrix.dart';
  
  enum ActiveFilter { allChats, unread, groups, messages, tag }
-@@ -80,11 +91,12 @@ class ChatListController extends State<ChatList>
+@@ -80,11 +95,12 @@ class ChatListController extends State<ChatList>
    String? activeTag;
  
    String? _activeSpaceId;
@@ -318892,7 +319137,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
  
      setState(() {
        _activeSpaceId = spaceId;
-@@ -132,6 +144,10 @@ class ChatListController extends State<ChatList>
+@@ -132,6 +148,10 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -318903,7 +319148,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
      context.go('/rooms/${room.id}');
    }
  
-@@ -140,9 +156,9 @@ class ChatListController extends State<ChatList>
+@@ -140,9 +160,9 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -318915,7 +319160,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -150,12 +166,312 @@ class ChatListController extends State<ChatList>
+@@ -150,12 +170,472 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -319032,6 +319277,9 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
 +  Set<String> _cachedHiddenInboxRoomIds = {};
 +  Map<String, String> _cachedRoomDisplayNames = {};
 +  Map<String, DateTime> _cachedTimestamps = {};
++  Map<String, String> _cachedRoomToMergeId = {};
++  Map<String, MergedContactEntry> _cachedMergedEntries = {};
++  Set<String> _cachedMergedRoomIds = {};
 +  StreamSubscription? _onSyncForRoomCache;
 +  
 +  final Set<String> _pendingChangedRoomIds = {};
@@ -319062,7 +319310,86 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
 +      }
 +
 +      final client = Matrix.of(context).client;
-+      final allRooms = client.rooms.toList();
++      final allClientRooms = client.rooms.toList();
++
++      // Process merged contacts state
++      final mergedContacts = BeeperMergeUtils.getMergedContacts(client);
++      BeeperMergeUtils.updateSiblingRooms(client);
++
++      final newRoomToMergeId = <String, String>{};
++      final newMergedRoomIds = <String>{};
++      final newMergedEntries = <String, MergedContactEntry>{};
++
++      for (final contact in mergedContacts.values) {
++        final contactRooms = <Room>[];
++        for (final rId in contact.roomIds) {
++          final r = client.getRoomById(rId);
++          if (r != null) contactRooms.add(r);
++        }
++
++        if (contactRooms.length < 2) continue;
++
++        for (final r in contactRooms) {
++          newRoomToMergeId[r.id] = contact.id;
++          newMergedRoomIds.add(r.id);
++        }
++
++        DateTime maxTs = DateTime.fromMillisecondsSinceEpoch(0);
++        int totalUnread = 0;
++        Room? latestRoom;
++        String? latestSnippet;
++        BeeperNetwork? latestNet;
++
++        for (final r in contactRooms) {
++          final ts = _cachedTimestamps[r.id] ?? _getMessageTimestamp(r);
++          totalUnread += r.notificationCount;
++          if (ts.isAfter(maxTs) || latestRoom == null) {
++            maxTs = ts;
++            latestRoom = r;
++            latestNet = BeeperBridgeUtils.getRoomNetwork(r);
++          }
++        }
++
++        if (latestRoom != null) {
++          final lastEv = BeeperBridgeUtils.lastRealMessageCache[latestRoom.id] ?? latestRoom.lastEvent;
++          if (lastEv != null) {
++            final netName = latestNet?.name ?? '';
++            final body = lastEv.calcLocalizedBodyFallback(
++              MatrixLocals(L10n.of(context)),
++              hideReply: true,
++              hideEdit: true,
++              plaintextBody: true,
++              removeMarkdown: true,
++            );
++            latestSnippet = netName.isNotEmpty ? '[$netName] $body' : body;
++          }
++        }
++
++        final beeperData = latestRoom != null ? BeeperBridgeUtils.getRoomData(latestRoom) : null;
++        final dName = contact.displayName.isNotEmpty
++            ? contact.displayName
++            : (beeperData?.displayName ?? contactRooms.first.name);
++
++        newMergedEntries[contact.id] = MergedContactEntry(
++          contact: contact,
++          rooms: contactRooms,
++          latestTs: maxTs,
++          totalUnread: totalUnread,
++          latestRoom: latestRoom ?? contactRooms.first,
++          displayName: dName,
++          avatarUrl: beeperData?.avatarUrl,
++          lastMessageSnippet: latestSnippet,
++          latestNetwork: latestNet,
++        );
++      }
++
++      _cachedRoomToMergeId = newRoomToMergeId;
++      _cachedMergedRoomIds = newMergedRoomIds;
++      _cachedMergedEntries = newMergedEntries;
++
++      final allRooms = allClientRooms
++          .where((r) => !_cachedMergedRoomIds.contains(r.id))
++          .toList();
 +
 +      // Precalculate timestamps incrementally to avoid repeated iteration
 +      if (!isIncremental) {
@@ -319205,6 +319532,84 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
 +  List<Room> get allRoomsSorted => _cachedAllRoomsSorted;
 +  Set<String> get hiddenInboxRoomIds => _cachedHiddenInboxRoomIds;
 +  Map<String, String> get roomDisplayNames => _cachedRoomDisplayNames;
++  Map<String, MergedContactEntry> get mergedContactEntries => _cachedMergedEntries;
++  Map<String, String> get roomToMergeId => _cachedRoomToMergeId;
++  Set<String> get mergedRoomIds => _cachedMergedRoomIds;
++
++  void onMergedContactTap(MergedContactEntry entry) {
++    final room = entry.latestRoom ?? (entry.rooms.isNotEmpty ? entry.rooms.first : null);
++    if (room != null) {
++      onChatTap(room);
++    }
++  }
++
++  Future<void> mergedContactContextAction(
++    MergedContactEntry entry,
++    BuildContext posContext,
++  ) async {
++    final overlay =
++        Overlay.of(posContext).context.findRenderObject() as RenderBox;
++    final button = posContext.findRenderObject() as RenderBox;
++    final position = RelativeRect.fromRect(
++      Rect.fromPoints(
++        button.localToGlobal(const Offset(0, -65), ancestor: overlay),
++        button.localToGlobal(
++          button.size.bottomRight(Offset.zero) + const Offset(-50, 0),
++          ancestor: overlay,
++        ),
++      ),
++      Offset.zero & overlay.size,
++    );
++
++    final action = await showMenu<String>(
++      context: posContext,
++      position: position,
++      items: [
++        const PopupMenuItem(
++          value: 'edit',
++          child: Row(
++            children: [
++              Icon(Icons.edit_outlined),
++              SizedBox(width: 12),
++              Text('Editar / Vincular cuentas'),
++            ],
++          ),
++        ),
++        PopupMenuItem(
++          value: 'unmerge',
++          child: Row(
++            children: [
++              Icon(Icons.link_off_outlined, color: Theme.of(context).colorScheme.error),
++              const SizedBox(width: 12),
++              Text('Desfusionar contacto', style: TextStyle(color: Theme.of(context).colorScheme.error)),
++            ],
++          ),
++        ),
++      ],
++    );
++
++    if (!mounted || !posContext.mounted) return;
++
++    if (action == 'edit') {
++      if (entry.latestRoom != null) {
++        await showMergeContactPicker(context, entry.latestRoom!);
++        _invalidateRoomCache();
++      }
++    } else if (action == 'unmerge') {
++      final consent = await showOkCancelAlertDialog(
++        context: context,
++        title: 'Desfusionar contacto',
++        message: '¿Estás seguro de que quieres separar los chats de "${entry.displayName}"?',
++        okLabel: 'Desfusionar',
++        isDestructive: true,
++      );
++      if (consent == OkCancelResult.ok) {
++        final client = Matrix.of(context).client;
++        await BeeperMergeUtils.removeMerge(client, entry.contact.id);
++        _invalidateRoomCache();
++      }
++    }
++  }
 +
 +  // ── Space-delegate cache ─────────────────────────────────────────────────────
 +  // Previously computed inside build() on every frame – now computed once per sync.
@@ -319232,7 +319637,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +480,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +644,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -319339,7 +319744,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +510,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +674,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -319366,7 +319771,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
    }
  
    void openNavrail() {
-@@ -285,13 +544,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +708,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -319390,7 +319795,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +562,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +726,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -319404,7 +319809,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +650,136 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +814,136 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -319577,7 +319982,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +873,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1037,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -319593,7 +319998,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +986,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1150,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -319625,7 +320030,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1021,28 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1185,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -319651,10 +320056,21 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
 +              ],
 +            ),
 +          ),
++          PopupMenuItem(
++            value: ChatContextAction.merge,
++            child: Row(
++              mainAxisSize: .min,
++              children: [
++                const Icon(Icons.merge_type_outlined),
++                const SizedBox(width: 12),
++                const Text('Fusionar contacto...'),
++              ],
++            ),
++          ),
          ],
        );
      }
-@@ -700,7 +1063,30 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1238,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -319686,7 +320102,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1187,120 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1362,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -319805,10 +320221,14 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
 +          future: () => BeeperBridgeUtils.setBeeperLabels(client, updatedLabels),
 +        );
 +        return;
++      case ChatContextAction.merge:
++        await showMergeContactPicker(context, room);
++        _invalidateRoomCache();
++        return;
      }
    }
  
-@@ -864,6 +1357,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1536,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -319816,7 +320236,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1408,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1587,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -319830,18 +320250,19 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5861288a92a9e7283a813c64627d3050
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1532,6 @@ enum ChatContextAction {
+@@ -1039,4 +1711,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
 +  addToLabel,
 +  removeFromLabel,
++  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a4e553a1f 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..9a5b7fc7d64a67da17c2ec0b021bcf397e0d1a5b 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -3,6 +3,10 @@
+@@ -3,224 +3,450 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -319852,7 +320273,8 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
  import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/chat_list.dart';
-@@ -10,217 +14,368 @@ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+ import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
++import 'package:fluffychat/pages/chat_list/merged_contact_list_item.dart';
  import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
  import 'package:fluffychat/pages/chat_list/search_title.dart';
  import 'package:fluffychat/pages/chat_list/space_view.dart';
@@ -320008,6 +320430,76 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
 +            final displayname = displayNames[room.id] ?? '';
 +            return displayname.contains(filter);
 +          }).toList();
++        }
++
++        var mergedEntries = widget.controller.mergedContactEntries.values.where((entry) {
++          if (widget.controller.activeFilter == ActiveFilter.groups) return false;
++          if (widget.controller.activeFilter == ActiveFilter.unread && entry.totalUnread <= 0) return false;
++          if (widget.controller.activeFilter == ActiveFilter.tag) {
++            final tag = widget.controller.activeTag;
++            if (tag == null || !entry.rooms.any((r) => r.tags.containsKey(tag))) return false;
++          }
++          if (isVirtualSpace) {
++            final virtualNetKey = activeSpace!.replaceFirst('virtual_space_', '');
++            if (!entry.rooms.any((r) => BeeperBridgeUtils.getRoomNetwork(r)?.key == virtualNetKey)) return false;
++          }
++          if (isVirtualTag) {
++            final tagKey = activeSpace!.replaceFirst('virtual_tag_', '');
++            if (!entry.rooms.any((r) => r.tags.containsKey(tagKey))) return false;
++          }
++          if (isVirtualBeeperLabel) {
++            final uuid = activeSpace!.replaceFirst('virtual_beeper_label_', '');
++            final labels = BeeperBridgeUtils.getBeeperLabels(client);
++            final labelData = labels[uuid];
++            if (labelData is Map) {
++              final labelRooms = labelData['rooms'];
++              if (labelRooms is List) {
++                final roomIdSet = Set<String>.from(labelRooms.cast<String>());
++                if (!entry.rooms.any((r) => roomIdSet.contains(r.id))) return false;
++              } else {
++                return false;
++              }
++            } else {
++              return false;
++            }
++          }
++          if (filter.isNotEmpty) {
++            final matchName = entry.displayName.toLowerCase().contains(filter);
++            final matchRoom = entry.rooms.any((r) =>
++                (widget.controller.roomDisplayNames[r.id] ?? '').contains(filter));
++            if (!matchName && !matchRoom) return false;
++          }
++          return true;
++        }).toList();
++
++        final List<dynamic> listItems = <dynamic>[];
++        if (mergedEntries.isEmpty) {
++          listItems.addAll(rooms);
++        } else {
++          final sortedMerged = List<MergedContactEntry>.from(mergedEntries)
++            ..sort((a, b) => b.latestTs.compareTo(a.latestTs));
++
++          int ri = 0;
++          int mi = 0;
++          while (ri < rooms.length || mi < sortedMerged.length) {
++            if (ri >= rooms.length) {
++              listItems.add(sortedMerged[mi++]);
++            } else if (mi >= sortedMerged.length) {
++              listItems.add(rooms[ri++]);
++            } else {
++              final r = rooms[ri];
++              final roomTs = BeeperBridgeUtils.getLastMessageTime(r.id) ??
++                  (BeeperBridgeUtils.getCachedLastTimestamp(r.id) != null
++                      ? DateTime.fromMillisecondsSinceEpoch(BeeperBridgeUtils.getCachedLastTimestamp(r.id)!)
++                      : DateTime.fromMillisecondsSinceEpoch(0));
++              final mergeTs = sortedMerged[mi].latestTs;
++              if (mergeTs.isAfter(roomTs)) {
++                listItems.add(sortedMerged[mi++]);
++              } else {
++                listItems.add(rooms[ri++]);
++              }
++            }
++          }
 +        }
 +
 +        return GestureDetector(
@@ -320287,7 +320779,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
 +                        icon: const Icon(Icons.forum_outlined),
 +                      ),
 +                    if (client.prevBatch != null &&
-+                        rooms.isEmpty &&
++                        listItems.isEmpty &&
 +                        !widget.controller.isSearchMode) ...[
 +                      Column(
 +                        mainAxisAlignment: MainAxisAlignment.center,
@@ -320370,13 +320862,13 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
 +                  if (client.rooms.isNotEmpty && !widget.controller.isSearchMode) 1,
 +                  if (isVirtualBeeperLabel) 1,
 +                  if (widget.controller.isSearchMode) 1,
-+                  if (client.prevBatch != null && rooms.isEmpty && !widget.controller.isSearchMode) 1,
++                  if (client.prevBatch != null && listItems.isEmpty && !widget.controller.isSearchMode) 1,
 +                ].fold<int>(0, (p, e) => p + e),
 +              ),
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +390,40 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +461,53 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -320400,7 +320892,20 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
 +                sliver: SliverList(
 +                  delegate: SliverChildBuilderDelegate(
 +                    (BuildContext context, int i) {
-+                      final room = rooms[i];
++                      final item = listItems[i];
++                      if (item is MergedContactEntry) {
++                        return MergedContactListItem(
++                          key: Key('merged_contact_${item.contact.id}'),
++                          entry: item,
++                          filter: filter,
++                          activeChat: widget.controller.activeChat != null &&
++                              item.rooms.any((r) => r.id == widget.controller.activeChat),
++                          onTap: () => widget.controller.onMergedContactTap(item),
++                          onLongPress: (ctx) =>
++                              widget.controller.mergedContactContextAction(item, ctx),
++                        );
++                      }
++                      final room = item as Room;
 +                      final space = spaceDelegateCandidates[room.id];
 +                      return ChatListItem(
 +                        room,
@@ -320414,16 +320919,16 @@ index 8610b92531be84898e03439fa07f16145a6d552c..f793901b1e0c36f54c2102edc8c93a7a
 +                        activeChat: widget.controller.activeChat == room.id,
 +                      );
 +                    },
-+                    childCount: rooms.length,
++                    childCount: listItems.length,
 +                    addAutomaticKeepAlives: false,
 +                    addRepaintBoundaries: true,
 +                  ),
-               ),
++              ),
 +            ),
 +            SliverToBoxAdapter(
 +              child: SizedBox(
 +                height: AppSettings.searchStyle.value == 'bottom_fab' && !FluffyThemes.isColumnMode(context) ? 80 : 20,
-+              ),
+               ),
 +            ),
            ],
 +        ),
@@ -322405,6 +322910,288 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +          ],
 +        ),
 +      ),
++    );
++  }
++}
+diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..87d25f33e94d4ba19f52bf486edc68ab7d8dbd71
+--- /dev/null
++++ b/lib/pages/chat_list/merged_contact_list_item.dart
+@@ -0,0 +1,276 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import '../../config/app_config.dart';
++import '../../config/themes.dart';
++import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/beeper_merge_utils.dart';
++import '../../utils/beeper_phone_contacts.dart';
++import '../../utils/date_time_extension.dart';
++import '../../widgets/avatar.dart';
++import 'unread_bubble.dart';
++
++class MergedContactEntry {
++  final MergedContact contact;
++  final List<Room> rooms;
++  final DateTime latestTs;
++  final int totalUnread;
++  final Room? latestRoom;
++  final String displayName;
++  final Uri? avatarUrl;
++  final String? lastMessageSnippet;
++  final BeeperNetwork? latestNetwork;
++
++  const MergedContactEntry({
++    required this.contact,
++    required this.rooms,
++    required this.latestTs,
++    required this.totalUnread,
++    this.latestRoom,
++    required this.displayName,
++    this.avatarUrl,
++    this.lastMessageSnippet,
++    this.latestNetwork,
++  });
++}
++
++class MergedContactListItem extends StatelessWidget {
++  final MergedContactEntry entry;
++  final bool activeChat;
++  final VoidCallback onTap;
++  final void Function(BuildContext context)? onLongPress;
++  final String? filter;
++
++  const MergedContactListItem({
++    super.key,
++    required this.entry,
++    this.activeChat = false,
++    required this.onTap,
++    this.onLongPress,
++    this.filter,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final backgroundColor = activeChat ? theme.colorScheme.secondaryContainer : null;
++
++    final phoneContact = entry.contact.phoneContactId != null
++        ? BeeperPhoneContacts.findById(entry.contact.phoneContactId!)
++        : null;
++
++    final Widget avatarWidget = SizedBox(
++      width: Avatar.defaultSize,
++      height: Avatar.defaultSize,
++      child: Stack(
++        clipBehavior: Clip.none,
++        children: [
++          if (phoneContact?.thumbnail != null)
++            ClipRRect(
++              borderRadius: BorderRadius.circular(Avatar.defaultSize),
++              child: Image.memory(
++                phoneContact!.thumbnail!,
++                width: Avatar.defaultSize,
++                height: Avatar.defaultSize,
++                fit: BoxFit.cover,
++              ),
++            )
++          else
++            Avatar(
++              mxContent: entry.avatarUrl,
++              size: Avatar.defaultSize,
++              name: entry.displayName,
++              onTap: () => onLongPress?.call(context),
++            ),
++          Positioned(
++            bottom: -2,
++            right: -2,
++            child: _NetworkBadgeRow(rooms: entry.rooms),
++          ),
++        ],
++      ),
++    );
++
++    final snippet = entry.lastMessageSnippet ?? 'Chat unificado';
++    final hasNewMessages = entry.totalUnread > 0;
++
++    return Padding(
++      padding: const EdgeInsets.symmetric(horizontal: 8),
++      child: Material(
++        borderRadius: BorderRadius.circular(AppConfig.borderRadius),
++        clipBehavior: Clip.hardEdge,
++        color: backgroundColor,
++        child: ListTile(
++          minVerticalPadding: 16,
++          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
++          onLongPress: () => onLongPress?.call(context),
++          onTap: onTap,
++          leading: avatarWidget,
++          title: Row(
++            children: [
++              Expanded(
++                child: Row(
++                  children: [
++                    Flexible(
++                      child: Text(
++                        entry.displayName,
++                        maxLines: 1,
++                        overflow: TextOverflow.ellipsis,
++                        style: TextStyle(
++                          fontWeight: hasNewMessages ? FontWeight.bold : FontWeight.w600,
++                        ),
++                      ),
++                    ),
++                    const SizedBox(width: 6),
++                    Container(
++                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
++                      decoration: BoxDecoration(
++                        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
++                        borderRadius: BorderRadius.circular(8),
++                      ),
++                      child: Text(
++                        '${entry.rooms.length}',
++                        style: TextStyle(
++                          fontSize: 10,
++                          fontWeight: FontWeight.bold,
++                          color: theme.colorScheme.onPrimaryContainer,
++                        ),
++                      ),
++                    ),
++                  ],
++                ),
++              ),
++            ],
++          ),
++          subtitle: Row(
++            children: [
++              if (entry.latestNetwork != null) ...[
++                Container(
++                  width: 8,
++                  height: 8,
++                  margin: const EdgeInsets.only(right: 6),
++                  decoration: BoxDecoration(
++                    shape: BoxShape.circle,
++                    color: Color(entry.latestNetwork!.colorHex),
++                  ),
++                ),
++              ],
++              Expanded(
++                child: Text(
++                  snippet,
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: TextStyle(
++                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
++                  ),
++                ),
++              ),
++            ],
++          ),
++          trailing: AnimatedContainer(
++            duration: FluffyThemes.animationDuration,
++            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
++            decoration: BoxDecoration(
++              borderRadius: BorderRadius.circular(16),
++              border: hasNewMessages
++                  ? Border.all(
++                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
++                      width: 1,
++                    )
++                  : null,
++              color: hasNewMessages
++                  ? theme.colorScheme.primary.withValues(alpha: 0.08)
++                  : Colors.transparent,
++            ),
++            child: Column(
++              mainAxisSize: MainAxisSize.min,
++              mainAxisAlignment: MainAxisAlignment.center,
++              children: [
++                if (entry.latestTs.millisecondsSinceEpoch > 0)
++                  Text(
++                    entry.latestTs.localizedTimeShort(context),
++                    style: TextStyle(
++                      fontSize: 11,
++                      fontWeight: hasNewMessages ? FontWeight.bold : null,
++                      color: hasNewMessages
++                          ? theme.colorScheme.primary
++                          : theme.colorScheme.onSurfaceVariant,
++                    ),
++                  ),
++                if (entry.totalUnread > 0) ...[
++                  const SizedBox(height: 4),
++                  Container(
++                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
++                    decoration: BoxDecoration(
++                      color: theme.colorScheme.primary,
++                      borderRadius: BorderRadius.circular(10),
++                    ),
++                    child: Text(
++                      '${entry.totalUnread}',
++                      style: TextStyle(
++                        fontSize: 11,
++                        color: theme.colorScheme.onPrimary,
++                        fontWeight: FontWeight.bold,
++                      ),
++                    ),
++                  ),
++                ],
++              ],
++            ),
++          ),
++        ),
++      ),
++    );
++  }
++}
++
++class _NetworkBadgeRow extends StatelessWidget {
++  final List<Room> rooms;
++
++  const _NetworkBadgeRow({required this.rooms});
++
++  @override
++  Widget build(BuildContext context) {
++    final networks = <BeeperNetwork>[];
++    final seenKeys = <String>{};
++
++    for (final room in rooms) {
++      final net = BeeperBridgeUtils.getRoomNetwork(room);
++      if (net != null && seenKeys.add(net.key)) {
++        networks.add(net);
++      }
++    }
++
++    if (networks.isEmpty) {
++      return Container(
++        width: 14,
++        height: 14,
++        decoration: BoxDecoration(
++          shape: BoxShape.circle,
++          color: Theme.of(context).colorScheme.primary,
++          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
++        ),
++        child: Icon(Icons.link, size: 8, color: Theme.of(context).colorScheme.onPrimary),
++      );
++    }
++
++    return Row(
++      mainAxisSize: MainAxisSize.min,
++      children: networks.take(3).map((net) {
++        return Container(
++          margin: const EdgeInsets.only(left: 1),
++          width: 12,
++          height: 12,
++          decoration: BoxDecoration(
++            shape: BoxShape.circle,
++            color: Color(net.colorHex),
++            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
++          ),
++        );
++      }).toList(),
 +    );
 +  }
 +}
@@ -333541,6 +334328,466 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +            ),
 +          );
 +        },
++      ),
++    );
++  }
++}
+diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..61a3ef5b4aed324e2bf4cfb79fd335f7032707bd
+--- /dev/null
++++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
+@@ -0,0 +1,454 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:collection';
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import '../../config/themes.dart';
++import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/beeper_merge_utils.dart';
++import '../../utils/beeper_phone_contacts.dart';
++import '../../widgets/avatar.dart';
++import '../../widgets/matrix.dart';
++
++Future<void> showMergeContactPicker(BuildContext context, Room initialRoom) async {
++  await showModalBottomSheet<void>(
++    context: context,
++    isScrollControlled: true,
++    backgroundColor: Colors.transparent,
++    builder: (ctx) => MergeContactPicker(initialRoom: initialRoom),
++  );
++}
++
++class MergeContactPicker extends StatefulWidget {
++  final Room initialRoom;
++
++  const MergeContactPicker({
++    super.key,
++    required this.initialRoom,
++  });
++
++  @override
++  State<MergeContactPicker> createState() => _MergeContactPickerState();
++}
++
++class _MergeContactPickerState extends State<MergeContactPicker> {
++  final Set<String> _selectedRoomIds = <String>{};
++  final TextEditingController _searchController = TextEditingController();
++  final TextEditingController _nameController = TextEditingController();
++
++  String? _matchedPhoneContactId;
++  String _searchFilter = '';
++  bool _isLoadingContacts = false;
++  String? _existingMergeId;
++
++  @override
++  void initState() {
++    super.initState();
++    _existingMergeId = BeeperMergeUtils.getMergeIdForRoom(widget.initialRoom.id);
++    if (_existingMergeId != null) {
++      final siblings = BeeperMergeUtils.getSiblingRooms(widget.initialRoom.id);
++      for (final s in siblings) {
++        _selectedRoomIds.add(s.id);
++      }
++      final mc = BeeperMergeUtils.getMergedContacts(widget.initialRoom.client)[_existingMergeId];
++      if (mc != null) {
++        _nameController.text = mc.displayName;
++        _matchedPhoneContactId = mc.phoneContactId;
++      }
++    } else {
++      _selectedRoomIds.add(widget.initialRoom.id);
++      final initialData = BeeperBridgeUtils.getRoomData(widget.initialRoom);
++      _nameController.text = initialData.displayName ?? widget.initialRoom.name;
++    }
++
++    _searchController.addListener(() {
++      setState(() {
++        _searchFilter = _searchController.text.trim().toLowerCase();
++      });
++    });
++
++    _initPhoneContacts();
++  }
++
++  Future<void> _initPhoneContacts() async {
++    if (!BeeperPhoneContacts.isLoaded && !BeeperPhoneContacts.isPermissionDenied) {
++      setState(() => _isLoadingContacts = true);
++      await BeeperPhoneContacts.load(requestPermission: false);
++      if (mounted) {
++        _checkPhoneMatch();
++        setState(() => _isLoadingContacts = false);
++      }
++    } else {
++      _checkPhoneMatch();
++    }
++  }
++
++  void _checkPhoneMatch() {
++    if (_matchedPhoneContactId != null) return;
++    for (final rId in _selectedRoomIds) {
++      final room = widget.initialRoom.client.getRoomById(rId);
++      if (room == null) continue;
++      final beeperData = BeeperBridgeUtils.getRoomData(room);
++      final contactId = beeperData.contactId ?? room.directChatMatrixID;
++      if (contactId != null) {
++        final phone = BeeperMergeUtils.extractPhoneFromMxid(contactId);
++        if (phone != null) {
++          final pc = BeeperPhoneContacts.findByPhone(phone);
++          if (pc != null) {
++            _matchedPhoneContactId = pc.id;
++            if (_nameController.text.isEmpty || _nameController.text == widget.initialRoom.name) {
++              _nameController.text = pc.displayName;
++            }
++            break;
++          }
++        }
++      }
++    }
++  }
++
++  @override
++  void dispose() {
++    _searchController.dispose();
++    _nameController.dispose();
++    super.dispose();
++  }
++
++  Future<void> _requestPhonePermission() async {
++    setState(() => _isLoadingContacts = true);
++    await BeeperPhoneContacts.load(requestPermission: true);
++    if (mounted) {
++      _checkPhoneMatch();
++      setState(() => _isLoadingContacts = false);
++    }
++  }
++
++  Future<void> _saveMerge() async {
++    final client = widget.initialRoom.client;
++    final name = _nameController.text.trim();
++    if (name.isEmpty || _selectedRoomIds.length < 2) return;
++
++    await BeeperMergeUtils.addMerge(
++      client,
++      roomIds: _selectedRoomIds.toList(),
++      displayName: name,
++      phoneContactId: _matchedPhoneContactId,
++    );
++
++    if (mounted) {
++      Navigator.of(context).pop();
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text('Contacto "$name" fusionado exitosamente (${_selectedRoomIds.length} chats)')),
++      );
++    }
++  }
++
++  Future<void> _unmerge() async {
++    if (_existingMergeId == null) return;
++    final client = widget.initialRoom.client;
++    await BeeperMergeUtils.removeMerge(client, _existingMergeId!);
++    if (mounted) {
++      Navigator.of(context).pop();
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Contacto desfusionado')),
++      );
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final client = Matrix.of(context).client;
++    final allRooms = client.rooms
++        .where((r) => !r.isSpace)
++        .toList();
++
++    final filteredRooms = allRooms.where((r) {
++      if (_searchFilter.isEmpty) return true;
++      final data = BeeperBridgeUtils.getRoomData(r);
++      final name = (data.displayName ?? r.name).toLowerCase();
++      final net = (data.networkKey ?? '').toLowerCase();
++      return name.contains(_searchFilter) || net.contains(_searchFilter);
++    }).toList();
++
++    final suggestions = BeeperMergeUtils.getSuggestedMerges(
++      client,
++      BeeperPhoneContacts.isLoaded ? BeeperPhoneContacts.contacts : null,
++    );
++
++    final isEditing = _existingMergeId != null;
++
++    return Container(
++      height: MediaQuery.sizeOf(context).height * 0.88,
++      decoration: BoxDecoration(
++        color: theme.colorScheme.surface,
++        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
++      ),
++      child: Column(
++        children: [
++          // Drag handle
++          Center(
++            child: Container(
++              margin: const EdgeInsets.only(top: 10, bottom: 6),
++              width: 36,
++              height: 4,
++              decoration: BoxDecoration(
++                color: theme.dividerColor,
++                borderRadius: BorderRadius.circular(2),
++              ),
++            ),
++          ),
++
++          // Header
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++            child: Row(
++              children: [
++                Icon(Icons.merge_type, color: theme.colorScheme.primary),
++                const SizedBox(width: 10),
++                Expanded(
++                  child: Text(
++                    isEditing ? 'Editar contacto fusionado' : 'Fusionar cuentas y chats',
++                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
++                  ),
++                ),
++                if (isEditing)
++                  TextButton.icon(
++                    style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
++                    icon: const Icon(Icons.link_off, size: 18),
++                    label: const Text('Desfusionar'),
++                    onPressed: _unmerge,
++                  ),
++              ],
++            ),
++          ),
++
++          // Name field
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
++            child: TextField(
++              controller: _nameController,
++              decoration: InputDecoration(
++                labelText: 'Nombre del contacto unificado',
++                prefixIcon: const Icon(Icons.person_outline),
++                border: const OutlineInputBorder(),
++                filled: true,
++                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
++                suffixIcon: _matchedPhoneContactId != null
++                    ? const Tooltip(
++                        message: 'Vinculado a agenda del teléfono',
++                        child: Icon(Icons.contact_phone, color: Colors.green),
++                      )
++                    : null,
++              ),
++            ),
++          ),
++
++          // Contacts permission banner if not loaded
++          if (!BeeperPhoneContacts.isLoaded)
++            Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
++              child: Card(
++                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
++                child: ListTile(
++                  dense: true,
++                  leading: const Icon(Icons.contacts_outlined),
++                  title: const Text(
++                    'Vincular con tu agenda telefónica',
++                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
++                  ),
++                  subtitle: const Text(
++                    'Detecta automáticamente números de WhatsApp coincidentes',
++                    style: TextStyle(fontSize: 11),
++                  ),
++                  trailing: _isLoadingContacts
++                      ? const SizedBox(
++                          width: 20,
++                          height: 20,
++                          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
++                        )
++                      : TextButton(
++                          onPressed: _requestPhonePermission,
++                          child: const Text('Vincular'),
++                        ),
++                ),
++              ),
++            ),
++
++          // Suggestions section (if any)
++          if (suggestions.isNotEmpty && _searchFilter.isEmpty && !isEditing) ...[
++            Padding(
++              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
++              child: Align(
++                alignment: Alignment.centerLeft,
++                child: Text(
++                  'Sugerencias automáticas',
++                  style: theme.textTheme.labelLarge?.copyWith(
++                    color: theme.colorScheme.primary,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++              ),
++            ),
++            SizedBox(
++              height: 52,
++              child: ListView.builder(
++                scrollDirection: Axis.horizontal,
++                padding: const EdgeInsets.symmetric(horizontal: 12),
++                itemCount: suggestions.length,
++                itemBuilder: (context, i) {
++                  final group = suggestions[i];
++                  final firstName = BeeperBridgeUtils.getRoomData(group.first).displayName ?? group.first.name;
++                  return Padding(
++                    padding: const EdgeInsets.only(right: 8),
++                    child: ActionChip(
++                      avatar: const Icon(Icons.auto_awesome, size: 16),
++                      label: Text('$firstName (${group.length} chats)'),
++                      onPressed: () {
++                        setState(() {
++                          _selectedRoomIds.addAll(group.map((r) => r.id));
++                          if (_nameController.text.isEmpty) {
++                            _nameController.text = firstName;
++                          }
++                          _checkPhoneMatch();
++                        });
++                      },
++                    ),
++                  );
++                },
++              ),
++            ),
++          ],
++
++          // Search bar
++          Padding(
++            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
++            child: TextField(
++              controller: _searchController,
++              decoration: InputDecoration(
++                hintText: 'Buscar cuentas o chats para vincular...',
++                prefixIcon: const Icon(Icons.search),
++                suffixIcon: _searchFilter.isNotEmpty
++                    ? IconButton(
++                        icon: const Icon(Icons.clear),
++                        onPressed: () => _searchController.clear(),
++                      )
++                    : null,
++                isDense: true,
++                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
++              ),
++            ),
++          ),
++
++          // Selection summary chip
++          Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
++            child: Row(
++              children: [
++                Text(
++                  'Chats seleccionados: ${_selectedRoomIds.length}',
++                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
++                ),
++                const Spacer(),
++                if (_selectedRoomIds.length >= 2)
++                  Text(
++                    'Listo para fusionar',
++                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
++                  ),
++              ],
++            ),
++          ),
++
++          // Rooms list
++          Expanded(
++            child: ListView.builder(
++              itemCount: filteredRooms.length,
++              itemBuilder: (context, index) {
++                final room = filteredRooms[index];
++                final isSelected = _selectedRoomIds.contains(room.id);
++                final beeperData = BeeperBridgeUtils.getRoomData(room);
++                final network = BeeperBridgeUtils.getRoomNetwork(room);
++                final displayname = beeperData.displayName ?? room.name;
++
++                return CheckboxListTile(
++                  value: isSelected,
++                  onChanged: (checked) {
++                    setState(() {
++                      if (checked == true) {
++                        _selectedRoomIds.add(room.id);
++                      } else {
++                        _selectedRoomIds.remove(room.id);
++                      }
++                      _checkPhoneMatch();
++                    });
++                  },
++                  secondary: Stack(
++                    clipBehavior: Clip.none,
++                    children: [
++                      Avatar(
++                        mxContent: beeperData.avatarUrl,
++                        name: displayname,
++                        size: 36,
++                      ),
++                      if (network != null)
++                        Positioned(
++                          bottom: -2,
++                          right: -2,
++                          child: Container(
++                            width: 12,
++                            height: 12,
++                            decoration: BoxDecoration(
++                              shape: BoxShape.circle,
++                              color: Color(network.colorHex),
++                              border: Border.all(
++                                color: theme.colorScheme.surface,
++                                width: 1.5,
++                              ),
++                            ),
++                          ),
++                        ),
++                    ],
++                  ),
++                  title: Text(
++                    displayname,
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                    style: TextStyle(
++                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
++                    ),
++                  ),
++                  subtitle: Text(
++                    network != null ? '${network.name} • ${room.id}' : room.id,
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                    style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
++                  ),
++                );
++              },
++            ),
++          ),
++
++          // Bottom Action Bar
++          SafeArea(
++            child: Padding(
++              padding: const EdgeInsets.all(16),
++              child: FilledButton.icon(
++                style: FilledButton.styleFrom(
++                  minimumSize: const Size.fromHeight(48),
++                ),
++                onPressed: _selectedRoomIds.length >= 2 ? _saveMerge : null,
++                icon: const Icon(Icons.check_circle_outline),
++                label: Text(
++                  _selectedRoomIds.length < 2
++                      ? 'Selecciona al menos 2 chats para unir'
++                      : 'Guardar contacto unificado (${_selectedRoomIds.length} chats)',
++                ),
++              ),
++            ),
++          ),
++        ],
 +      ),
 +    );
 +  }
@@ -348448,6 +349695,502 @@ index 0000000000000000000000000000000000000000..2aa3209d66c7416b8bd95d57f75e8f19
 +
 +  String getBeeperDisplayname(MatrixLocalizations locals) {
 +    return _beeperData.displayName ?? getLocalizedDisplayname(locals);
++  }
++}
+diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b8092297aa16
+--- /dev/null
++++ b/lib/utils/beeper_merge_utils.dart
+@@ -0,0 +1,351 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:collection';
++import 'package:matrix/matrix.dart';
++import 'beeper_bridge_utils.dart';
++import 'beeper_phone_contacts.dart';
++
++class MergedContact {
++  final String id;
++  final String displayName;
++  final String? avatarMxc;
++  final List<String> roomIds;
++  final String? phoneContactId;
++  final int createdAt;
++
++  const MergedContact({
++    required this.id,
++    required this.displayName,
++    this.avatarMxc,
++    required this.roomIds,
++    this.phoneContactId,
++    required this.createdAt,
++  });
++
++  Map<String, dynamic> toJson() => {
++    'displayName': displayName,
++    if (avatarMxc != null) 'avatarMxc': avatarMxc,
++    'roomIds': roomIds,
++    if (phoneContactId != null) 'phoneContactId': phoneContactId,
++    'createdAt': createdAt,
++  };
++
++  factory MergedContact.fromJson(String id, Map<dynamic, dynamic> json) => MergedContact(
++    id: id,
++    displayName: json['displayName']?.toString() ?? '',
++    avatarMxc: json['avatarMxc']?.toString(),
++    roomIds: (json['roomIds'] is List)
++        ? List<String>.from((json['roomIds'] as List).whereType<String>())
++        : <String>[],
++    phoneContactId: json['phoneContactId']?.toString(),
++    createdAt: json['createdAt'] is int
++        ? json['createdAt'] as int
++        : (DateTime.now().millisecondsSinceEpoch ~/ 1000),
++  );
++
++  MergedContact copyWith({
++    String? displayName,
++    String? avatarMxc,
++    List<String>? roomIds,
++    String? phoneContactId,
++  }) {
++    return MergedContact(
++      id: id,
++      displayName: displayName ?? this.displayName,
++      avatarMxc: avatarMxc ?? this.avatarMxc,
++      roomIds: roomIds ?? this.roomIds,
++      phoneContactId: phoneContactId ?? this.phoneContactId,
++      createdAt: createdAt,
++    );
++  }
++}
++
++class BeeperMergeUtils {
++  static const String accountDataKey = 'com.beeper.merged_contacts';
++
++  static Map<String, MergedContact> _contactsCache = <String, MergedContact>{};
++  static dynamic _lastMergeDataRef;
++
++  /// Map of roomId -> mergeId for O(1) membership queries
++  static Map<String, String> _roomToMergeId = <String, String>{};
++
++  /// Precomputed sibling rooms map: key is roomId or mergeId -> List<Room>
++  static Map<String, List<Room>> _mergeSiblingRooms = <String, List<Room>>{};
++
++  static void invalidateCache() {
++    _lastMergeDataRef = null;
++    _contactsCache = <String, MergedContact>{};
++    _roomToMergeId = <String, String>{};
++    _mergeSiblingRooms = <String, List<Room>>{};
++  }
++
++  static void _invalidateDerivedMaps() {
++    final newMap = <String, String>{};
++    for (final contact in _contactsCache.values) {
++      for (final rId in contact.roomIds) {
++        newMap[rId] = contact.id;
++      }
++    }
++    _roomToMergeId = newMap;
++    _mergeSiblingRooms = <String, List<Room>>{};
++  }
++
++  /// Get all merged contacts from Account Data with O(1) reference caching.
++  static Map<String, MergedContact> getMergedContacts(Client client) {
++    final event = client.accountData[accountDataKey];
++    final content = event?.content;
++    if (content != null && identical(content, _lastMergeDataRef)) {
++      return _contactsCache;
++    }
++    _lastMergeDataRef = content;
++
++    if (content == null || content is! Map) {
++      _contactsCache = <String, MergedContact>{};
++      _invalidateDerivedMaps();
++      return _contactsCache;
++    }
++
++    final rawContacts = content['contacts'];
++    if (rawContacts is! Map) {
++      _contactsCache = <String, MergedContact>{};
++      _invalidateDerivedMaps();
++      return _contactsCache;
++    }
++
++    final parsed = <String, MergedContact>{};
++    for (final entry in rawContacts.entries) {
++      if (entry.value is Map) {
++        final mc = MergedContact.fromJson(entry.key.toString(), entry.value as Map);
++        if (mc.roomIds.length >= 2) {
++          parsed[mc.id] = mc;
++        }
++      }
++    }
++
++    _contactsCache = parsed;
++    _invalidateDerivedMaps();
++    return _contactsCache;
++  }
++
++  /// Check if a roomId is part of any merged contact (O(1))
++  static bool isRoomMerged(String roomId) => _roomToMergeId.containsKey(roomId);
++
++  /// Get merge ID for a room ID (O(1))
++  static String? getMergeIdForRoom(String roomId) => _roomToMergeId[roomId];
++
++  /// Get sibling rooms for a roomId (O(1))
++  static List<Room> getSiblingRooms(String roomId) =>
++      _mergeSiblingRooms[roomId] ?? const <Room>[];
++
++  /// Updates the sibling rooms cache with active Matrix Client instance
++  static void updateSiblingRooms(Client client) {
++    final contacts = getMergedContacts(client);
++    final newSiblingMap = <String, List<Room>>{};
++
++    for (final contact in contacts.values) {
++      final rooms = <Room>[];
++      for (final rId in contact.roomIds) {
++        final r = client.getRoomById(rId);
++        if (r != null) {
++          rooms.add(r);
++        }
++      }
++
++      if (rooms.length >= 2) {
++        newSiblingMap[contact.id] = rooms;
++        for (final r in rooms) {
++          newSiblingMap[r.id] = rooms;
++        }
++      }
++    }
++    _mergeSiblingRooms = newSiblingMap;
++  }
++
++  /// Save raw merged contacts map to Account Data
++  static Future<void> _save(Client client, Map<String, dynamic> contacts) async {
++    invalidateCache();
++    await client.setAccountData(
++      client.userID!,
++      accountDataKey,
++      {'contacts': contacts},
++    );
++  }
++
++  /// Create or update a merged contact
++  static Future<String> addMerge(
++    Client client, {
++    required List<String> roomIds,
++    required String displayName,
++    String? phoneContactId,
++    String? avatarMxc,
++  }) async {
++    final current = getMergedContacts(client);
++    final map = <String, dynamic>{};
++    for (final e in current.entries) {
++      map[e.key] = e.value.toJson();
++    }
++
++    // Check if any of these roomIds already belongs to an existing merge
++    String? existingMergeId;
++    for (final rId in roomIds) {
++      if (_roomToMergeId.containsKey(rId)) {
++        existingMergeId = _roomToMergeId[rId];
++        break;
++      }
++    }
++
++    final mergeId = existingMergeId ??
++        'mc_${DateTime.now().millisecondsSinceEpoch}_${roomIds.first.hashCode.abs()}';
++
++    final uniqueRoomIds = LinkedHashSet<String>.from(
++      existingMergeId != null && map[mergeId] is Map
++          ? (map[mergeId]['roomIds'] as List? ?? <dynamic>[]).cast<String>()
++          : <String>[],
++    )..addAll(roomIds);
++
++    map[mergeId] = {
++      'displayName': displayName.trim(),
++      if (avatarMxc != null) 'avatarMxc': avatarMxc,
++      'roomIds': uniqueRoomIds.toList(),
++      if (phoneContactId != null) 'phoneContactId': phoneContactId,
++      'createdAt': DateTime.now().millisecondsSinceEpoch ~/ 1000,
++    };
++
++    await _save(client, map);
++    return mergeId;
++  }
++
++  /// Rename a merged contact
++  static Future<void> renameMerge(
++    Client client,
++    String mergeId,
++    String newDisplayName,
++  ) async {
++    final current = getMergedContacts(client);
++    final map = <String, dynamic>{};
++    for (final e in current.entries) {
++      map[e.key] = e.value.toJson();
++    }
++    if (map.containsKey(mergeId) && map[mergeId] is Map) {
++      map[mergeId]['displayName'] = newDisplayName.trim();
++      await _save(client, map);
++    }
++  }
++
++  /// Remove an entire merged contact
++  static Future<void> removeMerge(Client client, String mergeId) async {
++    final current = getMergedContacts(client);
++    final map = <String, dynamic>{};
++    for (final e in current.entries) {
++      if (e.key != mergeId) {
++        map[e.key] = e.value.toJson();
++      }
++    }
++    await _save(client, map);
++  }
++
++  /// Remove a single room from a merged contact
++  static Future<void> removeRoomFromMerge(
++    Client client,
++    String mergeId,
++    String roomId,
++  ) async {
++    final current = getMergedContacts(client);
++    final map = <String, dynamic>{};
++    for (final e in current.entries) {
++      map[e.key] = e.value.toJson();
++    }
++
++    if (map.containsKey(mergeId) && map[mergeId] is Map) {
++      final rooms = List<String>.from(map[mergeId]['roomIds'] as List? ?? <dynamic>[]);
++      rooms.remove(roomId);
++      if (rooms.length < 2) {
++        map.remove(mergeId);
++      } else {
++        map[mergeId]['roomIds'] = rooms;
++      }
++      await _save(client, map);
++    }
++  }
++
++  /// Extract phone number from WhatsApp MXID
++  static String? extractPhoneFromMxid(String mxid) {
++    final match = RegExp(r'@whatsapp(?:go)?_(\d{7,16}):').firstMatch(mxid);
++    return match?.group(1);
++  }
++
++  /// Normalize display name for fuzzy grouping
++  static String normalizeDisplayName(String name) {
++    return name
++        .toLowerCase()
++        .replaceAll(RegExp(r'[\s\-_\.\(\)\[\]]'), '')
++        .trim();
++  }
++
++  /// Calculate suggested merges across bridged rooms
++  static List<List<Room>> getSuggestedMerges(
++    Client client, [
++    List<CachedPhoneContact>? phoneContacts,
++  ]) {
++    getMergedContacts(client); // Ensure cache is loaded
++
++    final bridgedRooms = client.rooms
++        .where((r) =>
++            !r.isSpace &&
++            BeeperBridgeUtils.getRoomData(r).networkKey != null &&
++            !isRoomMerged(r.id))
++        .toList();
++
++    if (bridgedRooms.length < 2) return const <List<Room>>[];
++
++    final groups = <String, List<Room>>{};
++
++    for (final room in bridgedRooms) {
++      final beeperData = BeeperBridgeUtils.getRoomData(room);
++      final contactId = beeperData.contactId ?? room.directChatMatrixID;
++
++      // 1. WhatsApp phone match
++      if (contactId != null) {
++        final phone = extractPhoneFromMxid(contactId);
++        if (phone != null && phone.length >= 7) {
++          // Index by last 8 digits for international code resilience
++          final key = phone.length >= 8
++              ? 'phone_${phone.substring(phone.length - 8)}'
++              : 'phone_$phone';
++          groups.putIfAbsent(key, () => <Room>[]).add(room);
++          continue;
++        }
++      }
++
++      // 2. Phone contacts match if available
++      if (phoneContacts != null && phoneContacts.isNotEmpty) {
++        bool matchedPhoneContact = false;
++        final dName = beeperData.displayName?.toLowerCase() ?? '';
++        for (final pc in phoneContacts) {
++          if (dName.isNotEmpty &&
++              pc.displayName.toLowerCase().trim() == dName.trim()) {
++            groups.putIfAbsent('contact_${pc.id}', () => <Room>[]).add(room);
++            matchedPhoneContact = true;
++            break;
++          }
++        }
++        if (matchedPhoneContact) continue;
++      }
++
++      // 3. Normalized display name match
++      final name = beeperData.displayName;
++      if (name != null && name.trim().length >= 3) {
++        final norm = normalizeDisplayName(name);
++        if (norm.length >= 3) {
++          groups.putIfAbsent('name_$norm', () => <Room>[]).add(room);
++        }
++      }
++    }
++
++    return groups.values
++        .where((list) => list.length >= 2)
++        .toList();
++  }
++}
+diff --git a/lib/utils/beeper_phone_contacts.dart b/lib/utils/beeper_phone_contacts.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5cd18b1b59a55df4c3960c2af52604d4ca2f20b
+--- /dev/null
++++ b/lib/utils/beeper_phone_contacts.dart
+@@ -0,0 +1,133 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:typed_data';
++import 'package:flutter/foundation.dart';
++import 'package:flutter_contacts/flutter_contacts.dart';
++
++class CachedPhoneContact {
++  final String id;
++  final String displayName;
++  final List<String> normalizedPhones;
++  final Uint8List? thumbnail;
++
++  const CachedPhoneContact({
++    required this.id,
++    required this.displayName,
++    required this.normalizedPhones,
++    this.thumbnail,
++  });
++}
++
++class BeeperPhoneContacts {
++  static List<CachedPhoneContact> _contacts = <CachedPhoneContact>[];
++  static Map<String, CachedPhoneContact> _phoneIndex = <String, CachedPhoneContact>{};
++  static bool _loaded = false;
++  static bool _isLoading = false;
++  static bool _permissionDenied = false;
++
++  static bool get isLoaded => _loaded;
++  static bool get isPermissionDenied => _permissionDenied;
++  static List<CachedPhoneContact> get contacts => _contacts;
++
++  /// Normalize phone string: removes all non-digit characters, leading zeroes
++  static String normalizePhone(String raw) {
++    return raw
++        .replaceAll(RegExp(r'[^\d]'), '')
++        .replaceFirst(RegExp(r'^00'), '')
++        .replaceFirst(RegExp(r'^0'), '');
++  }
++
++  /// Request permission and load phone contacts into fast indexed cache
++  static Future<bool> load({bool requestPermission = true}) async {
++    if (_loaded) return true;
++    if (_isLoading) return false;
++    if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS) {
++      // Desktop platforms: silently skip without error
++      return false;
++    }
++
++    _isLoading = true;
++    try {
++      if (requestPermission) {
++        final granted = await FlutterContacts.requestPermission(readonly: true);
++        if (!granted) {
++          _permissionDenied = true;
++          _isLoading = false;
++          return false;
++        }
++      }
++
++      final rawList = await FlutterContacts.getContacts(
++        withProperties: true,
++        withThumbnail: true,
++      );
++
++      final list = <CachedPhoneContact>[];
++      final index = <String, CachedPhoneContact>{};
++
++      for (final c in rawList) {
++        final phones = <String>[];
++        for (final p in c.phones) {
++          final norm = normalizePhone(p.number);
++          if (norm.length >= 7) {
++            phones.add(norm);
++          }
++        }
++
++        final cached = CachedPhoneContact(
++          id: c.id,
++          displayName: c.displayName.isNotEmpty ? c.displayName : (phones.isNotEmpty ? phones.first : 'Contacto'),
++          normalizedPhones: phones,
++          thumbnail: c.thumbnail,
++        );
++        list.add(cached);
++
++        // Index by full phone number and by last 8 digits for fuzzy match
++        for (final p in phones) {
++          index[p] = cached;
++          if (p.length >= 8) {
++            index[p.substring(p.length - 8)] = cached;
++          }
++        }
++      }
++
++      _contacts = list;
++      _phoneIndex = index;
++      _loaded = true;
++      _permissionDenied = false;
++      _isLoading = false;
++      return true;
++    } catch (e) {
++      debugPrint('[BeeperPhoneContacts] Error loading phone contacts: $e');
++      _permissionDenied = true;
++      _isLoading = false;
++      return false;
++    }
++  }
++
++  /// Lookup contact by phone number (O(1))
++  static CachedPhoneContact? findByPhone(String phone) {
++    if (!_loaded || _phoneIndex.isEmpty) return null;
++    final norm = normalizePhone(phone);
++    if (_phoneIndex.containsKey(norm)) {
++      return _phoneIndex[norm];
++    }
++    if (norm.length >= 8) {
++      final sub = norm.substring(norm.length - 8);
++      if (_phoneIndex.containsKey(sub)) {
++        return _phoneIndex[sub];
++      }
++    }
++    return null;
++  }
++
++  /// Lookup contact by ID (O(N), used infrequently)
++  static CachedPhoneContact? findById(String id) {
++    for (final c in _contacts) {
++      if (c.id == id) return c;
++    }
++    return null;
 +  }
 +}
 diff --git a/lib/utils/beeper_video_thumbnail_cache.dart b/lib/utils/beeper_video_thumbnail_cache.dart
@@ -364031,10 +365774,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..670de62da14313f2463d08c7284e700da7f2e8f5 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..752ecb0e5cdb9f540a53fae9e511df81d88a8fc1 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,488 @@
+@@ -1,443 +1,490 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -364490,6 +366233,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..670de62da14313f2463d08c7284e700d
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/utils/client_manager.dart';
 +import 'package:fluffychat/utils/init_with_restore.dart';
++import 'package:fluffychat/utils/beeper_phone_contacts.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 +import 'package:fluffychat/utils/notification_background_handler.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
@@ -364709,6 +366453,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..670de62da14313f2463d08c7284e700d
 +    // Initialize and preload Beeper bridge cache
 +    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
 +    _preloadBridgeCache();
++    BeeperPhoneContacts.load(requestPermission: false);
 +
 +    initMatrix();
 +  }
@@ -370629,10 +372374,10 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..d4783b705ddf41e0fb596d2a15225a72caac603c 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..187bca6e6a9c7025019f334e4443287c5062b264 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -29,8 +29,11 @@ dependencies:
+@@ -29,8 +29,12 @@ dependencies:
    emoji_picker_flutter: ^4.5.3
    file_picker: ^12.0.0-beta.7
    file_selector: ^1.1.0
@@ -370640,11 +372385,12 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..d4783b705ddf41e0fb596d2a15225a72
 +  whisper_ggml: ^2.6.0
    flutter:
      sdk: flutter
++  flutter_contacts: ^1.1.9+2
 +  flutter_displaymode: ^0.6.0
    flutter_foreground_task: ^10.0.0
    flutter_linkify: ^6.0.0
    flutter_local_notifications: ^22.3.0
-@@ -38,7 +41,7 @@ dependencies:
+@@ -38,7 +42,7 @@ dependencies:
      sdk: flutter
    flutter_map: ^8.3.1
    flutter_new_badger: ^2.0.0
@@ -370653,7 +372399,7 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..d4783b705ddf41e0fb596d2a15225a72
    flutter_shortcuts_new: ^2.0.0
    flutter_vodozemac: ^0.7.1
    flutter_web_auth_2: ^5.0.3
-@@ -111,6 +114,7 @@ hooks:
+@@ -111,6 +115,7 @@ hooks:
      sqlite3:
        source: sqlcipher
  
