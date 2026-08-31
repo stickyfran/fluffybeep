@@ -13987,10 +13987,10 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 8ebf61d428332c89de5bc6b78b58490b19645655..ab21bec9d8ead2aba47a78d5de227803783d1328 100644
+index 8ebf61d428332c89de5bc6b78b58490b19645655..1ff6d60f27a2d94d5efddf86a84e4ddbd0bfa062 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
-@@ -1,96 +1,95 @@
+@@ -1,96 +1,101 @@
 -import java.util.Properties
 -import java.io.FileInputStream
 -
@@ -14175,6 +14175,12 @@ index 8ebf61d428332c89de5bc6b78b58490b19645655..ab21bec9d8ead2aba47a78d5de227803
 +            isMinifyEnabled = true
 +            isShrinkResources = true
 +            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
++        }
++    }
++
++    packaging {
++        jniLibs {
++            pickFirsts += listOf("**/libavcodec.so", "**/libavfilter.so", "**/libavformat.so", "**/libavutil.so", "**/libswresample.so", "**/libswscale.so", "**/libc++_shared.so")
 +        }
 +    }
 +}
@@ -311236,10 +311242,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eedc0adc5855fec408839340b86f56f1f97ce7bf 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2d1c6d4016b46bacc6261a650e6957370b17e395 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,375 @@
+@@ -1,222 +1,346 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -311478,8 +311484,8 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eedc0adc5855fec408839340b86f56f1
 +import 'package:flutter/cupertino.dart';
 +import 'package:flutter/foundation.dart';
 +import 'package:flutter/material.dart';
-+import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
-+import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
++import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
++import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:path/path.dart' as path_lib;
 +import 'package:path_provider/path_provider.dart';
@@ -311722,11 +311728,10 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eedc0adc5855fec408839340b86f56f1
 +      var effectiveFileName = fileName ??
 +          'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
 +
-+      // Normalize audio to strict RFC 7845 compliant OGG Opus or AAC m4a on mobile.
-+      // Android's native MediaRecorder produces non-standard granule positions
-+      // that cause WhatsApp iOS to reject voice messages ("This audio is no longer available").
-+      // FFmpegKit rewrites the container with valid metadata, 16kHz mono,
-+      // compatible with all WhatsApp, Matrix, and Telegram clients on both iOS and Android.
++      // Normalize audio to strict RFC 7845 compliant OGG Opus container on mobile.
++      // Android's native MediaRecorder produces Opus audio. We use stream copy (-c:a copy)
++      // or remux with FFmpeg to ensure standard container headers and granule positions.
++      // If FFmpeg remuxing succeeds, the remuxed OGG file is used; otherwise the recorded Opus file is used.
 +      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
 +        try {
 +          final tempDir = await getTemporaryDirectory();
@@ -311735,54 +311740,26 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..eedc0adc5855fec408839340b86f56f1
 +          final normalizedOggPath =
 +              path_lib.join(tempDir.path, normalizedOggFileName);
 +
-+          // Tier 1: Try external libopus encoder
++          // Try stream copy first to re-package into a clean OGG container without re-encoding
 +          var session = await FFmpegKit.execute(
-+            '-y -i "$path" -c:a libopus -b:a 24k -ac 1 -ar 16000 "$normalizedOggPath"',
++            '-y -i "$path" -c:a copy "$normalizedOggPath"',
 +          );
 +          var returnCode = await session.getReturnCode();
-+
-+          // Tier 2: Try native FFmpeg opus encoder if libopus is not linked
-+          if (!ReturnCode.isSuccess(returnCode)) {
-+            session = await FFmpegKit.execute(
-+              '-y -i "$path" -c:a opus -strict -2 -b:a 24k -ac 1 -ar 16000 "$normalizedOggPath"',
-+            );
-+            returnCode = await session.getReturnCode();
-+          }
 +
 +          if (ReturnCode.isSuccess(returnCode)) {
 +            final normalizedFile = File(normalizedOggPath);
 +            if (await normalizedFile.exists() &&
 +                await normalizedFile.length() > 0) {
 +              Logs().i(
-+                'Voice message normalized with FFmpegKit (Opus): $normalizedOggPath',
++                'Voice message remuxed with FFmpegKit (copy): $normalizedOggPath',
 +              );
 +              effectivePath = normalizedOggPath;
 +              effectiveFileName = normalizedOggFileName;
 +            }
 +          } else {
-+            // Tier 3: If Opus encoding is unavailable in ffmpeg-kit-min, encode to AAC (m4a)
-+            // which is built-in to all FFmpeg builds and 100% playable by WhatsApp on iOS & Android.
-+            final aacFileName =
-+                'voice_message_${DateTime.now().millisecondsSinceEpoch}.m4a';
-+            final aacPath = path_lib.join(tempDir.path, aacFileName);
-+            session = await FFmpegKit.execute(
-+              '-y -i "$path" -c:a aac -b:a 32k -ac 1 -ar 16000 "$aacPath"',
++            Logs().i(
++              'FFmpegKit copy remux skipped (return code $returnCode), sending original recorded Opus file',
 +            );
-+            returnCode = await session.getReturnCode();
-+            if (ReturnCode.isSuccess(returnCode)) {
-+              final aacFile = File(aacPath);
-+              if (await aacFile.exists() && await aacFile.length() > 0) {
-+                Logs().i(
-+                  'Voice message normalized with FFmpegKit (AAC): $aacPath',
-+                );
-+                effectivePath = aacPath;
-+                effectiveFileName = aacFileName;
-+              }
-+            } else {
-+              Logs().w(
-+                'FFmpegKit audio normalization failed (return code $returnCode), sending original file',
-+              );
-+            }
 +          }
 +        } catch (e, s) {
 +          Logs().w(
@@ -356335,7 +356312,7 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..51ec9d634eb97d3d82e8f30fc27b5b263c7c7fc0
+index 0000000000000000000000000000000000000000..6c6bcc7972388ba874c24ab097a28addce0632d7
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
 @@ -0,0 +1,415 @@
@@ -356346,8 +356323,8 @@ index 0000000000000000000000000000000000000000..51ec9d634eb97d3d82e8f30fc27b5b26
 +import 'dart:async';
 +import 'dart:io';
 +
-+import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
-+import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
++import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
++import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 +import 'package:flutter/foundation.dart';
 +import 'package:http/http.dart' as http;
 +import 'package:matrix/matrix.dart';
@@ -370652,14 +370629,14 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..3ed3ee82655c2ee640e54d4b9fab1cae581cf6a3 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..d4783b705ddf41e0fb596d2a15225a72caac603c 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
 @@ -29,8 +29,11 @@ dependencies:
    emoji_picker_flutter: ^4.5.3
    file_picker: ^12.0.0-beta.7
    file_selector: ^1.1.0
-+  ffmpeg_kit_flutter_new_audio: ^2.5.2
++  ffmpeg_kit_flutter_new_min: ^2.1.0
 +  whisper_ggml: ^2.6.0
    flutter:
      sdk: flutter
