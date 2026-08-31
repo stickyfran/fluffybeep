@@ -345661,10 +345661,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +  );
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
-index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..9ebb61884691ce069a39e975d74da734b13de4ba 100644
+index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..0bef6ae88a8776e1d14f72818110c1ca3753f3b7 100644
 --- a/lib/utils/background_push.dart
 +++ b/lib/utils/background_push.dart
-@@ -1,471 +1,605 @@
+@@ -1,471 +1,606 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -// Copyright (C) 2020, 2021 Famedly GmbH
@@ -346427,6 +346427,7 @@ index 5ead47dbc02f5934208c30ef7ad89b54f5da204c..9ebb61884691ce069a39e975d74da734
 +    } catch (e, s) {
 +      Logs().e('[Push] Unable to set pushers', e, s);
 +      await FileLogger.log('[UnifiedPush] CRITICAL: postPusher failed! Error: $e\nStacktrace:\n$s');
++    }
 +    } finally {
 +      _isSettingUpPusher = false;
 +    }
