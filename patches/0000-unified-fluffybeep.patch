@@ -13987,7 +13987,7 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 8ebf61d428332c89de5bc6b78b58490b19645655..b7720c75f6ef546b45262ce11ca4f96a5816ed0f 100644
+index 8ebf61d428332c89de5bc6b78b58490b19645655..ab21bec9d8ead2aba47a78d5de227803783d1328 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
 @@ -1,96 +1,95 @@
@@ -14124,7 +14124,7 @@ index 8ebf61d428332c89de5bc6b78b58490b19645655..b7720c75f6ef546b45262ce11ca4f96a
 +
 +android {
 +    namespace = "chat.fluffy.fluffychat"
-+    compileSdk = 35
++    compileSdk = flutter.compileSdkVersion
 +    ndkVersion = flutter.ndkVersion
 +
 +    compileOptions {
@@ -15631,10 +15631,10 @@ index bb9924bc0ce946c16d8bff44efc25818355ac0ca..8f1c22cd5e4b351622c99c9f0b90a2e6
 +    <locale android:name="zh"/>
 +</locale-config>
 diff --git a/android/build.gradle.kts b/android/build.gradle.kts
-index 89176ef44e8c7931fa32322d576e7f3f54d225c9..493d7161815418ec657c6deb1dca8945ec0291cc 100644
+index 89176ef44e8c7931fa32322d576e7f3f54d225c9..2f2f3f00fc713f34787b14b52d7b61279d600ddb 100644
 --- a/android/build.gradle.kts
 +++ b/android/build.gradle.kts
-@@ -1,21 +1,33 @@
+@@ -1,21 +1,21 @@
 -allprojects {
 -    repositories {
 -        google()
@@ -15672,18 +15672,6 @@ index 89176ef44e8c7931fa32322d576e7f3f54d225c9..493d7161815418ec657c6deb1dca8945
 +}
 +subprojects {
 +    project.evaluationDependsOn(":app")
-+}
-+subprojects {
-+    afterEvaluate {
-+        if (project.hasProperty("android")) {
-+            val androidExt = project.extensions.findByName("android")
-+            if (androidExt is com.android.build.gradle.BaseExtension) {
-+                if (androidExt.compileSdkVersion == "android-37" || androidExt.compileSdkVersion == "37") {
-+                    androidExt.compileSdkVersion(35)
-+                }
-+            }
-+        }
-+    }
 +}
 +
 +tasks.register<Delete>("clean") {
@@ -353447,9 +353435,18 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..cae74e9a9a6d17249e698ab73e6c8613ef5c0ce3 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..b2c25b0502048f2737c690ce0cde3b0cca8d9190 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
+@@ -38,7 +38,7 @@ dependencies:
+     sdk: flutter
+   flutter_map: ^8.3.1
+   flutter_new_badger: ^2.0.0
+-  flutter_secure_storage: ^11.0.0
++  flutter_secure_storage: ^10.3.1
+   flutter_shortcuts_new: ^2.0.0
+   flutter_vodozemac: ^0.7.1
+   flutter_web_auth_2: ^5.0.3
 @@ -111,6 +111,7 @@ hooks:
      sqlite3:
        source: sqlcipher
