@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - '2.9'
   workflow_dispatch: # Permite ejecución manual
 
 permissions:
