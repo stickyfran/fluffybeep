@@ -32546,10 +32546,21 @@ index 2d0f798acca84988f3dc06d66672e88da46902bc..8a37e1b83d78a3cec07303def16b999b
 +/q4AaOeMSQ+2b1tbFfLn
 +-----END CERTIFICATE-----''';
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..76147a491ece245bfb523dead30314758c5b821f 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..12390a39b1bae99cd7c9d2ee9f3e1a3b799014e5 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -120,6 +120,12 @@ enum AppSettings<T> {
+@@ -76,6 +76,10 @@ enum AppSettings<T> {
+   chatFilter<String>('chat.fluffy.chat_filter', 'allChats'),
+   hideRoomsInSpaces<bool>('chat.fluffy.hideRoomsInSpaces', false),
+   showThumbnailsInTimeline<bool>('chat.fluffy.showThumbnailsInTimeline', true),
++  whisperModel<String>('chat.fluffy.whisper_model', 'base'),
++  whisperLang<String>('chat.fluffy.whisper_lang', 'es'),
++  whisperPrompt<String>('chat.fluffy.whisper_prompt', 'Transcripción de audio en español rioplatense (Argentina).'),
++  searchStyle<String>('chat.fluffy.search_style', 'bottom_fab'),
+   doubleTapToReact<bool>('chat.fluffy.double_tap_to_react', false),
+   doubleTapReaction<String>('chat.fluffy.double_tap_reaction', '❤️'),
+   benchmarksInLogs<bool>('chat.fluffy.benchmarks_in_logs', false);
+@@ -120,6 +124,12 @@ enum AppSettings<T> {
          PlatformInfos.isMobile,
        );
      }
@@ -353435,10 +353446,19 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..b2c25b0502048f2737c690ce0cde3b0cca8d9190 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..2f236d073e0a81d739a6febdce5e89af8207ae0a 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -38,7 +38,7 @@ dependencies:
+@@ -29,6 +29,8 @@ dependencies:
+   emoji_picker_flutter: ^4.5.3
+   file_picker: ^12.0.0-beta.7
+   file_selector: ^1.1.0
++  ffmpeg_kit_flutter_new_min: ^2.1.0
++  whisper_ggml: ^2.6.0
+   flutter:
+     sdk: flutter
+   flutter_foreground_task: ^10.0.0
+@@ -38,7 +40,7 @@ dependencies:
      sdk: flutter
    flutter_map: ^8.3.1
    flutter_new_badger: ^2.0.0
@@ -353447,7 +353467,7 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..b2c25b0502048f2737c690ce0cde3b0c
    flutter_shortcuts_new: ^2.0.0
    flutter_vodozemac: ^0.7.1
    flutter_web_auth_2: ^5.0.3
-@@ -111,6 +111,7 @@ hooks:
+@@ -111,6 +113,7 @@ hooks:
      sqlite3:
        source: sqlcipher
  
