@@ -38,6 +38,6 @@
 - **Imports**: `space_view.dart` must always import `package:fluffychat/config/setting_keys.dart`.
 
 ### 3. Branch Base Commits
-- **`main` branch**: Upstream FluffyChat base is `259bc72fb897e99303058712fcdfaee033bd4d33` (v2.8.0).
-- **`2.9` branch**: Upstream FluffyChat base is `c9c58c24f04304cc2ec263d891073805468383b8` (v2.9.4).
+- **`main` branch (Active)**: Upstream FluffyChat base is `c9c58c24f04304cc2ec263d891073805468383b8` (v2.9.4).
+- **`legacy-2.8` branch (Legacy)**: Upstream FluffyChat base is `259bc72fb897e99303058712fcdfaee033bd4d33` (v2.8.0).
 
