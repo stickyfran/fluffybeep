@@ -301101,10 +301101,10 @@ index 777155b94aebef3bc005683305d08bff09f2fa19..0fa2a8e473c5c702f9d517144706c8d7
 +  }
 +}
 diff --git a/lib/pages/bootstrap/view_model/bootstrap_state.dart b/lib/pages/bootstrap/view_model/bootstrap_state.dart
-index f8d5fa7779042475b4fa8167afccaac3781b8549..471c03c91497e8173dc0c306f7e0ccce1bbdbfb5 100644
+index f8d5fa7779042475b4fa8167afccaac3781b8549..f1b16b9a8de562f6c7bccce58f0ec0f5737261cf 100644
 --- a/lib/pages/bootstrap/view_model/bootstrap_state.dart
 +++ b/lib/pages/bootstrap/view_model/bootstrap_state.dart
-@@ -1,35 +1,29 @@
+@@ -1,35 +1,34 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -301151,8 +301151,13 @@ index f8d5fa7779042475b4fa8167afccaac3781b8549..471c03c91497e8173dc0c306f7e0ccce
 +class BootstrapViewModelState {
 +  String? recoveryKey;
 +  bool isLoading = false;
-+  Object? unlockWithError;
-+  ({bool connected, bool initialized})? cryptoIdentityState;
++  ({
++    bool connected,
++    bool crossSigningEnabled,
++    bool initialized,
++    bool keyBackupEnabled,
++  })?
++  cryptoIdentityState;
 +  bool reset = false;
 +  KeyVerification? keyVerification;
 +  List<DeviceKeys>? connectedDevices;
@@ -351865,155 +351870,6 @@ index b2e637f837c0f03fae4ecfac621f469316a90def..403d08b6bd523a539cc33b5ae4b00632
 +
 +  await AppSettings.noEncryptionWarningShown.setItem(true);
 +}
-diff --git a/lib/utils/matrix_sdk_extensions/matrix_file_extension.dart b/lib/utils/matrix_sdk_extensions/matrix_file_extension.dart
-index deaadd194cb94a3bfff4e85a60b3970d5a9618b7..ea1685088a09891b8047782cfc895510bb8d73ac 100644
---- a/lib/utils/matrix_sdk_extensions/matrix_file_extension.dart
-+++ b/lib/utils/matrix_sdk_extensions/matrix_file_extension.dart
-@@ -1,70 +1,74 @@
--// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
--// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
--//
--// SPDX-License-Identifier: AGPL-3.0-or-later
--
--import 'package:file_picker/file_picker.dart';
--import 'package:fluffychat/l10n/l10n.dart';
--import 'package:fluffychat/utils/size_string.dart';
--import 'package:flutter/material.dart';
--import 'package:matrix/matrix.dart';
--import 'package:share_plus/share_plus.dart';
--
--extension MatrixFileExtension on MatrixFile {
--  Future<void> save(BuildContext context) async {
--    final scaffoldMessenger = ScaffoldMessenger.of(context);
--    final l10n = L10n.of(context);
--    final downloadPath = await FilePicker.saveFile(
--      dialogTitle: l10n.saveFile,
--      fileName: name,
--      type: filePickerFileType,
--      bytes: bytes,
--    );
--    if (downloadPath == null) return;
--
--    scaffoldMessenger.showSnackBar(
--      SnackBar(
--        content: Text(l10n.fileHasBeenSavedAt(downloadPath)),
--        showCloseIcon: true,
--      ),
--    );
--  }
--
--  FileType get filePickerFileType {
--    if (this is MatrixImageFile) return FileType.image;
--    if (this is MatrixAudioFile) return FileType.audio;
--    if (this is MatrixVideoFile) return FileType.video;
--    return FileType.any;
--  }
--
--  Future<void> share(BuildContext context) async {
--    // Workaround for iPad from
--    // https://github.com/fluttercommunity/plus_plugins/tree/main/packages/share_plus/share_plus#ipad
--    final box = context.findRenderObject() as RenderBox?;
--
--    await SharePlus.instance.share(
--      ShareParams(
--        files: [XFile.fromData(bytes, name: name, mimeType: mimeType)],
--        sharePositionOrigin: box == null
--            ? null
--            : box.localToGlobal(Offset.zero) & box.size,
--      ),
--    );
--    return;
--  }
--
--  MatrixFile get detectFileType {
--    if (msgType == MessageTypes.Image) {
--      return MatrixImageFile(bytes: bytes, name: name);
--    }
--    if (msgType == MessageTypes.Video) {
--      return MatrixVideoFile(bytes: bytes, name: name);
--    }
--    if (msgType == MessageTypes.Audio) {
--      return MatrixAudioFile(bytes: bytes, name: name);
--    }
--    return this;
--  }
--
--  String get sizeString => size.sizeString;
--}
-+// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
-+// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
-+import 'package:file_picker/file_picker.dart';
-+import 'package:fluffychat/l10n/l10n.dart';
-+import 'package:fluffychat/utils/size_string.dart';
-+import 'package:flutter/material.dart';
-+import 'package:matrix/matrix.dart';
-+import 'package:open_file/open_file.dart';
-+import 'package:share_plus/share_plus.dart';
-+
-+extension MatrixFileExtension on MatrixFile {
-+  Future<void> save(BuildContext context) async {
-+    final scaffoldMessenger = ScaffoldMessenger.of(context);
-+    final l10n = L10n.of(context);
-+    final downloadPath = await FilePicker.saveFile(
-+      dialogTitle: l10n.saveFile,
-+      fileName: name,
-+      type: filePickerFileType,
-+      bytes: bytes,
-+    );
-+    if (downloadPath == null) return;
-+
-+    scaffoldMessenger.showSnackBar(
-+      SnackBar(
-+        content: Text(l10n.fileHasBeenSavedAt(downloadPath)),
-+        action: SnackBarAction(
-+          label: l10n.open,
-+          onPressed: () => OpenFile.open(downloadPath),
-+        ),
-+      ),
-+    );
-+  }
-+
-+  FileType get filePickerFileType {
-+    if (this is MatrixImageFile) return FileType.image;
-+    if (this is MatrixAudioFile) return FileType.audio;
-+    if (this is MatrixVideoFile) return FileType.video;
-+    return FileType.any;
-+  }
-+
-+  Future<void> share(BuildContext context) async {
-+    // Workaround for iPad from
-+    // https://github.com/fluttercommunity/plus_plugins/tree/main/packages/share_plus/share_plus#ipad
-+    final box = context.findRenderObject() as RenderBox?;
-+
-+    await SharePlus.instance.share(
-+      ShareParams(
-+        files: [XFile.fromData(bytes, name: name, mimeType: mimeType)],
-+        sharePositionOrigin: box == null
-+            ? null
-+            : box.localToGlobal(Offset.zero) & box.size,
-+      ),
-+    );
-+    return;
-+  }
-+
-+  MatrixFile get detectFileType {
-+    if (msgType == MessageTypes.Image) {
-+      return MatrixImageFile(bytes: bytes, name: name);
-+    }
-+    if (msgType == MessageTypes.Video) {
-+      return MatrixVideoFile(bytes: bytes, name: name);
-+    }
-+    if (msgType == MessageTypes.Audio) {
-+      return MatrixAudioFile(bytes: bytes, name: name);
-+    }
-+    return this;
-+  }
-+
-+  String get sizeString => size.sizeString;
-+}
 diff --git a/lib/utils/matrix_sdk_extensions/matrix_locals.dart b/lib/utils/matrix_sdk_extensions/matrix_locals.dart
 index daffb557c96af4dbd20bf80b53b37f3d34a2891a..383668e0961cf86d24d5aa8099ac060a2a5ddb2b 100644
 --- a/lib/utils/matrix_sdk_extensions/matrix_locals.dart
@@ -352906,10 +352762,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index ee462f873c82516dad8729bf60ee0ab626663879..7f847ae8ac10f1de29c84663d1e04d6834e0b0b9 100644
+index ee462f873c82516dad8729bf60ee0ab626663879..afefa95412e9c221aa4c42f4765edc8aa9d14226 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,212 +1,290 @@
+@@ -1,212 +1,292 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -353408,6 +353264,8 @@ index ee462f873c82516dad8729bf60ee0ab626663879..7f847ae8ac10f1de29c84663d1e04d68
 +                : '/rooms/$roomId?client=${client.clientName}${payload.eventId != null ? '&event=${payload.eventId}' : ''}',
 +          );
 +      }
++    case NotificationResponseType.notificationDismissed:
++      break;
 +  }
 +}
 +
@@ -357121,7 +356979,7 @@ index 3b99cce0ab5300b080e150d6ac85daaa40327163..84affe890ba121cf28b9986f508e2b45
 +  String toString() => reason;
 +}
 diff --git a/lib/utils/url_launcher.dart b/lib/utils/url_launcher.dart
-index 26cb270e47c817140824a116581a4471c7aaf946..08a6790ca34e596fa716a7a980575a4d7d753306 100644
+index 26cb270e47c817140824a116581a4471c7aaf946..f9d109d129178ef58bf3a2272628d8f43026be27 100644
 --- a/lib/utils/url_launcher.dart
 +++ b/lib/utils/url_launcher.dart
 @@ -1,253 +1,258 @@
@@ -357593,7 +357451,7 @@ index 26cb270e47c817140824a116581a4471c7aaf946..08a6790ca34e596fa716a7a980575a4d
 +            context: context,
 +            future: () => matrix.client.joinRoom(
 +              roomIdOrAlias,
-+              serverName: servers.isNotEmpty ? servers.toList() : null,
++              via: servers.isNotEmpty ? servers.toList() : null,
 +            ),
 +          );
 +          if (response.error != null) return;
@@ -370793,10 +370651,10 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..2f236d073e0a81d739a6febdce5e89af8207ae0a 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..d4783b705ddf41e0fb596d2a15225a72caac603c 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
-@@ -29,6 +29,8 @@ dependencies:
+@@ -29,8 +29,11 @@ dependencies:
    emoji_picker_flutter: ^4.5.3
    file_picker: ^12.0.0-beta.7
    file_selector: ^1.1.0
@@ -370804,8 +370662,11 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..2f236d073e0a81d739a6febdce5e89af
 +  whisper_ggml: ^2.6.0
    flutter:
      sdk: flutter
++  flutter_displaymode: ^0.6.0
    flutter_foreground_task: ^10.0.0
-@@ -38,7 +40,7 @@ dependencies:
+   flutter_linkify: ^6.0.0
+   flutter_local_notifications: ^22.3.0
+@@ -38,7 +41,7 @@ dependencies:
      sdk: flutter
    flutter_map: ^8.3.1
    flutter_new_badger: ^2.0.0
@@ -370814,7 +370675,7 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..2f236d073e0a81d739a6febdce5e89af
    flutter_shortcuts_new: ^2.0.0
    flutter_vodozemac: ^0.7.1
    flutter_web_auth_2: ^5.0.3
-@@ -111,6 +113,7 @@ hooks:
+@@ -111,6 +114,7 @@ hooks:
      sqlite3:
        source: sqlcipher
  
