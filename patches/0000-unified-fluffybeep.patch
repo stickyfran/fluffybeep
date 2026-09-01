@@ -349818,10 +349818,10 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f44e9c8c3672ba7c9257fa872c63e97841a0c799
+index 0000000000000000000000000000000000000000..1621e299abab4077224cf53010e93e5491bb2632
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1036 @@
+@@ -0,0 +1,1040 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350297,7 +350297,9 @@ index 0000000000000000000000000000000000000000..f44e9c8c3672ba7c9257fa872c63e978
 +      final event = room.states[stateKey]?.values.firstOrNull;
 +      if (event != null) {
 +        final content = event.content;
-+        final raw = content['phone'] ?? content['remote_id'] ?? content['channel']?['id'] ?? content['sender']?['id'];
++        final channel = content['channel'] is Map ? (content['channel'] as Map) : null;
++        final sender = content['sender'] is Map ? (content['sender'] as Map) : null;
++        final raw = content['phone'] ?? content['remote_id'] ?? channel?['id'] ?? sender?['id'];
 +        if (raw != null) {
 +          final str = raw.toString();
 +          if (!str.contains('lid')) {
@@ -350370,11 +350372,13 @@ index 0000000000000000000000000000000000000000..f44e9c8c3672ba7c9257fa872c63e978
 +      final event = room.states[stateKey]?.values.firstOrNull;
 +      if (event != null) {
 +        final content = event.content;
-+        final u = content['username'] ?? content['channel']?['username'] ?? content['channel']?['displayname'] ?? content['remote_user']?['username'];
++        final channel = content['channel'] is Map ? (content['channel'] as Map) : null;
++        final remoteUser = content['remote_user'] is Map ? (content['remote_user'] as Map) : null;
++        final u = content['username'] ?? channel?['username'] ?? channel?['displayname'] ?? remoteUser?['username'];
 +        if (u != null && u.toString().isNotEmpty) {
 +          username ??= cleanInstagramUsername(u.toString());
 +        }
-+        final id = content['id'] ?? content['channel']?['id'] ?? content['remote_id'];
++        final id = content['id'] ?? channel?['id'] ?? content['remote_id'];
 +        if (id != null && id.toString().isNotEmpty) {
 +          numericId ??= id.toString();
 +        }
@@ -351409,7 +351413,7 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +}
 diff --git a/lib/utils/beeper_sync_manager.dart b/lib/utils/beeper_sync_manager.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..41c0f3f0dee5f7af8ee30b8cc07ee14334d7347b
+index 0000000000000000000000000000000000000000..5c6ef7bb5c2737a3f12ef791ed7ec0f7c31bdd01
 --- /dev/null
 +++ b/lib/utils/beeper_sync_manager.dart
 @@ -0,0 +1,182 @@
@@ -351498,7 +351502,7 @@ index 0000000000000000000000000000000000000000..41c0f3f0dee5f7af8ee30b8cc07ee143
 +      if (client.prevBatch == null) {
 +        await client.onSync.stream.firstWhere((s) => client.prevBatch != null).timeout(
 +          const Duration(seconds: 20),
-+          onTimeout: () => SyncUpdate(),
++          onTimeout: () => SyncUpdate(nextBatch: client.syncToken ?? ''),
 +        );
 +      }
 +
