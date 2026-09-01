@@ -311135,7 +311135,7 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc
                          child: supportsVideoPlayer
 diff --git a/lib/pages/chat/floating_manual_read_button.dart b/lib/pages/chat/floating_manual_read_button.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..92412ab2c80b914fb5932379ed5c292738ae55a8
+index 0000000000000000000000000000000000000000..9954f14cb3d431d53557f53c7405b9b4a338dd87
 --- /dev/null
 +++ b/lib/pages/chat/floating_manual_read_button.dart
 @@ -0,0 +1,107 @@
@@ -311166,7 +311166,7 @@ index 0000000000000000000000000000000000000000..92412ab2c80b914fb5932379ed5c2927
 +    HapticFeedback.mediumImpact();
 +    if (mounted) setState(() => _isMarkingRead = true);
 +
-+    await widget.controller.setReadMarker(force: true);
++    widget.controller.setReadMarker(force: true);
 +
 +    await Future.delayed(const Duration(milliseconds: 250));
 +    if (mounted) {
