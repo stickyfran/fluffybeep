@@ -352224,10 +352224,10 @@ index db7182924e667ee16455513bfe235665c9373a3a..99f61119f193a0b6283dc75b6b27dc46
 +  }
 +}
 diff --git a/lib/utils/init_with_restore.dart b/lib/utils/init_with_restore.dart
-index 03f101ce6a85c0a9f1a88968229f377d833d2cab..9c60e800197fad2d1896b704b57a0fa7560a1e5a 100644
+index 03f101ce6a85c0a9f1a88968229f377d833d2cab..8149ba4174bd230fb60cc890c383b6a21b090267 100644
 --- a/lib/utils/init_with_restore.dart
 +++ b/lib/utils/init_with_restore.dart
-@@ -1,154 +1,154 @@
+@@ -1,154 +1,180 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352492,6 +352492,29 @@ index 03f101ce6a85c0a9f1a88968229f377d833d2cab..9c60e800197fad2d1896b704b57a0fa7
 +        }
 +      }
 +    } catch (e, s) {
++      final errorStr = e.toString().toLowerCase();
++      final isLocked = errorStr.contains('database is locked') ||
++          errorStr.contains('sqlite_error: 5') ||
++          errorStr.contains('sqlite_error: 6') ||
++          errorStr.contains('busy');
++
++      if (isLocked) {
++        Logs().w('Client init hit database lock. Retrying in 1s...', e);
++        await Future.delayed(const Duration(seconds: 1));
++        try {
++          await init(
++            onInitStateChanged: (state) {
++              if (state == InitState.migratingDatabase) onMigration?.call();
++            },
++            waitForFirstSync: false,
++            waitUntilLoadCompletedLoaded: false,
++          );
++          if (isLogged()) return;
++        } catch (retryErr) {
++          Logs().w('Retry after lock failed', retryErr);
++        }
++      }
++
 +      Logs().wtf('Client init failed!', e, s);
 +      final l10n = await lookupL10n(PlatformDispatcher.instance.locale);
 +      final sessionBackupString = await storage?.read(key: storageKey);
@@ -352518,6 +352541,9 @@ index 03f101ce6a85c0a9f1a88968229f377d833d2cab..9c60e800197fad2d1896b704b57a0fa7
 +            if (state == InitState.migratingDatabase) onMigration?.call();
 +          },
 +        );
++        if (isLogged()) {
++          storage?.write(key: storageKey, value: sessionBackup.toString());
++        }
 +        ClientManager.sendInitNotification(
 +          l10n.initAppError,
 +          l10n.restoreSessionBody(
@@ -353433,6 +353459,120 @@ index 337cd2ad30b9e35c18daf574524d61308bc390eb..24789e7ef1d4d8a3b5aea2d57beea4a8
 +      {PollEventContent.responseType}.contains(type) ||
 +      type.startsWith('m.key.verification.');
 +}
+diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
+index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..c92964143d5dc9a63e6caa3edf0ec68f735bc92d 100644
+--- a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
++++ b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
+@@ -19,33 +19,58 @@ import 'package:universal_html/html.dart' as html;
+ import 'cipher.dart';
+ 
+ Future<DatabaseApi> flutterMatrixSdkDatabaseBuilder(String clientName) async {
+-  try {
+-    return await _constructDatabase(clientName);
+-  } catch (e, s) {
+-    Logs().wtf('Unable to construct database!', e, s);
+-
++  for (int attempt = 1; attempt <= 4; attempt++) {
+     try {
+-      // Send error notification:
+-      final l10n = await lookupL10n(PlatformDispatcher.instance.locale);
+-      // We expect that the database cannot be open on iOS 2.8.0 due to that
+-      // the team ID has changed and te app can no longer access the database
+-      // key in the iOS keychain. This should be removed from 2.9.0 on.
+-      if (!PlatformInfos.isIOS) {
+-        ClientManager.sendInitNotification(l10n.initAppError, e.toString());
+-      }
++      return await _constructDatabase(clientName);
+     } catch (e, s) {
+-      Logs().e('Unable to send error notification', e, s);
+-    }
++      final errorStr = e.toString().toLowerCase();
++      final isLockedOrBusy = errorStr.contains('database is locked') ||
++          errorStr.contains('sqlite_error: 5') ||
++          errorStr.contains('sqlite_error: 6') ||
++          errorStr.contains('busy');
++
++      if (isLockedOrBusy && attempt < 4) {
++        Logs().w('[DatabaseBuilder] Database is temporarily locked (attempt $attempt/4). Retrying in ${300 * attempt}ms...', e);
++        await Future.delayed(Duration(milliseconds: 300 * attempt));
++        continue;
++      }
+ 
+-    // Delete database file:
+-    if (!kIsWeb) {
+-      final dbFile = File(await _getDatabasePath(clientName));
+-      if (await dbFile.exists()) await dbFile.delete();
+-    }
++      Logs().wtf('Unable to construct database on attempt $attempt!', e, s);
++
++      // Only delete database if it is actually corrupted/malformed (NEVER delete on transient database locked/busy error!)
++      final isCorrupt = errorStr.contains('corrupt') ||
++          errorStr.contains('malformed') ||
++          errorStr.contains('not a database') ||
++          errorStr.contains('sqlite_error: 11') ||
++          errorStr.contains('sqlite_error: 26');
++
++      if (isCorrupt) {
++        try {
++          final l10n = await lookupL10n(PlatformDispatcher.instance.locale);
++          if (!PlatformInfos.isIOS) {
++            ClientManager.sendInitNotification(l10n.initAppError, e.toString());
++          }
++        } catch (notifErr, notifTrace) {
++          Logs().e('Unable to send error notification', notifErr, notifTrace);
++        }
++
++        if (!kIsWeb) {
++          final dbFile = File(await _getDatabasePath(clientName));
++          if (await dbFile.exists()) await dbFile.delete();
++        }
++
++        return await _constructDatabase(clientName);
++      }
+ 
+-    // Try again
+-    return await _constructDatabase(clientName);
++      if (attempt == 4) {
++        // Wait 1 second and try once more rather than destroying the DB
++        await Future.delayed(const Duration(seconds: 1));
++        return await _constructDatabase(clientName);
++      }
++    }
+   }
++
++  return await _constructDatabase(clientName);
+ }
+ 
+ Future<Directory?> getFileStorageLocation() async {
+@@ -106,8 +131,26 @@ Future<MatrixSdkDatabase> _constructDatabase(String clientName) async {
+     path,
+     options: OpenDatabaseOptions(
+       version: 1,
+-      // most important : apply encryption when opening the DB
+-      onConfigure: helper?.applyPragmaKey,
++      onConfigure: (db) async {
++        // 1. Set busy_timeout (10 seconds) so concurrent operations wait for locks to release
++        try {
++          await db.execute('PRAGMA busy_timeout = 10000;');
++        } catch (_) {}
++
++        // 2. Enable WAL journal mode for multi-threaded / multi-isolate read/write concurrency
++        try {
++          await db.execute('PRAGMA journal_mode = WAL;');
++        } catch (_) {}
++
++        try {
++          await db.execute('PRAGMA synchronous = NORMAL;');
++        } catch (_) {}
++
++        // 3. Apply encryption when opening the DB
++        if (helper != null) {
++          await helper.applyPragmaKey(db);
++        }
++      },
+     ),
+   );
+ 
 diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart
 index b2e637f837c0f03fae4ecfac621f469316a90def..403d08b6bd523a539cc33b5ae4b006324e3d211f 100644
 --- a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart
@@ -354483,7 +354623,7 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index ee462f873c82516dad8729bf60ee0ab626663879..afefa95412e9c221aa4c42f4765edc8aa9d14226 100644
+index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee736973e415 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
 @@ -1,212 +1,292 @@
@@ -354811,7 +354951,7 @@ index ee462f873c82516dad8729bf60ee0ab626663879..afefa95412e9c221aa4c42f4765edc8a
 +  } catch (e, s) {
 +    Logs().e('Error handling notification tap in background', e, s);
 +  } finally {
-+    await client.dispose(closeDatabase: false);
++    await client.dispose(closeDatabase: true);
 +    pushIsolateReceivePort.sendPort.send('DONE');
 +    IsolateNameServer.removePortNameMapping(AppConfig.pushIsolatePortName);
 +  }
@@ -355497,10 +355637,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a122b2964 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..22e6cf6d32c4669cb6ee50ed57639dd62a74eeff 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,500 +1,640 @@
+@@ -1,500 +1,649 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -356565,6 +356705,15 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a
 +  );
 +  await androidPlugin.createNotificationChannel(defaultDirectChannel);
 +  await androidPlugin.createNotificationChannel(defaultGroupChannel);
++  } finally {
++    if (isBackgroundMessage && client != null) {
++      try {
++        await client.dispose(closeDatabase: true);
++      } catch (e) {
++        Logs().w('[PushHelper] Error disposing background client', e);
++      }
++    }
++  }
 +}
 +
 +class FluffyChatPushPayload {
