@@ -311014,10 +311014,10 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e
            focusNode: focusNode,
 diff --git a/lib/pages/chat/merged_contact_switcher.dart b/lib/pages/chat/merged_contact_switcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..19fd1d803b00cfff5871f198e182a64ce3a26dda
+index 0000000000000000000000000000000000000000..e099e099330534c787dd49af6009c471627f70e4
 --- /dev/null
 +++ b/lib/pages/chat/merged_contact_switcher.dart
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,176 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -311089,94 +311089,101 @@ index 0000000000000000000000000000000000000000..19fd1d803b00cfff5871f198e182a64c
 +          final displayname = beeperData.displayName ?? room.name;
 +          final hasUnread = room.isUnreadOrInvited || room.notificationCount > 0;
 +
++          final handle = BeeperBridgeUtils.getAccountHandle(room);
++          final label = network?.name ?? 'Chat';
++          final tooltipText = handle != null ? '$label ($handle)' : label;
++
 +          return Padding(
 +            padding: const EdgeInsets.only(right: 12),
-+            child: Material(
-+              color: Colors.transparent,
-+              child: InkWell(
-+                borderRadius: BorderRadius.circular(12),
-+                onTap: isActive ? null : () => context.go('/rooms/${room.id}'),
-+                child: AnimatedContainer(
-+                  duration: FluffyThemes.animationDuration,
-+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-+                  decoration: BoxDecoration(
-+                    borderRadius: BorderRadius.circular(12),
-+                    color: isActive
-+                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.6)
-+                        : Colors.transparent,
-+                    border: isActive
-+                        ? Border.all(
-+                            color: theme.colorScheme.primary.withValues(alpha: 0.8),
-+                            width: 1.5,
-+                          )
-+                        : Border.all(color: Colors.transparent, width: 1.5),
-+                  ),
-+                  child: Column(
-+                    mainAxisSize: MainAxisSize.min,
-+                    mainAxisAlignment: MainAxisAlignment.center,
-+                    children: [
-+                      Stack(
-+                        clipBehavior: Clip.none,
-+                        children: [
-+                          Avatar(
-+                            mxContent: beeperData.avatarUrl,
-+                            name: displayname,
-+                            size: 34,
-+                          ),
-+                          if (network != null)
-+                            Positioned(
-+                              bottom: -2,
-+                              right: -2,
-+                              child: Container(
-+                                width: 12,
-+                                height: 12,
-+                                decoration: BoxDecoration(
-+                                  shape: BoxShape.circle,
-+                                  color: Color(network.colorHex),
-+                                  border: Border.all(
-+                                    color: theme.colorScheme.surface,
-+                                    width: 1.5,
++            child: Tooltip(
++              message: tooltipText,
++              child: Material(
++                color: Colors.transparent,
++                child: InkWell(
++                  borderRadius: BorderRadius.circular(12),
++                  onTap: isActive ? null : () => context.go('/rooms/${room.id}'),
++                  child: AnimatedContainer(
++                    duration: FluffyThemes.animationDuration,
++                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
++                    decoration: BoxDecoration(
++                      borderRadius: BorderRadius.circular(12),
++                      color: isActive
++                          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.6)
++                          : Colors.transparent,
++                      border: isActive
++                          ? Border.all(
++                              color: theme.colorScheme.primary.withValues(alpha: 0.8),
++                              width: 1.5,
++                            )
++                          : Border.all(color: Colors.transparent, width: 1.5),
++                    ),
++                    child: Column(
++                      mainAxisSize: MainAxisSize.min,
++                      mainAxisAlignment: MainAxisAlignment.center,
++                      children: [
++                        Stack(
++                          clipBehavior: Clip.none,
++                          children: [
++                            Avatar(
++                              mxContent: beeperData.avatarUrl,
++                              name: displayname,
++                              size: 34,
++                            ),
++                            if (network != null)
++                              Positioned(
++                                bottom: -2,
++                                right: -2,
++                                child: Container(
++                                  width: 12,
++                                  height: 12,
++                                  decoration: BoxDecoration(
++                                    shape: BoxShape.circle,
++                                    color: Color(network.colorHex),
++                                    border: Border.all(
++                                      color: theme.colorScheme.surface,
++                                      width: 1.5,
++                                    ),
 +                                  ),
 +                                ),
 +                              ),
-+                            ),
-+                          if (hasUnread && !isActive)
-+                            Positioned(
-+                              top: -2,
-+                              right: -2,
-+                              child: Container(
-+                                width: 10,
-+                                height: 10,
-+                                decoration: BoxDecoration(
-+                                  shape: BoxShape.circle,
-+                                  color: theme.colorScheme.error,
-+                                  border: Border.all(
-+                                    color: theme.colorScheme.surface,
-+                                    width: 1.5,
++                            if (hasUnread && !isActive)
++                              Positioned(
++                                top: -2,
++                                right: -2,
++                                child: Container(
++                                  width: 10,
++                                  height: 10,
++                                  decoration: BoxDecoration(
++                                    shape: BoxShape.circle,
++                                    color: theme.colorScheme.error,
++                                    border: Border.all(
++                                      color: theme.colorScheme.surface,
++                                      width: 1.5,
++                                    ),
 +                                  ),
 +                                ),
 +                              ),
++                          ],
++                        ),
++                        const SizedBox(height: 3),
++                        SizedBox(
++                          width: 58,
++                          child: Text(
++                            label,
++                            maxLines: 1,
++                            textAlign: TextAlign.center,
++                            overflow: TextOverflow.ellipsis,
++                            style: TextStyle(
++                              fontSize: 10,
++                              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
++                              color: isActive
++                                  ? theme.colorScheme.onPrimaryContainer
++                                  : theme.colorScheme.onSurfaceVariant,
 +                            ),
-+                        ],
-+                      ),
-+                      const SizedBox(height: 3),
-+                      SizedBox(
-+                        width: 58,
-+                        child: Text(
-+                          network?.name ?? 'Chat',
-+                          maxLines: 1,
-+                          textAlign: TextAlign.center,
-+                          overflow: TextOverflow.ellipsis,
-+                          style: TextStyle(
-+                            fontSize: 10,
-+                            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-+                            color: isActive
-+                                ? theme.colorScheme.onPrimaryContainer
-+                                : theme.colorScheme.onSurfaceVariant,
 +                          ),
 +                        ),
-+                      ),
-+                    ],
++                      ],
++                    ),
 +                  ),
 +                ),
 +              ),
@@ -317556,10 +317563,10 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd1129349639aea 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8157b0116 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
-@@ -3,36 +3,63 @@
+@@ -3,36 +3,64 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -317572,6 +317579,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
 -import 'package:fluffychat/utils/verified_room_extension.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/beeper_merge_utils.dart';
++import 'package:fluffychat/utils/beeper_app_launcher.dart';
 +import '../merge_contact_picker/merge_contact_picker.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
@@ -317629,7 +317637,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
      if (room == null) {
        return Scaffold(
          appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
-@@ -42,25 +69,30 @@ class ChatDetailsView extends StatelessWidget {
+@@ -42,25 +70,30 @@ class ChatDetailsView extends StatelessWidget {
        );
      }
  
@@ -317670,7 +317678,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
          return Scaffold(
            appBar: AppBar(
              leading:
-@@ -79,8 +111,10 @@ class ChatDetailsView extends StatelessWidget {
+@@ -79,8 +112,10 @@ class ChatDetailsView extends StatelessWidget {
                  IconButton(
                    tooltip: L10n.of(context).share,
                    icon: const Icon(Icons.qr_code_rounded),
@@ -317683,7 +317691,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -92,278 +126,295 @@ class ChatDetailsView extends StatelessWidget {
+@@ -92,278 +127,351 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -318139,12 +318147,12 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
 +                          backgroundColor: theme.colorScheme.surfaceContainer,
 +                          foregroundColor: iconColor,
 +                          child: const Icon(Icons.merge_type_outlined),
-+                        ),
+                         ),
 +                        title: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Contacto fusionado (${BeeperMergeUtils.getSiblingRooms(room.id).length} chats)'
 +                              : 'Fusionar con otras cuentas...',
-                         ),
++                        ),
 +                        subtitle: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Gestionar chats vinculados de este contacto'
@@ -318155,6 +318163,62 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
                        ),
 -                      onTap: () => context.push(
 -                        '/rooms/${controller.roomId!}/details/members',
++                      if (BeeperBridgeUtils.extractWhatsAppPhone(room) != null ||
++                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'whatsapp' ||
++                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'whatsappgo') ...[
++                        Divider(color: theme.dividerColor),
++                        ListTile(
++                          leading: CircleAvatar(
++                            backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.15),
++                            foregroundColor: const Color(0xFF25D366),
++                            child: const Icon(Icons.call_outlined),
++                          ),
++                          title: const Text('Abrir en WhatsApp'),
++                          subtitle: Text(
++                            BeeperBridgeUtils.extractWhatsAppPhone(room) != null
++                                ? BeeperBridgeUtils.formatPhoneNumber(BeeperBridgeUtils.extractWhatsAppPhone(room)!)
++                                : 'Contactar por WhatsApp',
++                          ),
++                          trailing: Row(
++                            mainAxisSize: MainAxisSize.min,
++                            children: [
++                              IconButton(
++                                icon: const Icon(Icons.phone_in_talk_outlined),
++                                tooltip: 'Llamar por teléfono',
++                                onPressed: () => BeeperAppLauncher.dialPhone(room: room),
++                              ),
++                              IconButton(
++                                icon: const Icon(Icons.open_in_new),
++                                tooltip: 'Abrir app de WhatsApp',
++                                onPressed: () => BeeperAppLauncher.openWhatsApp(room: room),
++                              ),
++                            ],
++                          ),
++                        ),
++                      ],
++                      if (BeeperBridgeUtils.extractInstagramDetails(room).username != null ||
++                          BeeperBridgeUtils.extractInstagramDetails(room).numericId != null ||
++                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'instagram' ||
++                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'instagramgo') ...[
++                        Divider(color: theme.dividerColor),
++                        ListTile(
++                          leading: CircleAvatar(
++                            backgroundColor: const Color(0xFFE1306C).withValues(alpha: 0.15),
++                            foregroundColor: const Color(0xFFE1306C),
++                            child: const Icon(Icons.camera_alt_outlined),
++                          ),
++                          title: const Text('Abrir en Instagram'),
++                          subtitle: Text(
++                            BeeperBridgeUtils.extractInstagramDetails(room).username != null
++                                ? '@${BeeperBridgeUtils.extractInstagramDetails(room).username}'
++                                : (BeeperBridgeUtils.extractInstagramDetails(room).numericId != null
++                                    ? 'ID: ${BeeperBridgeUtils.extractInstagramDetails(room).numericId}'
++                                    : 'Ver perfil en Instagram'),
++                          ),
++                          trailing: const Icon(Icons.chevron_right_outlined),
++                          onTap: () => BeeperAppLauncher.openInstagram(room: room),
++                        ),
++                      ],
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -318204,14 +318268,14 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
 +                  title: Text(
 +                    L10n.of(context).loadCountMoreParticipants(
 +                      (actualMembersCount - members.length),
-+                    ),
+                     ),
 +                  ),
 +                  leading: CircleAvatar(
 +                    backgroundColor: theme.scaffoldBackgroundColor,
 +                    child: const Icon(
 +                      Icons.group_outlined,
 +                      color: Colors.grey,
-                     ),
++                    ),
 +                  ),
 +                  onTap: () => context.push(
 +                    '/rooms/${controller.roomId!}/details/members',
@@ -318222,7 +318286,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..d12f9527fb6a8795f224addf5cd11293
              ),
            ),
          );
-@@ -371,48 +422,3 @@ class ChatDetailsView extends StatelessWidget {
+@@ -371,48 +479,3 @@ class ChatDetailsView extends StatelessWidget {
      );
    }
  }
@@ -334534,10 +334598,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f243dd664ca
+index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d689f5f6fd7
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,535 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334576,6 +334640,7 @@ index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f24
 +class _MergePickerRoomItem {
 +  final Room room;
 +  final String displayName;
++  final String? accountHandle;
 +  final String searchKey;
 +  final BeeperNetwork? network;
 +  final Uri? avatarUrl;
@@ -334583,6 +334648,7 @@ index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f24
 +  const _MergePickerRoomItem({
 +    required this.room,
 +    required this.displayName,
++    this.accountHandle,
 +    required this.searchKey,
 +    required this.network,
 +    required this.avatarUrl,
@@ -334647,11 +334713,13 @@ index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f24
 +      final dName = data.displayName ?? room.name;
 +      final net = BeeperBridgeUtils.getRoomNetwork(room);
 +      final netKey = (data.networkKey ?? '').toLowerCase();
-+      final searchKey = '${dName.toLowerCase()} $netKey ${room.id.toLowerCase()}';
++      final handle = BeeperBridgeUtils.getAccountHandle(room);
++      final searchKey = '${dName.toLowerCase()} ${handle?.toLowerCase() ?? ''} $netKey ${room.id.toLowerCase()}';
 +
 +      items.add(_MergePickerRoomItem(
 +        room: room,
 +        displayName: dName,
++        accountHandle: handle,
 +        searchKey: searchKey,
 +        network: net,
 +        avatarUrl: data.avatarUrl,
@@ -335030,7 +335098,10 @@ index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f24
 +                          ),
 +                        ),
 +                        subtitle: Text(
-+                          network != null ? '${network.name} • ${item.room.id}' : item.room.id,
++                          [
++                            if (network != null) network.name,
++                            if (item.accountHandle != null && item.accountHandle!.isNotEmpty) item.accountHandle!,
++                          ].join(' • '),
 +                          maxLines: 1,
 +                          overflow: TextOverflow.ellipsis,
 +                          style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
@@ -349571,10 +349642,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c94f3ebfe
+index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148445c6984
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
-@@ -0,0 +1,212 @@
+@@ -0,0 +1,170 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -349594,44 +349665,19 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +
 +  /// Robust extraction of WhatsApp phone number from a room or its merged sibling rooms
 +  static String? extractWhatsAppPhone(Room room) {
-+    // 1. Check directId
-+    final directId = room.directChatMatrixID ?? '';
-+    final directMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(directId);
-+    if (directMatch != null) return directMatch.group(1);
++    // 1. Direct extraction from this room
++    final direct = BeeperBridgeUtils.extractWhatsAppPhone(room);
++    if (direct != null && direct.isNotEmpty) return direct;
 +
-+    // 2. Check beeperData contactId
-+    final beeperData = BeeperBridgeUtils.getRoomData(room);
-+    final contactId = beeperData.contactId ?? '';
-+    final contactMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(contactId);
-+    if (contactMatch != null) return contactMatch.group(1);
-+
-+    if (beeperData.networkKey == 'whatsapp' || beeperData.networkKey == 'whatsappgo') {
-+      final digits = contactId.replaceAll(RegExp(r'\D'), '');
-+      if (digits.length >= 7 && digits.length <= 16) return digits;
-+    }
-+
-+    // 3. Check participants / members
-+    try {
-+      final members = room.getParticipants();
-+      for (final m in members) {
-+        if (m.id == room.client.userID) continue;
-+        final mMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(m.id);
-+        if (mMatch != null) return mMatch.group(1);
-+      }
-+    } catch (_) {}
-+
-+    // 4. If this is a merged contact or has sibling rooms, check any WhatsApp sibling room
++    // 2. Check sibling rooms if merged
 +    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
 +    for (final s in siblings) {
 +      if (s.id == room.id) continue;
-+      final sData = BeeperBridgeUtils.getRoomData(s);
-+      if (sData.networkKey == 'whatsapp' || sData.networkKey == 'whatsappgo') {
-+        final phone = extractWhatsAppPhone(s);
-+        if (phone != null) return phone;
-+      }
++      final sPhone = BeeperBridgeUtils.extractWhatsAppPhone(s);
++      if (sPhone != null && sPhone.isNotEmpty) return sPhone;
 +    }
 +
-+    // 5. Check phone contacts match
++    // 3. Check matched phone contact
 +    final mergeId = BeeperMergeUtils.getMergeIdForRoom(room.id);
 +    if (mergeId != null) {
 +      final mc = BeeperMergeUtils.getMergedContacts(room.client)[mergeId];
@@ -349649,36 +349695,18 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +
 +  /// Robust extraction of Instagram user or numeric ID from a room or its merged sibling rooms
 +  static String? extractInstagramId(Room room) {
-+    // 1. Check directId
-+    final directId = room.directChatMatrixID ?? '';
-+    final igMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
-+    if (igMatch != null) return igMatch.group(1);
++    // 1. Direct extraction from this room
++    final direct = BeeperBridgeUtils.extractInstagramDetails(room);
++    if (direct.username != null) return direct.username;
++    if (direct.numericId != null) return direct.numericId;
 +
-+    // 2. Check beeperData contactId
-+    final beeperData = BeeperBridgeUtils.getRoomData(room);
-+    final contactId = beeperData.contactId ?? '';
-+    final contactMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(contactId);
-+    if (contactMatch != null) return contactMatch.group(1);
-+
-+    // 3. Check participants / members
-+    try {
-+      final members = room.getParticipants();
-+      for (final m in members) {
-+        if (m.id == room.client.userID) continue;
-+        final mMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(m.id);
-+        if (mMatch != null) return mMatch.group(1);
-+      }
-+    } catch (_) {}
-+
-+    // 4. Check merged siblings
++    // 2. Check sibling rooms if merged
 +    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
 +    for (final s in siblings) {
 +      if (s.id == room.id) continue;
-+      final sData = BeeperBridgeUtils.getRoomData(s);
-+      if (sData.networkKey == 'instagram' || sData.networkKey == 'instagramgo') {
-+        final id = extractInstagramId(s);
-+        if (id != null) return id;
-+      }
++      final sIg = BeeperBridgeUtils.extractInstagramDetails(s);
++      if (sIg.username != null) return sIg.username;
++      if (sIg.numericId != null) return sIg.numericId;
 +    }
 +
 +    return null;
@@ -349705,12 +349733,12 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +    // Fallback using url_launcher
 +    if (targetId != null && targetId.isNotEmpty) {
 +      final isNumeric = RegExp(r'^\d+$').hasMatch(targetId);
-+      final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=' : 'https://instagram.com/');
++      final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=$targetId' : 'https://instagram.com/$targetId');
 +      try {
 +        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
 +      } catch (_) {}
 +      try {
-+        return await launchUrl(Uri.parse('https://instagram.com/'), mode: LaunchMode.externalApplication);
++        return await launchUrl(Uri.parse('https://instagram.com/$targetId'), mode: LaunchMode.externalApplication);
 +      } catch (_) {}
 +    }
 +
@@ -349743,11 +349771,11 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +    if (targetPhone != null && targetPhone.isNotEmpty) {
 +      final clean = targetPhone.replaceAll(RegExp(r'\D'), '');
 +      try {
-+        final uri = Uri.parse('whatsapp://send?phone=');
++        final uri = Uri.parse('whatsapp://send?phone=$clean');
 +        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
 +      } catch (_) {}
 +      try {
-+        final waUri = Uri.parse('https://api.whatsapp.com/send?phone=');
++        final waUri = Uri.parse('https://api.whatsapp.com/send?phone=$clean');
 +        if (await launchUrl(waUri, mode: LaunchMode.externalApplication)) return true;
 +      } catch (_) {}
 +    }
@@ -349767,7 +349795,8 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +    final targetPhone = phone ?? (room != null ? extractWhatsAppPhone(room) : null);
 +    if (targetPhone == null || targetPhone.isEmpty) return false;
 +
-+    final cleanPhone = targetPhone.trim();
++    final cleanPhone = targetPhone.replaceAll(RegExp(r'\D'), '');
++    if (cleanPhone.isEmpty) return false;
 +
 +    if (Platform.isAndroid) {
 +      try {
@@ -349779,7 +349808,7 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +    }
 +
 +    // Fallback using url_launcher tel scheme
-+    final telUri = Uri.parse(cleanPhone.startsWith('+') ? 'tel:' : 'tel:+');
++    final telUri = Uri.parse('tel:+$cleanPhone');
 +    try {
 +      return await launchUrl(telUri, mode: LaunchMode.externalApplication);
 +    } catch (_) {
@@ -349789,10 +349818,10 @@ index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c1ba7c2b0
+index 0000000000000000000000000000000000000000..f44e9c8c3672ba7c9257fa872c63e97841a0c799
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,825 @@
+@@ -0,0 +1,1036 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350239,6 +350268,217 @@ index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c
 +    return BeeperNetwork(spec.name, spec.colorHex, key);
 +  }
 +
++  /// Format raw phone number into human-readable phone format
++  static String formatPhoneNumber(String raw) {
++    final digits = raw.replaceAll(RegExp(r'\D'), '');
++    if (digits.length < 7) return raw;
++    if (digits.startsWith('549') && digits.length >= 12) {
++      final area = digits.substring(3, 5);
++      final mid = digits.substring(5, 9);
++      final rest = digits.substring(9);
++      return '+54 9 $area $mid-$rest';
++    }
++    if (digits.startsWith('1') && digits.length == 11) {
++      final area = digits.substring(1, 4);
++      final mid = digits.substring(4, 7);
++      final rest = digits.substring(7);
++      return '+1 ($area) $mid-$rest';
++    }
++    if (digits.length == 10) {
++      return '(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}';
++    }
++    return '+$digits';
++  }
++
++  /// Robust extraction of WhatsApp phone number from a room or its members/bridge state
++  static String? extractWhatsAppPhone(Room room) {
++    // 1. Check bridge state events (com.beeper.bridge, m.bridge, fi.mau.whatsapp, uk.half-shot.bridge)
++    for (final stateKey in const ['com.beeper.bridge', 'm.bridge', 'fi.mau.whatsapp', 'uk.half-shot.bridge']) {
++      final event = room.states[stateKey]?.values.firstOrNull;
++      if (event != null) {
++        final content = event.content;
++        final raw = content['phone'] ?? content['remote_id'] ?? content['channel']?['id'] ?? content['sender']?['id'];
++        if (raw != null) {
++          final str = raw.toString();
++          if (!str.contains('lid')) {
++            final digits = str.replaceAll(RegExp(r'\D'), '');
++            if (digits.length >= 7 && digits.length <= 16) {
++              return digits;
++            }
++          }
++        }
++      }
++    }
++
++    // 2. Check candidate MXIDs (directChatMatrixID, contactId, room participants)
++    final candidateMxids = <String>[
++      if (room.directChatMatrixID != null) room.directChatMatrixID!,
++      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
++      ...room.getParticipants().map((p) => p.id),
++    ];
++
++    for (final mxid in candidateMxids) {
++      if (mxid == room.client.userID || isBeeperBot(mxid)) continue;
++      // Match whatsapp user MXIDs: e.g. @whatsapp_5491112345678:beeper.local, @_whatsapp_acc1_54911...
++      final match = RegExp(r'(?:whatsapp|w4b)[^:]*?(\d{7,16})', caseSensitive: false).firstMatch(mxid);
++      if (match != null) {
++        final digits = match.group(1)!;
++        if (!mxid.contains('lid')) {
++          return digits;
++        }
++      }
++    }
++
++    // 3. Check room name or member display names (e.g. "+54 9 11 1234-5678" or "Name (+54911...)")
++    final candidateNames = <String>[
++      room.name,
++      ...room.states['m.room.member']?.values.map((v) => v.content.tryGet<String>('displayname') ?? '') ?? <String>[],
++    ];
++
++    for (final name in candidateNames) {
++      if (name.isEmpty) continue;
++      final phoneMatch = RegExp(r'(?:\+)?(?:[0-9][\s\-\.\(\)]*){7,16}').firstMatch(name);
++      if (phoneMatch != null) {
++        final digits = phoneMatch.group(0)!.replaceAll(RegExp(r'\D'), '');
++        if (digits.length >= 7 && digits.length <= 16) {
++          return digits;
++        }
++      }
++    }
++
++    // 4. Check room topic
++    if (room.topic.isNotEmpty) {
++      final topicMatch = RegExp(r'(?:\+)?(?:[0-9][\s\-\.\(\)]*){7,16}').firstMatch(room.topic);
++      if (topicMatch != null) {
++        final digits = topicMatch.group(0)!.replaceAll(RegExp(r'\D'), '');
++        if (digits.length >= 7 && digits.length <= 16) {
++          return digits;
++        }
++      }
++    }
++
++    return null;
++  }
++
++  /// Robust extraction of Instagram username and numeric ID from room or bridge events
++  static ({String? username, String? numericId}) extractInstagramDetails(Room room) {
++    String? username;
++    String? numericId;
++
++    // 1. Check bridge state events (com.beeper.bridge, m.bridge, fi.mau.instagram, uk.half-shot.bridge)
++    for (final stateKey in const ['com.beeper.bridge', 'm.bridge', 'fi.mau.instagram', 'uk.half-shot.bridge']) {
++      final event = room.states[stateKey]?.values.firstOrNull;
++      if (event != null) {
++        final content = event.content;
++        final u = content['username'] ?? content['channel']?['username'] ?? content['channel']?['displayname'] ?? content['remote_user']?['username'];
++        if (u != null && u.toString().isNotEmpty) {
++          username ??= cleanInstagramUsername(u.toString());
++        }
++        final id = content['id'] ?? content['channel']?['id'] ?? content['remote_id'];
++        if (id != null && id.toString().isNotEmpty) {
++          numericId ??= id.toString();
++        }
++      }
++    }
++
++    // 2. Extract from participant displaynames & room name (e.g. "John Doe (@johndoe)" or "@johndoe")
++    final candidateNames = <String>[
++      ...room.states['m.room.member']?.values.map((v) => v.content.tryGet<String>('displayname') ?? '') ?? <String>[],
++      room.name,
++    ];
++
++    for (final name in candidateNames) {
++      if (username != null) break;
++      if (name.isEmpty) continue;
++
++      // Check for "(@username)" or "(username)"
++      final parenMatch = RegExp(r'\(@?([a-zA-Z0-9._]{1,30})\)').firstMatch(name);
++      if (parenMatch != null) {
++        username = parenMatch.group(1);
++        break;
++      }
++
++      // Check for "@username"
++      final atMatch = RegExp(r'@([a-zA-Z0-9._]{1,30})').firstMatch(name);
++      if (atMatch != null) {
++        username = atMatch.group(1);
++        break;
++      }
++
++      // If the name is a single word alphanumeric handle (not pure digits)
++      final cleanName = name.trim();
++      if (RegExp(r'^[a-zA-Z0-9._]{1,30}$').hasMatch(cleanName) && RegExp(r'[a-zA-Z]').hasMatch(cleanName)) {
++        username = cleanName;
++        break;
++      }
++    }
++
++    // 3. Check room topic (e.g. "Instagram DM with @johndoe" or "https://instagram.com/johndoe")
++    if (username == null && room.topic.isNotEmpty) {
++      final topicMatch = RegExp(r'instagram\.com/(?:_u/)?([a-zA-Z0-9._]{1,30})', caseSensitive: false).firstMatch(room.topic) ??
++          RegExp(r'@([a-zA-Z0-9._]{1,30})').firstMatch(room.topic);
++      if (topicMatch != null) {
++        username = topicMatch.group(1);
++      }
++    }
++
++    // 4. Extract numeric ID or handle from MXID
++    final candidateMxids = <String>[
++      if (room.directChatMatrixID != null) room.directChatMatrixID!,
++      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
++      ...room.getParticipants().map((p) => p.id),
++    ];
++
++    for (final mxid in candidateMxids) {
++      if (mxid == room.client.userID || isBeeperBot(mxid)) continue;
++      final match = RegExp(r'instagram(?:go)?[^:]*?_([^:@]+)(?:@|:|$)', caseSensitive: false).firstMatch(mxid);
++      if (match != null) {
++        final part = match.group(1)!;
++        if (RegExp(r'^\d+$').hasMatch(part)) {
++          numericId ??= part;
++        } else if (username == null && RegExp(r'[a-zA-Z]').hasMatch(part)) {
++          username = cleanInstagramUsername(part);
++        }
++      }
++    }
++
++    return (username: username, numericId: numericId);
++  }
++
++  static String cleanInstagramUsername(String raw) {
++    return raw
++        .replaceAll('@', '')
++        .replaceAll(RegExp(r'^instagram(?:go)?_'), '')
++        .trim();
++  }
++
++  /// Get human-friendly account handle or phone for a room (e.g. "+54 9 11 1234 5678" or "@johndoe")
++  static String? getAccountHandle(Room room) {
++    final net = getRoomNetwork(room)?.key;
++    if (net == 'whatsapp' || net == 'whatsappgo') {
++      final phone = extractWhatsAppPhone(room);
++      if (phone != null) return formatPhoneNumber(phone);
++    } else if (net == 'instagram' || net == 'instagramgo') {
++      final ig = extractInstagramDetails(room);
++      if (ig.username != null) return '@${ig.username}';
++      if (ig.numericId != null) return '@${ig.numericId}';
++    } else if (net == 'telegram' || net == 'telegramgo') {
++      for (final name in [
++        room.name,
++        ...room.states['m.room.member']?.values.map((v) => v.content.tryGet<String>('displayname') ?? '') ?? <String>[],
++      ]) {
++        final atMatch = RegExp(r'@([a-zA-Z0-9_]{3,32})').firstMatch(name);
++        if (atMatch != null) return atMatch.group(0);
++      }
++    }
++
++    final dName = getRoomData(room).displayName;
++    if (dName != null && dName.isNotEmpty && dName != room.name) {
++      return dName;
++    }
++    return null;
++  }
++
 +
 +  static Future<void> addStickerToWhatsappPack(BuildContext context, Event event) async {
 +    final client = event.room.client;
@@ -350620,10 +350860,10 @@ index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52735bd3e9
+index 0000000000000000000000000000000000000000..e052f1d9e0b4910ba3a5361fd49d85732832a8cd
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,401 @@
 +import 'dart:collection';
 +import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
@@ -350933,17 +351173,20 @@ index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52
 +    }
 +  }
 +
-+  /// Extract phone number from WhatsApp MXID
++  /// Extract phone number from WhatsApp MXID or room
 +  static String? extractPhoneFromMxid(String mxid) {
-+    final match = RegExp(r'@whatsapp(?:go)?_(\d{7,16}):').firstMatch(mxid);
++    final match = RegExp(r'(?:whatsapp|w4b)[^:]*?(\d{7,16})', caseSensitive: false).firstMatch(mxid);
 +    return match?.group(1);
 +  }
 +
-+  /// Normalize display name for fuzzy grouping
++  /// Normalize display name for fuzzy grouping across networks (e.g. "Juan Perez" vs "Juan Perez (@juanperez)")
 +  static String normalizeDisplayName(String name) {
 +    return name
++        .replaceAll(RegExp(r'\[(?:whatsapp|instagram|telegram|signal|discord|slack|facebook)\]', caseSensitive: false), '')
++        .replaceAll(RegExp(r'\(@?[a-zA-Z0-9._]+\)'), '') // remove (@username) suffix
++        .replaceAll(RegExp(r'\+?[0-9\s\-\.\(\)]+'), '') // remove phone number fragments
 +        .toLowerCase()
-+        .replaceAll(RegExp(r'[\s\-_\.\(\)\[\]]'), '')
++        .replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '') // keep unicode letters and digits
 +        .trim();
 +  }
 +
@@ -350967,11 +351210,11 @@ index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52
 +
 +    for (final room in bridgedRooms) {
 +      final beeperData = BeeperBridgeUtils.getRoomData(room);
-+      final contactId = beeperData.contactId ?? room.directChatMatrixID;
++      final netKey = beeperData.networkKey;
 +
 +      // 1. WhatsApp phone match
-+      if (contactId != null) {
-+        final phone = extractPhoneFromMxid(contactId);
++      if (netKey == 'whatsapp' || netKey == 'whatsappgo') {
++        final phone = BeeperBridgeUtils.extractWhatsAppPhone(room);
 +        if (phone != null && phone.length >= 7) {
 +          // Index by last 8 digits for international code resilience
 +          final key = phone.length >= 8
@@ -350982,13 +351225,23 @@ index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52
 +        }
 +      }
 +
-+      // 2. Phone contacts match if available
++      // 2. Instagram username match
++      if (netKey == 'instagram' || netKey == 'instagramgo') {
++        final ig = BeeperBridgeUtils.extractInstagramDetails(room);
++        if (ig.username != null && ig.username!.length >= 3) {
++          groups.putIfAbsent('ig_${ig.username!.toLowerCase()}', () => <Room>[]).add(room);
++        }
++      }
++
++      // 3. Phone contacts match if available
 +      if (phoneContacts != null && phoneContacts.isNotEmpty) {
 +        bool matchedPhoneContact = false;
-+        final dName = beeperData.displayName?.toLowerCase() ?? '';
++        final dName = beeperData.displayName ?? room.name;
++        final normDName = normalizeDisplayName(dName);
++
 +        for (final pc in phoneContacts) {
-+          if (dName.isNotEmpty &&
-+              pc.displayName.toLowerCase().trim() == dName.trim()) {
++          final normPc = normalizeDisplayName(pc.displayName);
++          if (normDName.isNotEmpty && normPc == normDName) {
 +            groups.putIfAbsent('contact_${pc.id}', () => <Room>[]).add(room);
 +            matchedPhoneContact = true;
 +            break;
@@ -350997,9 +351250,9 @@ index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52
 +        if (matchedPhoneContact) continue;
 +      }
 +
-+      // 3. Normalized display name match
-+      final name = beeperData.displayName;
-+      if (name != null && name.trim().length >= 3) {
++      // 4. Normalized display name match across rooms
++      final name = beeperData.displayName ?? room.name;
++      if (name.trim().length >= 3) {
 +        final norm = normalizeDisplayName(name);
 +        if (norm.length >= 3) {
 +          groups.putIfAbsent('name_$norm', () => <Room>[]).add(room);
