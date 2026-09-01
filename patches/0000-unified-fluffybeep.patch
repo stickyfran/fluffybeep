@@ -339498,7 +339498,7 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..93b2d388964c031c53e7f7ddbb1da33d56aa2ffe 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8b976a4f30da85b738ef4213bdd386cb4d328f03 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
 @@ -1,181 +1,255 @@
@@ -339806,7 +339806,7 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..93b2d388964c031c53e7f7ddbb1da33d
 +                    cancelLabel: 'Cancelar',
 +                  );
 +                  if (newPackage != null && newPackage.trim().isNotEmpty) {
-+                    AppSettings.instagramPackageName.value = newPackage.trim();
++                    await AppSettings.instagramPackageName.setItem(newPackage.trim());
 +                    controller.refresh();
 +                  }
 +                },
@@ -339825,7 +339825,7 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..93b2d388964c031c53e7f7ddbb1da33d
 +                    cancelLabel: 'Cancelar',
 +                  );
 +                  if (newPackage != null && newPackage.trim().isNotEmpty) {
-+                    AppSettings.whatsappPackageName.value = newPackage.trim();
++                    await AppSettings.whatsappPackageName.setItem(newPackage.trim());
 +                    controller.refresh();
 +                  }
 +                },
@@ -349605,7 +349605,7 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..42d73210941396bd9ce8cb524d5c7f5cef3228db
+index 0000000000000000000000000000000000000000..6f0bbc99277991415aa6b2ba727a891c94f3ebfe
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
 @@ -0,0 +1,212 @@
@@ -349671,8 +349671,8 @@ index 0000000000000000000000000000000000000000..42d73210941396bd9ce8cb524d5c7f5c
 +      final mc = BeeperMergeUtils.getMergedContacts(room.client)[mergeId];
 +      if (mc?.phoneContactId != null && BeeperPhoneContacts.isLoaded) {
 +        final pc = BeeperPhoneContacts.findById(mc!.phoneContactId!);
-+        if (pc != null && pc.phones.isNotEmpty) {
-+          final digits = pc.phones.first.replaceAll(RegExp(r'\D'), '');
++        if (pc != null && pc.normalizedPhones.isNotEmpty) {
++          final digits = pc.normalizedPhones.first.replaceAll(RegExp(r'\D'), '');
 +          if (digits.isNotEmpty) return digits;
 +        }
 +      }
