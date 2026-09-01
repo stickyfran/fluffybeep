@@ -33803,10 +33803,10 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..1a8b43cb4ac663cc1e1292c2da95db3d
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..5cbea860062cf5eed5d87d167386a5e29d60e447 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..d3558984676e3b4f05048ea4f15a57cf81b014c5 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,224 +1,222 @@
+@@ -1,224 +1,223 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -34076,6 +34076,7 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..5cbea860062cf5eed5d87d167386a5e2
 +  sendPublicReadReceipts<bool>('chat.fluffy.send_public_read_receipts', true),
 +  swipeRightToLeftToReply<bool>('chat.fluffy.swipeRightToLeftToReply', true),
 +  sendOnEnter<bool>('chat.fluffy.send_on_enter', false),
++  showImageAttachmentButton<bool>('chat.fluffy.show_image_attachment_button', true),
 +  displayNavigationRail<bool>('chat.fluffy.display_navigation_rail', false),
 +  experimentalVoip<bool>('chat.fluffy.experimental_voip', false),
 +  shareKeysWith<String>('chat.fluffy.share_keys_with_2', 'all'),
@@ -304495,7 +304496,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2ce7107df1 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..f15e2b4fd55721270f614eccd2a7c34976e67600 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -304508,7 +304509,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:flutter/cupertino.dart';
  import 'package:flutter/material.dart';
-@@ -21,62 +23,68 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
+@@ -21,62 +23,64 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
  import 'package:scroll_to_index/scroll_to_index.dart';
  
  import '../../config/app_config.dart';
@@ -304570,9 +304571,6 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
 -                    (72 + (FluffyThemes.isColumnMode(context) ? 16 : 0))),
 -            left: horizontalPadding,
 -            right: horizontalPadding,
-+    final hasMergedSiblings =
-+        BeeperMergeUtils.getSiblingRooms(controller.room.id).length >= 2;
-+
 +    return FontSizeScaler(
 +      child: CustomScrollView(
 +        cacheExtent: 500,
@@ -304588,7 +304586,6 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
 +              builder: (context, inputBarHeight, _) => SizedBox(
 +                height: 8 +
 +                    inputBarHeight +
-+                    (hasMergedSiblings ? 76.0 : 0.0) +
 +                    (FluffyThemes.isColumnMode(context) ? 16 : 0),
 +              ),
 +            ),
@@ -304612,7 +304609,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
                // Footer to display typing indicator and read receipts:
                if (i == 0) {
                  if (timeline.canRequestFuture) {
-@@ -92,13 +100,36 @@ class ChatEventList extends StatelessWidget {
+@@ -92,13 +96,36 @@ class ChatEventList extends StatelessWidget {
                      ),
                    );
                  }
@@ -304656,7 +304653,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
                  );
                }
  
-@@ -110,23 +141,21 @@ class ChatEventList extends StatelessWidget {
+@@ -110,23 +137,21 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -304691,7 +304688,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -164,82 +193,88 @@ class ChatEventList extends StatelessWidget {
+@@ -164,82 +189,88 @@ class ChatEventList extends StatelessWidget {
                  index: i,
                  controller: controller.scrollController,
                  child: Column(
@@ -304848,7 +304845,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
                );
              },
              childCount: events.length + 2,
-@@ -248,6 +283,8 @@ class ChatEventList extends StatelessWidget {
+@@ -248,6 +279,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
        ),
@@ -304859,7 +304856,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
    }
  }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971be35bb9c 100644
+index 879717fa9889be421184b768e20bad7417f95114..9036e50c0a61e4edff947fa960398c9b64f33f21 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
 @@ -4,22 +4,45 @@
@@ -304919,7 +304916,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
  
      if (!controller.room.otherPartyCanReceiveMessages) {
        return Center(
-@@ -133,14 +152,23 @@ class ChatInputRow extends StatelessWidget {
+@@ -133,16 +152,30 @@ class ChatInputRow extends StatelessWidget {
                  ]
                : <Widget>[
                    const SizedBox(width: 8),
@@ -304950,23 +304947,36 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
 +                    },
                      child: PopupMenuButton<AddPopupMenuActions>(
                        useRootNavigator: true,
++                      popUpAnimationStyle: AnimationStyle(
++                        duration: const Duration(milliseconds: 120),
++                        reverseDuration: const Duration(milliseconds: 100),
++                      ),
++                      position: PopupMenuPosition.over,
                        icon: const Icon(Icons.add_circle_outline),
-@@ -260,12 +288,23 @@ class ChatInputRow extends StatelessWidget {
+                       iconColor: theme.colorScheme.onPrimaryContainer,
+                       onSelected: controller.onAddPopupMenuButtonSelected,
+@@ -255,17 +288,29 @@ class ChatInputRow extends StatelessWidget {
+                       ],
+                     ),
+                   ),
++                  if (AppSettings.showImageAttachmentButton.value)
++                    Container(
++                      height: height,
++                      width: 48,
++                      alignment: Alignment.center,
++                      child: IconButton(
++                        tooltip: L10n.of(context).sendImage,
++                        color: theme.colorScheme.onPrimaryContainer,
++                        icon: const Icon(Icons.image_outlined),
++                        onPressed: () => controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.image),
++                      ),
++                    ),
+                   Container(
+                     height: height,
                      width: 48,
                      alignment: Alignment.center,
                      child: IconButton(
 -                      tooltip: L10n.of(context).emojis,
-+                      tooltip: L10n.of(context).sendImage,
-+                      color: theme.colorScheme.onPrimaryContainer,
-+                      icon: const Icon(Icons.image_outlined),
-+                      onPressed: () => controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.image),
-+                    ),
-+                  ),
-+                  Container(
-+                    height: height,
-+                    width: 48,
-+                    alignment: Alignment.center,
-+                    child: IconButton(
 +                      tooltip: L10n.of(context).stickers,
                        color: theme.colorScheme.onPrimaryContainer,
                        icon: Icon(
@@ -304977,11 +304987,15 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
                          key: ValueKey(controller.showEmojiPicker),
                        ),
                        onPressed: controller.emojiPickerAction,
-@@ -280,90 +319,159 @@ class ChatInputRow extends StatelessWidget {
+@@ -280,53 +325,76 @@ class ChatInputRow extends StatelessWidget {
                        alignment: Alignment.center,
                        child: _ChatAccountPicker(controller),
                      ),
-+                  _MergedCompactSwitcher(controller: controller),
++                  Container(
++                    height: height,
++                    alignment: Alignment.center,
++                    child: _MergedCompactSwitcher(controller: controller),
++                  ),
                    Expanded(
                      child: Padding(
                        padding: const EdgeInsets.symmetric(vertical: 2.0),
@@ -305092,29 +305106,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
                        ),
                      ),
                    ),
-+                  if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
-+                      (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_input_bar') ?? true))
-+                    Container(
-+                      height: height,
-+                      alignment: Alignment.center,
-+                      padding: const EdgeInsets.only(right: 6.0),
-+                      child: SizedBox(
-+                        height: 32,
-+                        width: 32,
-+                        child: IconButton(
-+                          padding: EdgeInsets.zero,
-+                          constraints: const BoxConstraints(),
-+                          tooltip: L10n.of(context).markAsRead,
-+                          onPressed: () => controller.setReadMarker(force: true),
-+                          style: IconButton.styleFrom(
-+                            backgroundColor: theme.colorScheme.primaryContainer,
-+                            foregroundColor: theme.colorScheme.onPrimaryContainer,
-+                          ),
-+                          icon: const Icon(Icons.done_all, size: 16),
-+                        ),
-+                      ),
-+                    ),
-                   Container(
+@@ -334,36 +402,64 @@ class ChatInputRow extends StatelessWidget {
                      height: height,
                      width: height,
                      alignment: Alignment.center,
@@ -305201,7 +305193,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
                                style: IconButton.styleFrom(
                                  backgroundColor: theme.bubbleColor,
                                  foregroundColor: theme.onBubbleColor,
-@@ -372,17 +480,20 @@ class ChatInputRow extends StatelessWidget {
+@@ -372,17 +468,20 @@ class ChatInputRow extends StatelessWidget {
                                  hovered ? Icons.mic : Icons.mic_none_outlined,
                                ),
                              ),
@@ -305232,7 +305224,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
                    ),
                  ],
          );
-@@ -391,11 +502,32 @@ class ChatInputRow extends StatelessWidget {
+@@ -391,11 +490,32 @@ class ChatInputRow extends StatelessWidget {
    }
  }
  
@@ -305266,7 +305258,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
    void _popupMenuButtonSelected(String mxid, BuildContext context) {
      final client = Matrix.of(
        context,
-@@ -404,16 +536,16 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -404,16 +524,16 @@ class _ChatAccountPicker extends StatelessWidget {
        Logs().w('Attempted to switch to a non-existing client $mxid');
        return;
      }
@@ -305286,7 +305278,7 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
          builder: (context, snapshot) => PopupMenuButton<String>(
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
-@@ -450,3 +582,110 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -450,3 +570,110 @@ class _ChatAccountPicker extends StatelessWidget {
      );
    }
  }
@@ -305398,10 +305390,10 @@ index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f9253cfb66d1 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ff42a2a084908dcb979734115f5487b48d404706 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -16,17 +16,24 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
+@@ -16,17 +16,25 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
  import 'package:fluffychat/pages/chat/pinned_events.dart';
  import 'package:fluffychat/pages/chat/reply_display.dart';
  import 'package:fluffychat/utils/account_config.dart';
@@ -305422,11 +305414,12 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 +import '../../utils/beeper_merge_utils.dart';
  import 'chat_emoji_picker.dart';
  import 'chat_input_row.dart';
++import 'floating_manual_read_button.dart';
 +import 'merged_contact_switcher.dart';
  
  enum _EventContextAction { info, report }
  
-@@ -37,6 +44,7 @@ class ChatView extends StatelessWidget {
+@@ -37,6 +45,7 @@ class ChatView extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -305434,7 +305427,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +54,549 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +55,557 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -305685,6 +305678,14 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 -                            ),
 +                    ),
 +                  ),
++                  ValueListenableBuilder<double>(
++                    valueListenable: controller.inputBarHeightNotifier,
++                    builder: (context, inputBarHeight, _) => Positioned(
++                      bottom: inputBarHeight + 8,
++                      right: 16,
++                      child: FloatingManualReadButton(controller: controller),
++                    ),
++                  ),
 +                  Positioned(
 +                    bottom: 0,
 +                    left: 0,
@@ -305702,6 +305703,13 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 +                            ],
 +                            begin: Alignment.topCenter,
 +                            end: Alignment.bottomCenter,
++                          ),
++                        ),
++                        alignment: Alignment.center,
++                        child: Container(
++                          margin: EdgeInsets.all(bottomSheetPadding),
++                          constraints: const BoxConstraints(
++                            maxWidth: FluffyThemes.maxTimelineWidth,
                            ),
 -                          if (controller.selectedEvents.single.status.isSent)
 -                            PopupMenuItem(
@@ -305712,13 +305720,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 -                                  const Icon(
 -                                    Icons.shield_outlined,
 -                                    color: Colors.red,
-+                        ),
-+                        alignment: Alignment.center,
-+                        child: Container(
-+                          margin: EdgeInsets.all(bottomSheetPadding),
-+                          constraints: const BoxConstraints(
-+                            maxWidth: FluffyThemes.maxTimelineWidth,
-+                          ),
 +                          child: controller.room.isExtinct
 +                              ? ElevatedButton.icon(
 +                                  icon: const Icon(Icons.chevron_right),
@@ -306127,6 +306128,15 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 -                              imageFilter: ui.ImageFilter.blur(
 -                                sigmaX: accountConfig.wallpaperBlur ?? 0.0,
 -                                sigmaY: accountConfig.wallpaperBlur ?? 0.0,
+-                              ),
+-                              child: MxcImage(
+-                                cacheKey: accountConfig.wallpaperUrl.toString(),
+-                                uri: accountConfig.wallpaperUrl,
+-                                fit: BoxFit.cover,
+-                                height: MediaQuery.sizeOf(context).height,
+-                                width: MediaQuery.sizeOf(context).width,
+-                                isThumbnail: false,
+-                                placeholder: (_) => Container(),
 +                      if (selectedEvents.single.status.isSent)
 +                        PopupMenuItem(
 +                          value: _EventContextAction.report,
@@ -306137,15 +306147,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f925
 +                                Icons.shield_outlined,
 +                                color: Colors.red,
                                ),
--                              child: MxcImage(
--                                cacheKey: accountConfig.wallpaperUrl.toString(),
--                                uri: accountConfig.wallpaperUrl,
--                                fit: BoxFit.cover,
--                                height: MediaQuery.sizeOf(context).height,
--                                width: MediaQuery.sizeOf(context).width,
--                                isThumbnail: false,
--                                placeholder: (_) => Container(),
--                              ),
 -                            ),
 +                              const SizedBox(width: 12),
 +                              Text(L10n.of(context).reportMessage),
@@ -311132,6 +311133,119 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc
                      Center(
                        child: CircleAvatar(
                          child: supportsVideoPlayer
+diff --git a/lib/pages/chat/floating_manual_read_button.dart b/lib/pages/chat/floating_manual_read_button.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..92412ab2c80b914fb5932379ed5c292738ae55a8
+--- /dev/null
++++ b/lib/pages/chat/floating_manual_read_button.dart
+@@ -0,0 +1,107 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
++import '../../config/themes.dart';
++import '../../l10n/l10n.dart';
++import '../../utils/beeper_bridge_utils.dart';
++import 'chat.dart';
++
++class FloatingManualReadButton extends StatefulWidget {
++  final ChatController controller;
++
++  const FloatingManualReadButton({super.key, required this.controller});
++
++  @override
++  State<FloatingManualReadButton> createState() => _FloatingManualReadButtonState();
++}
++
++class _FloatingManualReadButtonState extends State<FloatingManualReadButton> {
++  bool _isMarkingRead = false;
++
++  Future<void> _handleMarkAsRead() async {
++    HapticFeedback.mediumImpact();
++    if (mounted) setState(() => _isMarkingRead = true);
++
++    await widget.controller.setReadMarker(force: true);
++
++    await Future.delayed(const Duration(milliseconds: 250));
++    if (mounted) {
++      setState(() => _isMarkingRead = false);
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final prefs = BeeperBridgeUtils.prefs;
++    final isEnabled = (prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
++        (prefs?.getBool('beeper_manual_read_show_input_bar') ?? true);
++
++    if (!isEnabled) return const SizedBox.shrink();
++
++    final theme = Theme.of(context);
++    final room = widget.controller.room;
++    final hasUnread = room.hasNewMessages || room.isUnreadOrInvited || room.notificationCount > 0;
++
++    return AnimatedContainer(
++      duration: FluffyThemes.animationDuration,
++      height: 38,
++      width: 38,
++      decoration: BoxDecoration(
++        shape: BoxShape.circle,
++        color: hasUnread
++            ? theme.colorScheme.primaryContainer
++            : theme.colorScheme.surface.withValues(alpha: 0.9),
++        border: Border.all(
++          color: hasUnread
++              ? theme.colorScheme.primary.withValues(alpha: 0.5)
++              : theme.dividerColor.withValues(alpha: 0.4),
++          width: hasUnread ? 1.5 : 1.0,
++        ),
++        boxShadow: [
++          BoxShadow(
++            color: Colors.black.withValues(alpha: 0.12),
++            blurRadius: 6,
++            offset: const Offset(0, 2),
++          ),
++        ],
++      ),
++      child: Material(
++        color: Colors.transparent,
++        child: Tooltip(
++          message: L10n.of(context).markAsRead,
++          child: InkWell(
++            borderRadius: BorderRadius.circular(19),
++            onTap: _handleMarkAsRead,
++            child: Center(
++              child: AnimatedSwitcher(
++                duration: FluffyThemes.animationDuration,
++                transitionBuilder: (child, animation) => ScaleTransition(
++                  scale: animation,
++                  child: FadeTransition(opacity: animation, child: child),
++                ),
++                child: _isMarkingRead
++                    ? Icon(
++                        Icons.check_circle,
++                        key: const ValueKey('checked'),
++                        size: 18,
++                        color: theme.colorScheme.primary,
++                      )
++                    : Icon(
++                        Icons.done_all,
++                        key: ValueKey(hasUnread ? 'unread_icon' : 'read_icon'),
++                        size: 18,
++                        color: hasUnread
++                            ? theme.colorScheme.primary
++                            : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
++                      ),
++              ),
++            ),
++          ),
++        ),
++      ),
++    );
++  }
++}
 diff --git a/lib/pages/chat/input_bar.dart b/lib/pages/chat/input_bar.dart
 index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e6c46dc2a 100644
 --- a/lib/pages/chat/input_bar.dart
@@ -340021,10 +340135,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8b976a4f30da85b738ef4213bdd386cb4d328f03 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..c6ad5e37b75b060e6b07e3c537d458a7e8cfe63e 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,255 @@
+@@ -1,181 +1,260 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -340277,6 +340391,11 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8b976a4f30da85b738ef4213bdd386cb
 +              SettingsSwitchListTile.adaptive(
 +                title: L10n.of(context).showThumbnailsInTimeline,
 +                setting: AppSettings.showThumbnailsInTimeline,
++              ),
++              SettingsSwitchListTile.adaptive(
++                title: 'Mostrar botón de enviar imagen',
++                subtitle: 'Muestra u oculta el botón rápido de cámara/galería en la barra de mensajes',
++                setting: AppSettings.showImageAttachmentButton,
 +              ),
 +              StatefulBuilder(
 +                builder: (context, setTileState) => SwitchListTile.adaptive(
