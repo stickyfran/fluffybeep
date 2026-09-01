@@ -308765,10 +308765,10 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..19cff2bc8bfe3d1935a31f6834b4f1c2
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a84565ae2a512afdeb39584e6075b8d6d5e9f7a1 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..dc16ae3fc72420ae35e27594e5f4b5358257c7e3 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,447 @@
+@@ -1,324 +1,449 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309110,6 +309110,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a84565ae2a512afdeb39584e6075b8d6
 +import 'package:matrix/matrix.dart';
 +
 +import '../../../config/app_config.dart';
++import '../../../utils/beeper_bridge_utils.dart';
 +import '../../../utils/event_checkbox_extension.dart';
 +import '../../../utils/platform_infos.dart';
 +import '../../../utils/url_launcher.dart';
@@ -309402,6 +309403,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..a84565ae2a512afdeb39584e6075b8d6
 +            var html = AppSettings.renderHtml.value && event.isRichMessage
 +                ? event.formattedText
 +                : event.body.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
++            html = BeeperBridgeUtils.stripNetworkPrefix(html);
 +            if (event.body.contains('Incoming call. Use the WhatsApp app to answer.')) {
 +              final phoneMatch = RegExp(r'^@whatsapp_(\d+):').firstMatch(event.senderId);
 +              final phone = phoneMatch?.group(1);
@@ -310276,10 +310278,10 @@ index 03f75372e8d89053d508c124302b38d6f1b02181..8b7e047a1179ed3a03f32beae8c641f0
 +  }
 +}
 diff --git a/lib/pages/chat/events/reply_content.dart b/lib/pages/chat/events/reply_content.dart
-index 6f9ce424eed633437971e74ecdfa8267a9d64da8..553a1b0b766955de426c585eb4313adde044e782 100644
+index 6f9ce424eed633437971e74ecdfa8267a9d64da8..79410c350aa8ff57d6c70fe10ed43fda9fbd0cfb 100644
 --- a/lib/pages/chat/events/reply_content.dart
 +++ b/lib/pages/chat/events/reply_content.dart
-@@ -1,110 +1,104 @@
+@@ -1,110 +1,107 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -310401,6 +310403,7 @@ index 6f9ce424eed633437971e74ecdfa8267a9d64da8..553a1b0b766955de426c585eb4313add
 +import 'package:matrix/matrix.dart';
 +
 +import '../../../config/app_config.dart';
++import '../../../utils/beeper_bridge_utils.dart';
 +
 +class ReplyContent extends StatelessWidget {
 +  final Event replyEvent;
@@ -310465,15 +310468,17 @@ index 6f9ce424eed633437971e74ecdfa8267a9d64da8..553a1b0b766955de426c585eb4313add
 +                  ),
 +                ),
 +                Text(
-+                  displayEvent
-+                      .calcLocalizedBodyFallback(
-+                        MatrixLocals(L10n.of(context)),
-+                        withSenderNamePrefix: false,
-+                        hideReply: true,
-+                        plaintextBody: true,
-+                      )
-+                      .trim()
-+                      .replaceAll('\n', ' '),
++                  BeeperBridgeUtils.stripNetworkPrefix(
++                    displayEvent
++                        .calcLocalizedBodyFallback(
++                          MatrixLocals(L10n.of(context)),
++                          withSenderNamePrefix: false,
++                          hideReply: true,
++                          plaintextBody: true,
++                        )
++                        .trim()
++                        .replaceAll('\n', ' '),
++                  ),
 +                  overflow: TextOverflow.ellipsis,
 +                  maxLines: 1,
 +                  style: TextStyle(
@@ -312048,10 +312053,10 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2d1c6d4016b46bacc6261a650e695737
 +  }
 +}
 diff --git a/lib/pages/chat/reply_display.dart b/lib/pages/chat/reply_display.dart
-index 087047dc04d4283dd230b7ee7cec95939e904ddc..4b633dfde3cb439924ec6789f32ebda66004ca53 100644
+index 087047dc04d4283dd230b7ee7cec95939e904ddc..3746e6045ded05356e387eaaf81095939953ea2d 100644
 --- a/lib/pages/chat/reply_display.dart
 +++ b/lib/pages/chat/reply_display.dart
-@@ -1,95 +1,86 @@
+@@ -1,95 +1,89 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -312158,6 +312163,7 @@ index 087047dc04d4283dd230b7ee7cec95939e904ddc..4b633dfde3cb439924ec6789f32ebda6
 +import 'package:matrix/matrix.dart';
 +
 +import '../../config/themes.dart';
++import '../../utils/beeper_bridge_utils.dart';
 +import 'chat.dart';
 +import 'events/reply_content.dart';
 +
@@ -312217,14 +312223,16 @@ index 087047dc04d4283dd230b7ee7cec95939e904ddc..4b633dfde3cb439924ec6789f32ebda6
 +        Icon(Icons.edit, color: theme.colorScheme.primary),
 +        Container(width: 15.0),
 +        Text(
-+          event
-+              .calcLocalizedBodyFallback(
-+                MatrixLocals(L10n.of(context)),
-+                withSenderNamePrefix: false,
-+                hideReply: true,
-+              )
-+              .trim()
-+              .replaceAll('\n', ' '),
++          BeeperBridgeUtils.stripNetworkPrefix(
++            event
++                .calcLocalizedBodyFallback(
++                  MatrixLocals(L10n.of(context)),
++                  withSenderNamePrefix: false,
++                  hideReply: true,
++                )
++                .trim()
++                .replaceAll('\n', ' '),
++          ),
 +          overflow: TextOverflow.ellipsis,
 +          maxLines: 1,
 +          style: TextStyle(color: theme.textTheme.bodyMedium!.color),
@@ -319088,7 +319096,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734dd9c064b 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e07494a7d73b 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -319173,7 +319181,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -150,12 +170,472 @@ class ChatListController extends State<ChatList>
+@@ -150,12 +170,474 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -319374,7 +319382,9 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
 +              plaintextBody: true,
 +              removeMarkdown: true,
 +            );
-+            latestSnippet = netName.isNotEmpty ? '[$netName] $body' : body;
++            final cleanBody = BeeperBridgeUtils.stripNetworkPrefix(body);
++            final hidePrefix = AppSettings.hideNetworkPrefixInNotification.value;
++            latestSnippet = (!hidePrefix && netName.isNotEmpty) ? '[$netName] $cleanBody' : cleanBody;
 +          }
 +        }
 +
@@ -319650,7 +319660,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +644,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +646,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -319757,7 +319767,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +674,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +676,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -319784,7 +319794,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
    }
  
    void openNavrail() {
-@@ -285,13 +708,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +710,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -319808,7 +319818,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +726,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +728,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -319822,7 +319832,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +814,136 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +816,136 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -319995,7 +320005,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1037,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1039,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -320011,7 +320021,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1150,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1152,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320043,7 +320053,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1185,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1187,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320083,7 +320093,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
          ],
        );
      }
-@@ -700,7 +1238,30 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1240,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -320115,7 +320125,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1362,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1364,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -320241,7 +320251,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
      }
    }
  
-@@ -864,6 +1536,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1538,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -320249,7 +320259,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1587,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1589,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -320263,7 +320273,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1711,7 @@ enum ChatContextAction {
+@@ -1039,4 +1713,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -321102,7 +321112,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..3dd37dec56e81dba32765554e4f3024b3df61d41 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a40fc5708d 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,22 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -321661,7 +321671,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3dd37dec56e81dba32765554e4f3024b
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,14 +428,14 @@ class ChatListItem extends StatelessWidget {
+@@ -336,70 +428,153 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -321680,9 +321690,21 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3dd37dec56e81dba32765554e4f3024b
                                              )
                                              ?.content
                                              .tryGet<String>('reason') ??
-@@ -356,50 +448,131 @@ class ChatListItem extends StatelessWidget {
-                                         ) ??
-                                         L10n.of(context).noMessagesYet,
+                                         (isDirectChat
+                                             ? L10n.of(context).newChatRequest
+                                             : L10n.of(context).inviteGroupChat)
+-                                  : snapshot.data?.trim().replaceAll(
+-                                          '\n',
+-                                          ' ',
+-                                        ) ??
+-                                        L10n.of(context).noMessagesYet,
++                                  : BeeperBridgeUtils.stripNetworkPrefix(
++                                        snapshot.data?.trim().replaceAll(
++                                              '\n',
++                                              ' ',
++                                            ) ??
++                                            L10n.of(context).noMessagesYet,
++                                      ),
                                softWrap: false,
 -                              maxLines: room.notificationCount >= 1 ? 2 : 1,
 +                              maxLines: widget.room.notificationCount >= 1 ? 2 : 1,
@@ -339254,10 +339276,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..ae93419c48a900b383c51553c8506f6aca6055ed 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..010d1038347bce2964126729dac98b53d5b73d26 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,212 @@
+@@ -1,181 +1,217 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -339542,6 +339564,11 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..ae93419c48a900b383c51553c8506f6a
 +                  padding: EdgeInsets.all(16.0),
 +                  child: Icon(Icons.chevron_right_outlined),
 +                ),
++              ),
++              SettingsSwitchListTile.adaptive(
++                title: 'Ocultar prefijo de red en mensajes',
++                subtitle: 'Oculta etiquetas como [WhatsApp] o [Instagram] al inicio de los mensajes',
++                setting: AppSettings.hideNetworkPrefixInNotification,
 +              ),
 +              Divider(color: theme.dividerColor),
 +              ListTile(
@@ -349318,13 +349345,14 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..2aa3209d66c7416b8bd95d57f75e8f19f1d28734
+index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c1ba7c2b0
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,814 @@
+@@ -0,0 +1,825 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
++import 'package:fluffychat/config/setting_keys.dart';
 +import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
@@ -350109,6 +350137,16 @@ index 0000000000000000000000000000000000000000..2aa3209d66c7416b8bd95d57f75e8f19
 +    }
 +
 +    return null;
++  }
++
++  /// Strips leading bridge prefixes like [WhatsApp], [Telegram], [Signal], etc.
++  /// when AppSettings.hideNetworkPrefixInNotification is enabled.
++  static String stripNetworkPrefix(String text) {
++    if (!AppSettings.hideNetworkPrefixInNotification.value) return text;
++    if (text.startsWith('<p>[')) {
++      return text.replaceFirst(RegExp(r'^<p>\s*\[[^\]]+\]\s*'), '<p>');
++    }
++    return text.replaceFirst(RegExp(r'^\s*\[[^\]]+\]\s*'), '');
 +  }
 +}
 +
