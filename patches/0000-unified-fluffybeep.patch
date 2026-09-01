@@ -304859,10 +304859,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2c
    }
  }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd832e34990 100644
+index 879717fa9889be421184b768e20bad7417f95114..07396e6ad97be4f1592ab5b98e26a971be35bb9c 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
-@@ -4,11 +4,13 @@
+@@ -4,22 +4,45 @@
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
  import 'package:emoji_picker_flutter/locales/default_emoji_set_locale.dart';
@@ -304876,7 +304876,14 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/hover_builder.dart';
-@@ -20,6 +22,24 @@ import '../../config/themes.dart';
+ import 'package:fluffychat/widgets/matrix.dart';
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
++import 'package:go_router/go_router.dart';
+ import 'package:matrix/matrix.dart';
+ 
+ import '../../config/themes.dart';
++import '../../utils/beeper_merge_utils.dart';
  import 'chat.dart';
  import 'input_bar.dart';
  
@@ -304901,7 +304908,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
  class ChatInputRow extends StatelessWidget {
    final ChatController controller;
  
-@@ -30,10 +50,6 @@ class ChatInputRow extends StatelessWidget {
+@@ -30,10 +53,6 @@ class ChatInputRow extends StatelessWidget {
    @override
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
@@ -304912,7 +304919,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
  
      if (!controller.room.otherPartyCanReceiveMessages) {
        return Center(
-@@ -133,14 +149,23 @@ class ChatInputRow extends StatelessWidget {
+@@ -133,14 +152,23 @@ class ChatInputRow extends StatelessWidget {
                  ]
                : <Widget>[
                    const SizedBox(width: 8),
@@ -304944,7 +304951,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
                      child: PopupMenuButton<AddPopupMenuActions>(
                        useRootNavigator: true,
                        icon: const Icon(Icons.add_circle_outline),
-@@ -260,12 +285,23 @@ class ChatInputRow extends StatelessWidget {
+@@ -260,12 +288,23 @@ class ChatInputRow extends StatelessWidget {
                      width: 48,
                      alignment: Alignment.center,
                      child: IconButton(
@@ -304970,22 +304977,118 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
                          key: ValueKey(controller.showEmojiPicker),
                        ),
                        onPressed: controller.emojiPickerAction,
-@@ -316,54 +352,100 @@ class ChatInputRow extends StatelessWidget {
+@@ -280,90 +319,159 @@ class ChatInputRow extends StatelessWidget {
+                       alignment: Alignment.center,
+                       child: _ChatAccountPicker(controller),
+                     ),
++                  _MergedCompactSwitcher(controller: controller),
+                   Expanded(
+                     child: Padding(
+                       padding: const EdgeInsets.symmetric(vertical: 2.0),
+-                      child: InputBar(
+-                        room: controller.room,
+-                        minLines: 1,
+-                        maxLines: 8,
+-                        autofocus: !PlatformInfos.isMobile,
+-                        keyboardType: TextInputType.multiline,
+-                        textInputAction:
+-                            AppSettings.sendOnEnter.value == true &&
+-                                PlatformInfos.isMobile
+-                            ? TextInputAction.send
+-                            : null,
+-                        onSubmitted: controller.onInputBarSubmitted,
+-                        onSubmitImage: controller.sendImageFromClipBoard,
+-                        focusNode: controller.inputFocus,
+-                        controller: controller.sendController,
+-                        decoration: InputDecoration(
+-                          contentPadding: const EdgeInsets.only(
+-                            left: 6.0,
+-                            right: 6.0,
+-                            bottom: 6.0,
+-                            top: 3.0,
++                      child: GestureDetector(
++                        behavior: HitTestBehavior.translucent,
++                        onHorizontalDragEnd: (details) {
++                          final v = details.primaryVelocity ?? 0;
++                          final siblings = BeeperMergeUtils.getSiblingRooms(controller.room.id);
++                          if (siblings.length < 2) return;
++                          final currentIndex = siblings.indexWhere((r) => r.id == controller.room.id);
++                          if (currentIndex == -1) return;
++
++                          if (v < -200) {
++                            // Swipe Left -> Next sibling room
++                            final nextIndex = (currentIndex + 1) % siblings.length;
++                            final targetRoom = siblings[nextIndex];
++                            HapticFeedback.selectionClick();
++                            context.go('/rooms/${targetRoom.id}');
++                          } else if (v > 200) {
++                            // Swipe Right -> Previous sibling room
++                            final prevIndex = (currentIndex - 1 + siblings.length) % siblings.length;
++                            final targetRoom = siblings[prevIndex];
++                            HapticFeedback.selectionClick();
++                            context.go('/rooms/${targetRoom.id}');
++                          }
++                        },
++                        child: InputBar(
++                          room: controller.room,
++                          minLines: 1,
++                          maxLines: 8,
++                          autofocus: !PlatformInfos.isMobile,
++                          keyboardType: TextInputType.multiline,
++                          textInputAction:
++                              AppSettings.sendOnEnter.value == true &&
++                                  PlatformInfos.isMobile
++                              ? TextInputAction.send
++                              : null,
++                          onSubmitted: controller.onInputBarSubmitted,
++                          onSubmitImage: controller.sendImageFromClipBoard,
++                          focusNode: controller.inputFocus,
++                          controller: controller.sendController,
++                          decoration: InputDecoration(
++                            contentPadding: const EdgeInsets.only(
++                              left: 6.0,
++                              right: 6.0,
++                              bottom: 6.0,
++                              top: 3.0,
++                            ),
++                            counter: const SizedBox.shrink(),
++                            hintText: _buildInputHintText(context, controller),
++                            hintMaxLines: 1,
++                            border: InputBorder.none,
++                            enabledBorder: InputBorder.none,
++                            filled: false,
+                           ),
+-                          counter: const SizedBox.shrink(),
+-                          hintText: controller.room.encrypted
+-                              ? L10n.of(context).encryptedMessage
+-                              : L10n.of(context).unencryptedMessage,
+-                          hintMaxLines: 1,
+-                          border: InputBorder.none,
+-                          enabledBorder: InputBorder.none,
+-                          filled: false,
++                          onChanged: controller.onInputBarChanged,
++                          suggestionEmojis:
++                              _EmojiCache.getEmojis(
++                                AppSettings.emojiSuggestionLocale.value.isNotEmpty
++                                    ? Locale(
++                                        AppSettings.emojiSuggestionLocale.value,
++                                      )
++                                    : Localizations.localeOf(context),
++                              ),
                          ),
-                         onChanged: controller.onInputBarChanged,
-                         suggestionEmojis:
+-                        onChanged: controller.onInputBarChanged,
+-                        suggestionEmojis:
 -                            getDefaultEmojiLocale(
-+                            _EmojiCache.getEmojis(
-                               AppSettings.emojiSuggestionLocale.value.isNotEmpty
-                                   ? Locale(
-                                       AppSettings.emojiSuggestionLocale.value,
-                                     )
-                                   : Localizations.localeOf(context),
+-                              AppSettings.emojiSuggestionLocale.value.isNotEmpty
+-                                  ? Locale(
+-                                      AppSettings.emojiSuggestionLocale.value,
+-                                    )
+-                                  : Localizations.localeOf(context),
 -                            ).fold(
 -                              [],
 -                              (emojis, category) =>
 -                                  emojis..addAll(category.emoji),
-                             ),
+-                            ),
                        ),
                      ),
                    ),
@@ -305098,7 +305201,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
                                style: IconButton.styleFrom(
                                  backgroundColor: theme.bubbleColor,
                                  foregroundColor: theme.onBubbleColor,
-@@ -372,17 +454,20 @@ class ChatInputRow extends StatelessWidget {
+@@ -372,17 +480,20 @@ class ChatInputRow extends StatelessWidget {
                                  hovered ? Icons.mic : Icons.mic_none_outlined,
                                ),
                              ),
@@ -305129,7 +305232,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
                    ),
                  ],
          );
-@@ -391,11 +476,32 @@ class ChatInputRow extends StatelessWidget {
+@@ -391,11 +502,32 @@ class ChatInputRow extends StatelessWidget {
    }
  }
  
@@ -305163,7 +305266,7 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
    void _popupMenuButtonSelected(String mxid, BuildContext context) {
      final client = Matrix.of(
        context,
-@@ -404,16 +510,16 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -404,16 +536,16 @@ class _ChatAccountPicker extends StatelessWidget {
        Logs().w('Attempted to switch to a non-existing client $mxid');
        return;
      }
@@ -305183,8 +305286,119 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
          builder: (context, snapshot) => PopupMenuButton<String>(
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
+@@ -450,3 +582,110 @@ class _ChatAccountPicker extends StatelessWidget {
+     );
+   }
+ }
++
++String _buildInputHintText(BuildContext context, ChatController controller) {
++  final siblings = BeeperMergeUtils.getSiblingRooms(controller.room.id);
++  final net = BeeperBridgeUtils.getRoomNetwork(controller.room);
++  final baseHint = controller.room.encrypted
++      ? L10n.of(context).encryptedMessage
++      : L10n.of(context).unencryptedMessage;
++
++  if (siblings.length >= 2 && net != null) {
++    return '${net.name} • $baseHint';
++  }
++  return baseHint;
++}
++
++class _MergedCompactSwitcher extends StatelessWidget {
++  final ChatController controller;
++
++  const _MergedCompactSwitcher({required this.controller});
++
++  @override
++  Widget build(BuildContext context) {
++    return ValueListenableBuilder<int>(
++      valueListenable: BeeperMergeUtils.mergeChangeNotifier,
++      builder: (context, _, __) {
++        final siblings = BeeperMergeUtils.getSiblingRooms(controller.room.id);
++        if (siblings.length < 2) return const SizedBox.shrink();
++
++        final theme = Theme.of(context);
++
++        return Container(
++          margin: const EdgeInsets.only(left: 4.0, right: 2.0),
++          height: 36,
++          alignment: Alignment.center,
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: siblings.map((room) {
++              final isActive = room.id == controller.room.id;
++              final beeperData = BeeperBridgeUtils.getRoomData(room);
++              final net = BeeperBridgeUtils.getRoomNetwork(room);
++              final handle = BeeperBridgeUtils.getAccountHandle(room);
++              final tooltip = '${net?.name ?? 'Chat'}${handle != null ? ' ($handle)' : ''}';
++
++              return Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 2.0),
++                child: Tooltip(
++                  message: tooltip,
++                  child: InkWell(
++                    borderRadius: BorderRadius.circular(16),
++                    onTap: isActive
++                        ? null
++                        : () {
++                            HapticFeedback.selectionClick();
++                            context.go('/rooms/${room.id}');
++                          },
++                    child: AnimatedContainer(
++                      duration: FluffyThemes.animationDuration,
++                      padding: const EdgeInsets.all(1.5),
++                      decoration: BoxDecoration(
++                        shape: BoxShape.circle,
++                        border: Border.all(
++                          color: isActive
++                              ? theme.colorScheme.primary
++                              : Colors.transparent,
++                          width: isActive ? 2.0 : 1.0,
++                        ),
++                      ),
++                      child: Opacity(
++                        opacity: isActive ? 1.0 : 0.45,
++                        child: Stack(
++                          clipBehavior: Clip.none,
++                          children: [
++                            Avatar(
++                              mxContent: beeperData.avatarUrl,
++                              name: beeperData.displayName ?? room.name,
++                              size: 20,
++                            ),
++                            if (net != null)
++                              Positioned(
++                                bottom: -2,
++                                right: -2,
++                                child: Container(
++                                  width: 8,
++                                  height: 8,
++                                  decoration: BoxDecoration(
++                                    shape: BoxShape.circle,
++                                    color: Color(net.colorHex),
++                                    border: Border.all(
++                                      color: theme.colorScheme.surface,
++                                      width: 1.0,
++                                    ),
++                                  ),
++                                ),
++                              ),
++                          ],
++                        ),
++                      ),
++                    ),
++                  ),
++                ),
++              );
++            }).toList(),
++          ),
++        );
++      },
++    );
++  }
++}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d71cc3ea30 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d298c5daa506f993ed59873b8e32f9253cfb66d1 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,17 +16,24 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -305220,7 +305434,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +54,558 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +54,549 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -305471,15 +305685,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
 -                            ),
 +                    ),
 +                  ),
-+                  ValueListenableBuilder<double>(
-+                    valueListenable: controller.inputBarHeightNotifier,
-+                    builder: (context, inputBarHeight, _) => Positioned(
-+                      bottom: inputBarHeight,
-+                      left: 0,
-+                      right: 0,
-+                      child: MergedContactSwitcher(currentRoom: controller.room),
-+                    ),
-+                  ),
 +                  Positioned(
 +                    bottom: 0,
 +                    left: 0,
@@ -305497,13 +305702,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
 +                            ],
 +                            begin: Alignment.topCenter,
 +                            end: Alignment.bottomCenter,
-+                          ),
-+                        ),
-+                        alignment: Alignment.center,
-+                        child: Container(
-+                          margin: EdgeInsets.all(bottomSheetPadding),
-+                          constraints: const BoxConstraints(
-+                            maxWidth: FluffyThemes.maxTimelineWidth,
                            ),
 -                          if (controller.selectedEvents.single.status.isSent)
 -                            PopupMenuItem(
@@ -305514,6 +305712,13 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
 -                                  const Icon(
 -                                    Icons.shield_outlined,
 -                                    color: Colors.red,
++                        ),
++                        alignment: Alignment.center,
++                        child: Container(
++                          margin: EdgeInsets.all(bottomSheetPadding),
++                          constraints: const BoxConstraints(
++                            maxWidth: FluffyThemes.maxTimelineWidth,
++                          ),
 +                          child: controller.room.isExtinct
 +                              ? ElevatedButton.icon(
 +                                  icon: const Icon(Icons.chevron_right),
@@ -305922,15 +306127,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
 -                              imageFilter: ui.ImageFilter.blur(
 -                                sigmaX: accountConfig.wallpaperBlur ?? 0.0,
 -                                sigmaY: accountConfig.wallpaperBlur ?? 0.0,
--                              ),
--                              child: MxcImage(
--                                cacheKey: accountConfig.wallpaperUrl.toString(),
--                                uri: accountConfig.wallpaperUrl,
--                                fit: BoxFit.cover,
--                                height: MediaQuery.sizeOf(context).height,
--                                width: MediaQuery.sizeOf(context).width,
--                                isThumbnail: false,
--                                placeholder: (_) => Container(),
 +                      if (selectedEvents.single.status.isSent)
 +                        PopupMenuItem(
 +                          value: _EventContextAction.report,
@@ -305941,6 +306137,15 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d7
 +                                Icons.shield_outlined,
 +                                color: Colors.red,
                                ),
+-                              child: MxcImage(
+-                                cacheKey: accountConfig.wallpaperUrl.toString(),
+-                                uri: accountConfig.wallpaperUrl,
+-                                fit: BoxFit.cover,
+-                                height: MediaQuery.sizeOf(context).height,
+-                                width: MediaQuery.sizeOf(context).width,
+-                                isThumbnail: false,
+-                                placeholder: (_) => Container(),
+-                              ),
 -                            ),
 +                              const SizedBox(width: 12),
 +                              Text(L10n.of(context).reportMessage),
@@ -319309,7 +319514,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff2f19a76a 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8f8654450 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -319394,7 +319599,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -150,12 +170,474 @@ class ChatListController extends State<ChatList>
+@@ -150,12 +170,482 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -319772,6 +319977,14 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
 +  Map<String, String> get roomToMergeId => _cachedRoomToMergeId;
 +  Set<String> get mergedRoomIds => _cachedMergedRoomIds;
 +
++  DateTime getRoomTimestamp(String roomId) {
++    final cached = _cachedTimestamps[roomId];
++    if (cached != null) return cached;
++    final room = Matrix.of(context).client.getRoomById(roomId);
++    if (room != null) return _getMessageTimestamp(room);
++    return DateTime.fromMillisecondsSinceEpoch(0);
++  }
++
 +  void onMergedContactTap(MergedContactEntry entry) {
 +    final room = entry.latestRoom ?? (entry.rooms.isNotEmpty ? entry.rooms.first : null);
 +    if (room != null) {
@@ -319873,7 +320086,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +646,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +654,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -319980,7 +320193,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +676,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +684,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -320007,7 +320220,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
    }
  
    void openNavrail() {
-@@ -285,13 +710,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +718,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -320031,7 +320244,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +728,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +736,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -320045,7 +320258,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +816,150 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +824,150 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -320231,7 +320444,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1053,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1061,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -320247,7 +320460,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1166,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1174,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320279,7 +320492,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1201,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1209,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320319,7 +320532,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
          ],
        );
      }
-@@ -700,7 +1254,30 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1262,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -320351,7 +320564,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1378,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1386,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -320477,7 +320690,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
      }
    }
  
-@@ -864,6 +1552,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1560,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -320485,7 +320698,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1603,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1611,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -320499,7 +320712,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1727,7 @@ enum ChatContextAction {
+@@ -1039,4 +1735,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -320508,10 +320721,10 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff
 +  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..2c2b0c4f65cd6a5e97e08d3eb6d2269db34840bf 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..fd0400b7cc1ea5770d9214cf03eb8b4591ff51de 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -3,224 +3,453 @@
+@@ -3,224 +3,450 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -320740,10 +320953,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..2c2b0c4f65cd6a5e97e08d3eb6d2269d
 +              listItems.add(rooms[ri++]);
 +            } else {
 +              final r = rooms[ri];
-+              final roomTs = BeeperBridgeUtils.getLastMessageTime(r.id) ??
-+                  (BeeperBridgeUtils.getCachedLastTimestamp(r.id) != null
-+                      ? DateTime.fromMillisecondsSinceEpoch(BeeperBridgeUtils.getCachedLastTimestamp(r.id)!)
-+                      : DateTime.fromMillisecondsSinceEpoch(0));
++              final roomTs = widget.controller.getRoomTimestamp(r.id);
 +              final mergeTs = sortedMerged[mi].latestTs;
 +              if (mergeTs.isAfter(roomTs)) {
 +                listItems.add(sortedMerged[mi++]);
@@ -321120,7 +321330,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..2c2b0c4f65cd6a5e97e08d3eb6d2269d
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +464,53 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +461,53 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -321338,7 +321548,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a40fc5708d 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..ce902ef86772899f22497a3724f5898500f154db 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,22 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -321377,7 +321587,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +41,266 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +41,275 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -321421,10 +321631,16 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 +    _initLocalizedBodyFuture();
 +  }
 +
++  bool _isMarkingRead = false;
++
 +  Future<void> _markAsReadAnimated() async {
 +    if (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') == true && widget.room.isUnreadOrInvited) {
++      HapticFeedback.lightImpact();
 +      if (widget.isUnreadFilter) {
 +        await _sizeController.reverse();
++      } else {
++        if (mounted) setState(() => _isMarkingRead = true);
++        await Future.delayed(const Duration(milliseconds: 220));
 +      }
 +      if (widget.room.markedUnread) {
 +        await widget.room.markUnread(false);
@@ -321444,6 +321660,9 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 +          .where((r) => r.isUnreadOrInvited)
 +          .length;
 +      updateAppBadge(unreadCount);
++      if (mounted) {
++        setState(() => _isMarkingRead = false);
++      }
 +    }
 +  }
 +
@@ -321664,8 +321883,37 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 -                              size: Avatar.defaultSize * 0.75,
 -                              name: space.getLocalizedDisplayname(),
 -                              onTap: () => onLongPress?.call(context),
--                            ),
--                          ),
++    Widget buildTile(bool listTileHovered) => ListTile(
++      minVerticalPadding: 16,
++      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
++      onLongPress: () => widget.onLongPress?.call(context),
++      leading: PlatformInfos.isMobile
++          ? avatarWidget
++          : HoverBuilder(
++              builder: (context, hovered) => AnimatedScale(
++                duration: FluffyThemes.animationDuration,
++                curve: FluffyThemes.animationCurve,
++                scale: hovered ? 1.1 : 1.0,
++                child: Stack(
++                  children: [
++                    avatarWidget,
++                    Positioned(
++                      top: 0,
++                      right: 0,
++                      child: GestureDetector(
++                        onTap: () => widget.onLongPress?.call(context),
++                        child: AnimatedScale(
++                          duration: FluffyThemes.animationDuration,
++                          curve: FluffyThemes.animationCurve,
++                          scale: listTileHovered ? 1.0 : 0.0,
++                          child: Material(
++                            color: backgroundColor,
++                            borderRadius: BorderRadius.circular(16),
++                            child: const Icon(
++                              Icons.arrow_drop_down_circle_outlined,
++                              size: 18,
+                             ),
+                           ),
 -                        Positioned(
 -                          bottom: 0,
 -                          right: 0,
@@ -321707,7 +321955,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 -                            presenceBackgroundColor: backgroundColor,
 -                            onTap: () => onLongPress?.call(context),
 -                          ),
--                        ),
+                         ),
 -                        Positioned(
 -                          top: 0,
 -                          right: 0,
@@ -321725,38 +321973,9 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 -                                  size: 18,
 -                                ),
 -                              ),
-+    Widget buildTile(bool listTileHovered) => ListTile(
-+      minVerticalPadding: 16,
-+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-+      onLongPress: () => widget.onLongPress?.call(context),
-+      leading: PlatformInfos.isMobile
-+          ? avatarWidget
-+          : HoverBuilder(
-+              builder: (context, hovered) => AnimatedScale(
-+                duration: FluffyThemes.animationDuration,
-+                curve: FluffyThemes.animationCurve,
-+                scale: hovered ? 1.1 : 1.0,
-+                child: Stack(
-+                  children: [
-+                    avatarWidget,
-+                    Positioned(
-+                      top: 0,
-+                      right: 0,
-+                      child: GestureDetector(
-+                        onTap: () => widget.onLongPress?.call(context),
-+                        child: AnimatedScale(
-+                          duration: FluffyThemes.animationDuration,
-+                          curve: FluffyThemes.animationCurve,
-+                          scale: listTileHovered ? 1.0 : 0.0,
-+                          child: Material(
-+                            color: backgroundColor,
-+                            borderRadius: BorderRadius.circular(16),
-+                            child: const Icon(
-+                              Icons.arrow_drop_down_circle_outlined,
-+                              size: 18,
-                             ),
-                           ),
-                         ),
+-                            ),
+-                          ),
+-                        ),
 -                      ],
 +                      ),
                      ),
@@ -321768,7 +321987,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +316,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +325,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -321777,7 +321996,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +327,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +336,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -321786,7 +322005,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +338,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +347,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -321825,7 +322044,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +355,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +364,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -321848,7 +322067,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +383,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +392,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -321857,7 +322076,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +401,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +410,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -321871,7 +322090,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +414,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +423,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -321897,7 +322116,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,70 +428,153 @@ class ChatListItem extends StatelessWidget {
+@@ -336,70 +437,179 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -322050,9 +322269,35 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..4971062a92cfddbb55fc5085e01005a4
 +                                                  : theme.colorScheme.onSurfaceVariant,
 +                                        ),
 +                                      ),
-+                                      if (widget.room.isUnreadOrInvited || widget.room.notificationCount > 0) ...[
++                                      if (widget.room.isUnreadOrInvited || widget.room.notificationCount > 0 || _isMarkingRead) ...[
 +                                        const SizedBox(height: 4),
-+                                        UnreadBubble(room: widget.room),
++                                        AnimatedSwitcher(
++                                          duration: FluffyThemes.animationDuration,
++                                          transitionBuilder: (child, animation) => ScaleTransition(
++                                            scale: animation,
++                                            child: FadeTransition(
++                                              opacity: animation,
++                                              child: child,
++                                            ),
++                                          ),
++                                          child: _isMarkingRead
++                                              ? Container(
++                                                  key: const ValueKey('check_marked'),
++                                                  padding: const EdgeInsets.all(2),
++                                                  decoration: BoxDecoration(
++                                                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
++                                                    shape: BoxShape.circle,
++                                                  ),
++                                                  child: Icon(
++                                                    Icons.done_all,
++                                                    size: 14,
++                                                    color: theme.colorScheme.primary,
++                                                  ),
++                                                )
++                                              : (widget.room.isUnreadOrInvited || widget.room.notificationCount > 0)
++                                                  ? UnreadBubble(key: const ValueKey('unread_bubble'), room: widget.room)
++                                                  : const SizedBox.shrink(key: ValueKey('empty')),
++                                        ),
 +                                      ],
 +                                    ],
 +                                  ),
