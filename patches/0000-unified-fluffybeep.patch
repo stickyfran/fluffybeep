@@ -14281,10 +14281,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..8c20e8a0ad254f68433468a7aaa3b7d3a5de068f 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..cfe8ed9babcba7c5dd5af31f8dd6cf7472ee6d9f 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,31 @@
+@@ -1,31 +1,147 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14320,8 +14320,11 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..8c20e8a0ad254f68433468a7aaa3b7d3
 +
 +import io.flutter.embedding.android.FlutterFragmentActivity
 +import io.flutter.embedding.engine.FlutterEngine
++import io.flutter.plugin.common.MethodChannel
 +
 +import android.content.Context
++import android.content.Intent
++import android.net.Uri
 +
 +class MainActivity : FlutterFragmentActivity() {
 +
@@ -14329,24 +14332,137 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..8c20e8a0ad254f68433468a7aaa3b7d3
 +        super.attachBaseContext(base)
 +    }
 +
-+
 +    override fun provideFlutterEngine(context: Context): FlutterEngine? {
 +        return provideEngine(this)
 +    }
 +
 +    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-+        // do nothing, because the engine was been configured in provideEngine
++        setupMethodChannel(flutterEngine, this)
 +    }
 +
 +    companion object {
 +        var engine: FlutterEngine? = null
++        private const val CHANNEL = "chat.fluffy.fluffybeep/native_launcher"
++
++        fun setupMethodChannel(flutterEngine: FlutterEngine, context: Context) {
++            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
++                when (call.method) {
++                    "launchApp" -> {
++                        val packageName = call.argument<String>("packageName")
++                        if (packageName.isNullOrEmpty()) {
++                            result.error("INVALID_ARGS", "Package name required", null)
++                            return@setMethodCallHandler
++                        }
++                        try {
++                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                            if (launchIntent != null) {
++                                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                context.startActivity(launchIntent)
++                                result.success(true)
++                            } else {
++                                result.success(false)
++                            }
++                        } catch (e: Exception) {
++                            result.error("LAUNCH_FAILED", e.message, null)
++                        }
++                    }
++                    "openInstagram" -> {
++                        val packageName = call.argument<String>("packageName") ?: "com.instagram.android"
++                        val userOrId = call.argument<String>("userOrId")
++                        try {
++                            var launched = false
++                            if (!userOrId.isNullOrEmpty()) {
++                                val isNumeric = userOrId.all { it.isDigit() }
++                                val uriString = if (isNumeric) "instagram://user?user_id=$userOrId" else "https://instagram.com/$userOrId"
++                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
++                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    if (packageName.isNotEmpty()) {
++                                        setPackage(packageName)
++                                    }
++                                }
++                                try {
++                                    context.startActivity(intent)
++                                    launched = true
++                                } catch (_: Exception) {}
++                            }
++                            if (!launched) {
++                                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                                if (launchIntent != null) {
++                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    context.startActivity(launchIntent)
++                                    launched = true
++                                }
++                            }
++                            result.success(launched)
++                        } catch (e: Exception) {
++                            result.error("INSTAGRAM_FAILED", e.message, null)
++                        }
++                    }
++                    "openWhatsApp" -> {
++                        val packageName = call.argument<String>("packageName") ?: "com.whatsapp"
++                        val phone = call.argument<String>("phone")
++                        try {
++                            var launched = false
++                            if (!phone.isNullOrEmpty()) {
++                                val cleanPhone = phone.filter { it.isDigit() }
++                                val uri = Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone")
++                                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
++                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    if (packageName.isNotEmpty()) {
++                                        setPackage(packageName)
++                                    }
++                                }
++                                try {
++                                    context.startActivity(intent)
++                                    launched = true
++                                } catch (_: Exception) {}
++                            }
++                            if (!launched) {
++                                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                                if (launchIntent != null) {
++                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    context.startActivity(launchIntent)
++                                    launched = true
++                                }
++                            }
++                            result.success(launched)
++                        } catch (e: Exception) {
++                            result.error("WHATSAPP_FAILED", e.message, null)
++                        }
++                    }
++                    "dialPhone" -> {
++                        val phone = call.argument<String>("phone")
++                        if (phone.isNullOrEmpty()) {
++                            result.error("INVALID_ARGS", "Phone required", null)
++                            return@setMethodCallHandler
++                        }
++                        try {
++                            val cleanPhone = phone.trim()
++                            val telUri = if (cleanPhone.startsWith("+")) Uri.parse("tel:$cleanPhone") else Uri.parse("tel:+$cleanPhone")
++                            val intent = Intent(Intent.ACTION_DIAL, telUri).apply {
++                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                            }
++                            context.startActivity(intent)
++                            result.success(true)
++                        } catch (e: Exception) {
++                            result.error("DIAL_FAILED", e.message, null)
++                        }
++                    }
++                    else -> result.notImplemented()
++                }
++            }
++        }
++
 +        fun provideEngine(context: Context): FlutterEngine {
-+            val eng = engine ?: FlutterEngine(context, emptyArray(), true, false)
++            val eng = engine ?: FlutterEngine(context, emptyArray(), true, false).also {
++                setupMethodChannel(it, context)
++            }
 +            engine = eng
 +            return eng
 +        }
 +    }
 +}
++
 diff --git a/android/app/src/main/res/drawable-night-v21/launch_background.xml b/android/app/src/main/res/drawable-night-v21/launch_background.xml
 index 3fe6b2e8821ee859d652350db1310b5f51698871..89832c8c4c407a922c01f5eedadd033454023bd3 100644
 --- a/android/app/src/main/res/drawable-night-v21/launch_background.xml
@@ -33687,10 +33803,10 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..1a8b43cb4ac663cc1e1292c2da95db3d
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..2551c02fc8dca1ec8021fa06753fd699b7815274 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..5cbea860062cf5eed5d87d167386a5e29d60e447 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,224 +1,220 @@
+@@ -1,224 +1,222 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -33997,7 +34113,9 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..2551c02fc8dca1ec8021fa06753fd699
 +  whisperLang<String>('chat.fluffy.whisper_lang', 'es'),
 +  whisperPrompt<String>('chat.fluffy.whisper_prompt', 'Transcripción de audio en español rioplatense (Argentina).'),
 +  searchStyle<String>('chat.fluffy.search_style', 'bottom_fab'),
-+  hideNetworkPrefixInNotification<bool>('beeper.hide_network_prefix_in_notification', true);
++  hideNetworkPrefixInNotification<bool>('beeper.hide_network_prefix_in_notification', true),
++  instagramPackageName<String>('beeper.instagram_package_name', 'com.instagram.android'),
++  whatsappPackageName<String>('beeper.whatsapp_package_name', 'com.whatsapp');
 +
 +  final String key;
 +  final T defaultValue;
@@ -305100,10 +305218,10 @@ index 879717fa9889be421184b768e20bad7417f95114..938f684b5f84d92f1d80542290736dd8
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423153b8e15 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..e4bff9844c9a4947604240a4e35c78d71cc3ea30 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -16,17 +16,23 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
+@@ -16,17 +16,24 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
  import 'package:fluffychat/pages/chat/pinned_events.dart';
  import 'package:fluffychat/pages/chat/reply_display.dart';
  import 'package:fluffychat/utils/account_config.dart';
@@ -305120,6 +305238,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423
 +import 'package:url_launcher/url_launcher.dart';
  
  import '../../utils/stream_extension.dart';
++import '../../utils/beeper_app_launcher.dart';
 +import '../../utils/beeper_merge_utils.dart';
  import 'chat_emoji_picker.dart';
  import 'chat_input_row.dart';
@@ -305127,7 +305246,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423
  
  enum _EventContextAction { info, report }
  
-@@ -37,6 +43,7 @@ class ChatView extends StatelessWidget {
+@@ -37,6 +44,7 @@ class ChatView extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -305135,7 +305254,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +53,561 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +54,558 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -305971,39 +306090,36 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..060a7e4f617107534c7a6339b3c42423
 +                    ],
 +                  ),
 +              ] else if (!widget.controller.room.isArchived) ...[
-+                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'whatsapp')
++                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'whatsapp' ||
++                    BeeperAppLauncher.extractWhatsAppPhone(widget.controller.room) != null)
 +                  IconButton(
-+                    onPressed: () {
-+                      final directId = widget.controller.room.directChatMatrixID ?? '';
-+                      final match = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(directId);
-+                      if (match != null) {
-+                        final number = match.group(1);
-+                        launchUrl(Uri.parse('tel:+$number'));
++                    onPressed: () async {
++                      final success = await BeeperAppLauncher.dialPhone(room: widget.controller.room);
++                      if (!success && context.mounted) {
++                        final waSuccess = await BeeperAppLauncher.openWhatsApp(room: widget.controller.room);
++                        if (!waSuccess && context.mounted) {
++                          ScaffoldMessenger.of(context).showSnackBar(
++                            const SnackBar(content: Text('No se pudo encontrar el número telefónico para discar')),
++                          );
++                        }
 +                      }
 +                    },
 +                    icon: const Icon(Icons.call_outlined),
 +                    tooltip: 'Llamar por celular',
 +                  ),
-+                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'instagram')
++                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'instagram' ||
++                    BeeperAppLauncher.extractInstagramId(widget.controller.room) != null)
 +                  IconButton(
 +                    onPressed: () async {
-+                      final directId = widget.controller.room.directChatMatrixID ?? '';
-+                      final match = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
-+                      if (match != null) {
-+                        final id = match.group(1)!;
-+                        final isNumeric = RegExp(r'^\d+$').hasMatch(id);
-+                        final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=$id' : 'https://instagram.com/$id');
-+                        try {
-+                          if (!await launchUrl(uri)) {
-+                            await launchUrl(Uri.parse('https://instagram.com/$id'));
-+                          }
-+                        } catch (_) {
-+                          await launchUrl(Uri.parse('https://instagram.com/$id'));
-+                        }
++                      final success = await BeeperAppLauncher.openInstagram(room: widget.controller.room);
++                      if (!success && context.mounted) {
++                        ScaffoldMessenger.of(context).showSnackBar(
++                          const SnackBar(content: Text('No se pudo abrir el perfil de Instagram')),
++                        );
 +                      }
 +                    },
 +                    icon: const Icon(Icons.camera_alt_outlined),
-+                    tooltip: 'Ver perfil',
++                    tooltip: 'Abrir Instagram',
 +                  ),
 +                if ((AppSettings.experimentalVoip.value &&
 +                    widget.controller.room.isDirectChat))
@@ -308765,10 +308881,10 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..19cff2bc8bfe3d1935a31f6834b4f1c2
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..dc16ae3fc72420ae35e27594e5f4b5358257c7e3 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..35c30c08369016550d935a85ac6405742151fb50 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,449 @@
+@@ -1,324 +1,516 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -309110,6 +309226,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..dc16ae3fc72420ae35e27594e5f4b535
 +import 'package:matrix/matrix.dart';
 +
 +import '../../../config/app_config.dart';
++import '../../../utils/beeper_app_launcher.dart';
 +import '../../../utils/beeper_bridge_utils.dart';
 +import '../../../utils/event_checkbox_extension.dart';
 +import '../../../utils/platform_infos.dart';
@@ -309400,16 +309517,82 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..dc16ae3fc72420ae35e27594e5f4b535
 +                fontSize: fontSize,
 +              );
 +            }
++            if (event.body.contains('Incoming call. Use the WhatsApp app to answer.')) {
++              final theme = Theme.of(context);
++              return Container(
++                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
++                padding: const EdgeInsets.all(12),
++                decoration: BoxDecoration(
++                  color: const Color(0xFF25D366).withValues(alpha: 0.15),
++                  border: Border.all(
++                    color: const Color(0xFF25D366).withValues(alpha: 0.4),
++                    width: 1,
++                  ),
++                  borderRadius: borderRadius,
++                ),
++                child: Column(
++                  crossAxisAlignment: CrossAxisAlignment.start,
++                  mainAxisSize: MainAxisSize.min,
++                  children: [
++                    Row(
++                      children: [
++                        const Icon(
++                          Icons.phone_callback_rounded,
++                          color: Color(0xFF25D366),
++                          size: 22,
++                        ),
++                        const SizedBox(width: 8),
++                        Expanded(
++                          child: Text(
++                            'Llamada entrante de WhatsApp',
++                            style: TextStyle(
++                              fontWeight: FontWeight.bold,
++                              fontSize: 14,
++                              color: theme.colorScheme.onSurface,
++                            ),
++                          ),
++                        ),
++                      ],
++                    ),
++                    const SizedBox(height: 6),
++                    Text(
++                      'Usa la aplicación de WhatsApp para atender o responder.',
++                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
++                    ),
++                    const SizedBox(height: 10),
++                    Row(
++                      children: [
++                        ElevatedButton.icon(
++                          onPressed: () => BeeperAppLauncher.openWhatsApp(room: event.room),
++                          icon: const Icon(Icons.open_in_new, size: 16),
++                          label: const Text('Abrir WhatsApp'),
++                          style: ElevatedButton.styleFrom(
++                            backgroundColor: const Color(0xFF25D366),
++                            foregroundColor: Colors.white,
++                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
++                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
++                          ),
++                        ),
++                        const SizedBox(width: 8),
++                        OutlinedButton.icon(
++                          onPressed: () => BeeperAppLauncher.dialPhone(room: event.room),
++                          icon: const Icon(Icons.call, size: 16),
++                          label: const Text('Llamar por teléfono'),
++                          style: OutlinedButton.styleFrom(
++                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
++                            textStyle: const TextStyle(fontSize: 12),
++                          ),
++                        ),
++                      ],
++                    ),
++                  ],
++                ),
++              );
++            }
 +            var html = AppSettings.renderHtml.value && event.isRichMessage
 +                ? event.formattedText
 +                : event.body.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 +            html = BeeperBridgeUtils.stripNetworkPrefix(html);
-+            if (event.body.contains('Incoming call. Use the WhatsApp app to answer.')) {
-+              final phoneMatch = RegExp(r'^@whatsapp_(\d+):').firstMatch(event.senderId);
-+              final phone = phoneMatch?.group(1);
-+              final targetUrl = phone != null ? 'https://wa.me/$phone' : 'whatsapp://';
-+              html = '<a href="$targetUrl">$html</a>';
-+            }
 +            if (event.messageType == MessageTypes.Emote) {
 +              html = '* $html';
 +            }
@@ -339315,10 +339498,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..010d1038347bce2964126729dac98b53d5b73d26 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..93b2d388964c031c53e7f7ddbb1da33d56aa2ffe 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,217 @@
+@@ -1,181 +1,255 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -339608,6 +339791,44 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..010d1038347bce2964126729dac98b53
 +                title: 'Ocultar prefijo de red en mensajes',
 +                subtitle: 'Oculta etiquetas como [WhatsApp] o [Instagram] al inicio de los mensajes',
 +                setting: AppSettings.hideNetworkPrefixInNotification,
++              ),
++              ListTile(
++                title: const Text('Paquete de la app de Instagram'),
++                subtitle: Text(AppSettings.instagramPackageName.value),
++                trailing: const Icon(Icons.edit_outlined),
++                onTap: () async {
++                  final newPackage = await showTextInputDialog(
++                    context: context,
++                    title: 'Paquete de Instagram',
++                    hintText: 'ej. com.instagram.android.piko',
++                    initialText: AppSettings.instagramPackageName.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (newPackage != null && newPackage.trim().isNotEmpty) {
++                    AppSettings.instagramPackageName.value = newPackage.trim();
++                    controller.refresh();
++                  }
++                },
++              ),
++              ListTile(
++                title: const Text('Paquete de la app de WhatsApp'),
++                subtitle: Text(AppSettings.whatsappPackageName.value),
++                trailing: const Icon(Icons.edit_outlined),
++                onTap: () async {
++                  final newPackage = await showTextInputDialog(
++                    context: context,
++                    title: 'Paquete de WhatsApp',
++                    hintText: 'ej. com.whatsapp',
++                    initialText: AppSettings.whatsappPackageName.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (newPackage != null && newPackage.trim().isNotEmpty) {
++                    AppSettings.whatsappPackageName.value = newPackage.trim();
++                    controller.refresh();
++                  }
++                },
 +              ),
 +              Divider(color: theme.dividerColor),
 +              ListTile(
@@ -349382,6 +349603,224 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +    return beautifiedStr;
 +  }
 +}
+diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..42d73210941396bd9ce8cb524d5c7f5cef3228db
+--- /dev/null
++++ b/lib/utils/beeper_app_launcher.dart
+@@ -0,0 +1,212 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:io';
++import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
++import 'package:matrix/matrix.dart';
++import 'package:url_launcher/url_launcher.dart';
++import '../config/setting_keys.dart';
++import 'beeper_bridge_utils.dart';
++import 'beeper_merge_utils.dart';
++import 'beeper_phone_contacts.dart';
++
++class BeeperAppLauncher {
++  static const MethodChannel _channel = MethodChannel('chat.fluffy.fluffybeep/native_launcher');
++
++  /// Robust extraction of WhatsApp phone number from a room or its merged sibling rooms
++  static String? extractWhatsAppPhone(Room room) {
++    // 1. Check directId
++    final directId = room.directChatMatrixID ?? '';
++    final directMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(directId);
++    if (directMatch != null) return directMatch.group(1);
++
++    // 2. Check beeperData contactId
++    final beeperData = BeeperBridgeUtils.getRoomData(room);
++    final contactId = beeperData.contactId ?? '';
++    final contactMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(contactId);
++    if (contactMatch != null) return contactMatch.group(1);
++
++    if (beeperData.networkKey == 'whatsapp' || beeperData.networkKey == 'whatsappgo') {
++      final digits = contactId.replaceAll(RegExp(r'\D'), '');
++      if (digits.length >= 7 && digits.length <= 16) return digits;
++    }
++
++    // 3. Check participants / members
++    try {
++      final members = room.getParticipants();
++      for (final m in members) {
++        if (m.id == room.client.userID) continue;
++        final mMatch = RegExp(r'whatsapp(?:go)?_(\d+):').firstMatch(m.id);
++        if (mMatch != null) return mMatch.group(1);
++      }
++    } catch (_) {}
++
++    // 4. If this is a merged contact or has sibling rooms, check any WhatsApp sibling room
++    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
++    for (final s in siblings) {
++      if (s.id == room.id) continue;
++      final sData = BeeperBridgeUtils.getRoomData(s);
++      if (sData.networkKey == 'whatsapp' || sData.networkKey == 'whatsappgo') {
++        final phone = extractWhatsAppPhone(s);
++        if (phone != null) return phone;
++      }
++    }
++
++    // 5. Check phone contacts match
++    final mergeId = BeeperMergeUtils.getMergeIdForRoom(room.id);
++    if (mergeId != null) {
++      final mc = BeeperMergeUtils.getMergedContacts(room.client)[mergeId];
++      if (mc?.phoneContactId != null && BeeperPhoneContacts.isLoaded) {
++        final pc = BeeperPhoneContacts.findById(mc!.phoneContactId!);
++        if (pc != null && pc.phones.isNotEmpty) {
++          final digits = pc.phones.first.replaceAll(RegExp(r'\D'), '');
++          if (digits.isNotEmpty) return digits;
++        }
++      }
++    }
++
++    return null;
++  }
++
++  /// Robust extraction of Instagram user or numeric ID from a room or its merged sibling rooms
++  static String? extractInstagramId(Room room) {
++    // 1. Check directId
++    final directId = room.directChatMatrixID ?? '';
++    final igMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
++    if (igMatch != null) return igMatch.group(1);
++
++    // 2. Check beeperData contactId
++    final beeperData = BeeperBridgeUtils.getRoomData(room);
++    final contactId = beeperData.contactId ?? '';
++    final contactMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(contactId);
++    if (contactMatch != null) return contactMatch.group(1);
++
++    // 3. Check participants / members
++    try {
++      final members = room.getParticipants();
++      for (final m in members) {
++        if (m.id == room.client.userID) continue;
++        final mMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(m.id);
++        if (mMatch != null) return mMatch.group(1);
++      }
++    } catch (_) {}
++
++    // 4. Check merged siblings
++    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
++    for (final s in siblings) {
++      if (s.id == room.id) continue;
++      final sData = BeeperBridgeUtils.getRoomData(s);
++      if (sData.networkKey == 'instagram' || sData.networkKey == 'instagramgo') {
++        final id = extractInstagramId(s);
++        if (id != null) return id;
++      }
++    }
++
++    return null;
++  }
++
++  /// Open Instagram with custom package name support (e.g. com.instagram.android.piko)
++  static Future<bool> openInstagram({
++    String? userOrId,
++    Room? room,
++  }) async {
++    final targetId = userOrId ?? (room != null ? extractInstagramId(room) : null);
++    final packageName = AppSettings.instagramPackageName.value.trim();
++
++    if (Platform.isAndroid) {
++      try {
++        final res = await _channel.invokeMethod<bool>('openInstagram', {
++          'packageName': packageName.isNotEmpty ? packageName : 'com.instagram.android',
++          'userOrId': targetId,
++        });
++        if (res == true) return true;
++      } catch (_) {}
++    }
++
++    // Fallback using url_launcher
++    if (targetId != null && targetId.isNotEmpty) {
++      final isNumeric = RegExp(r'^\d+$').hasMatch(targetId);
++      final uri = Uri.parse(isNumeric ? 'instagram://user?user_id=' : 'https://instagram.com/');
++      try {
++        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
++      } catch (_) {}
++      try {
++        return await launchUrl(Uri.parse('https://instagram.com/'), mode: LaunchMode.externalApplication);
++      } catch (_) {}
++    }
++
++    try {
++      return await launchUrl(Uri.parse('instagram://'), mode: LaunchMode.externalApplication);
++    } catch (_) {
++      return await launchUrl(Uri.parse('https://instagram.com'), mode: LaunchMode.externalApplication);
++    }
++  }
++
++  /// Open WhatsApp with custom package name support (e.g. com.whatsapp or com.whatsapp.w4b)
++  static Future<bool> openWhatsApp({
++    String? phone,
++    Room? room,
++  }) async {
++    final targetPhone = phone ?? (room != null ? extractWhatsAppPhone(room) : null);
++    final packageName = AppSettings.whatsappPackageName.value.trim();
++
++    if (Platform.isAndroid) {
++      try {
++        final res = await _channel.invokeMethod<bool>('openWhatsApp', {
++          'packageName': packageName.isNotEmpty ? packageName : 'com.whatsapp',
++          'phone': targetPhone,
++        });
++        if (res == true) return true;
++      } catch (_) {}
++    }
++
++    // Fallback using url_launcher
++    if (targetPhone != null && targetPhone.isNotEmpty) {
++      final clean = targetPhone.replaceAll(RegExp(r'\D'), '');
++      try {
++        final uri = Uri.parse('whatsapp://send?phone=');
++        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
++      } catch (_) {}
++      try {
++        final waUri = Uri.parse('https://api.whatsapp.com/send?phone=');
++        if (await launchUrl(waUri, mode: LaunchMode.externalApplication)) return true;
++      } catch (_) {}
++    }
++
++    try {
++      return await launchUrl(Uri.parse('whatsapp://'), mode: LaunchMode.externalApplication);
++    } catch (_) {
++      return await launchUrl(Uri.parse('https://whatsapp.com'), mode: LaunchMode.externalApplication);
++    }
++  }
++
++  /// Dial phone number via native Android dialer
++  static Future<bool> dialPhone({
++    String? phone,
++    Room? room,
++  }) async {
++    final targetPhone = phone ?? (room != null ? extractWhatsAppPhone(room) : null);
++    if (targetPhone == null || targetPhone.isEmpty) return false;
++
++    final cleanPhone = targetPhone.trim();
++
++    if (Platform.isAndroid) {
++      try {
++        final res = await _channel.invokeMethod<bool>('dialPhone', {
++          'phone': cleanPhone,
++        });
++        if (res == true) return true;
++      } catch (_) {}
++    }
++
++    // Fallback using url_launcher tel scheme
++    final telUri = Uri.parse(cleanPhone.startsWith('+') ? 'tel:' : 'tel:+');
++    try {
++      return await launchUrl(telUri, mode: LaunchMode.externalApplication);
++    } catch (_) {
++      return false;
++    }
++  }
++}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
 index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c1ba7c2b0
@@ -355179,10 +355618,10 @@ index d21dc9a1f89ab4a8bb4f1c1cbb275f23edb5154d..6a431ce2cef9c1344fe7194ad94e15b9
 +  }
 +}
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee736973e415 100644
+index ee462f873c82516dad8729bf60ee0ab626663879..0fb1f5d65b7663454682f4ccb17a968e66a34d9f 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,212 +1,292 @@
+@@ -1,212 +1,279 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -355414,6 +355853,7 @@ index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee73
 +import 'package:matrix/matrix.dart';
 +import 'package:url_launcher/url_launcher.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
++import 'package:fluffychat/utils/beeper_app_launcher.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +
 +import '../config/app_config.dart';
@@ -355538,11 +355978,7 @@ index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee73
 +      final roomId = payload.roomId;
 +      if (roomId == null) return;
 +      if (payload.isWhatsAppCall) {
-+        try {
-+          launchUrl(Uri.parse('whatsapp://'), mode: LaunchMode.externalApplication);
-+        } catch (e, s) {
-+          Logs().e('Failed to launch whatsapp:// scheme', e, s);
-+        }
++        BeeperAppLauncher.openWhatsApp();
 +      }
 +
 +      if (router == null) {
@@ -355567,17 +356003,12 @@ index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee73
 +        }
 +        if (event != null && event.type == EventTypes.Encrypted) {
 +          final network = BeeperBridgeUtils.getRoomNetwork(room);
-+          if (network?.key == 'instagram') {
-+            final directId = room.directChatMatrixID ?? '';
-+            final igMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
-+            if (igMatch != null) {
-+              final id = igMatch.group(1)!;
-+              try {
-+                if (await launchUrl(Uri.parse('https://ig.me/m/$id'), mode: LaunchMode.externalApplication)) {
-+                  return;
-+                }
-+              } catch (_) {}
-+            }
++          if (network?.key == 'instagram' || BeeperAppLauncher.extractInstagramId(room) != null) {
++            try {
++              if (await BeeperAppLauncher.openInstagram(room: room)) {
++                return;
++              }
++            } catch (_) {}
 +          }
 +        }
 +      }
@@ -355660,17 +356091,12 @@ index ee462f873c82516dad8729bf60ee0ab626663879..594a70ffba5a96dfaed8ddede263ee73
 +            }
 +            if (event != null && event.type == EventTypes.Encrypted) {
 +              final network = BeeperBridgeUtils.getRoomNetwork(room);
-+              if (network?.key == 'instagram') {
-+                final directId = room.directChatMatrixID ?? '';
-+                final igMatch = RegExp(r'instagram(?:go)?_([^:]+):').firstMatch(directId);
-+                if (igMatch != null) {
-+                  final id = igMatch.group(1)!;
-+                  try {
-+                    if (await launchUrl(Uri.parse('https://ig.me/m/$id'), mode: LaunchMode.externalApplication)) {
-+                      return;
-+                    }
-+                  } catch (_) {}
-+                }
++              if (network?.key == 'instagram' || BeeperAppLauncher.extractInstagramId(room) != null) {
++                try {
++                  if (await BeeperAppLauncher.openInstagram(room: room)) {
++                    return;
++                  }
++                } catch (_) {}
 +              }
 +            }
 +          }
