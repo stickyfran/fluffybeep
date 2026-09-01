@@ -355637,10 +355637,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..22e6cf6d32c4669cb6ee50ed57639dd62a74eeff 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a122b2964 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,500 +1,649 @@
+@@ -1,500 +1,640 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -356705,15 +356705,6 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..22e6cf6d32c4669cb6ee50ed57639dd6
 +  );
 +  await androidPlugin.createNotificationChannel(defaultDirectChannel);
 +  await androidPlugin.createNotificationChannel(defaultGroupChannel);
-+  } finally {
-+    if (isBackgroundMessage && client != null) {
-+      try {
-+        await client.dispose(closeDatabase: true);
-+      } catch (e) {
-+        Logs().w('[PushHelper] Error disposing background client', e);
-+      }
-+    }
-+  }
 +}
 +
 +class FluffyChatPushPayload {
