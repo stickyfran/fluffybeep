@@ -319514,7 +319514,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8f8654450 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..c9dbaffa46c5bdbad4f7cac36725cfa3a444858e 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -319599,7 +319599,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
        case ActiveFilter.unread:
          return (room) => room.isUnreadOrInvited;
        case ActiveFilter.tag:
-@@ -150,12 +170,482 @@ class ChatListController extends State<ChatList>
+@@ -150,12 +170,622 @@ class ChatListController extends State<ChatList>
      }
    }
  
@@ -320010,13 +320010,67 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
 +      Offset.zero & overlay.size,
 +    );
 +
++    final isAnyMuted = entry.rooms.any((r) => r.pushRuleState != PushRuleState.notify);
++    final isAnyUnread = entry.totalUnread > 0 || entry.rooms.any((r) => r.isUnreadOrInvited);
++    final isFav = entry.rooms.any((r) => r.isFavourite);
++
 +    final action = await showMenu<String>(
 +      context: posContext,
 +      position: position,
 +      items: [
++        PopupMenuItem(
++          value: 'mute',
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Icon(
++                isAnyMuted
++                    ? Icons.notifications_off
++                    : Icons.notifications_off_outlined,
++              ),
++              const SizedBox(width: 12),
++              Text(
++                isAnyMuted
++                    ? L10n.of(context).unmuteChat
++                    : L10n.of(context).muteChat,
++              ),
++            ],
++          ),
++        ),
++        PopupMenuItem(
++          value: 'mark_read',
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Icon(
++                isAnyUnread
++                    ? Icons.mark_as_unread
++                    : Icons.mark_as_unread_outlined,
++              ),
++              const SizedBox(width: 12),
++              Text(
++                isAnyUnread
++                    ? L10n.of(context).markAsRead
++                    : L10n.of(context).markAsUnread,
++              ),
++            ],
++          ),
++        ),
++        PopupMenuItem(
++          value: 'favorite',
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Icon(isFav ? Icons.push_pin : Icons.push_pin_outlined),
++              const SizedBox(width: 12),
++              Text(isFav ? L10n.of(context).unpin : L10n.of(context).pin),
++            ],
++          ),
++        ),
 +        const PopupMenuItem(
 +          value: 'edit',
 +          child: Row(
++            mainAxisSize: MainAxisSize.min,
 +            children: [
 +              Icon(Icons.edit_outlined),
 +              SizedBox(width: 12),
@@ -320027,6 +320081,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
 +        PopupMenuItem(
 +          value: 'unmerge',
 +          child: Row(
++            mainAxisSize: MainAxisSize.min,
 +            children: [
 +              Icon(Icons.link_off_outlined, color: Theme.of(context).colorScheme.error),
 +              const SizedBox(width: 12),
@@ -320034,14 +320089,77 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
 +            ],
 +          ),
 +        ),
++        PopupMenuItem(
++          value: 'leave',
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              Icon(Icons.delete_outlined, color: Theme.of(context).colorScheme.error),
++              const SizedBox(width: 12),
++              Text(L10n.of(context).leave, style: TextStyle(color: Theme.of(context).colorScheme.error)),
++            ],
++          ),
++        ),
 +      ],
 +    );
 +
-+    if (!mounted || !posContext.mounted) return;
++    if (!mounted || !posContext.mounted || action == null) return;
 +
-+    if (action == 'edit') {
-+      if (entry.latestRoom != null) {
-+        await showMergeContactPicker(context, entry.latestRoom!);
++    if (action == 'mute') {
++      await showFutureLoadingDialog(
++        context: context,
++        future: () async {
++          final targetState = isAnyMuted ? PushRuleState.notify : PushRuleState.mentionsOnly;
++          for (final room in entry.rooms) {
++            await room.setPushRuleState(targetState);
++          }
++        },
++      );
++    } else if (action == 'mark_read') {
++      await showFutureLoadingDialog(
++        context: context,
++        future: () async {
++          for (final room in entry.rooms) {
++            if (isAnyUnread) {
++              if (room.markedUnread) {
++                await room.markUnread(false);
++              }
++              final lastEventId = room.lastEvent?.eventId;
++              await room.setReadMarker(
++                lastEventId,
++                mRead: lastEventId,
++                public: AppSettings.sendPublicReadReceipts.value,
++              );
++              if (PlatformInfos.isMobile) {
++                final notifId = '${room.client.clientName}_${room.id}'.hashCode;
++                await FlutterLocalNotificationsPlugin().cancel(id: notifId);
++              }
++            } else {
++              await room.markUnread(true);
++            }
++          }
++          final unreadCount = Matrix.of(context).client.rooms
++              .where((r) => r.isUnreadOrInvited)
++              .length;
++          updateAppBadge(unreadCount);
++          _invalidateRoomCache();
++        },
++      );
++    } else if (action == 'favorite') {
++      await showFutureLoadingDialog(
++        context: context,
++        future: () async {
++          final targetFav = !isFav;
++          for (final room in entry.rooms) {
++            await room.setFavourite(targetFav);
++          }
++          _invalidateRoomCache();
++        },
++      );
++    } else if (action == 'edit') {
++      final targetRoom = entry.latestRoom ?? (entry.rooms.isNotEmpty ? entry.rooms.first : null);
++      if (targetRoom != null) {
++        await showMergeContactPicker(context, targetRoom);
 +        _invalidateRoomCache();
 +      }
 +    } else if (action == 'unmerge') {
@@ -320056,6 +320174,28 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
 +        final client = Matrix.of(context).client;
 +        await BeeperMergeUtils.removeMerge(client, entry.contact.id);
 +        _invalidateRoomCache();
++      }
++    } else if (action == 'leave') {
++      final confirmed = await showOkCancelAlertDialog(
++        context: context,
++        title: L10n.of(context).areYouSure,
++        message: '¿Deseas archivar/abandonar todos los chats asociados a "${entry.displayName}"?',
++        okLabel: L10n.of(context).leave,
++        cancelLabel: L10n.of(context).cancel,
++        isDestructive: true,
++      );
++      if (confirmed == OkCancelResult.ok) {
++        await showFutureLoadingDialog(
++          context: context,
++          future: () async {
++            for (final room in entry.rooms) {
++              await room.leave();
++            }
++            final client = Matrix.of(context).client;
++            await BeeperMergeUtils.removeMerge(client, entry.contact.id);
++            _invalidateRoomCache();
++          },
++        );
 +      }
 +    }
 +  }
@@ -320086,7 +320226,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +654,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +794,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -320193,7 +320333,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +684,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +824,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -320220,7 +320360,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
    }
  
    void openNavrail() {
-@@ -285,13 +718,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +858,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -320244,7 +320384,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +736,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +876,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -320258,7 +320398,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +824,150 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +964,150 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -320444,7 +320584,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1061,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1201,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -320460,7 +320600,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1174,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1314,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320492,7 +320632,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1209,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1349,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320532,7 +320672,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
          ],
        );
      }
-@@ -700,7 +1262,30 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1402,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -320564,7 +320704,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1386,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1526,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -320690,7 +320830,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
      }
    }
  
-@@ -864,6 +1560,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1700,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -320698,7 +320838,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1611,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1751,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -320712,7 +320852,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7fa613f26aeb02492c01e7460acbfdc8
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1735,7 @@ enum ChatContextAction {
+@@ -1039,4 +1875,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -323425,10 +323565,10 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..87d25f33e94d4ba19f52bf486edc68ab7d8dbd71
+index 0000000000000000000000000000000000000000..fd2f15ccd9d8e2f9354174a59cfb61168c3aa682
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,260 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -323552,22 +323692,6 @@ index 0000000000000000000000000000000000000000..87d25f33e94d4ba19f52bf486edc68ab
 +                        overflow: TextOverflow.ellipsis,
 +                        style: TextStyle(
 +                          fontWeight: hasNewMessages ? FontWeight.bold : FontWeight.w600,
-+                        ),
-+                      ),
-+                    ),
-+                    const SizedBox(width: 6),
-+                    Container(
-+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-+                      decoration: BoxDecoration(
-+                        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
-+                        borderRadius: BorderRadius.circular(8),
-+                      ),
-+                      child: Text(
-+                        '${entry.rooms.length}',
-+                        style: TextStyle(
-+                          fontSize: 10,
-+                          fontWeight: FontWeight.bold,
-+                          color: theme.colorScheme.onPrimaryContainer,
 +                        ),
 +                      ),
 +                    ),
@@ -334844,10 +334968,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b553677b8
+index 0000000000000000000000000000000000000000..c4d4fc374130287f14f514bfde5505c1db3a8791
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,603 @@
+@@ -0,0 +1,651 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334965,18 +335089,46 @@ index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b
 +            .toList()
 +        : [widget.initialRoom];
 +
++    // Precalculate source strings once to avoid redundant state queries
++    final sourceTexts = <String>[];
++    for (final sRoom in sourceRooms) {
++      final sData = BeeperBridgeUtils.getRoomData(sRoom);
++      if (sData.displayName != null && sData.displayName!.isNotEmpty) {
++        sourceTexts.add(sData.displayName!);
++      }
++      if (sRoom.name.isNotEmpty) sourceTexts.add(sRoom.name);
++      final sHandle = BeeperBridgeUtils.getAccountHandle(sRoom);
++      if (sHandle != null && sHandle.isNotEmpty) sourceTexts.add(sHandle);
++      final sIg = BeeperBridgeUtils.extractInstagramDetails(sRoom);
++      if (sIg.username != null) sourceTexts.add(sIg.username!);
++    }
++
 +    for (final room in nonSpaceRooms) {
 +      final data = BeeperBridgeUtils.getRoomData(room);
 +      final dName = data.displayName ?? room.name;
 +      final net = BeeperBridgeUtils.getRoomNetwork(room);
 +      final netKey = (data.networkKey ?? '').toLowerCase();
 +      final handle = BeeperBridgeUtils.getAccountHandle(room);
-+      final searchKey = '${dName.toLowerCase()} ${handle?.toLowerCase() ?? ''} $netKey ${room.id.toLowerCase()}';
++      final ig = BeeperBridgeUtils.extractInstagramDetails(room);
++      final igUser = ig.username?.toLowerCase() ?? '';
++      final igId = ig.numericId ?? '';
++      final phone = BeeperBridgeUtils.extractWhatsAppPhone(room) ?? '';
++
++      final searchKey = '${dName.toLowerCase()} ${room.name.toLowerCase()} ${handle?.toLowerCase() ?? ''} $igUser @$igUser $igId $phone $netKey ${room.id.toLowerCase()}';
 +
 +      var maxSim = 0.0;
-+      for (final sRoom in sourceRooms) {
-+        final sim = BeeperFuzzyMatcher.computeRoomSimilarity(sRoom, room);
-+        if (sim > maxSim) maxSim = sim;
++      final cTexts = [
++        if (dName.isNotEmpty) dName,
++        if (room.name.isNotEmpty) room.name,
++        if (handle != null && handle.isNotEmpty) handle,
++        if (igUser.isNotEmpty) igUser,
++      ];
++
++      for (final s in sourceTexts) {
++        for (final c in cTexts) {
++          final sim = BeeperFuzzyMatcher.matchStrings(s, c);
++          if (sim > maxSim) maxSim = sim;
++        }
 +      }
 +
 +      items.add(_MergePickerRoomItem(
@@ -335181,8 +335333,8 @@ index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b
 +              ),
 +            ),
 +
-+            // Contacts permission banner if not loaded
-+            if (!BeeperPhoneContacts.isLoaded)
++            // Contacts permission banner if not loaded and not previously dismissed/asked
++            if (!BeeperPhoneContacts.isLoaded && !BeeperPhoneContacts.isPermissionAsked)
 +              Padding(
 +                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
 +                child: Card(
@@ -335198,16 +335350,32 @@ index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b
 +                      'Detecta automáticamente números de WhatsApp coincidentes',
 +                      style: TextStyle(fontSize: 11),
 +                    ),
-+                    trailing: _isLoadingContacts
-+                        ? const SizedBox(
++                    trailing: Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        if (_isLoadingContacts)
++                          const SizedBox(
 +                            width: 20,
 +                            height: 20,
 +                            child: CircularProgressIndicator.adaptive(strokeWidth: 2),
 +                          )
-+                        : TextButton(
++                        else ...[
++                          TextButton(
 +                            onPressed: _requestPhonePermission,
 +                            child: const Text('Vincular'),
 +                          ),
++                          IconButton(
++                            icon: const Icon(Icons.close, size: 18),
++                            tooltip: 'Descartar',
++                            onPressed: () async {
++                              final prefs = BeeperBridgeUtils.prefs;
++                              await prefs?.setBool('beeper_contacts_permission_asked', true);
++                              if (mounted) setState(() {});
++                            },
++                          ),
++                        ],
++                      ],
++                    ),
 +                  ),
 +                ),
 +              ),
@@ -335316,9 +335484,13 @@ index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b
 +              child: ValueListenableBuilder<String>(
 +                valueListenable: _searchFilterNotifier,
 +                builder: (context, filter, _) {
++                  final cleanQuery = filter.replaceAll('@', '').trim();
 +                  final filteredItems = filter.isEmpty
 +                      ? _allRoomItems
-+                      : _allRoomItems.where((item) => item.searchKey.contains(filter)).toList();
++                      : _allRoomItems.where((item) {
++                          final key = item.searchKey;
++                          return key.contains(filter) || (cleanQuery.isNotEmpty && key.contains(cleanQuery));
++                        }).toList();
 +
 +                  return ListView.builder(
 +                    itemCount: filteredItems.length,
@@ -350132,10 +350304,10 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..1621e299abab4077224cf53010e93e5491bb2632
+index 0000000000000000000000000000000000000000..419be26de1a0c46caa11c61b06580bd27324bab5
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1040 @@
+@@ -0,0 +1,1048 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350688,11 +350860,19 @@ index 0000000000000000000000000000000000000000..1621e299abab4077224cf53010e93e54
 +        final content = event.content;
 +        final channel = content['channel'] is Map ? (content['channel'] as Map) : null;
 +        final remoteUser = content['remote_user'] is Map ? (content['remote_user'] as Map) : null;
-+        final u = content['username'] ?? channel?['username'] ?? channel?['displayname'] ?? remoteUser?['username'];
++        final sender = content['sender'] is Map ? (content['sender'] as Map) : null;
++        final u = content['username'] ??
++            channel?['username'] ??
++            channel?['displayname'] ??
++            remoteUser?['username'] ??
++            remoteUser?['displayname'] ??
++            sender?['username'] ??
++            sender?['displayname'] ??
++            content['name'];
 +        if (u != null && u.toString().isNotEmpty) {
 +          username ??= cleanInstagramUsername(u.toString());
 +        }
-+        final id = content['id'] ?? channel?['id'] ?? content['remote_id'];
++        final id = content['id'] ?? channel?['id'] ?? content['remote_id'] ?? sender?['id'] ?? remoteUser?['id'];
 +        if (id != null && id.toString().isNotEmpty) {
 +          numericId ??= id.toString();
 +        }
@@ -351521,10 +351701,10 @@ index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..32bf0c688a62ac6f2524da2fd0882a081c8afee0
+index 0000000000000000000000000000000000000000..36a750227c3d10ae43103a62de4d6f27d994d766
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,431 @@
 +import 'dart:collection';
 +import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
@@ -351911,29 +352091,42 @@ index 0000000000000000000000000000000000000000..32bf0c688a62ac6f2524da2fd0882a08
 +        }
 +        if (matchedPhoneContact) continue;
 +      }
++    }
 +
-+      // 4. Normalized display name match across rooms
++    // 4. Normalized display name and fast token-indexed matching
++    final tokenIndex = <String, List<Room>>{};
++
++    for (final room in bridgedRooms) {
++      final beeperData = BeeperBridgeUtils.getRoomData(room);
 +      final name = beeperData.displayName ?? room.name;
-+      if (name.trim().length >= 3) {
-+        final norm = normalizeDisplayName(name);
-+        if (norm.length >= 3) {
-+          groups.putIfAbsent('name_$norm', () => <Room>[]).add(room);
++      final norm = normalizeDisplayName(name);
++      if (norm.length >= 3) {
++        groups.putIfAbsent('name_$norm', () => <Room>[]).add(room);
++      }
++
++      final tokens = BeeperFuzzyMatcher.extractTokens(name);
++      for (final t in tokens) {
++        if (t.length >= 4) {
++          tokenIndex.putIfAbsent(t, () => <Room>[]).add(room);
 +        }
 +      }
 +    }
 +
-+    // 5. Intelligent fuzzy match pass for unassigned rooms
-+    final groupedRoomIds = groups.values.expand((l) => l.map((r) => r.id)).toSet();
-+    final remainingRooms = bridgedRooms.where((r) => !groupedRoomIds.contains(r.id)).toList();
-+
-+    for (var i = 0; i < remainingRooms.length; i++) {
-+      final r1 = remainingRooms[i];
-+      for (var j = i + 1; j < remainingRooms.length; j++) {
-+        final r2 = remainingRooms[j];
-+        final sim = BeeperFuzzyMatcher.computeRoomSimilarity(r1, r2);
-+        if (sim >= 0.70) {
-+          final key = 'fuzzy_${r1.id}_${r2.id}';
-+          groups.putIfAbsent(key, () => <Room>[r1, r2]);
++    // 5. Match candidate pairs that share significant tokens (e.g. shared surname)
++    for (final entry in tokenIndex.entries) {
++      final candidates = entry.value;
++      if (candidates.length >= 2 && candidates.length <= 8) {
++        for (var i = 0; i < candidates.length; i++) {
++          for (var j = i + 1; j < candidates.length; j++) {
++            final r1 = candidates[i];
++            final r2 = candidates[j];
++            if (r1.id == r2.id) continue;
++            final sim = BeeperFuzzyMatcher.computeRoomSimilarity(r1, r2);
++            if (sim >= 0.70) {
++              final key = 'fuzzy_${r1.id}_${r2.id}';
++              groups.putIfAbsent(key, () => <Room>[r1, r2]);
++            }
++          }
 +        }
 +      }
 +    }
@@ -351945,10 +352138,10 @@ index 0000000000000000000000000000000000000000..32bf0c688a62ac6f2524da2fd0882a08
 +}
 diff --git a/lib/utils/beeper_phone_contacts.dart b/lib/utils/beeper_phone_contacts.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ffd937da1b
+index 0000000000000000000000000000000000000000..f063047e0e87ba488b9003291180b4291c9020b3
 --- /dev/null
 +++ b/lib/utils/beeper_phone_contacts.dart
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,149 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -351956,6 +352149,8 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +import 'dart:typed_data';
 +import 'package:flutter/foundation.dart';
 +import 'package:flutter_contacts/flutter_contacts.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'beeper_bridge_utils.dart';
 +
 +class CachedPhoneContact {
 +  final String id;
@@ -351982,6 +352177,11 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +  static bool get isPermissionDenied => _permissionDenied;
 +  static List<CachedPhoneContact> get contacts => _contacts;
 +
++  static bool get isPermissionAsked {
++    final prefs = BeeperBridgeUtils.prefs;
++    return prefs?.getBool('beeper_contacts_permission_asked') ?? false;
++  }
++
 +  /// Normalize phone string: removes all non-digit characters, leading zeroes
 +  static String normalizePhone(String raw) {
 +    return raw
@@ -351999,8 +352199,10 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +      return false;
 +    }
 +
-+    if (!requestPermission) {
-+      // Don't query contacts or request permission unprompted at app start
++    final prefs = BeeperBridgeUtils.prefs ?? await SharedPreferences.getInstance();
++    final wasGranted = prefs.getBool('beeper_contacts_permission_granted') ?? false;
++
++    if (!requestPermission && !wasGranted) {
 +      return false;
 +    }
 +
@@ -352010,8 +352212,12 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +      if (!granted) {
 +        _permissionDenied = true;
 +        _isLoading = false;
++        await prefs.setBool('beeper_contacts_permission_granted', false);
 +        return false;
 +      }
++
++      await prefs.setBool('beeper_contacts_permission_granted', true);
++      await prefs.setBool('beeper_contacts_permission_asked', true);
 +
 +      final rawList = await FlutterContacts.getContacts(
 +        withProperties: true,
