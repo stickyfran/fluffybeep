@@ -302751,7 +302751,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e05cf4d3dc 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..142aa61b358fc46a6e90f488c28b4ab762036aec 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -302939,22 +302939,23 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
  
    Future<void> recreateChat() async {
      final room = this.room;
-@@ -234,6 +260,23 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -234,9 +260,29 @@ class ChatController extends State<ChatPageWithRoom>
      context.go('/rooms');
    }
  
 +
 +  bool _historyRequestScheduled = false;
-+  void scheduleHistoryRequest() {
++  void scheduleHistoryRequest({bool force = false}) {
 +    if (_historyRequestScheduled) return;
 +    _historyRequestScheduled = true;
 +    WidgetsBinding.instance.addPostFrameCallback((_) {
 +      _historyRequestScheduled = false;
 +      if (timeline?.canRequestHistory == true &&
 +          timeline?.isRequestingHistory == false &&
-+          scrollController.hasClients &&
-+          scrollController.position.pixels >=
-+              scrollController.position.maxScrollExtent - 200) {
++          (force ||
++              (scrollController.hasClients &&
++                  scrollController.position.pixels >=
++                      scrollController.position.maxScrollExtent - 200))) {
 +        requestHistory();
 +      }
 +    });
@@ -302963,7 +302964,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    Future<void> requestHistory([_]) async {
      Logs().v('Requesting history...');
      await timeline?.requestHistory(historyCount: _loadHistoryCount);
-@@ -271,9 +314,9 @@ class ChatController extends State<ChatPageWithRoom>
++    _invalidateTimelineCache();
++    timelineUpdateNotifier.value++;
+   }
+ 
+   Future<void> requestFuture() async {
+@@ -271,9 +317,9 @@ class ChatController extends State<ChatPageWithRoom>
      if (!scrollController.hasClients) return;
      if (timeline?.allowNewEvent == false ||
          scrollController.position.pixels > 0 && _scrolledUp == false) {
@@ -302975,7 +302981,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
        setReadMarker();
      }
    }
-@@ -401,13 +444,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -401,13 +447,7 @@ class ChatController extends State<ChatPageWithRoom>
        AppSettings.displayChatDetailsColumn.value,
      );
  
@@ -302990,7 +302996,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
  
      sendingClient = Matrix.of(context).client;
      final lastEventThreadId =
-@@ -428,17 +465,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -428,17 +468,17 @@ class ChatController extends State<ChatPageWithRoom>
        threadId: activeThreadId,
      );
      final start = events.indexOf(event);
@@ -303018,16 +303024,24 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,6 +483,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,6 +486,16 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
 +      _invalidateTimelineCache();
 +      timelineUpdateNotifier.value++;
++
++      // If timeline is empty but can request history (e.g. un-cached or fresh room), fetch initial history automatically
++      if (filteredEvents.isEmpty && timeline?.canRequestHistory == true) {
++        await timeline?.requestHistory(historyCount: _loadHistoryCount);
++        _invalidateTimelineCache();
++        timelineUpdateNotifier.value++;
++      }
++
        // We launched the chat with a given initial event ID:
        if (initialEventId != null) {
          scrollToEventId(initialEventId);
-@@ -454,30 +493,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -454,30 +504,17 @@ class ChatController extends State<ChatPageWithRoom>
  
        var readMarkerEventIndex = readMarkerEventId.isEmpty
            ? -1
@@ -303062,19 +303076,19 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
          _showScrollUpMaterialBanner(readMarkerEventId);
        }
  
-@@ -491,15 +517,20 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -491,15 +528,20 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -303088,7 +303102,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
  
    String? animateInEventId;
  
-@@ -512,10 +543,115 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -512,10 +554,115 @@ class ChatController extends State<ChatPageWithRoom>
      if (animateInEventId == eventId) animateInEventId = null;
    }
  
@@ -303206,7 +303220,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +660,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +671,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -303214,7 +303228,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +668,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +679,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -303233,7 +303247,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +695,148 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +706,148 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -303434,7 +303448,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      super.dispose();
    }
  
-@@ -696,12 +892,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,12 +903,6 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -303447,7 +303461,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      // ignore: unawaited_futures
      room.sendTextEvent(
        sendController.text,
-@@ -710,17 +900,33 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,17 +911,33 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -303487,7 +303501,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      });
    }
  
-@@ -883,60 +1089,100 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1100,100 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -303634,7 +303648,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1191,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1202,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -303649,7 +303663,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      }
    }
  
-@@ -964,21 +1210,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1221,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -303682,7 +303696,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1254,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1265,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -303695,7 +303709,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1271,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1282,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -303704,7 +303718,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1328,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1339,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -303717,7 +303731,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1144,7 +1391,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1144,7 +1402,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -303726,7 +303740,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1405,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1416,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -303744,7 +303758,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1507,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1518,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -303758,7 +303772,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1539,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1550,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -303767,7 +303781,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1605,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1616,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -303782,7 +303796,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1463,27 +1708,33 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,27 +1719,33 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -303831,7 +303845,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
      }
  
      _storeInputTimeoutTimer?.cancel();
-@@ -1498,9 +1749,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +1760,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -303842,7 +303856,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
            return;
          }
        }
-@@ -1527,8 +1776,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +1787,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -303851,7 +303865,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ba0a64f2c75ac848f235b985ca0db5e0
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +1830,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +1841,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304547,7 +304561,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..05bc0c06db41594bcda68b5f29739502
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..f8cbb47827ed62421e174e59d127f21695aa84cd 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..c624a0742d91b2403a5250a42f3ebc2ce7107df1 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -304708,7 +304722,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..f8cbb47827ed62421e174e59d127f216
                  );
                }
  
-@@ -110,14 +141,8 @@ class ChatEventList extends StatelessWidget {
+@@ -110,23 +141,21 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -304719,13 +304733,31 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..f8cbb47827ed62421e174e59d127f216
 -                    if (visibleIndex > timeline.events.length - 50) {
 -                      WidgetsBinding.instance.addPostFrameCallback(
 -                        controller.requestHistory,
--                      );
-+                    if (events.length > 0 && !timeline.isRequestingHistory) {
-+                      controller.scheduleHistoryRequest();
++                    if (!timeline.isRequestingHistory) {
++                      controller.scheduleHistoryRequest(force: events.isEmpty);
++                    }
++                    if (events.isEmpty || timeline.isRequestingHistory) {
++                      return const Padding(
++                        padding: EdgeInsets.symmetric(vertical: 24.0),
++                        child: Center(
++                          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
++                        ),
+                       );
                      }
                      return Center(
                        child: TextButton.icon(
-@@ -164,82 +189,88 @@ class ChatEventList extends StatelessWidget {
+-                        onPressed: timeline.isRequestingHistory
+-                            ? null
+-                            : controller.requestHistory,
+-                        icon: timeline.isRequestingHistory
+-                            ? CircularProgressIndicator.adaptive(strokeWidth: 2)
+-                            : const Icon(Icons.arrow_upward_outlined),
++                        onPressed: controller.requestHistory,
++                        icon: const Icon(Icons.arrow_upward_outlined),
+                         label: Text(L10n.of(context).loadMore),
+                       ),
+                     );
+@@ -164,82 +193,88 @@ class ChatEventList extends StatelessWidget {
                  index: i,
                  controller: controller.scrollController,
                  child: Column(
@@ -304882,7 +304914,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..f8cbb47827ed62421e174e59d127f216
                );
              },
              childCount: events.length + 2,
-@@ -248,6 +279,8 @@ class ChatEventList extends StatelessWidget {
+@@ -248,6 +283,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
        ),
