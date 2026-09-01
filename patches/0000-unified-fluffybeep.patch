@@ -32564,10 +32564,10 @@ index 2d0f798acca84988f3dc06d66672e88da46902bc..8a37e1b83d78a3cec07303def16b999b
 +/q4AaOeMSQ+2b1tbFfLn
 +-----END CERTIFICATE-----''';
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index bd83769b216b413ef00b18bfe7b7867a7d17028e..77028fce9b50e675111f05761f9fe831cda35dc2 100644
+index bd83769b216b413ef00b18bfe7b7867a7d17028e..3f420be5d135bad576b768f0b436dc01c0584f0d 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
-@@ -1,528 +1,578 @@
+@@ -1,528 +1,590 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -33125,6 +33125,7 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..77028fce9b50e675111f05761f9fe831
 +import 'package:fluffychat/pages/settings_tags/settings_tags.dart';
 +import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart' deferred as settings_3pid;
 +import 'package:fluffychat/pages/settings_chat/settings_chat.dart' deferred as settings_chat;
++import 'package:fluffychat/pages/settings_chat/merged_contacts_settings.dart' deferred as settings_merged_contacts;
 +import 'package:fluffychat/pages/settings_emotes/settings_emotes.dart' deferred as settings_emotes;
 +import 'package:fluffychat/pages/settings_homeserver/settings_homeserver.dart' deferred as settings_homeserver;
 +import 'package:fluffychat/pages/settings_ignore_list/settings_ignore_list.dart' deferred as settings_ignore_list;
@@ -33381,6 +33382,17 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..77028fce9b50e675111f05761f9fe831
 +                        DeferredWidget(libraryLoader: settings_chat.loadLibrary, createWidget: () => settings_chat.SettingsChat()),
 +                      ),
 +                      routes: [
++                        GoRoute(
++                          path: 'merged_contacts',
++                          pageBuilder: (context, state) => defaultPageBuilder(
++                            context,
++                            state,
++                            DeferredWidget(
++                              libraryLoader: settings_merged_contacts.loadLibrary,
++                              createWidget: () => const settings_merged_contacts.MergedContactsSettings(),
++                            ),
++                          ),
++                        ),
 +                        GoRoute(
 +                          path: 'emotes',
 +                          pageBuilder: (context, state) => defaultPageBuilder(
@@ -33675,10 +33687,10 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..77028fce9b50e675111f05761f9fe831
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..acc1b0617b433bf103f44b5473897b68fefbf3c1 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..2551c02fc8dca1ec8021fa06753fd699b7815274 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,224 +1,219 @@
+@@ -1,224 +1,220 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -33984,7 +33996,8 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..acc1b0617b433bf103f44b5473897b68
 +  whisperModel<String>('chat.fluffy.whisper_model', 'base'),
 +  whisperLang<String>('chat.fluffy.whisper_lang', 'es'),
 +  whisperPrompt<String>('chat.fluffy.whisper_prompt', 'Transcripción de audio en español rioplatense (Argentina).'),
-+  searchStyle<String>('chat.fluffy.search_style', 'bottom_fab');
++  searchStyle<String>('chat.fluffy.search_style', 'bottom_fab'),
++  hideNetworkPrefixInNotification<bool>('beeper.hide_network_prefix_in_notification', true);
 +
 +  final String key;
 +  final T defaultValue;
@@ -320259,10 +320272,10 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..8d7478abad164498f8748e3c5d038734
 +  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..9a5b7fc7d64a67da17c2ec0b021bcf397e0d1a5b 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..2c2b0c4f65cd6a5e97e08d3eb6d2269db34840bf 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -3,224 +3,450 @@
+@@ -3,224 +3,453 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -320432,12 +320445,15 @@ index 8610b92531be84898e03439fa07f16145a6d552c..9a5b7fc7d64a67da17c2ec0b021bcf39
 +          }).toList();
 +        }
 +
++        final isSearching = filter.isNotEmpty || widget.controller.isSearchMode;
 +        var mergedEntries = widget.controller.mergedContactEntries.values.where((entry) {
-+          if (widget.controller.activeFilter == ActiveFilter.groups) return false;
-+          if (widget.controller.activeFilter == ActiveFilter.unread && entry.totalUnread <= 0) return false;
-+          if (widget.controller.activeFilter == ActiveFilter.tag) {
-+            final tag = widget.controller.activeTag;
-+            if (tag == null || !entry.rooms.any((r) => r.tags.containsKey(tag))) return false;
++          if (!isSearching) {
++            if (widget.controller.activeFilter == ActiveFilter.groups) return false;
++            if (widget.controller.activeFilter == ActiveFilter.unread && entry.totalUnread <= 0) return false;
++            if (widget.controller.activeFilter == ActiveFilter.tag) {
++              final tag = widget.controller.activeTag;
++              if (tag == null || !entry.rooms.any((r) => r.tags.containsKey(tag))) return false;
++            }
 +          }
 +          if (isVirtualSpace) {
 +            final virtualNetKey = activeSpace!.replaceFirst('virtual_space_', '');
@@ -320868,7 +320884,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..9a5b7fc7d64a67da17c2ec0b021bcf39
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +461,53 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +464,53 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -334334,10 +334350,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df07813633241849881
+index 0000000000000000000000000000000000000000..aea11f5e1db46b96b5ee5cfec34bfcd34a332d48
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,447 @@
+@@ -0,0 +1,518 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334373,26 +334389,47 @@ index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df078136332
 +  State<MergeContactPicker> createState() => _MergeContactPickerState();
 +}
 +
++class _MergePickerRoomItem {
++  final Room room;
++  final String displayName;
++  final String searchKey;
++  final BeeperNetwork? network;
++  final Uri? avatarUrl;
++
++  const _MergePickerRoomItem({
++    required this.room,
++    required this.displayName,
++    required this.searchKey,
++    required this.network,
++    required this.avatarUrl,
++  });
++}
++
 +class _MergeContactPickerState extends State<MergeContactPicker> {
 +  final Set<String> _selectedRoomIds = <String>{};
 +  final TextEditingController _searchController = TextEditingController();
 +  final TextEditingController _nameController = TextEditingController();
++  final ValueNotifier<String> _searchFilterNotifier = ValueNotifier<String>('');
 +
 +  String? _matchedPhoneContactId;
-+  String _searchFilter = '';
 +  bool _isLoadingContacts = false;
 +  String? _existingMergeId;
++
++  List<_MergePickerRoomItem> _allRoomItems = const [];
++  List<List<Room>> _suggestions = const [];
 +
 +  @override
 +  void initState() {
 +    super.initState();
++    final client = widget.initialRoom.client;
++
 +    _existingMergeId = BeeperMergeUtils.getMergeIdForRoom(widget.initialRoom.id);
 +    if (_existingMergeId != null) {
 +      final siblings = BeeperMergeUtils.getSiblingRooms(widget.initialRoom.id);
 +      for (final s in siblings) {
 +        _selectedRoomIds.add(s.id);
 +      }
-+      final mc = BeeperMergeUtils.getMergedContacts(widget.initialRoom.client)[_existingMergeId];
++      final mc = BeeperMergeUtils.getMergedContacts(client)[_existingMergeId];
 +      if (mc != null) {
 +        _nameController.text = mc.displayName;
 +        _matchedPhoneContactId = mc.phoneContactId;
@@ -334403,18 +334440,56 @@ index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df078136332
 +      _nameController.text = initialData.displayName ?? widget.initialRoom.name;
 +    }
 +
++    _buildCachedRoomItems();
++    _computeSuggestions();
++
 +    _searchController.addListener(() {
-+      setState(() {
-+        _searchFilter = _searchController.text.trim().toLowerCase();
-+      });
++      final text = _searchController.text.trim().toLowerCase();
++      if (_searchFilterNotifier.value != text) {
++        _searchFilterNotifier.value = text;
++      }
 +    });
 +
 +    _initPhoneContacts();
 +  }
 +
++  void _buildCachedRoomItems() {
++    final client = widget.initialRoom.client;
++    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
++    final items = <_MergePickerRoomItem>[];
++
++    for (final room in nonSpaceRooms) {
++      final data = BeeperBridgeUtils.getRoomData(room);
++      final dName = data.displayName ?? room.name;
++      final net = BeeperBridgeUtils.getRoomNetwork(room);
++      final netKey = (data.networkKey ?? '').toLowerCase();
++      final searchKey = '${dName.toLowerCase()} $netKey ${room.id.toLowerCase()}';
++
++      items.add(_MergePickerRoomItem(
++        room: room,
++        displayName: dName,
++        searchKey: searchKey,
++        network: net,
++        avatarUrl: data.avatarUrl,
++      ));
++    }
++
++    _allRoomItems = items;
++  }
++
++  void _computeSuggestions() {
++    final client = widget.initialRoom.client;
++    _suggestions = BeeperMergeUtils.getSuggestedMerges(
++      client,
++      BeeperPhoneContacts.isLoaded ? BeeperPhoneContacts.contacts : null,
++    );
++  }
++
 +  Future<void> _initPhoneContacts() async {
 +    if (BeeperPhoneContacts.isLoaded) {
 +      _checkPhoneMatch();
++      _computeSuggestions();
++      if (mounted) setState(() {});
 +    }
 +  }
 +
@@ -334445,6 +334520,7 @@ index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df078136332
 +  void dispose() {
 +    _searchController.dispose();
 +    _nameController.dispose();
++    _searchFilterNotifier.dispose();
 +    super.dispose();
 +  }
 +
@@ -334453,6 +334529,7 @@ index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df078136332
 +    await BeeperPhoneContacts.load(requestPermission: true);
 +    if (mounted) {
 +      _checkPhoneMatch();
++      _computeSuggestions();
 +      setState(() => _isLoadingContacts = false);
 +    }
 +  }
@@ -334492,295 +334569,305 @@ index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df078136332
 +  @override
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
-+    final client = Matrix.of(context).client;
-+    final allRooms = client.rooms
-+        .where((r) => !r.isSpace)
-+        .toList();
-+
-+    final filteredRooms = allRooms.where((r) {
-+      if (_searchFilter.isEmpty) return true;
-+      final data = BeeperBridgeUtils.getRoomData(r);
-+      final name = (data.displayName ?? r.name).toLowerCase();
-+      final net = (data.networkKey ?? '').toLowerCase();
-+      return name.contains(_searchFilter) || net.contains(_searchFilter);
-+    }).toList();
-+
-+    final suggestions = BeeperMergeUtils.getSuggestedMerges(
-+      client,
-+      BeeperPhoneContacts.isLoaded ? BeeperPhoneContacts.contacts : null,
-+    );
-+
 +    final isEditing = _existingMergeId != null;
 +
-+    return Container(
-+      height: MediaQuery.sizeOf(context).height * 0.88,
-+      decoration: BoxDecoration(
-+        color: theme.colorScheme.surface,
-+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-+      ),
-+      child: Column(
-+        children: [
-+          // Drag handle
-+          Center(
-+            child: Container(
-+              margin: const EdgeInsets.only(top: 10, bottom: 6),
-+              width: 36,
-+              height: 4,
-+              decoration: BoxDecoration(
-+                color: theme.dividerColor,
-+                borderRadius: BorderRadius.circular(2),
-+              ),
-+            ),
-+          ),
-+
-+          // Header
-+          Padding(
-+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-+            child: Row(
-+              children: [
-+                Icon(Icons.merge_type, color: theme.colorScheme.primary),
-+                const SizedBox(width: 10),
-+                Expanded(
-+                  child: Text(
-+                    isEditing ? 'Editar contacto fusionado' : 'Fusionar cuentas y chats',
-+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-+                  ),
++    return Padding(
++      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
++      child: Container(
++        height: MediaQuery.sizeOf(context).height * 0.88,
++        decoration: BoxDecoration(
++          color: theme.colorScheme.surface,
++          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
++        ),
++        child: Column(
++          children: [
++            // Drag handle
++            Center(
++              child: Container(
++                margin: const EdgeInsets.only(top: 10, bottom: 6),
++                width: 36,
++                height: 4,
++                decoration: BoxDecoration(
++                  color: theme.dividerColor,
++                  borderRadius: BorderRadius.circular(2),
 +                ),
-+                if (isEditing)
-+                  TextButton.icon(
-+                    style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
-+                    icon: const Icon(Icons.link_off, size: 18),
-+                    label: const Text('Desfusionar'),
-+                    onPressed: _unmerge,
-+                  ),
-+              ],
-+            ),
-+          ),
-+
-+          // Name field
-+          Padding(
-+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-+            child: TextField(
-+              controller: _nameController,
-+              decoration: InputDecoration(
-+                labelText: 'Nombre del contacto unificado',
-+                prefixIcon: const Icon(Icons.person_outline),
-+                border: const OutlineInputBorder(),
-+                filled: true,
-+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-+                suffixIcon: _matchedPhoneContactId != null
-+                    ? const Tooltip(
-+                        message: 'Vinculado a agenda del teléfono',
-+                        child: Icon(Icons.contact_phone, color: Colors.green),
-+                      )
-+                    : null,
 +              ),
 +            ),
-+          ),
 +
-+          // Contacts permission banner if not loaded
-+          if (!BeeperPhoneContacts.isLoaded)
++            // Header
++            Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++              child: Row(
++                children: [
++                  Icon(Icons.merge_type, color: theme.colorScheme.primary),
++                  const SizedBox(width: 10),
++                  Expanded(
++                    child: Text(
++                      isEditing ? 'Editar contacto fusionado' : 'Fusionar cuentas y chats',
++                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
++                    ),
++                  ),
++                  if (isEditing)
++                    TextButton.icon(
++                      style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
++                      icon: const Icon(Icons.link_off, size: 18),
++                      label: const Text('Desfusionar'),
++                      onPressed: _unmerge,
++                    ),
++                ],
++              ),
++            ),
++
++            // Name field
 +            Padding(
 +              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-+              child: Card(
-+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-+                child: ListTile(
-+                  dense: true,
-+                  leading: const Icon(Icons.contacts_outlined),
-+                  title: const Text(
-+                    'Vincular con tu agenda telefónica',
-+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-+                  ),
-+                  subtitle: const Text(
-+                    'Detecta automáticamente números de WhatsApp coincidentes',
-+                    style: TextStyle(fontSize: 11),
-+                  ),
-+                  trailing: _isLoadingContacts
-+                      ? const SizedBox(
-+                          width: 20,
-+                          height: 20,
-+                          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
++              child: TextField(
++                controller: _nameController,
++                decoration: InputDecoration(
++                  labelText: 'Nombre del contacto unificado',
++                  prefixIcon: const Icon(Icons.person_outline),
++                  border: const OutlineInputBorder(),
++                  filled: true,
++                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
++                  suffixIcon: _matchedPhoneContactId != null
++                      ? const Tooltip(
++                          message: 'Vinculado a agenda del teléfono',
++                          child: Icon(Icons.contact_phone, color: Colors.green),
 +                        )
-+                      : TextButton(
-+                          onPressed: _requestPhonePermission,
-+                          child: const Text('Vincular'),
-+                        ),
++                      : null,
 +                ),
 +              ),
 +            ),
 +
-+          // Suggestions section (if any)
-+          if (suggestions.isNotEmpty && _searchFilter.isEmpty && !isEditing) ...[
-+            Padding(
-+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-+              child: Align(
-+                alignment: Alignment.centerLeft,
-+                child: Text(
-+                  'Sugerencias automáticas',
-+                  style: theme.textTheme.labelLarge?.copyWith(
-+                    color: theme.colorScheme.primary,
-+                    fontWeight: FontWeight.bold,
++            // Contacts permission banner if not loaded
++            if (!BeeperPhoneContacts.isLoaded)
++              Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
++                child: Card(
++                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
++                  child: ListTile(
++                    dense: true,
++                    leading: const Icon(Icons.contacts_outlined),
++                    title: const Text(
++                      'Vincular con tu agenda telefónica',
++                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
++                    ),
++                    subtitle: const Text(
++                      'Detecta automáticamente números de WhatsApp coincidentes',
++                      style: TextStyle(fontSize: 11),
++                    ),
++                    trailing: _isLoadingContacts
++                        ? const SizedBox(
++                            width: 20,
++                            height: 20,
++                            child: CircularProgressIndicator.adaptive(strokeWidth: 2),
++                          )
++                        : TextButton(
++                            onPressed: _requestPhonePermission,
++                            child: const Text('Vincular'),
++                          ),
 +                  ),
 +                ),
 +              ),
-+            ),
-+            SizedBox(
-+              height: 52,
-+              child: ListView.builder(
-+                scrollDirection: Axis.horizontal,
-+                padding: const EdgeInsets.symmetric(horizontal: 12),
-+                itemCount: suggestions.length,
-+                itemBuilder: (context, i) {
-+                  final group = suggestions[i];
-+                  final firstName = BeeperBridgeUtils.getRoomData(group.first).displayName ?? group.first.name;
-+                  return Padding(
-+                    padding: const EdgeInsets.only(right: 8),
-+                    child: ActionChip(
-+                      avatar: const Icon(Icons.auto_awesome, size: 16),
-+                      label: Text('$firstName (${group.length} chats)'),
-+                      onPressed: () {
-+                        setState(() {
-+                          _selectedRoomIds.addAll(group.map((r) => r.id));
-+                          if (_nameController.text.isEmpty) {
-+                            _nameController.text = firstName;
-+                          }
-+                          _checkPhoneMatch();
-+                        });
-+                      },
++
++            // Suggestions section (if any)
++            if (_suggestions.isNotEmpty && !isEditing)
++              ValueListenableBuilder<String>(
++                valueListenable: _searchFilterNotifier,
++                builder: (context, filter, _) {
++                  if (filter.isNotEmpty) return const SizedBox.shrink();
++                  return Column(
++                    mainAxisSize: MainAxisSize.min,
++                    children: [
++                      Padding(
++                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
++                        child: Align(
++                          alignment: Alignment.centerLeft,
++                          child: Text(
++                            'Sugerencias automáticas',
++                            style: theme.textTheme.labelLarge?.copyWith(
++                              color: theme.colorScheme.primary,
++                              fontWeight: FontWeight.bold,
++                            ),
++                          ),
++                        ),
++                      ),
++                      SizedBox(
++                        height: 52,
++                        child: ListView.builder(
++                          scrollDirection: Axis.horizontal,
++                          padding: const EdgeInsets.symmetric(horizontal: 12),
++                          itemCount: _suggestions.length,
++                          itemBuilder: (context, i) {
++                            final group = _suggestions[i];
++                            final firstName = BeeperBridgeUtils.getRoomData(group.first).displayName ?? group.first.name;
++                            return Padding(
++                              padding: const EdgeInsets.only(right: 8),
++                              child: ActionChip(
++                                avatar: const Icon(Icons.auto_awesome, size: 16),
++                                label: Text('$firstName (${group.length} chats)'),
++                                onPressed: () {
++                                  setState(() {
++                                    _selectedRoomIds.addAll(group.map((r) => r.id));
++                                    if (_nameController.text.isEmpty) {
++                                      _nameController.text = firstName;
++                                    }
++                                    _checkPhoneMatch();
++                                  });
++                                },
++                              ),
++                            );
++                          },
++                        ),
++                      ),
++                    ],
++                  );
++                },
++              ),
++
++            // Search bar
++            Padding(
++              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
++              child: ValueListenableBuilder<String>(
++                valueListenable: _searchFilterNotifier,
++                builder: (context, filter, _) {
++                  return TextField(
++                    controller: _searchController,
++                    decoration: InputDecoration(
++                      hintText: 'Buscar cuentas o chats para vincular...',
++                      prefixIcon: const Icon(Icons.search),
++                      suffixIcon: filter.isNotEmpty
++                          ? IconButton(
++                              icon: const Icon(Icons.clear),
++                              onPressed: () => _searchController.clear(),
++                            )
++                          : null,
++                      isDense: true,
++                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
 +                    ),
 +                  );
 +                },
 +              ),
 +            ),
-+          ],
 +
-+          // Search bar
-+          Padding(
-+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-+            child: TextField(
-+              controller: _searchController,
-+              decoration: InputDecoration(
-+                hintText: 'Buscar cuentas o chats para vincular...',
-+                prefixIcon: const Icon(Icons.search),
-+                suffixIcon: _searchFilter.isNotEmpty
-+                    ? IconButton(
-+                        icon: const Icon(Icons.clear),
-+                        onPressed: () => _searchController.clear(),
-+                      )
-+                    : null,
-+                isDense: true,
-+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
++            // Selection summary chip
++            Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
++              child: Row(
++                children: [
++                  Text(
++                    'Chats seleccionados: ${_selectedRoomIds.length}',
++                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
++                  ),
++                  const Spacer(),
++                  if (_selectedRoomIds.length >= 2)
++                    Text(
++                      'Listo para fusionar',
++                      style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
++                    ),
++                ],
 +              ),
 +            ),
-+          ),
 +
-+          // Selection summary chip
-+          Padding(
-+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-+            child: Row(
-+              children: [
-+                Text(
-+                  'Chats seleccionados: ${_selectedRoomIds.length}',
-+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-+                ),
-+                const Spacer(),
-+                if (_selectedRoomIds.length >= 2)
-+                  Text(
-+                    'Listo para fusionar',
-+                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-+                  ),
-+              ],
-+            ),
-+          ),
++            // Rooms list (ValueListenableBuilder allows reactive search with zero whole-sheet rebuilds)
++            Expanded(
++              child: ValueListenableBuilder<String>(
++                valueListenable: _searchFilterNotifier,
++                builder: (context, filter, _) {
++                  final filteredItems = filter.isEmpty
++                      ? _allRoomItems
++                      : _allRoomItems.where((item) => item.searchKey.contains(filter)).toList();
 +
-+          // Rooms list
-+          Expanded(
-+            child: ListView.builder(
-+              itemCount: filteredRooms.length,
-+              itemBuilder: (context, index) {
-+                final room = filteredRooms[index];
-+                final isSelected = _selectedRoomIds.contains(room.id);
-+                final beeperData = BeeperBridgeUtils.getRoomData(room);
-+                final network = BeeperBridgeUtils.getRoomNetwork(room);
-+                final displayname = beeperData.displayName ?? room.name;
++                  return ListView.builder(
++                    itemCount: filteredItems.length,
++                    addRepaintBoundaries: true,
++                    addAutomaticKeepAlives: false,
++                    itemBuilder: (context, index) {
++                      final item = filteredItems[index];
++                      final isSelected = _selectedRoomIds.contains(item.room.id);
++                      final network = item.network;
++                      final displayname = item.displayName;
 +
-+                return CheckboxListTile(
-+                  value: isSelected,
-+                  onChanged: (checked) {
-+                    setState(() {
-+                      if (checked == true) {
-+                        _selectedRoomIds.add(room.id);
-+                      } else {
-+                        _selectedRoomIds.remove(room.id);
-+                      }
-+                      _checkPhoneMatch();
-+                    });
-+                  },
-+                  secondary: Stack(
-+                    clipBehavior: Clip.none,
-+                    children: [
-+                      Avatar(
-+                        mxContent: beeperData.avatarUrl,
-+                        name: displayname,
-+                        size: 36,
-+                      ),
-+                      if (network != null)
-+                        Positioned(
-+                          bottom: -2,
-+                          right: -2,
-+                          child: Container(
-+                            width: 12,
-+                            height: 12,
-+                            decoration: BoxDecoration(
-+                              shape: BoxShape.circle,
-+                              color: Color(network.colorHex),
-+                              border: Border.all(
-+                                color: theme.colorScheme.surface,
-+                                width: 1.5,
-+                              ),
++                      return CheckboxListTile(
++                        value: isSelected,
++                        onChanged: (checked) {
++                          setState(() {
++                            if (checked == true) {
++                              _selectedRoomIds.add(item.room.id);
++                            } else {
++                              _selectedRoomIds.remove(item.room.id);
++                            }
++                            _checkPhoneMatch();
++                          });
++                        },
++                        secondary: Stack(
++                          clipBehavior: Clip.none,
++                          children: [
++                            Avatar(
++                              mxContent: item.avatarUrl,
++                              name: displayname,
++                              size: 36,
 +                            ),
++                            if (network != null)
++                              Positioned(
++                                bottom: -2,
++                                right: -2,
++                                child: Container(
++                                  width: 12,
++                                  height: 12,
++                                  decoration: BoxDecoration(
++                                    shape: BoxShape.circle,
++                                    color: Color(network.colorHex),
++                                    border: Border.all(
++                                      color: theme.colorScheme.surface,
++                                      width: 1.5,
++                                    ),
++                                  ),
++                                ),
++                              ),
++                          ],
++                        ),
++                        title: Text(
++                          displayname,
++                          maxLines: 1,
++                          overflow: TextOverflow.ellipsis,
++                          style: TextStyle(
++                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
 +                          ),
 +                        ),
-+                    ],
-+                  ),
-+                  title: Text(
-+                    displayname,
-+                    maxLines: 1,
-+                    overflow: TextOverflow.ellipsis,
-+                    style: TextStyle(
-+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-+                    ),
-+                  ),
-+                  subtitle: Text(
-+                    network != null ? '${network.name} • ${room.id}' : room.id,
-+                    maxLines: 1,
-+                    overflow: TextOverflow.ellipsis,
-+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
-+                  ),
-+                );
-+              },
++                        subtitle: Text(
++                          network != null ? '${network.name} • ${item.room.id}' : item.room.id,
++                          maxLines: 1,
++                          overflow: TextOverflow.ellipsis,
++                          style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
++                        ),
++                      );
++                    },
++                  );
++                },
++              ),
 +            ),
-+          ),
 +
-+          // Bottom Action Bar
-+          SafeArea(
-+            child: Padding(
-+              padding: const EdgeInsets.all(16),
-+              child: FilledButton.icon(
-+                style: FilledButton.styleFrom(
-+                  minimumSize: const Size.fromHeight(48),
-+                ),
-+                onPressed: _selectedRoomIds.length >= 2 ? _saveMerge : null,
-+                icon: const Icon(Icons.check_circle_outline),
-+                label: Text(
-+                  _selectedRoomIds.length < 2
-+                      ? 'Selecciona al menos 2 chats para unir'
-+                      : 'Guardar contacto unificado (${_selectedRoomIds.length} chats)',
++            // Bottom Action Bar
++            SafeArea(
++              child: Padding(
++                padding: const EdgeInsets.all(16),
++                child: FilledButton.icon(
++                  style: FilledButton.styleFrom(
++                    minimumSize: const Size.fromHeight(48),
++                  ),
++                  onPressed: _selectedRoomIds.length >= 2 ? _saveMerge : null,
++                  icon: const Icon(Icons.check_circle_outline),
++                  label: Text(
++                    _selectedRoomIds.length < 2
++                        ? 'Selecciona al menos 2 chats para unir'
++                        : 'Guardar contacto unificado (${_selectedRoomIds.length} chats)',
++                  ),
 +                ),
 +              ),
 +            ),
-+          ),
-+        ],
++          ],
++        ),
 +      ),
 +    );
 +  }
@@ -338782,6 +338869,341 @@ index 627a2ed7a0fe8b069cce1b08768ef1d7159a8c64..8a74184d8cbd563106ee874ee9f6a1d5
 +    }
 +  }
 +}
+diff --git a/lib/pages/settings_chat/merged_contacts_settings.dart b/lib/pages/settings_chat/merged_contacts_settings.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..916cc8e1e6299c2b35e794e0d91dea7d8502e28e
+--- /dev/null
++++ b/lib/pages/settings_chat/merged_contacts_settings.dart
+@@ -0,0 +1,329 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import '../../config/themes.dart';
++import '../../utils/beeper_bridge_utils.dart';
++import '../../utils/beeper_merge_utils.dart';
++import '../../utils/beeper_phone_contacts.dart';
++import '../../widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
++import '../../widgets/avatar.dart';
++import '../../widgets/layouts/max_width_body.dart';
++import '../../widgets/matrix.dart';
++import '../merge_contact_picker/merge_contact_picker.dart';
++
++class MergedContactsSettings extends StatefulWidget {
++  const MergedContactsSettings({super.key});
++
++  @override
++  State<MergedContactsSettings> createState() => _MergedContactsSettingsState();
++}
++
++class _MergedContactsSettingsState extends State<MergedContactsSettings> {
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final client = Matrix.of(context).client;
++    final mergedContacts = BeeperMergeUtils.getMergedContacts(client).values.toList();
++
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Contactos fusionados'),
++        automaticallyImplyLeading: !FluffyThemes.isColumnMode(context),
++        centerTitle: FluffyThemes.isColumnMode(context),
++      ),
++      floatingActionButton: FloatingActionButton.extended(
++        onPressed: () => _pickRoomToMerge(context, client),
++        icon: const Icon(Icons.add_link),
++        label: const Text('Fusionar chats'),
++      ),
++      body: MaxWidthBody(
++        child: mergedContacts.isEmpty
++            ? Center(
++                child: Padding(
++                  padding: const EdgeInsets.all(32.0),
++                  child: Column(
++                    mainAxisAlignment: MainAxisAlignment.center,
++                    children: [
++                      Icon(
++                        Icons.merge_type,
++                        size: 80,
++                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
++                      ),
++                      const SizedBox(height: 16),
++                      Text(
++                        'No tienes contactos fusionados',
++                        style: theme.textTheme.titleMedium?.copyWith(
++                          fontWeight: FontWeight.bold,
++                        ),
++                      ),
++                      const SizedBox(height: 8),
++                      Text(
++                        'Puedes unificar chats de una misma persona en diferentes redes (WhatsApp, Telegram, Signal, etc.) en una sola conversación.',
++                        textAlign: TextAlign.center,
++                        style: theme.textTheme.bodyMedium?.copyWith(
++                          color: theme.colorScheme.outline,
++                        ),
++                      ),
++                      const SizedBox(height: 24),
++                      FilledButton.icon(
++                        onPressed: () => _pickRoomToMerge(context, client),
++                        icon: const Icon(Icons.add_link),
++                        label: const Text('Unificar un contacto'),
++                      ),
++                    ],
++                  ),
++                ),
++              )
++            : ListView.separated(
++                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
++                itemCount: mergedContacts.length,
++                separatorBuilder: (_, __) => Divider(color: theme.dividerColor.withValues(alpha: 0.5)),
++                itemBuilder: (context, index) {
++                  final contact = mergedContacts[index];
++                  final rooms = contact.roomIds
++                      .map((id) => client.getRoomById(id))
++                      .whereType<Room>()
++                      .toList();
++
++                  final phoneContact = contact.phoneContactId != null
++                      ? BeeperPhoneContacts.findById(contact.phoneContactId!)
++                      : null;
++
++                  final beeperData = rooms.isNotEmpty ? BeeperBridgeUtils.getRoomData(rooms.first) : null;
++                  final displayName = contact.displayName.isNotEmpty
++                      ? contact.displayName
++                      : (beeperData?.displayName ?? (rooms.isNotEmpty ? rooms.first.name : 'Contacto'));
++
++                  final networks = <BeeperNetwork>[];
++                  final seenNetKeys = <String>{};
++                  for (final r in rooms) {
++                    final net = BeeperBridgeUtils.getRoomNetwork(r);
++                    if (net != null && seenNetKeys.add(net.key)) {
++                      networks.add(net);
++                    }
++                  }
++
++                  return ListTile(
++                    leading: SizedBox(
++                      width: 44,
++                      height: 44,
++                      child: Stack(
++                        clipBehavior: Clip.none,
++                        children: [
++                          if (phoneContact?.thumbnail != null)
++                            ClipRRect(
++                              borderRadius: BorderRadius.circular(22),
++                              child: Image.memory(
++                                phoneContact!.thumbnail!,
++                                width: 44,
++                                height: 44,
++                                fit: BoxFit.cover,
++                              ),
++                            )
++                          else
++                            Avatar(
++                              mxContent: beeperData?.avatarUrl,
++                              name: displayName,
++                              size: 44,
++                            ),
++                          Positioned(
++                            bottom: -2,
++                            right: -2,
++                            child: Row(
++                              mainAxisSize: MainAxisSize.min,
++                              children: networks.take(3).map((net) {
++                                return Container(
++                                  margin: const EdgeInsets.only(left: 1),
++                                  width: 10,
++                                  height: 10,
++                                  decoration: BoxDecoration(
++                                    shape: BoxShape.circle,
++                                    color: Color(net.colorHex),
++                                    border: Border.all(
++                                      color: theme.colorScheme.surface,
++                                      width: 1.5,
++                                    ),
++                                  ),
++                                );
++                              }).toList(),
++                            ),
++                          ),
++                        ],
++                      ),
++                    ),
++                    title: Row(
++                      children: [
++                        Expanded(
++                          child: Text(
++                            displayName,
++                            style: const TextStyle(fontWeight: FontWeight.bold),
++                            maxLines: 1,
++                            overflow: TextOverflow.ellipsis,
++                          ),
++                        ),
++                        Container(
++                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
++                          decoration: BoxDecoration(
++                            color: theme.colorScheme.primaryContainer,
++                            borderRadius: BorderRadius.circular(8),
++                          ),
++                          child: Text(
++                            '${contact.roomIds.length} chats',
++                            style: TextStyle(
++                              fontSize: 11,
++                              fontWeight: FontWeight.bold,
++                              color: theme.colorScheme.onPrimaryContainer,
++                            ),
++                          ),
++                        ),
++                      ],
++                    ),
++                    subtitle: Text(
++                      rooms.map((r) {
++                        final net = BeeperBridgeUtils.getRoomNetwork(r);
++                        return net?.name ?? r.name;
++                      }).join(' • '),
++                      maxLines: 1,
++                      overflow: TextOverflow.ellipsis,
++                      style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
++                    ),
++                    trailing: PopupMenuButton<String>(
++                      icon: const Icon(Icons.more_vert),
++                      onSelected: (action) async {
++                        if (action == 'edit' && rooms.isNotEmpty) {
++                          await showMergeContactPicker(context, rooms.first);
++                          if (mounted) setState(() {});
++                        } else if (action == 'unmerge') {
++                          final consent = await showOkCancelAlertDialog(
++                            context: context,
++                            title: 'Desfusionar contacto',
++                            message: '¿Estás seguro de que quieres separar los chats de "$displayName"?',
++                            okLabel: 'Desfusionar',
++                            isDestructive: true,
++                          );
++                          if (consent == OkCancelResult.ok) {
++                            await BeeperMergeUtils.removeMerge(client, contact.id);
++                            if (mounted) setState(() {});
++                          }
++                        }
++                      },
++                      itemBuilder: (context) => [
++                        const PopupMenuItem(
++                          value: 'edit',
++                          child: Row(
++                            children: [
++                              Icon(Icons.edit_outlined),
++                              SizedBox(width: 12),
++                              Text('Editar chats'),
++                            ],
++                          ),
++                        ),
++                        PopupMenuItem(
++                          value: 'unmerge',
++                          child: Row(
++                            children: [
++                              Icon(Icons.link_off_outlined, color: theme.colorScheme.error),
++                              SizedBox(width: 12),
++                              Text('Desfusionar', style: TextStyle(color: theme.colorScheme.error)),
++                            ],
++                          ),
++                        ),
++                      ],
++                    ),
++                    onTap: () async {
++                      if (rooms.isNotEmpty) {
++                        await showMergeContactPicker(context, rooms.first);
++                        if (mounted) setState(() {});
++                      }
++                    },
++                  );
++                },
++              ),
++      ),
++    );
++  }
++
++  Future<void> _pickRoomToMerge(BuildContext context, Client client) async {
++    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
++    if (nonSpaceRooms.isEmpty) return;
++
++    final selectedRoom = await showDialog<Room>(
++      context: context,
++      builder: (ctx) {
++        String filterText = '';
++        return StatefulBuilder(
++          builder: (dialogCtx, setDialogState) {
++            final filtered = filterText.isEmpty
++                ? nonSpaceRooms
++                : nonSpaceRooms.where((r) {
++                    final data = BeeperBridgeUtils.getRoomData(r);
++                    final name = (data.displayName ?? r.name).toLowerCase();
++                    return name.contains(filterText.toLowerCase());
++                  }).toList();
++
++            return AlertDialog(
++              title: const Text('Seleccionar chat inicial'),
++              content: SizedBox(
++                width: double.maxFinite,
++                height: 400,
++                child: Column(
++                  children: [
++                    TextField(
++                      decoration: const InputDecoration(
++                        hintText: 'Buscar chat...',
++                        prefixIcon: Icon(Icons.search),
++                        isDense: true,
++                      ),
++                      onChanged: (text) {
++                        setDialogState(() {
++                          filterText = text;
++                        });
++                      },
++                    ),
++                    const SizedBox(height: 8),
++                    Expanded(
++                      child: ListView.builder(
++                        itemCount: filtered.length,
++                        itemBuilder: (context, index) {
++                          final r = filtered[index];
++                          final data = BeeperBridgeUtils.getRoomData(r);
++                          final net = BeeperBridgeUtils.getRoomNetwork(r);
++                          final dName = data.displayName ?? r.name;
++                          return ListTile(
++                            dense: true,
++                            leading: Avatar(
++                              mxContent: data.avatarUrl,
++                              name: dName,
++                              size: 32,
++                            ),
++                            title: Text(dName, maxLines: 1, overflow: TextOverflow.ellipsis),
++                            subtitle: Text(net?.name ?? r.id, maxLines: 1, overflow: TextOverflow.ellipsis),
++                            onTap: () => Navigator.of(ctx).pop(r),
++                          );
++                        },
++                      ),
++                    ),
++                  ],
++                ),
++              ),
++              actions: [
++                TextButton(
++                  onPressed: () => Navigator.of(ctx).pop(),
++                  child: const Text('Cancelar'),
++                ),
++              ],
++            );
++          },
++        );
++      },
++    );
++
++    if (selectedRoom != null && mounted) {
++      await showMergeContactPicker(context, selectedRoom);
++      if (mounted) setState(() {});
++    }
++  }
++}
 diff --git a/lib/pages/settings_chat/settings_chat.dart b/lib/pages/settings_chat/settings_chat.dart
 index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d62efbad79 100644
 --- a/lib/pages/settings_chat/settings_chat.dart
@@ -338832,10 +339254,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..681e91cb89b486cea990df30248799c4fe4d2f17 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..ae93419c48a900b383c51553c8506f6aca6055ed 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,193 @@
+@@ -1,181 +1,212 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -339100,6 +339522,25 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..681e91cb89b486cea990df30248799c4
 +                    await AppSettings.searchStyle.setItem(enabled ? 'bottom_fab' : 'top_bar');
 +                    setTileState(() {});
 +                  },
++                ),
++              ),
++              Divider(color: theme.dividerColor),
++              ListTile(
++                title: Text(
++                  'Contactos fusionados',
++                  style: TextStyle(
++                    color: theme.colorScheme.secondary,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++              ),
++              ListTile(
++                title: const Text('Gestionar contactos fusionados'),
++                subtitle: const Text('Ver, vincular y administrar cuentas unificadas de Beeper'),
++                onTap: () => context.go('/rooms/settings/chat/merged_contacts'),
++                trailing: const Padding(
++                  padding: EdgeInsets.all(16.0),
++                  child: Icon(Icons.chevron_right_outlined),
 +                ),
 +              ),
 +              Divider(color: theme.dividerColor),
@@ -343288,10 +343729,10 @@ index 9ab83eb27963f39eb590cf61f4c8c558f93be70d..8f3ba0e23025cf04a767131cd0ed755e
 +  return encoder.convert(object);
 +}
 diff --git a/lib/pages/settings_notifications/settings_notifications_view.dart b/lib/pages/settings_notifications/settings_notifications_view.dart
-index 15953aea3488cc23911e553f189186bb707ef497..9f9bd423f1fd29da64d16bc757c442eac5c7f344 100644
+index 15953aea3488cc23911e553f189186bb707ef497..a793055dff2b9cac1e4799aeb0453755dea1a5b0 100644
 --- a/lib/pages/settings_notifications/settings_notifications_view.dart
 +++ b/lib/pages/settings_notifications/settings_notifications_view.dart
-@@ -1,254 +1,412 @@
+@@ -1,254 +1,417 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -343785,6 +344226,11 @@ index 15953aea3488cc23911e553f189186bb707ef497..9f9bd423f1fd29da64d16bc757c442ea
 +                        ),
 +                      );
 +                    },
++                  ),
++                  SettingsSwitchListTile.adaptive(
++                    title: 'Ocultar prefijo de red en notificaciones',
++                    subtitle: 'Oculta etiquetas como [WhatsApp] o [Instagram] en el texto de las notificaciones',
++                    setting: AppSettings.hideNetworkPrefixInNotification,
 +                  ),
 +                  Divider(color: theme.dividerColor),
 +                  ListTile(
@@ -355633,10 +356079,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a122b2964 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..ca340d30930be582412b61fc36904b3c75a364e5 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,500 +1,640 @@
+@@ -1,500 +1,644 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -356407,7 +356853,7 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a
 +    final matrixLocals = MatrixLocals(l10n);
 +
 +    // Calculate the body
-+    final body = event.type == EventTypes.Encrypted
++    var body = event.type == EventTypes.Encrypted
 +        ? l10n.newMessageInFluffyChat
 +        : await event.calcLocalizedBody(
 +            matrixLocals,
@@ -356417,6 +356863,10 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..dced73694757e378bb150f3708710b7a
 +            hideEdit: true,
 +            removeMarkdown: true,
 +          );
++
++    if (AppSettings.hideNetworkPrefixInNotification.value) {
++      body = body.replaceFirst(RegExp(r'^\[[^\]]+\]\s*'), '');
++    }
 +
 +    final isWhatsAppCall = body.contains('Incoming call. Use the WhatsApp app to answer.');
 +
@@ -365041,10 +365491,10 @@ index 40ae50f0d14e34f851c07c660fb2a8af99cb11fc..6fbae7b343445a99dbc3056158dfeb11
 +  }
 +}
 diff --git a/lib/widgets/local_notifications_extension.dart b/lib/widgets/local_notifications_extension.dart
-index 840a7d4b99de9a2feeaf5228119c07d6b35f5722..915a1243a4febac5eb0f50f8f062d2bf1fdb2aea 100644
+index 840a7d4b99de9a2feeaf5228119c07d6b35f5722..f11ef28684b3eba420efda62a51cf99de6b0d1d1 100644
 --- a/lib/widgets/local_notifications_extension.dart
 +++ b/lib/widgets/local_notifications_extension.dart
-@@ -1,112 +1,150 @@
+@@ -1,112 +1,153 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -365193,7 +365643,7 @@ index 840a7d4b99de9a2feeaf5228119c07d6b35f5722..915a1243a4febac5eb0f50f8f062d2bf
 +    final title = event.room.getLocalizedDisplayname(
 +      MatrixLocals(L10n.of(context)),
 +    );
-+    final body = await event.calcLocalizedBody(
++    var body = await event.calcLocalizedBody(
 +      MatrixLocals(L10n.of(context)),
 +      withSenderNamePrefix:
 +          !event.room.isDirectChat ||
@@ -365203,6 +365653,9 @@ index 840a7d4b99de9a2feeaf5228119c07d6b35f5722..915a1243a4febac5eb0f50f8f062d2bf
 +      hideEdit: true,
 +      removeMarkdown: true,
 +    );
++    if (AppSettings.hideNetworkPrefixInNotification.value) {
++      body = body.replaceFirst(RegExp(r'^\[[^\]]+\]\s*'), '');
++    }
 +    final avatarUrl = event.room.avatar;
 +
 +    const size = 128;
