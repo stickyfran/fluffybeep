@@ -351413,7 +351413,7 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +}
 diff --git a/lib/utils/beeper_sync_manager.dart b/lib/utils/beeper_sync_manager.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c6ef7bb5c2737a3f12ef791ed7ec0f7c31bdd01
+index 0000000000000000000000000000000000000000..b7abf2fd5bfedd13725ddb6b534d4a3e47b795bc
 --- /dev/null
 +++ b/lib/utils/beeper_sync_manager.dart
 @@ -0,0 +1,182 @@
@@ -351502,7 +351502,7 @@ index 0000000000000000000000000000000000000000..5c6ef7bb5c2737a3f12ef791ed7ec0f7
 +      if (client.prevBatch == null) {
 +        await client.onSync.stream.firstWhere((s) => client.prevBatch != null).timeout(
 +          const Duration(seconds: 20),
-+          onTimeout: () => SyncUpdate(nextBatch: client.syncToken ?? ''),
++          onTimeout: () => SyncUpdate(nextBatch: client.prevBatch ?? ''),
 +        );
 +      }
 +
