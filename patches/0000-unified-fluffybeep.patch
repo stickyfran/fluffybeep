@@ -32564,7 +32564,7 @@ index 2d0f798acca84988f3dc06d66672e88da46902bc..8a37e1b83d78a3cec07303def16b999b
 +/q4AaOeMSQ+2b1tbFfLn
 +-----END CERTIFICATE-----''';
 diff --git a/lib/config/routes.dart b/lib/config/routes.dart
-index bd83769b216b413ef00b18bfe7b7867a7d17028e..3f420be5d135bad576b768f0b436dc01c0584f0d 100644
+index bd83769b216b413ef00b18bfe7b7867a7d17028e..1a8b43cb4ac663cc1e1292c2da95db3dddd9b4a4 100644
 --- a/lib/config/routes.dart
 +++ b/lib/config/routes.dart
 @@ -1,528 +1,590 @@
@@ -33389,7 +33389,7 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..3f420be5d135bad576b768f0b436dc01
 +                            state,
 +                            DeferredWidget(
 +                              libraryLoader: settings_merged_contacts.loadLibrary,
-+                              createWidget: () => const settings_merged_contacts.MergedContactsSettings(),
++                              createWidget: () => settings_merged_contacts.MergedContactsSettings(),
 +                            ),
 +                          ),
 +                        ),
@@ -350215,10 +350215,10 @@ index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..041c05f6ab9139f08207121caca4f1e6a0478a34
+index 0000000000000000000000000000000000000000..c630a3de4f0f884fffaf74ed774f8c52735bd3e9
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,383 @@
+@@ -0,0 +1,388 @@
 +import 'dart:collection';
 +import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
@@ -350386,22 +350386,27 @@ index 0000000000000000000000000000000000000000..041c05f6ab9139f08207121caca4f1e6
 +
 +  /// Save raw merged contacts map to Account Data and notify all listeners immediately
 +  static Future<void> _save(Client client, Map<String, dynamic> contacts) async {
-+    // 1. Invalidate local cache
-+    invalidateCache();
++    // 1. Invalidate local cache and update in-memory contacts directly
++    final parsed = <String, MergedContact>{};
++    for (final entry in contacts.entries) {
++      if (entry.value is Map) {
++        final mc = MergedContact.fromJson(entry.key.toString(), entry.value as Map);
++        if (mc.roomIds.length >= 2) {
++          parsed[mc.id] = mc;
++        }
++      }
++    }
++    _contactsCache = parsed;
++    _invalidateDerivedMaps();
++    _lastMergeDataRef = {'contacts': contacts};
 +
-+    // 2. Synchronously update the local Client accountData entry so subsequent reads are immediate
-+    client.accountData[accountDataKey] = BasicAccountData(
-+      type: accountDataKey,
-+      content: {'contacts': contacts},
-+    );
-+
-+    // 3. Rebuild sibling maps
++    // 2. Rebuild sibling maps
 +    updateSiblingRooms(client);
 +
-+    // 4. Trigger UI listeners immediately
++    // 3. Trigger UI listeners immediately
 +    mergeChangeNotifier.value++;
 +
-+    // 5. Send to homeserver asynchronously
++    // 4. Send to homeserver asynchronously
 +    try {
 +      await client.setAccountData(
 +        client.userID!,
