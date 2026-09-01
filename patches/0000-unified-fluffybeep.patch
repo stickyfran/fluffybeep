@@ -334334,10 +334334,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..61a3ef5b4aed324e2bf4cfb79fd335f7032707bd
+index 0000000000000000000000000000000000000000..268168e3d2bf8686e5a19df07813633241849881
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,447 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334413,14 +334413,7 @@ index 0000000000000000000000000000000000000000..61a3ef5b4aed324e2bf4cfb79fd335f7
 +  }
 +
 +  Future<void> _initPhoneContacts() async {
-+    if (!BeeperPhoneContacts.isLoaded && !BeeperPhoneContacts.isPermissionDenied) {
-+      setState(() => _isLoadingContacts = true);
-+      await BeeperPhoneContacts.load(requestPermission: false);
-+      if (mounted) {
-+        _checkPhoneMatch();
-+        setState(() => _isLoadingContacts = false);
-+      }
-+    } else {
++    if (BeeperPhoneContacts.isLoaded) {
 +      _checkPhoneMatch();
 +    }
 +  }
@@ -350056,10 +350049,10 @@ index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b809
 +}
 diff --git a/lib/utils/beeper_phone_contacts.dart b/lib/utils/beeper_phone_contacts.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..a5cd18b1b59a55df4c3960c2af52604d4ca2f20b
+index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ffd937da1b
 --- /dev/null
 +++ b/lib/utils/beeper_phone_contacts.dart
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,136 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -350105,25 +350098,28 @@ index 0000000000000000000000000000000000000000..a5cd18b1b59a55df4c3960c2af52604d
 +  static Future<bool> load({bool requestPermission = true}) async {
 +    if (_loaded) return true;
 +    if (_isLoading) return false;
-+    if (!kIsWeb && defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS) {
-+      // Desktop platforms: silently skip without error
++    if (kIsWeb || (defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS)) {
++      // Desktop / web: silently skip
++      return false;
++    }
++
++    if (!requestPermission) {
++      // Don't query contacts or request permission unprompted at app start
 +      return false;
 +    }
 +
 +    _isLoading = true;
 +    try {
-+      if (requestPermission) {
-+        final granted = await FlutterContacts.requestPermission(readonly: true);
-+        if (!granted) {
-+          _permissionDenied = true;
-+          _isLoading = false;
-+          return false;
-+        }
++      final granted = await FlutterContacts.requestPermission(readonly: true);
++      if (!granted) {
++        _permissionDenied = true;
++        _isLoading = false;
++        return false;
 +      }
 +
 +      final rawList = await FlutterContacts.getContacts(
 +        withProperties: true,
-+        withThumbnail: true,
++        withThumbnail: false,
 +      );
 +
 +      final list = <CachedPhoneContact>[];
@@ -353460,7 +353456,7 @@ index 337cd2ad30b9e35c18daf574524d61308bc390eb..24789e7ef1d4d8a3b5aea2d57beea4a8
 +      type.startsWith('m.key.verification.');
 +}
 diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
-index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..c92964143d5dc9a63e6caa3edf0ec68f735bc92d 100644
+index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..4ac8ac07e561065c91e9cb2cd583b85493205722 100644
 --- a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
 +++ b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
 @@ -19,33 +19,58 @@ import 'package:universal_html/html.dart' as html;
@@ -353551,12 +353547,17 @@ index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..c92964143d5dc9a63e6caa3edf0ec68f
 -      // most important : apply encryption when opening the DB
 -      onConfigure: helper?.applyPragmaKey,
 +      onConfigure: (db) async {
-+        // 1. Set busy_timeout (10 seconds) so concurrent operations wait for locks to release
++        // 1. MUST BE FIRST: Apply encryption key before any other PRAGMA or query
++        if (helper != null) {
++          await helper.applyPragmaKey(db);
++        }
++
++        // 2. Set busy_timeout (10 seconds) so concurrent operations wait for locks to release
 +        try {
 +          await db.execute('PRAGMA busy_timeout = 10000;');
 +        } catch (_) {}
 +
-+        // 2. Enable WAL journal mode for multi-threaded / multi-isolate read/write concurrency
++        // 3. Enable WAL journal mode for multi-threaded / multi-isolate read/write concurrency
 +        try {
 +          await db.execute('PRAGMA journal_mode = WAL;');
 +        } catch (_) {}
@@ -353564,11 +353565,6 @@ index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..c92964143d5dc9a63e6caa3edf0ec68f
 +        try {
 +          await db.execute('PRAGMA synchronous = NORMAL;');
 +        } catch (_) {}
-+
-+        // 3. Apply encryption when opening the DB
-+        if (helper != null) {
-+          await helper.applyPragmaKey(db);
-+        }
 +      },
      ),
    );
@@ -365914,10 +365910,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..752ecb0e5cdb9f540a53fae9e511df81d88a8fc1 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..01c761e339b90f44e7b99701374ff2358edc38fd 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,490 @@
+@@ -1,443 +1,489 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -366593,7 +366589,6 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..752ecb0e5cdb9f540a53fae9e511df81
 +    // Initialize and preload Beeper bridge cache
 +    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
 +    _preloadBridgeCache();
-+    BeeperPhoneContacts.load(requestPermission: false);
 +
 +    initMatrix();
 +  }

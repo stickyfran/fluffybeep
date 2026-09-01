@@ -72,11 +72,17 @@ jobs:
           cd fluffychat
           flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
+      - name: 🏷️ Prepare Release Artifacts
+        run: |
+          mkdir -p release-apks
+          cp fluffychat/build/app/outputs/flutter-apk/app-release.apk release-apks/fluffybeep-2.9.4-v1.3.0.apk || true
+          cp fluffychat/build/app/outputs/flutter-apk/*.apk release-apks/ || true
+
       - name: 📤 Upload APK Artifact (On Success)
         uses: actions/upload-artifact@v4
         with:
-          name: fluffybeep-release-apk
-          path: fluffychat/build/app/outputs/flutter-apk/*.apk
+          name: fluffybeep-2.9.4-v1.3.0-apk
+          path: release-apks/*.apk
           retention-days: 7
 
       - name: 🧹 Remove Fluffychat Git Context
@@ -84,26 +90,23 @@ jobs:
 
       - name: 🚀 Release APK on GitHub Releases
         uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/2.9'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: v1.2.1
+          tag_name: v1.3.0
           target_commitish: main
-          name: "Fluffybeep v1.2.1 - RFC 7845 OGG Opus Voice Messages Fix"
+          name: "Fluffybeep v1.3.0 (FluffyChat 2.9.4 Base)"
           body: |
-            ### 🚀 Fluffybeep v1.2.1 Release
+            ### 🚀 Fluffybeep v1.3.0 Release (Upstream FluffyChat 2.9.4 Base)
 
-            - **WhatsApp iOS Voice Notes Fix**: Normalized voice messages to strict RFC 7845 OGG Opus using FFmpegKit. Resolves 'Este audio ya no está disponible' playback error on WhatsApp iOS (iPhone).
-            - **Native PTT Bubbles**: Guaranteed standard OGG stream with OpusHead/OpusTags and valid granule positions across Android and iPhone recipients.
-            - **UI Fluidity & Performance**: Inherits the complete v1.2 performance refactor (ValueNotifiers, isolated chat list rebuilds, fast caching).
-
-            **Highlights in v1.2:**
-            - **Chat View Rebuild Isolation**: Replaced broad setState calls with dedicated ValueNotifiers, eliminated full Scaffold rebuilds on message tap, fixed memory leaks with TapGestureRecognizer.
-            - **Chat List & Navigation Rail**: Added 250ms search debounce, optimized Navigation Rail unread counting ($O(N \times M) \to O(N)$), pre-filtered hidden space items, removed destructive AnimatedSwitcher in room list.
-            - **Global Caching**: Added caches for DateFormat and Emoji collections, throttled command/mention autocomplete.
-            - **Reliable Push Notifications & Audio**: Maintained ephemeral foreground sync, 48kHz Opus audio playback compatibility, permanent release keystore.
-          files: fluffychat/build/app/outputs/flutter-apk/*.apk
+            - **Beeper Unified Contacts Merge**: Merge multiple chats and accounts (WhatsApp personal, WhatsApp business, Instagram, etc.) into unified contacts with seamless sibling quick-switch bar inside the chat view.
+            - **Address Book Integration**: Match Matrix contacts directly with phone contacts safely using `flutter_contacts`.
+            - **Robust SQLite Concurrency & WAL**: Fix `database is locked (code 5)` and prevent session loss on restart.
+            - **WhatsApp iOS Voice Notes Fix**: Normalized PTT voice bubbles to strict RFC 7845 OGG Opus using FFmpegKit.
+            - **Upstream FluffyChat 2.9.4 Base**: Inherits all modern upstream 2.9.4 improvements.
+          files: release-apks/*.apk
           fail_on_unmatched_files: false
           draft: false
           prerelease: false
