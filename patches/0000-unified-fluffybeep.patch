@@ -319096,7 +319096,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e07494a7d73b 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..efddc86ed9ce7df104decf26894c55ff2f19a76a 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -319832,7 +319832,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +816,136 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +816,150 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -319954,9 +319954,17 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
 +      // Rate-limit to 1s so rapid syncs don't thrash the sort. Safe to use Matrix.of(context) here.
 +      _invalidateRoomCache();
 +      _cachedSpaceDelegates = _computeSpaceDelegates();
++
++      BeeperMergeUtils.mergeChangeNotifier.addListener(_onMergeChange);
++
 +      _onSyncForRoomCache = Matrix.of(context).client.onSync.stream
-+          .where((s) => s.hasRoomUpdate)
++          .where((s) => s.hasRoomUpdate || (s.accountData?.any((a) => a.type == BeeperMergeUtils.accountDataKey) ?? false))
 +          .listen((syncUpdate) {
++            if (syncUpdate.accountData?.any((a) => a.type == BeeperMergeUtils.accountDataKey) ?? false) {
++              BeeperMergeUtils.invalidateCache();
++              _invalidateRoomCache();
++            }
++
 +            if (syncUpdate.rooms?.join != null) {
 +              for (final entry in syncUpdate.rooms!.join!.entries) {
 +                final roomId = entry.key;
@@ -319981,14 +319989,19 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
 +
 +      _processPushHelperCrashReport();
      }
--
++  }
+ 
 -    _processPushHelperCrashReport();
 -
 -    super.initState();
++  void _onMergeChange() {
++    if (!mounted) return;
++    _invalidateRoomCache();
    }
  
    @override
    void dispose() {
++    BeeperMergeUtils.mergeChangeNotifier.removeListener(_onMergeChange);
 +    _batchTimestampTimer?.cancel();
 +    _roomCacheDebounceTimer?.cancel();
      _intentDataStreamSubscription?.cancel();
@@ -320005,7 +320018,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1039,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1053,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -320021,7 +320034,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1152,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1166,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320053,7 +320066,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1187,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1201,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -320093,7 +320106,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
          ],
        );
      }
-@@ -700,7 +1240,30 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1254,30 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -320125,7 +320138,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1364,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1378,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -320251,7 +320264,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
      }
    }
  
-@@ -864,6 +1538,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1552,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -320259,7 +320272,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1589,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1603,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -320273,7 +320286,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..54fda5a3529eb979fc6ac36837b0e074
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1713,7 @@ enum ChatContextAction {
+@@ -1039,4 +1727,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -334372,10 +334385,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..aea11f5e1db46b96b5ee5cfec34bfcd34a332d48
+index 0000000000000000000000000000000000000000..fe9357fa82c5ff5765aacc40ef782f243dd664ca
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,518 @@
+@@ -0,0 +1,528 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334496,6 +334509,15 @@ index 0000000000000000000000000000000000000000..aea11f5e1db46b96b5ee5cfec34bfcd3
 +      ));
 +    }
 +
++    // Sort selected chats to the top so they are easily visible and editable
++    items.sort((a, b) {
++      final aSelected = _selectedRoomIds.contains(a.room.id);
++      final bSelected = _selectedRoomIds.contains(b.room.id);
++      if (aSelected && !bSelected) return -1;
++      if (!aSelected && bSelected) return 1;
++      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
++    });
++
 +    _allRoomItems = items;
 +  }
 +
@@ -334563,6 +334585,7 @@ index 0000000000000000000000000000000000000000..aea11f5e1db46b96b5ee5cfec34bfcd3
 +
 +    await BeeperMergeUtils.addMerge(
 +      client,
++      existingMergeId: _existingMergeId,
 +      roomIds: _selectedRoomIds.toList(),
 +      displayName: name,
 +      phoneContactId: _matchedPhoneContactId,
@@ -338893,10 +338916,10 @@ index 627a2ed7a0fe8b069cce1b08768ef1d7159a8c64..8a74184d8cbd563106ee874ee9f6a1d5
 +}
 diff --git a/lib/pages/settings_chat/merged_contacts_settings.dart b/lib/pages/settings_chat/merged_contacts_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..916cc8e1e6299c2b35e794e0d91dea7d8502e28e
+index 0000000000000000000000000000000000000000..efc012a44a5096309a8cd0a0c45d428320031d9e
 --- /dev/null
 +++ b/lib/pages/settings_chat/merged_contacts_settings.dart
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,345 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -338921,6 +338944,22 @@ index 0000000000000000000000000000000000000000..916cc8e1e6299c2b35e794e0d91dea7d
 +}
 +
 +class _MergedContactsSettingsState extends State<MergedContactsSettings> {
++  @override
++  void initState() {
++    super.initState();
++    BeeperMergeUtils.mergeChangeNotifier.addListener(_onMergeChange);
++  }
++
++  @override
++  void dispose() {
++    BeeperMergeUtils.mergeChangeNotifier.removeListener(_onMergeChange);
++    super.dispose();
++  }
++
++  void _onMergeChange() {
++    if (mounted) setState(() {});
++  }
++
 +  @override
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
@@ -350176,15 +350215,12 @@ index 0000000000000000000000000000000000000000..bf8e1e2818836e5d3a1a6525b3d6589c
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b8092297aa16
+index 0000000000000000000000000000000000000000..041c05f6ab9139f08207121caca4f1e6a0478a34
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,351 @@
-+// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
+@@ -0,0 +1,383 @@
 +import 'dart:collection';
++import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
 +import 'beeper_bridge_utils.dart';
 +import 'beeper_phone_contacts.dart';
@@ -350246,6 +350282,9 @@ index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b809
 +
 +class BeeperMergeUtils {
 +  static const String accountDataKey = 'com.beeper.merged_contacts';
++
++  /// Global notifier to trigger UI updates immediately across all screens
++  static final ValueNotifier<int> mergeChangeNotifier = ValueNotifier<int>(0);
 +
 +  static Map<String, MergedContact> _contactsCache = <String, MergedContact>{};
 +  static dynamic _lastMergeDataRef;
@@ -350345,19 +350384,37 @@ index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b809
 +    _mergeSiblingRooms = newSiblingMap;
 +  }
 +
-+  /// Save raw merged contacts map to Account Data
++  /// Save raw merged contacts map to Account Data and notify all listeners immediately
 +  static Future<void> _save(Client client, Map<String, dynamic> contacts) async {
++    // 1. Invalidate local cache
 +    invalidateCache();
-+    await client.setAccountData(
-+      client.userID!,
-+      accountDataKey,
-+      {'contacts': contacts},
++
++    // 2. Synchronously update the local Client accountData entry so subsequent reads are immediate
++    client.accountData[accountDataKey] = BasicAccountData(
++      type: accountDataKey,
++      content: {'contacts': contacts},
 +    );
++
++    // 3. Rebuild sibling maps
++    updateSiblingRooms(client);
++
++    // 4. Trigger UI listeners immediately
++    mergeChangeNotifier.value++;
++
++    // 5. Send to homeserver asynchronously
++    try {
++      await client.setAccountData(
++        client.userID!,
++        accountDataKey,
++        {'contacts': contacts},
++      );
++    } catch (_) {}
 +  }
 +
 +  /// Create or update a merged contact
 +  static Future<String> addMerge(
 +    Client client, {
++    String? existingMergeId,
 +    required List<String> roomIds,
 +    required String displayName,
 +    String? phoneContactId,
@@ -350369,31 +350426,45 @@ index 0000000000000000000000000000000000000000..911cc36921dc5ba3d4d543886916b809
 +      map[e.key] = e.value.toJson();
 +    }
 +
-+    // Check if any of these roomIds already belongs to an existing merge
-+    String? existingMergeId;
-+    for (final rId in roomIds) {
-+      if (_roomToMergeId.containsKey(rId)) {
-+        existingMergeId = _roomToMergeId[rId];
-+        break;
++    final uniqueRoomIds = LinkedHashSet<String>.from(roomIds).toList();
++
++    // Check if any of these roomIds already belongs to an existing merge if not explicitly provided
++    existingMergeId ??= () {
++      for (final rId in uniqueRoomIds) {
++        if (_roomToMergeId.containsKey(rId)) {
++          return _roomToMergeId[rId];
++        }
++      }
++      return null;
++    }();
++
++    final mergeId = existingMergeId ??
++        'mc_${DateTime.now().millisecondsSinceEpoch}_${uniqueRoomIds.first.hashCode.abs()}';
++
++    // Remove these roomIds from any OTHER existing merge to prevent collisions
++    for (final entry in map.entries.toList()) {
++      if (entry.key != mergeId && entry.value is Map) {
++        final otherRooms = List<String>.from(entry.value['roomIds'] as List? ?? <dynamic>[]);
++        otherRooms.removeWhere((rId) => uniqueRoomIds.contains(rId));
++        if (otherRooms.length < 2) {
++          map.remove(entry.key);
++        } else {
++          entry.value['roomIds'] = otherRooms;
++        }
 +      }
 +    }
 +
-+    final mergeId = existingMergeId ??
-+        'mc_${DateTime.now().millisecondsSinceEpoch}_${roomIds.first.hashCode.abs()}';
-+
-+    final uniqueRoomIds = LinkedHashSet<String>.from(
-+      existingMergeId != null && map[mergeId] is Map
-+          ? (map[mergeId]['roomIds'] as List? ?? <dynamic>[]).cast<String>()
-+          : <String>[],
-+    )..addAll(roomIds);
-+
-+    map[mergeId] = {
-+      'displayName': displayName.trim(),
-+      if (avatarMxc != null) 'avatarMxc': avatarMxc,
-+      'roomIds': uniqueRoomIds.toList(),
-+      if (phoneContactId != null) 'phoneContactId': phoneContactId,
-+      'createdAt': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-+    };
++    if (uniqueRoomIds.length < 2) {
++      map.remove(mergeId);
++    } else {
++      map[mergeId] = {
++        'displayName': displayName.trim(),
++        if (avatarMxc != null) 'avatarMxc': avatarMxc,
++        'roomIds': uniqueRoomIds,
++        if (phoneContactId != null) 'phoneContactId': phoneContactId,
++        'createdAt': DateTime.now().millisecondsSinceEpoch ~/ 1000,
++      };
++    }
 +
 +    await _save(client, map);
 +    return mergeId;
