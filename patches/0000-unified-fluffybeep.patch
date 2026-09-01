@@ -34581,52 +34581,42 @@ index 17594b67e42a624f4354cf9fcfec6fa18d3f5ad2..cff6d0bb13e73139bd2c7771be13f404
 +}
 diff --git a/lib/controllers/beeper_reinit_controller.dart b/lib/controllers/beeper_reinit_controller.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..beff3589cc932cc0efa511b449bdab2b420dc158
+index 0000000000000000000000000000000000000000..a7c1e6b0559ab5ff3c92ecd274aefa72a3600bac
 --- /dev/null
 +++ b/lib/controllers/beeper_reinit_controller.dart
-@@ -0,0 +1,132 @@
-+import 'dart:io';
+@@ -0,0 +1,66 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
-+import 'package:fluffychat/widgets/matrix.dart';
-+import 'package:fluffychat/widgets/cache_refresh_overlay.dart';
-+import 'package:fluffychat/utils/beeper_bridge_utils.dart';
-+import 'package:shared_preferences/shared_preferences.dart';
++import '../l10n/l10n.dart';
++import '../utils/beeper_sync_manager.dart';
++import '../utils/matrix_sdk_extensions/matrix_locals.dart';
 +
 +class BeeperReinitController {
 +  final Client client;
 +
 +  BeeperReinitController({required this.client});
 +
-+  /// Purges local cache using the SDK's official lifecycle method.
-+  /// client.clearCache() handles pausing sync, wiping the DB tables, and
-+  /// restarting the sync loop — preventing any database corruption.
-+  Future<void> reinitCache(BuildContext context) async {
-+    try {
-+      BeeperBridgeUtils.invalidateAllRoomCaches();
-+      await client.clearCache();
-+    } catch (e) {
-+      debugPrint('Error during Beeper cache reinitialization: $e');
-+      rethrow;
-+    }
-+  }
-+
-+  /// Displays an overlay to block the UI while reinitializing and restarts the app.
++  /// Starts full background synchronization with non-blocking progress banner
 +  static Future<void> showReinitOverlay(BuildContext context, Client client) async {
-+    // Show a confirmation dialog first
 +    final confirm = await showDialog<bool>(
 +      context: context,
 +      builder: (context) => AlertDialog(
 +        title: const Text('Re-sincronizar chats (Beeper)'),
-+        content: const Text('La caché se limpiará y la aplicación se cerrará. Al volver a abrirla, descargará todo tu historial y avatares forzosamente.'),
++        content: const Text(
++          'Se descargarán los últimos mensajes y avatares de todos tus chats en segundo plano mientras continúas usando la aplicación con normalidad.',
++        ),
 +        actions: [
 +          TextButton(
 +            onPressed: () => Navigator.of(context).pop(false),
 +            child: const Text('Cancelar'),
 +          ),
-+          TextButton(
++          ElevatedButton(
 +            onPressed: () => Navigator.of(context).pop(true),
-+            child: const Text('Aceptar'),
++            child: const Text('Sincronizar ahora'),
 +          ),
 +        ],
 +      ),
@@ -34634,86 +34624,30 @@ index 0000000000000000000000000000000000000000..beff3589cc932cc0efa511b449bdab2b
 +
 +    if (confirm != true) return;
 +
-+    // Show the progress overlay
-+    final overlay = OverlayEntry(
-+      builder: (context) => Stack(
-+        children: [
-+          const ModalBarrier(
-+            color: Colors.black54,
-+            dismissible: false,
-+          ),
-+          Center(
-+            child: Container(
-+              padding: const EdgeInsets.all(24),
-+              decoration: BoxDecoration(
-+                color: Theme.of(context).dialogBackgroundColor,
-+                borderRadius: BorderRadius.circular(12),
-+              ),
-+              child: const Column(
-+                mainAxisSize: MainAxisSize.min,
-+                children: [
-+                  CircularProgressIndicator(),
-+                  SizedBox(height: 16),
-+                  Text(
-+                    'Limpiando caché...',
-+                    style: TextStyle(fontSize: 16, decoration: TextDecoration.none),
-+                  ),
-+                ],
-+              ),
-+            ),
-+          ),
-+        ],
-+      ),
-+    );
++    if (context.mounted) {
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(
++          content: Text('Sincronización de todos los chats iniciada en segundo plano.'),
++          duration: Duration(seconds: 3),
++        ),
++      );
 +
-+    Overlay.of(context).insert(overlay);
-+
-+    try {
-+      await client.clearCache();
-+      final prefs = await SharedPreferences.getInstance();
-+      await prefs.setBool('beeper_needs_cache_refresh', true);
-+      overlay.remove();
-+
-+      if (context.mounted) {
-+        // Mount CacheRefreshOverlay directly in the running app's overlay.
-+        late OverlayEntry refreshOverlayEntry;
-+        refreshOverlayEntry = OverlayEntry(
-+          builder: (overlayContext) => CacheRefreshOverlay(
-+            client: client,
-+            store: prefs,
-+            onCompleted: () {
-+              refreshOverlayEntry.remove();
-+              if (context.mounted) {
-+                ScaffoldMessenger.of(context).showSnackBar(
-+                  const SnackBar(
-+                    content: Text('Sincronización de Beeper completada con éxito.'),
-+                    duration: Duration(seconds: 3),
-+                  ),
-+                );
-+              }
-+            },
-+            child: const SizedBox.shrink(),
-+          ),
-+        );
-+        Overlay.of(context).insert(refreshOverlayEntry);
-+      }
-+    } catch (e) {
-+      if (overlay.mounted) overlay.remove();
-+      if (context.mounted) {
-+        showDialog(
-+          context: context,
-+          builder: (context) => AlertDialog(
-+            title: const Text('Error'),
-+            content: Text('Ocurrió un error al limpiar la caché: $e'),
-+            actions: [
-+              TextButton(
-+                onPressed: () => Navigator.of(context).pop(),
-+                child: const Text('Aceptar'),
++      final locals = MatrixLocals(L10n.of(context));
++      BeeperSyncManager.startFullSync(
++        client,
++        invalidateCachesFirst: true,
++        locals: locals,
++        onCompleted: () {
++          if (context.mounted) {
++            ScaffoldMessenger.of(context).showSnackBar(
++              const SnackBar(
++                content: Text('Sincronización de Beeper completada con éxito.'),
++                duration: Duration(seconds: 3),
 +              ),
-+            ],
-+          ),
-+        );
-+      }
++            );
++          }
++        },
++      );
 +    }
 +  }
 +}
@@ -351220,6 +351154,195 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +    return null;
 +  }
 +}
+diff --git a/lib/utils/beeper_sync_manager.dart b/lib/utils/beeper_sync_manager.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..5aff944e5ec84762d08453941d8ddd2d19705be0
+--- /dev/null
++++ b/lib/utils/beeper_sync_manager.dart
+@@ -0,0 +1,183 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:async';
++import 'dart:typed_data';
++import 'package:flutter/foundation.dart';
++import 'package:flutter_foreground_task/flutter_foreground_task.dart';
++import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:wakelock_plus/wakelock_plus.dart';
++
++import 'beeper_bridge_utils.dart';
++import 'beeper_merge_utils.dart';
++import 'beeper_phone_contacts.dart';
++import 'client_download_content_extension.dart';
++import 'matrix_sdk_extensions/matrix_locals.dart';
++import 'start_push_foreground_service.dart';
++
++class BeeperSyncProgress {
++  final bool isSyncing;
++  final int processedRooms;
++  final int totalRooms;
++  final String currentRoomName;
++  final double progress;
++
++  const BeeperSyncProgress({
++    this.isSyncing = false,
++    this.processedRooms = 0,
++    this.totalRooms = 0,
++    this.currentRoomName = '',
++    this.progress = 0.0,
++  });
++}
++
++class BeeperSyncManager {
++  static final ValueNotifier<BeeperSyncProgress> progressNotifier =
++      ValueNotifier<BeeperSyncProgress>(const BeeperSyncProgress());
++
++  static bool get isSyncing => progressNotifier.value.isSyncing;
++
++  static Completer<void>? _activeSyncCompleter;
++
++  /// Starts a full background synchronization of ALL rooms, contacts, and avatars
++  static Future<void> startFullSync(
++    Client client, {
++    bool invalidateCachesFirst = false,
++    MatrixLocals? locals,
++    VoidCallback? onCompleted,
++  }) async {
++    if (isSyncing) {
++      return _activeSyncCompleter?.future;
++    }
++
++    final completer = _activeSyncCompleter = Completer<void>();
++
++    progressNotifier.value = const BeeperSyncProgress(
++      isSyncing: true,
++      processedRooms: 0,
++      totalRooms: 0,
++      currentRoomName: 'Iniciando sincronización...',
++      progress: 0.0,
++    );
++
++    try {
++      if (invalidateCachesFirst) {
++        BeeperBridgeUtils.invalidateAllRoomCaches();
++        BeeperMergeUtils.invalidateCache();
++      }
++
++      // Keep device awake and start foreground task if supported
++      try {
++        await WakelockPlus.enable();
++      } catch (_) {}
++      try {
++        await ForegroundServices.startService('beeper_resync');
++      } catch (_) {}
++
++      // Preload phone contacts in background
++      BeeperPhoneContacts.load(requestPermission: false).catchError((_) => false);
++
++      // Wait for initial matrix sync if not already done
++      if (client.prevBatch == null) {
++        await client.onSync.stream.firstWhere((s) => client.prevBatch != null).timeout(
++          const Duration(seconds: 20),
++          onTimeout: () => SyncUpdate(),
++        );
++      }
++
++      // Collect ALL non-space rooms
++      final allRooms = client.rooms.where((r) => !r.isSpace).toList();
++      allRooms.sort((a, b) {
++        final aTime = a.lastEvent?.originServerTs ?? DateTime.fromMillisecondsSinceEpoch(0);
++        final bTime = b.lastEvent?.originServerTs ?? DateTime.fromMillisecondsSinceEpoch(0);
++        return bTime.compareTo(aTime);
++      });
++
++      final total = allRooms.length;
++      progressNotifier.value = BeeperSyncProgress(
++        isSyncing: true,
++        processedRooms: 0,
++        totalRooms: total,
++        currentRoomName: 'Preparando chats...',
++        progress: 0.0,
++      );
++
++      // Process all rooms concurrently in batches of 4
++      const batchSize = 4;
++      var processed = 0;
++
++      for (var i = 0; i < allRooms.length; i += batchSize) {
++        final batch = allRooms.sublist(i, (i + batchSize).clamp(0, allRooms.length));
++
++        await Future.wait(batch.map((room) async {
++          try {
++            final name = locals != null
++                ? room.getBeeperDisplayname(locals)
++                : (room.displayName.isNotEmpty ? room.displayName : room.name);
++
++            // Fetch recent history for this room (saving events into local DB)
++            await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
++
++            // Cache avatar image if present
++            final avatarUrl = room.beeperAvatarUrl;
++            if (avatarUrl != null) {
++              await client.downloadMxcCached(avatarUrl).catchError((_) => Uint8List(0));
++            }
++
++            processed++;
++            final currentProgress = total > 0 ? (processed / total).clamp(0.0, 1.0) : 0.0;
++
++            progressNotifier.value = BeeperSyncProgress(
++              isSyncing: true,
++              processedRooms: processed,
++              totalRooms: total,
++              currentRoomName: name,
++              progress: currentProgress,
++            );
++
++            // Update Android notification
++            try {
++              final pct = (currentProgress * 100).toInt();
++              FlutterForegroundTask.updateService(
++                notificationTitle: 'Sincronizando chats de Beeper (' + str(pct) + '%)',
++                notificationText: str(processed) + ' de ' + str(total) + ': ' + name,
++              );
++            } catch (_) {}
++          } catch (_) {}
++        }));
++      }
++
++      // Rebuild merges and sibling relations
++      BeeperMergeUtils.updateSiblingRooms(client);
++      BeeperMergeUtils.mergeChangeNotifier.value++;
++
++      final prefs = await SharedPreferences.getInstance();
++      await prefs.setBool('beeper_needs_cache_refresh', false);
++
++    } catch (e, s) {
++      debugPrint('Error during Beeper full sync: $e
++$s');
++    } finally {
++      try {
++        await WakelockPlus.disable();
++      } catch (_) {}
++      try {
++        await ForegroundServices.stopService('beeper_resync');
++      } catch (_) {}
++
++      progressNotifier.value = const BeeperSyncProgress(
++        isSyncing: false,
++        processedRooms: 0,
++        totalRooms: 0,
++        currentRoomName: '',
++        progress: 1.0,
++      );
++
++      if (!completer.isCompleted) completer.complete();
++      _activeSyncCompleter = null;
++      onCompleted?.call();
++    }
++  }
++}
 diff --git a/lib/utils/beeper_video_thumbnail_cache.dart b/lib/utils/beeper_video_thumbnail_cache.dart
 new file mode 100644
 index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f78f825b7
@@ -363860,18 +363983,20 @@ index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc6
    @override
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..7db7d4d7f71b0b8bdc32d1b682ae773434a9a4ed
+index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9f845b39e
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,247 @@
-+import 'package:fluffychat/l10n/l10n.dart';
-+import 'package:fluffychat/utils/beeper_bridge_utils.dart';
-+import 'package:fluffychat/utils/client_download_content_extension.dart';
-+import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+@@ -0,0 +1,176 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
-+import 'package:wakelock_plus/wakelock_plus.dart';
++import '../l10n/l10n.dart';
++import '../utils/beeper_sync_manager.dart';
++import '../utils/matrix_sdk_extensions/matrix_locals.dart';
 +
 +class CacheRefreshOverlay extends StatefulWidget {
 +  final Client client;
@@ -363892,222 +364017,149 @@ index 0000000000000000000000000000000000000000..7db7d4d7f71b0b8bdc32d1b682ae7734
 +}
 +
 +class _CacheRefreshOverlayState extends State<CacheRefreshOverlay> {
-+  bool _completed = false;
-+  bool _fullscreenDismissed = false;
-+  int _processedRooms = 0;
-+  int _totalRooms = 0;
-+  String _currentRoomName = '';
++  bool _bannerDismissed = false;
 +
 +  @override
 +  void initState() {
 +    super.initState();
-+    _startPrewarming();
-+  }
-+
-+  @override
-+  void dispose() {
-+    WakelockPlus.disable().catchError((_) {});
-+    super.dispose();
-+  }
-+
-+  Future<void> _startPrewarming() async {
-+    try {
-+      // 1. Wait for the initial sync to finish
-+      await widget.client.onSync.stream.firstWhere(
-+        (s) => widget.client.prevBatch != null,
-+      );
-+
-+      // 2. Fetch and sort rooms by last message (latest first), capping at top 30 recent rooms
-+      final rooms = List<Room>.from(widget.client.rooms);
-+      rooms.sort((a, b) {
-+        final aTime = a.lastEvent?.originServerTs ?? DateTime.fromMillisecondsSinceEpoch(0);
-+        final bTime = b.lastEvent?.originServerTs ?? DateTime.fromMillisecondsSinceEpoch(0);
-+        return bTime.compareTo(aTime);
++    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
++      WidgetsBinding.instance.addPostFrameCallback((_) {
++        if (!mounted) return;
++        final locals = MatrixLocals(L10n.of(context));
++        BeeperSyncManager.startFullSync(
++          widget.client,
++          locals: locals,
++          onCompleted: widget.onCompleted,
++        );
 +      });
-+
-+      final targetRooms = rooms.length > 30 ? rooms.sublist(0, 30) : rooms;
-+
-+      if (mounted) {
-+        setState(() {
-+          _totalRooms = targetRooms.length;
-+        });
-+      }
-+
-+      final locals = MatrixLocals(L10n.of(context));
-+      final throttleTimer = Stopwatch()..start();
-+
-+      // 3. Process rooms in parallel batches of 5
-+      const batchSize = 5;
-+      for (var i = 0; i < targetRooms.length; i += batchSize) {
-+        if (!mounted) break;
-+        final batch = targetRooms.sublist(i, (i + batchSize).clamp(0, targetRooms.length));
-+        
-+        await Future.wait(batch.map((room) async {
-+          try {
-+            final roomName = room.getBeeperDisplayname(locals);
-+            if (mounted && throttleTimer.elapsedMilliseconds > 200) {
-+              throttleTimer.reset();
-+              setState(() {
-+                _currentRoomName = roomName;
-+                _processedRooms = i; // Approximate since it's concurrent
-+              });
-+            }
-+            await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
-+            if (room.beeperAvatarUrl != null) {
-+              await widget.client.downloadMxcCached(room.beeperAvatarUrl!);
-+            }
-+          } catch (_) {}
-+        }));
-+
-+        _processedRooms = i + batch.length;
-+        if (mounted && (throttleTimer.elapsedMilliseconds > 200 || i + batchSize >= targetRooms.length)) {
-+          throttleTimer.reset();
-+          setState(() {});
-+        }
-+
-+        // Once we process at least 15 rooms (or all of them if less),
-+        // dismiss the fullscreen overlay and enable the wakelock to prevent suspension.
-+        if (!_fullscreenDismissed && (_processedRooms >= 15 || _processedRooms >= targetRooms.length)) {
-+          WakelockPlus.enable().catchError((_) {});
-+          if (mounted) {
-+            setState(() {
-+              _fullscreenDismissed = true;
-+            });
-+          }
-+        }
-+      }
-+    } catch (e) {
-+      debugPrint('Error during prewarming cache: $e');
-+    } finally {
-+      WakelockPlus.disable().catchError((_) {});
-+      if (mounted) {
-+        final prefs = await SharedPreferences.getInstance();
-+        await prefs.setBool('beeper_needs_cache_refresh', false);
-+        setState(() {
-+          _completed = true;
-+        });
-+        widget.onCompleted?.call();
-+      }
 +    }
 +  }
 +
 +  @override
 +  Widget build(BuildContext context) {
-+    return Stack(
-+      children: [
-+        // Always build the main app child first in the background
-+        widget.child,
++    return ValueListenableBuilder<BeeperSyncProgress>(
++      valueListenable: BeeperSyncManager.progressNotifier,
++      builder: (context, syncState, _) {
++        return Stack(
++          children: [
++            // Always display the actual app so user can use it completely freely
++            widget.child,
 +
-+        // If not completed and fullscreen not dismissed, display the progress overlay on top
-+        if (!_completed && !_fullscreenDismissed)
-+          Positioned.fill(
-+            child: Scaffold(
-+              backgroundColor: Colors.black.withValues(alpha: 0.9),
-+              body: Center(
-+                child: Padding(
-+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-+                  child: Column(
-+                    mainAxisAlignment: MainAxisAlignment.center,
-+                    children: [
-+                      const CircularProgressIndicator(
-+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-+                        strokeWidth: 3,
-+                      ),
-+                      const SizedBox(height: 32),
-+                      const Text(
-+                        'Sincronizando chats...',
-+                        style: TextStyle(
-+                          color: Colors.white,
-+                          fontSize: 20,
-+                          fontWeight: FontWeight.bold,
-+                        ),
-+                      ),
-+                      const SizedBox(height: 12),
-+                      Text(
-+                        _totalRooms > 0
-+                            ? 'Procesando $_processedRooms de $_totalRooms'
-+                            : 'Iniciando conexión...',
-+                        style: TextStyle(
-+                          color: Colors.white.withValues(alpha: 0.7),
-+                          fontSize: 14,
-+                        ),
-+                      ),
-+                      if (_currentRoomName.isNotEmpty) ...[
-+                        const SizedBox(height: 16),
-+                        Text(
-+                          _currentRoomName,
-+                          style: TextStyle(
-+                            color: Colors.white.withValues(alpha: 0.5),
-+                            fontSize: 12,
-+                            fontStyle: FontStyle.italic,
++            // Floating top banner when syncing in background
++            if (syncState.isSyncing && !_bannerDismissed)
++              Positioned(
++                top: 0,
++                left: 0,
++                right: 0,
++                child: SafeArea(
++                  child: Padding(
++                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
++                    child: Material(
++                      elevation: 8,
++                      borderRadius: BorderRadius.circular(16),
++                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
++                      shadowColor: Colors.black45,
++                      child: Container(
++                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
++                        decoration: BoxDecoration(
++                          borderRadius: BorderRadius.circular(16),
++                          border: Border.all(
++                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
++                            width: 1,
 +                          ),
-+                          textAlign: TextAlign.center,
-+                          maxLines: 1,
-+                          overflow: TextOverflow.ellipsis,
 +                        ),
-+                      ],
-+                    ],
-+                  ),
-+                ),
-+              ),
-+            ),
-+          ),
-+
-+        // If fullscreen is dismissed but not completed, show a small floating progress indicator
-+        if (!_completed && _fullscreenDismissed)
-+          Positioned(
-+            bottom: 16,
-+            left: 16,
-+            right: 16,
-+            child: SafeArea(
-+              child: Card(
-+                elevation: 6,
-+                color: Theme.of(context).cardColor,
-+                child: Padding(
-+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-+                  child: Row(
-+                    children: [
-+                      const SizedBox(
-+                        width: 20,
-+                        height: 20,
-+                        child: CircularProgressIndicator(
-+                          strokeWidth: 2,
-+                        ),
-+                      ),
-+                      const SizedBox(width: 16),
-+                      Expanded(
 +                        child: Column(
-+                          crossAxisAlignment: CrossAxisAlignment.start,
 +                          mainAxisSize: MainAxisSize.min,
++                          crossAxisAlignment: CrossAxisAlignment.start,
 +                          children: [
-+                            Text(
-+                              'Sincronizando chats de Beeper...',
-+                              style: TextStyle(
-+                                fontWeight: FontWeight.bold,
-+                                fontSize: 13,
-+                                color: Theme.of(context).textTheme.bodyLarge?.color,
++                            Row(
++                              children: [
++                                SizedBox(
++                                  width: 18,
++                                  height: 18,
++                                  child: CircularProgressIndicator(
++                                    strokeWidth: 2.5,
++                                    value: syncState.progress > 0 ? syncState.progress : null,
++                                    valueColor: AlwaysStoppedAnimation<Color>(
++                                      Theme.of(context).colorScheme.primary,
++                                    ),
++                                  ),
++                                ),
++                                const SizedBox(width: 12),
++                                Expanded(
++                                  child: Text(
++                                    'Sincronizando chats de Beeper (${(syncState.progress * 100).toInt()}%)',
++                                    style: TextStyle(
++                                      fontWeight: FontWeight.bold,
++                                      fontSize: 13,
++                                      color: Theme.of(context).colorScheme.onSurface,
++                                      decoration: TextDecoration.none,
++                                    ),
++                                  ),
++                                ),
++                                GestureDetector(
++                                  onTap: () => setState(() => _bannerDismissed = true),
++                                  child: Icon(
++                                    Icons.close,
++                                    size: 18,
++                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
++                                  ),
++                                ),
++                              ],
++                            ),
++                            const SizedBox(height: 8),
++                            ClipRRect(
++                              borderRadius: BorderRadius.circular(4),
++                              child: LinearProgressIndicator(
++                                value: syncState.progress > 0 ? syncState.progress : null,
++                                minHeight: 4,
++                                backgroundColor: Theme.of(context).colorScheme.surface,
++                                valueColor: AlwaysStoppedAnimation<Color>(
++                                  Theme.of(context).colorScheme.primary,
++                                ),
 +                              ),
 +                            ),
-+                            const SizedBox(height: 2),
-+                            Text(
-+                              'Procesados $_processedRooms de $_totalRooms ($_currentRoomName)',
-+                              style: TextStyle(
-+                                fontSize: 11,
-+                                color: Theme.of(context).textTheme.bodySmall?.color,
-+                              ),
-+                              maxLines: 1,
-+                              overflow: TextOverflow.ellipsis,
++                            const SizedBox(height: 6),
++                            Row(
++                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                              children: [
++                                Expanded(
++                                  child: Text(
++                                    syncState.currentRoomName.isNotEmpty
++                                        ? syncState.currentRoomName
++                                        : 'Descargando historial...',
++                                    style: TextStyle(
++                                      fontSize: 11,
++                                      fontStyle: FontStyle.italic,
++                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
++                                      decoration: TextDecoration.none,
++                                    ),
++                                    maxLines: 1,
++                                    overflow: TextOverflow.ellipsis,
++                                  ),
++                                ),
++                                const SizedBox(width: 8),
++                                Text(
++                                  '${syncState.processedRooms} / ${syncState.totalRooms}',
++                                  style: TextStyle(
++                                    fontSize: 11,
++                                    fontWeight: FontWeight.w600,
++                                    color: Theme.of(context).colorScheme.primary,
++                                    decoration: TextDecoration.none,
++                                  ),
++                                ),
++                              ],
 +                            ),
 +                          ],
 +                        ),
 +                      ),
-+                    ],
++                    ),
 +                  ),
 +                ),
 +              ),
-+            ),
-+          ),
-+      ],
++          ],
++        );
++      },
 +    );
 +  }
 +}
@@ -366935,10 +366987,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..01c761e339b90f44e7b99701374ff2358edc38fd 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..374e13fc0be9c9a00e64dde6f1a38f6d47fc0d7d 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,489 @@
+@@ -1,443 +1,486 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -367836,10 +367888,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..01c761e339b90f44e7b99701374ff235
 +  Widget build(BuildContext context) {
 +    final child = Provider.value(value: this, child: widget.child ?? const SizedBox.shrink());
 +
-+    if (widget.store.getBool('beeper_needs_cache_refresh') == true) {
-+      return CacheRefreshOverlay(client: client, store: widget.store, child: child);
-+    }
-+    return child;
++    return CacheRefreshOverlay(client: client, store: widget.store, child: child);
 +  }
 +
 +  Future<void> dehydrateAction(BuildContext context) async {
