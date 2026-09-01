@@ -334598,10 +334598,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d689f5f6fd7
+index 0000000000000000000000000000000000000000..2e9248d7c7ab37fed923aa7e44828a6b553677b8
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,535 @@
+@@ -0,0 +1,603 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -334613,6 +334613,7 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +import '../../utils/beeper_bridge_utils.dart';
 +import '../../utils/beeper_merge_utils.dart';
 +import '../../utils/beeper_phone_contacts.dart';
++import '../../utils/beeper_fuzzy_matcher.dart';
 +import '../../widgets/avatar.dart';
 +import '../../widgets/matrix.dart';
 +
@@ -334644,6 +334645,7 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +  final String searchKey;
 +  final BeeperNetwork? network;
 +  final Uri? avatarUrl;
++  final double similarity;
 +
 +  const _MergePickerRoomItem({
 +    required this.room,
@@ -334652,6 +334654,7 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +    required this.searchKey,
 +    required this.network,
 +    required this.avatarUrl,
++    this.similarity = 0.0,
 +  });
 +}
 +
@@ -334708,6 +334711,14 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
 +    final items = <_MergePickerRoomItem>[];
 +
++    // Source rooms to compare similarity against
++    final sourceRooms = _selectedRoomIds.isNotEmpty
++        ? _selectedRoomIds
++            .map((id) => client.getRoomById(id))
++            .whereType<Room>()
++            .toList()
++        : [widget.initialRoom];
++
 +    for (final room in nonSpaceRooms) {
 +      final data = BeeperBridgeUtils.getRoomData(room);
 +      final dName = data.displayName ?? room.name;
@@ -334716,6 +334727,12 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +      final handle = BeeperBridgeUtils.getAccountHandle(room);
 +      final searchKey = '${dName.toLowerCase()} ${handle?.toLowerCase() ?? ''} $netKey ${room.id.toLowerCase()}';
 +
++      var maxSim = 0.0;
++      for (final sRoom in sourceRooms) {
++        final sim = BeeperFuzzyMatcher.computeRoomSimilarity(sRoom, room);
++        if (sim > maxSim) maxSim = sim;
++      }
++
 +      items.add(_MergePickerRoomItem(
 +        room: room,
 +        displayName: dName,
@@ -334723,15 +334740,32 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +        searchKey: searchKey,
 +        network: net,
 +        avatarUrl: data.avatarUrl,
++        similarity: maxSim,
 +      ));
 +    }
 +
-+    // Sort selected chats to the top so they are easily visible and editable
++    // Sort order:
++    // 1. Selected chats at the top
++    // 2. High similarity matches ranked descending
++    // 3. Alphabetical for remaining chats
 +    items.sort((a, b) {
 +      final aSelected = _selectedRoomIds.contains(a.room.id);
 +      final bSelected = _selectedRoomIds.contains(b.room.id);
 +      if (aSelected && !bSelected) return -1;
 +      if (!aSelected && bSelected) return 1;
++      if (aSelected && bSelected) {
++        return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
++      }
++
++      final aHasSim = a.similarity >= 0.20;
++      final bHasSim = b.similarity >= 0.20;
++      if (aHasSim && !bHasSim) return -1;
++      if (!aHasSim && bHasSim) return 1;
++      if (aHasSim && bHasSim) {
++        final diff = b.similarity.compareTo(a.similarity);
++        if (diff != 0) return diff;
++      }
++
 +      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
 +    });
 +
@@ -335089,13 +335123,47 @@ index 0000000000000000000000000000000000000000..74da376fdd2a063b67c1372574e16d68
 +                              ),
 +                          ],
 +                        ),
-+                        title: Text(
-+                          displayname,
-+                          maxLines: 1,
-+                          overflow: TextOverflow.ellipsis,
-+                          style: TextStyle(
-+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-+                          ),
++                        title: Row(
++                          children: [
++                            Expanded(
++                              child: Text(
++                                displayname,
++                                maxLines: 1,
++                                overflow: TextOverflow.ellipsis,
++                                style: TextStyle(
++                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
++                                ),
++                              ),
++                            ),
++                            if (!isSelected && item.similarity >= 0.35)
++                              Container(
++                                margin: const EdgeInsets.only(left: 6),
++                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
++                                decoration: BoxDecoration(
++                                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
++                                  borderRadius: BorderRadius.circular(6),
++                                ),
++                                child: Row(
++                                  mainAxisSize: MainAxisSize.min,
++                                  children: [
++                                    Icon(
++                                      Icons.auto_awesome,
++                                      size: 11,
++                                      color: theme.colorScheme.primary,
++                                    ),
++                                    const SizedBox(width: 3),
++                                    Text(
++                                      'Similar',
++                                      style: TextStyle(
++                                        fontSize: 10,
++                                        fontWeight: FontWeight.bold,
++                                        color: theme.colorScheme.primary,
++                                      ),
++                                    ),
++                                  ],
++                                ),
++                              ),
++                          ],
 +                        ),
 +                        subtitle: Text(
 +                          [
@@ -350862,17 +350930,361 @@ index 0000000000000000000000000000000000000000..1621e299abab4077224cf53010e93e54
 +    return _beeperData.displayName ?? getLocalizedDisplayname(locals);
 +  }
 +}
+diff --git a/lib/utils/beeper_fuzzy_matcher.dart b/lib/utils/beeper_fuzzy_matcher.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e7cb2bbd5
+--- /dev/null
++++ b/lib/utils/beeper_fuzzy_matcher.dart
+@@ -0,0 +1,337 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:math';
++import 'package:matrix/matrix.dart';
++import 'beeper_bridge_utils.dart';
++import 'beeper_phone_contacts.dart';
++
++class BeeperFuzzyMatcher {
++  /// Spanish and Latin American common nicknames / apodos mapping
++  static const Map<String, List<String>> _nicknameMap = {
++    'alejandro': ['ale', 'alex', 'alejo', 'jano'],
++    'alejandra': ['ale', 'alex', 'aleja'],
++    'alberto': ['beto', 'tito', 'al'],
++    'agustin': ['agus'],
++    'agustina': ['agus'],
++    'camila': ['cami'],
++    'carlos': ['charly', 'carlitos'],
++    'daniel': ['dani'],
++    'daniela': ['dani'],
++    'diego': ['dieguito'],
++    'eduardo': ['lalo', 'edu'],
++    'ezequiel': ['eze'],
++    'esteban': ['este'],
++    'facundo': ['facu'],
++    'federico': ['fede'],
++    'fernando': ['fer', 'nando', 'fercho'],
++    'fernanda': ['fer'],
++    'florencia': ['flor'],
++    'francisco': ['fran', 'pancho', 'paco', 'franco'],
++    'francesca': ['fran', 'chesca'],
++    'franco': ['fran'],
++    'gabriel': ['gabi', 'gabo'],
++    'gabriela': ['gabi'],
++    'gonzalo': ['gonza'],
++    'guillermo': ['guille', 'willy', 'memo'],
++    'gustavo': ['tavo', 'gus'],
++    'ignacio': ['nacho'],
++    'joaquin': ['joaco'],
++    'jose': ['pepe', 'josecho'],
++    'josefina': ['jose', 'fina'],
++    'juan': ['juancho', 'juani'],
++    'leonardo': ['leo'],
++    'lucas': ['luca', 'luquitas'],
++    'lucia': ['lu', 'luli'],
++    'luciana': ['lu', 'luli'],
++    'manuel': ['manu'],
++    'manuela': ['manu'],
++    'maria': ['mari', 'marita'],
++    'mariana': ['mari'],
++    'matias': ['mati'],
++    'mateo': ['teom'],
++    'maximiliano': ['maxi'],
++    'milagros': ['mili'],
++    'nicolas': ['nico'],
++    'patricio': ['pato'],
++    'patricia': ['pato'],
++    'ramiro': ['rama', 'rami', 'ramarardo', 'ramoncito'],
++    'roberto': ['beto', 'tito', 'rober'],
++    'rodrigo': ['rodri', 'colo'],
++    'santiago': ['santi', 'tiago'],
++    'sebastian': ['seba', 'sebas'],
++    'sofia': ['sofi'],
++    'tomas': ['tomi', 'toto'],
++    'valentin': ['valen'],
++    'valentina': ['valen'],
++    'victoria': ['vicky'],
++  };
++
++  /// Remove accents, emojis, punctuation, bridge tags and normalize
++  static String clean(String input) {
++    var s = input.toLowerCase();
++    // Remove bridge tags like [WhatsApp], [Instagram]
++    s = s.replaceAll(
++      RegExp(
++        r'\[(?:whatsapp|instagram|telegram|signal|discord|slack|facebook|googlechat)\]',
++        caseSensitive: false,
++      ),
++      '',
++    );
++    // Remove accents (diacritics)
++    const withDia = 'áàäâãéèëêíìïîóòöôõúùüûñç';
++    const withoutDia = 'aaaaaeeeeiiiiooooouuuunc';
++    for (var i = 0; i < withDia.length; i++) {
++      s = s.replaceAll(withDia[i], withoutDia[i]);
++    }
++    return s.trim();
++  }
++
++  /// Split string into semantic alpha words/tokens (splits on numbers, underscores, dots, whitespace)
++  static List<String> extractTokens(String input) {
++    final cleaned = clean(input);
++    if (cleaned.isEmpty) return const [];
++    // Replace non-alphanumeric with spaces
++    final separated = cleaned.replaceAll(RegExp(r'[^a-z0-9]'), ' ');
++    // Split into tokens, separating digit blocks
++    final tokens = <String>[];
++    for (final part in separated.split(RegExp(r'\s+'))) {
++      if (part.isEmpty) continue;
++      // Split sub-parts if contains digits, e.g. "ramiro25caraballo" -> "ramiro", "caraballo"
++      final alphaParts = part.split(RegExp(r'\d+'));
++      for (final ap in alphaParts) {
++        final t = ap.trim();
++        if (t.length >= 2) {
++          tokens.add(t);
++        }
++      }
++    }
++    return tokens;
++  }
++
++  /// Check if two tokens are nickname variations of each other
++  static bool isNicknameMatch(String t1, String t2) {
++    if (t1 == t2) return true;
++    for (final entry in _nicknameMap.entries) {
++      final formal = entry.key;
++      final nicks = entry.value;
++      final matches1 = formal == t1 ||
++          nicks.contains(t1) ||
++          t1.startsWith(formal) ||
++          (formal.startsWith(t1) && t1.length >= 3);
++      final matches2 = formal == t2 ||
++          nicks.contains(t2) ||
++          t2.startsWith(formal) ||
++          (formal.startsWith(t2) && t2.length >= 3);
++      if (matches1 && matches2) return true;
++    }
++    return false;
++  }
++
++  /// Sørensen–Dice character bigram similarity (0.0 to 1.0)
++  static double diceBigramSimilarity(String s1, String s2) {
++    final a = clean(s1).replaceAll(RegExp(r'[^a-z0-9]'), '');
++    final b = clean(s2).replaceAll(RegExp(r'[^a-z0-9]'), '');
++    if (a.isEmpty || b.isEmpty) return 0.0;
++    if (a == b) return 1.0;
++    if (a.length < 2 || b.length < 2) {
++      return a == b ? 1.0 : (a.contains(b) || b.contains(a) ? 0.7 : 0.0);
++    }
++
++    final bigramsA = <int, int>{};
++    for (var i = 0; i < a.length - 1; i++) {
++      final code = (a.codeUnitAt(i) << 8) | a.codeUnitAt(i + 1);
++      bigramsA[code] = (bigramsA[code] ?? 0) + 1;
++    }
++
++    var matches = 0;
++    for (var i = 0; i < b.length - 1; i++) {
++      final code = (b.codeUnitAt(i) << 8) | b.codeUnitAt(i + 1);
++      final count = bigramsA[code] ?? 0;
++      if (count > 0) {
++        bigramsA[code] = count - 1;
++        matches++;
++      }
++    }
++
++    final totalBigrams = (a.length - 1) + (b.length - 1);
++    return (2.0 * matches) / totalBigrams;
++  }
++
++  /// Jaro-Winkler string distance (0.0 to 1.0)
++  static double jaroWinkler(String s1, String s2) {
++    if (s1 == s2) return 1.0;
++    if (s1.isEmpty || s2.isEmpty) return 0.0;
++
++    final matchWindow = max(s1.length, s2.length) ~/ 2 - 1;
++    final s1Matches = List<bool>.filled(s1.length, false);
++    final s2Matches = List<bool>.filled(s2.length, false);
++
++    var matches = 0;
++    for (var i = 0; i < s1.length; i++) {
++      final start = max(0, i - matchWindow);
++      final end = min(i + matchWindow + 1, s2.length);
++      for (var j = start; j < end; j++) {
++        if (s2Matches[j] || s1[i] != s2[j]) continue;
++        s1Matches[i] = true;
++        s2Matches[j] = true;
++        matches++;
++        break;
++      }
++    }
++
++    if (matches == 0) return 0.0;
++
++    var transpositions = 0;
++    var k = 0;
++    for (var i = 0; i < s1.length; i++) {
++      if (!s1Matches[i]) continue;
++      while (!s2Matches[k]) {
++        k++;
++      }
++      if (s1[i] != s2[k]) transpositions++;
++      k++;
++    }
++
++    final jaro = (matches / s1.length +
++            matches / s2.length +
++            (matches - transpositions / 2) / matches) /
++        3.0;
++
++    // Winkler prefix bonus
++    var prefix = 0;
++    final maxPrefix = min(4, min(s1.length, s2.length));
++    for (var i = 0; i < maxPrefix; i++) {
++      if (s1[i] == s2[i]) {
++        prefix++;
++      } else {
++        break;
++      }
++    }
++
++    return jaro + prefix * 0.1 * (1.0 - jaro);
++  }
++
++  /// Token-based similarity: splits both inputs into words and matches token pairs
++  static double tokenSimilarity(String s1, String s2) {
++    final tokens1 = extractTokens(s1);
++    final tokens2 = extractTokens(s2);
++    if (tokens1.isEmpty || tokens2.isEmpty) return 0.0;
++
++    var totalScore1 = 0.0;
++    for (final t1 in tokens1) {
++      var bestT1 = 0.0;
++      for (final t2 in tokens2) {
++        if (t1 == t2) {
++          bestT1 = max(bestT1, 1.0);
++        } else if (isNicknameMatch(t1, t2)) {
++          bestT1 = max(bestT1, 0.95);
++        } else if (t1.startsWith(t2) || t2.startsWith(t1)) {
++          final ratio = min(t1.length, t2.length) / max(t1.length, t2.length);
++          bestT1 = max(bestT1, 0.7 + 0.25 * ratio);
++        } else {
++          final jw = jaroWinkler(t1, t2);
++          if (jw > 0.7) bestT1 = max(bestT1, jw);
++        }
++      }
++      totalScore1 += bestT1;
++    }
++
++    var totalScore2 = 0.0;
++    for (final t2 in tokens2) {
++      var bestT2 = 0.0;
++      for (final t1 in tokens1) {
++        if (t1 == t2) {
++          bestT2 = max(bestT2, 1.0);
++        } else if (isNicknameMatch(t1, t2)) {
++          bestT2 = max(bestT2, 0.95);
++        } else if (t1.startsWith(t2) || t2.startsWith(t1)) {
++          final ratio = min(t1.length, t2.length) / max(t1.length, t2.length);
++          bestT2 = max(bestT2, 0.7 + 0.25 * ratio);
++        } else {
++          final jw = jaroWinkler(t1, t2);
++          if (jw > 0.7) bestT2 = max(bestT2, jw);
++        }
++      }
++      totalScore2 += bestT2;
++    }
++
++    final avg1 = totalScore1 / tokens1.length;
++    final avg2 = totalScore2 / tokens2.length;
++    return (avg1 + avg2) / 2.0;
++  }
++
++  /// Hybrid similarity combining Token-level and Character-level matching (0.0 to 1.0)
++  static double matchStrings(String s1, String s2) {
++    if (s1.isEmpty || s2.isEmpty) return 0.0;
++    final c1 = clean(s1);
++    final c2 = clean(s2);
++    if (c1 == c2) return 1.0;
++
++    final tokenScore = tokenSimilarity(c1, c2);
++    final diceScore = diceBigramSimilarity(c1, c2);
++
++    return max(tokenScore, diceScore);
++  }
++
++  /// Calculate similarity score between source room (or selected rooms) and a candidate room (0.0 to 1.0)
++  static double computeRoomSimilarity(Room sourceRoom, Room candidateRoom) {
++    if (sourceRoom.id == candidateRoom.id) return 1.0;
++
++    final sourceData = BeeperBridgeUtils.getRoomData(sourceRoom);
++    final candData = BeeperBridgeUtils.getRoomData(candidateRoom);
++
++    // 1. WhatsApp phone match (exact 1.0)
++    final sPhone = BeeperBridgeUtils.extractWhatsAppPhone(sourceRoom);
++    final cPhone = BeeperBridgeUtils.extractWhatsAppPhone(candidateRoom);
++    if (sPhone != null &&
++        cPhone != null &&
++        sPhone.length >= 7 &&
++        cPhone.length >= 7) {
++      final sTail = sPhone.substring(max(0, sPhone.length - 8));
++      final cTail = cPhone.substring(max(0, cPhone.length - 8));
++      if (sTail == cTail) return 1.0;
++    }
++
++    // 2. Candidate strings from source
++    final sList = <String>[
++      if (sourceData.displayName != null) sourceData.displayName!,
++      sourceRoom.name,
++      if (BeeperBridgeUtils.getAccountHandle(sourceRoom) != null)
++        BeeperBridgeUtils.getAccountHandle(sourceRoom)!,
++    ];
++
++    // 3. Candidate strings from candidate
++    final cList = <String>[
++      if (candData.displayName != null) candData.displayName!,
++      candidateRoom.name,
++      if (BeeperBridgeUtils.getAccountHandle(candidateRoom) != null)
++        BeeperBridgeUtils.getAccountHandle(candidateRoom)!,
++    ];
++
++    // If either room is connected to phone contact, add contact names
++    if (BeeperPhoneContacts.isLoaded) {
++      if (sPhone != null) {
++        final pc = BeeperPhoneContacts.findByPhone(sPhone);
++        if (pc != null) sList.add(pc.displayName);
++      }
++      if (cPhone != null) {
++        final pc = BeeperPhoneContacts.findByPhone(cPhone);
++        if (pc != null) cList.add(pc.displayName);
++      }
++    }
++
++    var maxScore = 0.0;
++    for (final s in sList) {
++      for (final c in cList) {
++        final score = matchStrings(s, c);
++        if (score > maxScore) {
++          maxScore = score;
++        }
++      }
++    }
++
++    return maxScore;
++  }
++}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e052f1d9e0b4910ba3a5361fd49d85732832a8cd
+index 0000000000000000000000000000000000000000..32bf0c688a62ac6f2524da2fd0882a081c8afee0
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,401 @@
+@@ -0,0 +1,418 @@
 +import 'dart:collection';
 +import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
 +import 'beeper_bridge_utils.dart';
 +import 'beeper_phone_contacts.dart';
++import 'beeper_fuzzy_matcher.dart';
 +
 +class MergedContact {
 +  final String id;
@@ -351260,6 +351672,22 @@ index 0000000000000000000000000000000000000000..e052f1d9e0b4910ba3a5361fd49d8573
 +        final norm = normalizeDisplayName(name);
 +        if (norm.length >= 3) {
 +          groups.putIfAbsent('name_$norm', () => <Room>[]).add(room);
++        }
++      }
++    }
++
++    // 5. Intelligent fuzzy match pass for unassigned rooms
++    final groupedRoomIds = groups.values.expand((l) => l.map((r) => r.id)).toSet();
++    final remainingRooms = bridgedRooms.where((r) => !groupedRoomIds.contains(r.id)).toList();
++
++    for (var i = 0; i < remainingRooms.length; i++) {
++      final r1 = remainingRooms[i];
++      for (var j = i + 1; j < remainingRooms.length; j++) {
++        final r2 = remainingRooms[j];
++        final sim = BeeperFuzzyMatcher.computeRoomSimilarity(r1, r2);
++        if (sim >= 0.70) {
++          final key = 'fuzzy_${r1.id}_${r2.id}';
++          groups.putIfAbsent(key, () => <Room>[r1, r2]);
 +        }
 +      }
 +    }
