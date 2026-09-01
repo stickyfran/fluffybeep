@@ -351409,10 +351409,10 @@ index 0000000000000000000000000000000000000000..8f2436ccb600b3672bd889e290de41ff
 +}
 diff --git a/lib/utils/beeper_sync_manager.dart b/lib/utils/beeper_sync_manager.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5aff944e5ec84762d08453941d8ddd2d19705be0
+index 0000000000000000000000000000000000000000..41c0f3f0dee5f7af8ee30b8cc07ee14334d7347b
 --- /dev/null
 +++ b/lib/utils/beeper_sync_manager.dart
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,182 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -351530,7 +351530,7 @@ index 0000000000000000000000000000000000000000..5aff944e5ec84762d08453941d8ddd2d
 +          try {
 +            final name = locals != null
 +                ? room.getBeeperDisplayname(locals)
-+                : (room.displayName.isNotEmpty ? room.displayName : room.name);
++                : (BeeperBridgeUtils.getRoomData(room).displayName ?? room.name);
 +
 +            // Fetch recent history for this room (saving events into local DB)
 +            await room.getTimeline().then((t) => t.requestHistory(historyCount: 30));
@@ -351556,8 +351556,8 @@ index 0000000000000000000000000000000000000000..5aff944e5ec84762d08453941d8ddd2d
 +            try {
 +              final pct = (currentProgress * 100).toInt();
 +              FlutterForegroundTask.updateService(
-+                notificationTitle: 'Sincronizando chats de Beeper (' + str(pct) + '%)',
-+                notificationText: str(processed) + ' de ' + str(total) + ': ' + name,
++                notificationTitle: 'Sincronizando chats de Beeper ($pct%)',
++                notificationText: '$processed de $total: $name',
 +              );
 +            } catch (_) {}
 +          } catch (_) {}
@@ -351572,8 +351572,7 @@ index 0000000000000000000000000000000000000000..5aff944e5ec84762d08453941d8ddd2d
 +      await prefs.setBool('beeper_needs_cache_refresh', false);
 +
 +    } catch (e, s) {
-+      debugPrint('Error during Beeper full sync: $e
-+$s');
++      debugPrint('Error during Beeper full sync: $e\n$s');
 +    } finally {
 +      try {
 +        await WakelockPlus.disable();
@@ -359338,6 +359337,30 @@ index 786009114e32cc4a43f939102f48698fbb5620e6..59ab0bcc11778b8a3435329032958ad1
 +    return '$size GB';
 +  }
 +}
+diff --git a/lib/utils/start_push_foreground_service.dart b/lib/utils/start_push_foreground_service.dart
+index 87344b926d07d65717382f432b79728145adef88..2cc6dad4e2e06548eb753a832c7fedbcd736f493 100644
+--- a/lib/utils/start_push_foreground_service.dart
++++ b/lib/utils/start_push_foreground_service.dart
+@@ -46,8 +46,8 @@ abstract class ForegroundServices {
+         FlutterForegroundTask.init(
+           androidNotificationOptions: AndroidNotificationOptions(
+             channelId: 'fluffychat_sync',
+-            channelName: l10n.loadingMessages,
+-            channelDescription: l10n.loadingMessages,
++            channelName: l10n.loadingPleaseWait,
++            channelDescription: l10n.loadingPleaseWait,
+             onlyAlertOnce: true,
+             playSound: false,
+             enableVibration: false,
+@@ -69,7 +69,7 @@ abstract class ForegroundServices {
+         final result = await FlutterForegroundTask.startService(
+           serviceTypes: [ForegroundServiceTypes.shortService],
+           notificationTitle: 'FluffyChat',
+-          notificationText: l10n.loadingMessages,
++          notificationText: l10n.loadingPleaseWait,
+           notificationIcon: NotificationIcon(metaDataName: 'ic_launcher'),
+         );
+         final started = result is ServiceRequestSuccess;
 diff --git a/lib/utils/stream_extension.dart b/lib/utils/stream_extension.dart
 index 93fa60dd0c5585be2430a654b84774a9f15a3cae..4e806c7f441e7b9fdb284f21bafa1a42033ce991 100644
 --- a/lib/utils/stream_extension.dart
