@@ -350756,10 +350756,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e95cce34aded70d354d95e03e6c10b695998a679
+index 0000000000000000000000000000000000000000..d53dba73c15480278a4c1806744d7555a640b40b
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1297 @@
+@@ -0,0 +1,1298 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350772,6 +350772,7 @@ index 0000000000000000000000000000000000000000..e95cce34aded70d354d95e03e6c10b69
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +import 'file_logger.dart';
++import 'beeper_merge_utils.dart';
 +
 +class BeeperRoomData {
 +  final String? contactId;
