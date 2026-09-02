@@ -306922,12 +306922,14 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c5376424c7c54c7 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e079f3c760 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
-@@ -8,13 +8,16 @@ import 'dart:io';
+@@ -7,14 +7,18 @@ import 'dart:async';
+ import 'dart:io';
  
  import 'package:async/async.dart';
++import 'package:audio_session/audio_session.dart';
  import 'package:fluffychat/config/app_config.dart';
 +import 'package:fluffychat/config/setting_keys.dart';
  import 'package:fluffychat/config/themes.dart';
@@ -306942,7 +306944,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
  import 'package:flutter_linkify/flutter_linkify.dart';
  import 'package:just_audio/just_audio.dart';
  import 'package:matrix/matrix.dart';
-@@ -22,6 +25,7 @@ import 'package:opus_caf_converter_dart/opus_caf_converter_dart.dart';
+@@ -22,6 +26,7 @@ import 'package:opus_caf_converter_dart/opus_caf_converter_dart.dart';
  import 'package:path_provider/path_provider.dart';
  
  import '../../../utils/matrix_sdk_extensions/event_extension.dart';
@@ -306950,7 +306952,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -53,9 +57,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -53,9 +58,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
    double? _downloadProgress;
  
@@ -306967,7 +306969,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
  
    @override
    void dispose() {
-@@ -70,7 +81,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -70,7 +82,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              MaterialBanner(
                padding: EdgeInsets.zero,
                leading: StreamBuilder(
@@ -306976,7 +306978,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
                  builder: (context, _) => IconButton(
                    onPressed: () {
                      if (audioPlayer.isAtEndPosition) {
-@@ -87,7 +98,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -87,7 +99,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                  ),
                ),
                content: StreamBuilder(
@@ -306985,7 +306987,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
                  builder: (context, _) => GestureDetector(
                    onTap: () => FluffyChatApp.router.go(
                      '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -179,7 +190,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -179,7 +191,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
          await file.writeAsBytes(matrixFile.bytes);
  
          if (Platform.isIOS &&
@@ -306996,24 +306998,27 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -204,6 +217,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -204,6 +218,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
  
      final audioPlayer = matrix.audioPlayer = AudioPlayer();
-+    if (PlatformInfos.isAndroid) {
-+      final isEarpiece = AppSettings.audioPlaybackOutput.value == 'earpiece';
-+      await audioPlayer.setAndroidAudioAttributes(
-+        AndroidAudioAttributes(
-+          contentType: isEarpiece ? AndroidAudioContentType.speech : AndroidAudioContentType.music,
-+          usage: isEarpiece ? AndroidAudioUsage.voiceCommunication : AndroidAudioUsage.media,
-+          flags: AndroidAudioFlags.none,
-+        ),
-+      );
++    if (PlatformInfos.isMobile) {
++      try {
++        final isEarpiece = AppSettings.audioPlaybackOutput.value == 'earpiece';
++        final session = await AudioSession.instance;
++        await session.configure(
++          isEarpiece
++              ? const AudioSessionConfiguration.speech()
++              : const AudioSessionConfiguration.music(),
++        );
++      } catch (e) {
++        Logs().w('Failed to configure audio session', e);
++      }
 +    }
  
      if (file != null) {
        audioPlayer.setFilePath(file.path);
-@@ -246,12 +269,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +273,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -307029,7 +307034,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +290,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +294,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -307104,7 +307109,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +387,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +391,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -307128,7 +307133,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -511,6 +600,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +604,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -307136,7 +307141,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..dba239fa1c1a31170ec5a50e3c537642
                  ],
                ),
              );
-@@ -519,6 +609,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +613,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -350504,10 +350509,10 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ce9531a03be9e9ea7ada946731b8c928bd52b170
+index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0f3f22b07
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1099 @@
+@@ -0,0 +1,1098 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -351548,7 +351553,6 @@ index 0000000000000000000000000000000000000000..ce9531a03be9e9ea7ada946731b8c928
 +    final targetId = targetEventId ??
 +        room.lastEvent?.eventId ??
 +        lastRealMessageCache[room.id]?.eventId ??
-+        room.timeline?.events.firstOrNull?.eventId ??
 +        room.fullyRead;
 +
 +    // 3. Clear system notifications & update app badge
@@ -375001,7 +375005,7 @@ index cfeb4e70fbd05fa9ed9b722057c3e07562ef1c97..594a8c2708ed67f770ae64e7a9c2cd61
 +</dict>
 +</plist>
 diff --git a/pubspec.yaml b/pubspec.yaml
-index 945f6613926ed28cb81c793cd45819f9085e63a8..187bca6e6a9c7025019f334e4443287c5062b264 100644
+index 945f6613926ed28cb81c793cd45819f9085e63a8..31e935bdd6a218d0ea17b59280ea42af3e77793b 100644
 --- a/pubspec.yaml
 +++ b/pubspec.yaml
 @@ -29,8 +29,12 @@ dependencies:
@@ -375026,7 +375030,15 @@ index 945f6613926ed28cb81c793cd45819f9085e63a8..187bca6e6a9c7025019f334e4443287c
    flutter_shortcuts_new: ^2.0.0
    flutter_vodozemac: ^0.7.1
    flutter_web_auth_2: ^5.0.3
-@@ -111,6 +115,7 @@ hooks:
+@@ -53,6 +57,7 @@ dependencies:
+   image_picker: ^1.2.3
+   intl: any
+   just_audio: ^0.10.6
++  audio_session: ^0.1.25
+   latlong2: ^0.10.1
+   local_auth: ^3.0.2
+   matrix: ^10.0.1
+@@ -111,6 +116,7 @@ hooks:
      sqlite3:
        source: sqlcipher
  
