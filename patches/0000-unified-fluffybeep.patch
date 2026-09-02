@@ -304857,7 +304857,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..f15e2b4fd55721270f614eccd2a7c349
    }
  }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..82732a4a2732394eedd700fa417e547c4099a0f3 100644
+index 879717fa9889be421184b768e20bad7417f95114..a8ef74f91b33c5315b2dc456e4eee6ce4881ab5b 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
 @@ -4,22 +4,45 @@
@@ -305360,17 +305360,17 @@ index 879717fa9889be421184b768e20bad7417f95114..82732a4a2732394eedd700fa417e547c
 +                            ),
 +                            if (net != null)
 +                              Positioned(
-+                                bottom: -2,
-+                                right: -2,
++                                bottom: -1,
++                                right: -1,
 +                                child: Container(
-+                                  width: 8,
-+                                  height: 8,
++                                  width: 5,
++                                  height: 5,
 +                                  decoration: BoxDecoration(
 +                                    shape: BoxShape.circle,
 +                                    color: Color(net.colorHex),
 +                                    border: Border.all(
 +                                      color: theme.colorScheme.surface,
-+                                      width: 1.0,
++                                      width: 0.8,
 +                                    ),
 +                                  ),
 +                                ),
@@ -311404,7 +311404,7 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e
            focusNode: focusNode,
 diff --git a/lib/pages/chat/merged_contact_switcher.dart b/lib/pages/chat/merged_contact_switcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e099e099330534c787dd49af6009c471627f70e4
+index 0000000000000000000000000000000000000000..5b27004776ed9604a3145274b211edc732ed9521
 --- /dev/null
 +++ b/lib/pages/chat/merged_contact_switcher.dart
 @@ -0,0 +1,176 @@
@@ -311521,17 +311521,17 @@ index 0000000000000000000000000000000000000000..e099e099330534c787dd49af6009c471
 +                            ),
 +                            if (network != null)
 +                              Positioned(
-+                                bottom: -2,
-+                                right: -2,
++                                bottom: -1,
++                                right: -1,
 +                                child: Container(
-+                                  width: 12,
-+                                  height: 12,
++                                  width: 6,
++                                  height: 6,
 +                                  decoration: BoxDecoration(
 +                                    shape: BoxShape.circle,
 +                                    color: Color(network.colorHex),
 +                                    border: Border.all(
 +                                      color: theme.colorScheme.surface,
-+                                      width: 1.5,
++                                      width: 1.0,
 +                                    ),
 +                                  ),
 +                                ),
@@ -323725,7 +323725,7 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..fd2f15ccd9d8e2f9354174a59cfb61168c3aa682
+index 0000000000000000000000000000000000000000..7e584958fe1ba5937e35fb7328d306e542a4ed98
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
 @@ -0,0 +1,260 @@
@@ -323864,9 +323864,9 @@ index 0000000000000000000000000000000000000000..fd2f15ccd9d8e2f9354174a59cfb6116
 +            children: [
 +              if (entry.latestNetwork != null) ...[
 +                Container(
-+                  width: 8,
-+                  height: 8,
-+                  margin: const EdgeInsets.only(right: 6),
++                  width: 5,
++                  height: 5,
++                  margin: const EdgeInsets.only(right: 5),
 +                  decoration: BoxDecoration(
 +                    shape: BoxShape.circle,
 +                    color: Color(entry.latestNetwork!.colorHex),
@@ -323961,14 +323961,14 @@ index 0000000000000000000000000000000000000000..fd2f15ccd9d8e2f9354174a59cfb6116
 +
 +    if (networks.isEmpty) {
 +      return Container(
-+        width: 14,
-+        height: 14,
++        width: 8,
++        height: 8,
 +        decoration: BoxDecoration(
 +          shape: BoxShape.circle,
 +          color: Theme.of(context).colorScheme.primary,
-+          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
++          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.0),
 +        ),
-+        child: Icon(Icons.link, size: 8, color: Theme.of(context).colorScheme.onPrimary),
++        child: Icon(Icons.link, size: 5, color: Theme.of(context).colorScheme.onPrimary),
 +      );
 +    }
 +
@@ -323977,12 +323977,12 @@ index 0000000000000000000000000000000000000000..fd2f15ccd9d8e2f9354174a59cfb6116
 +      children: networks.take(3).map((net) {
 +        return Container(
 +          margin: const EdgeInsets.only(left: 1),
-+          width: 12,
-+          height: 12,
++          width: 7,
++          height: 7,
 +          decoration: BoxDecoration(
 +            shape: BoxShape.circle,
 +            color: Color(net.colorHex),
-+            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
++            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.0),
 +          ),
 +        );
 +      }).toList(),
@@ -335128,7 +335128,7 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..c4d4fc374130287f14f514bfde5505c1db3a8791
+index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27ebf27b572f
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 @@ -0,0 +1,651 @@
@@ -335684,17 +335684,17 @@ index 0000000000000000000000000000000000000000..c4d4fc374130287f14f514bfde5505c1
 +                            ),
 +                            if (network != null)
 +                              Positioned(
-+                                bottom: -2,
-+                                right: -2,
++                                bottom: -1,
++                                right: -1,
 +                                child: Container(
-+                                  width: 12,
-+                                  height: 12,
++                                  width: 6,
++                                  height: 6,
 +                                  decoration: BoxDecoration(
 +                                    shape: BoxShape.circle,
 +                                    color: Color(network.colorHex),
 +                                    border: Border.all(
 +                                      color: theme.colorScheme.surface,
-+                                      width: 1.5,
++                                      width: 1.0,
 +                                    ),
 +                                  ),
 +                                ),
@@ -339782,7 +339782,7 @@ index 627a2ed7a0fe8b069cce1b08768ef1d7159a8c64..8a74184d8cbd563106ee874ee9f6a1d5
 +}
 diff --git a/lib/pages/settings_chat/merged_contacts_settings.dart b/lib/pages/settings_chat/merged_contacts_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..efc012a44a5096309a8cd0a0c45d428320031d9e
+index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc01754c4f
 --- /dev/null
 +++ b/lib/pages/settings_chat/merged_contacts_settings.dart
 @@ -0,0 +1,345 @@
@@ -339934,21 +339934,21 @@ index 0000000000000000000000000000000000000000..efc012a44a5096309a8cd0a0c45d4283
 +                              size: 44,
 +                            ),
 +                          Positioned(
-+                            bottom: -2,
-+                            right: -2,
++                            bottom: -1,
++                            right: -1,
 +                            child: Row(
 +                              mainAxisSize: MainAxisSize.min,
 +                              children: networks.take(3).map((net) {
 +                                return Container(
 +                                  margin: const EdgeInsets.only(left: 1),
-+                                  width: 10,
-+                                  height: 10,
++                                  width: 5,
++                                  height: 5,
 +                                  decoration: BoxDecoration(
 +                                    shape: BoxShape.circle,
 +                                    color: Color(net.colorHex),
 +                                    border: Border.all(
 +                                      color: theme.colorScheme.surface,
-+                                      width: 1.5,
++                                      width: 0.8,
 +                                    ),
 +                                  ),
 +                                );

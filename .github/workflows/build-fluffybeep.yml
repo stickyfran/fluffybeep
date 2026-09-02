@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
-      - '2.9'
   workflow_dispatch: # Permite ejecución manual
 
 permissions:
@@ -75,14 +73,13 @@ jobs:
       - name: 🏷️ Prepare Release Artifacts
         run: |
           mkdir -p release-apks
-          cp fluffychat/build/app/outputs/flutter-apk/app-release.apk release-apks/fluffybeep-2.9.4-v1.3.0.apk || true
-          cp fluffychat/build/app/outputs/flutter-apk/*.apk release-apks/ || true
+          cp fluffychat/build/app/outputs/flutter-apk/app-release.apk release-apks/fluffybeep-2.9.4-v1.3.0.apk
 
       - name: 📤 Upload APK Artifact (On Success)
         uses: actions/upload-artifact@v4
         with:
           name: fluffybeep-2.9.4-v1.3.0-apk
-          path: release-apks/*.apk
+          path: release-apks/fluffybeep-2.9.4-v1.3.0.apk
           retention-days: 7
 
       - name: 🧹 Remove Fluffychat Git Context
@@ -90,7 +87,7 @@ jobs:
 
       - name: 🚀 Release APK on GitHub Releases
         uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/2.9'
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -106,7 +103,7 @@ jobs:
             - **Robust SQLite Concurrency & WAL**: Fix `database is locked (code 5)` and prevent session loss on restart.
             - **WhatsApp iOS Voice Notes Fix**: Normalized PTT voice bubbles to strict RFC 7845 OGG Opus using FFmpegKit.
             - **Upstream FluffyChat 2.9.4 Base**: Inherits all modern upstream 2.9.4 improvements.
-          files: release-apks/*.apk
+          files: release-apks/fluffybeep-2.9.4-v1.3.0.apk
           fail_on_unmatched_files: false
           draft: false
           prerelease: false
