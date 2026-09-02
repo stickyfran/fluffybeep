@@ -14281,10 +14281,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..cfe8ed9babcba7c5dd5af31f8dd6cf7472ee6d9f 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..eb328d1b615fd28567e1d1acbbc1b77f55d39195 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,147 @@
+@@ -1,31 +1,218 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14372,26 +14372,64 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..cfe8ed9babcba7c5dd5af31f8dd6cf74
 +                        try {
 +                            var launched = false
 +                            if (!userOrId.isNullOrEmpty()) {
-+                                val isNumeric = userOrId.all { it.isDigit() }
-+                                val uriString = if (isNumeric) "instagram://user?user_id=$userOrId" else "https://instagram.com/$userOrId"
-+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
-+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                val cleanId = userOrId.trim().removePrefix("@")
++                                val isNumeric = cleanId.all { it.isDigit() }
++                                val uris = if (isNumeric) {
++                                    listOf(
++                                        Uri.parse("instagram://user?user_id=$cleanId"),
++                                        Uri.parse("https://instagram.com/_u/$cleanId"),
++                                        Uri.parse("https://instagram.com/$cleanId")
++                                    )
++                                } else {
++                                    listOf(
++                                        Uri.parse("instagram://user?username=$cleanId"),
++                                        Uri.parse("https://instagram.com/_u/$cleanId"),
++                                        Uri.parse("https://instagram.com/$cleanId")
++                                    )
++                                }
++                                for (uri in uris) {
++                                    if (launched) break
++                                    // 1. Intent with specified package
 +                                    if (packageName.isNotEmpty()) {
-+                                        setPackage(packageName)
++                                        try {
++                                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
++                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                                setPackage(packageName)
++                                            }
++                                            context.startActivity(intent)
++                                            launched = true
++                                            break
++                                        } catch (_: Exception) {}
++                                    }
++                                    // 2. Generic ACTION_VIEW intent (system chooser or modded Instagram)
++                                    try {
++                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
++                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                        }
++                                        context.startActivity(intent)
++                                        launched = true
++                                        break
++                                    } catch (_: Exception) {}
++                                }
++                            }
++                            if (!launched) {
++                                if (packageName.isNotEmpty()) {
++                                    val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                                    if (launchIntent != null) {
++                                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                        context.startActivity(launchIntent)
++                                        launched = true
 +                                    }
 +                                }
++                            }
++                            if (!launched) {
 +                                try {
++                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://instagram.com")).apply {
++                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    }
 +                                    context.startActivity(intent)
 +                                    launched = true
 +                                } catch (_: Exception) {}
-+                            }
-+                            if (!launched) {
-+                                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-+                                if (launchIntent != null) {
-+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-+                                    context.startActivity(launchIntent)
-+                                    launched = true
-+                                }
 +                            }
 +                            result.success(launched)
 +                        } catch (e: Exception) {
@@ -14405,25 +14443,52 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..cfe8ed9babcba7c5dd5af31f8dd6cf74
 +                            var launched = false
 +                            if (!phone.isNullOrEmpty()) {
 +                                val cleanPhone = phone.filter { it.isDigit() }
-+                                val uri = Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone")
-+                                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                val uris = listOf(
++                                    Uri.parse("whatsapp://send?phone=$cleanPhone"),
++                                    Uri.parse("https://api.whatsapp.com/send?phone=$cleanPhone"),
++                                    Uri.parse("https://wa.me/$cleanPhone")
++                                )
++                                for (uri in uris) {
++                                    if (launched) break
 +                                    if (packageName.isNotEmpty()) {
-+                                        setPackage(packageName)
++                                        try {
++                                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
++                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                                setPackage(packageName)
++                                            }
++                                            context.startActivity(intent)
++                                            launched = true
++                                            break
++                                        } catch (_: Exception) {}
++                                    }
++                                    try {
++                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
++                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                        }
++                                        context.startActivity(intent)
++                                        launched = true
++                                        break
++                                    } catch (_: Exception) {}
++                                }
++                            }
++                            if (!launched) {
++                                if (packageName.isNotEmpty()) {
++                                    val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                                    if (launchIntent != null) {
++                                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                        context.startActivity(launchIntent)
++                                        launched = true
 +                                    }
 +                                }
++                            }
++                            if (!launched) {
 +                                try {
++                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://")).apply {
++                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                    }
 +                                    context.startActivity(intent)
 +                                    launched = true
 +                                } catch (_: Exception) {}
-+                            }
-+                            if (!launched) {
-+                                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-+                                if (launchIntent != null) {
-+                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-+                                    context.startActivity(launchIntent)
-+                                    launched = true
-+                                }
 +                            }
 +                            result.success(launched)
 +                        } catch (e: Exception) {
@@ -14438,7 +14503,13 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..cfe8ed9babcba7c5dd5af31f8dd6cf74
 +                        }
 +                        try {
 +                            val cleanPhone = phone.trim()
-+                            val telUri = if (cleanPhone.startsWith("+")) Uri.parse("tel:$cleanPhone") else Uri.parse("tel:+$cleanPhone")
++                            val telUri = if (cleanPhone.startsWith("+")) {
++                                Uri.parse("tel:$cleanPhone")
++                            } else if (cleanPhone.length >= 10 && (cleanPhone.startsWith("54") || cleanPhone.startsWith("1") || cleanPhone.startsWith("34") || cleanPhone.startsWith("44") || cleanPhone.startsWith("52") || cleanPhone.startsWith("55") || cleanPhone.startsWith("56") || cleanPhone.startsWith("57"))) {
++                                Uri.parse("tel:+$cleanPhone")
++                            } else {
++                                Uri.parse("tel:$cleanPhone")
++                            }
 +                            val intent = Intent(Intent.ACTION_DIAL, telUri).apply {
 +                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 +                            }
@@ -305390,7 +305461,7 @@ index 879717fa9889be421184b768e20bad7417f95114..a8ef74f91b33c5315b2dc456e4eee6ce
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ff42a2a084908dcb979734115f5487b48d404706 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387090e9ed7 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,17 +16,25 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -305427,7 +305498,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ff42a2a084908dcb979734115f5487b4
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +55,557 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +55,559 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -306263,7 +306334,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ff42a2a084908dcb979734115f5487b4
 +                  ),
 +              ] else if (!widget.controller.room.isArchived) ...[
 +                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'whatsapp' ||
-+                    BeeperAppLauncher.extractWhatsAppPhone(widget.controller.room) != null)
++                    (BeeperAppLauncher.extractWhatsAppPhone(widget.controller.room, checkSiblings: false) != null &&
++                     BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key != 'instagram'))
 +                  IconButton(
 +                    onPressed: () async {
 +                      final success = await BeeperAppLauncher.dialPhone(room: widget.controller.room);
@@ -306280,7 +306352,8 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ff42a2a084908dcb979734115f5487b4
 +                    tooltip: 'Llamar por celular',
 +                  ),
 +                if (BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key == 'instagram' ||
-+                    BeeperAppLauncher.extractInstagramId(widget.controller.room) != null)
++                    (BeeperAppLauncher.extractInstagramId(widget.controller.room, checkSiblings: false) != null &&
++                     BeeperBridgeUtils.getRoomNetwork(widget.controller.room)?.key != 'whatsapp'))
 +                  IconButton(
 +                    onPressed: () async {
 +                      final success = await BeeperAppLauncher.openInstagram(room: widget.controller.room);
@@ -317953,7 +318026,7 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8157b0116 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc31a8e8099 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -3,36 +3,64 @@
@@ -318081,7 +318154,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -92,278 +127,351 @@ class ChatDetailsView extends StatelessWidget {
+@@ -92,278 +127,360 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -318537,12 +318610,12 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8
 +                          backgroundColor: theme.colorScheme.surfaceContainer,
 +                          foregroundColor: iconColor,
 +                          child: const Icon(Icons.merge_type_outlined),
-                         ),
++                        ),
 +                        title: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Contacto fusionado (${BeeperMergeUtils.getSiblingRooms(room.id).length} chats)'
 +                              : 'Fusionar con otras cuentas...',
-+                        ),
+                         ),
 +                        subtitle: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Gestionar chats vinculados de este contacto'
@@ -318553,62 +318626,71 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8
                        ),
 -                      onTap: () => context.push(
 -                        '/rooms/${controller.roomId!}/details/members',
-+                      if (BeeperBridgeUtils.extractWhatsAppPhone(room) != null ||
-+                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'whatsapp' ||
-+                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'whatsappgo') ...[
-+                        Divider(color: theme.dividerColor),
-+                        ListTile(
-+                          leading: CircleAvatar(
-+                            backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.15),
-+                            foregroundColor: const Color(0xFF25D366),
-+                            child: const Icon(Icons.call_outlined),
-+                          ),
-+                          title: const Text('Abrir en WhatsApp'),
-+                          subtitle: Text(
-+                            BeeperBridgeUtils.extractWhatsAppPhone(room) != null
-+                                ? BeeperBridgeUtils.formatPhoneNumber(BeeperBridgeUtils.extractWhatsAppPhone(room)!)
-+                                : 'Contactar por WhatsApp',
-+                          ),
-+                          trailing: Row(
-+                            mainAxisSize: MainAxisSize.min,
-+                            children: [
-+                              IconButton(
-+                                icon: const Icon(Icons.phone_in_talk_outlined),
-+                                tooltip: 'Llamar por teléfono',
-+                                onPressed: () => BeeperAppLauncher.dialPhone(room: room),
++                      () {
++                        final currentNet = BeeperBridgeUtils.getRoomNetwork(room)?.key;
++                        final isMerged = BeeperMergeUtils.isRoomMerged(room.id);
++                        final waPhone = BeeperAppLauncher.extractWhatsAppPhone(room, checkSiblings: isMerged);
++                        final igUserOrId = BeeperAppLauncher.extractInstagramId(room, checkSiblings: isMerged);
++
++                        final widgets = <Widget>[];
++
++                        if (waPhone != null && (currentNet == 'whatsapp' || currentNet == 'whatsappgo' || isMerged)) {
++                          widgets.add(Divider(color: theme.dividerColor));
++                          widgets.add(
++                            ListTile(
++                              leading: CircleAvatar(
++                                backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.15),
++                                foregroundColor: const Color(0xFF25D366),
++                                child: const Icon(Icons.call_outlined),
 +                              ),
-+                              IconButton(
-+                                icon: const Icon(Icons.open_in_new),
-+                                tooltip: 'Abrir app de WhatsApp',
-+                                onPressed: () => BeeperAppLauncher.openWhatsApp(room: room),
++                              title: const Text('Abrir en WhatsApp'),
++                              subtitle: Text(
++                                BeeperBridgeUtils.formatPhoneNumber(waPhone),
 +                              ),
-+                            ],
-+                          ),
-+                        ),
-+                      ],
-+                      if (BeeperBridgeUtils.extractInstagramDetails(room).username != null ||
-+                          BeeperBridgeUtils.extractInstagramDetails(room).numericId != null ||
-+                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'instagram' ||
-+                          BeeperBridgeUtils.getRoomNetwork(room)?.key == 'instagramgo') ...[
-+                        Divider(color: theme.dividerColor),
-+                        ListTile(
-+                          leading: CircleAvatar(
-+                            backgroundColor: const Color(0xFFE1306C).withValues(alpha: 0.15),
-+                            foregroundColor: const Color(0xFFE1306C),
-+                            child: const Icon(Icons.camera_alt_outlined),
-+                          ),
-+                          title: const Text('Abrir en Instagram'),
-+                          subtitle: Text(
-+                            BeeperBridgeUtils.extractInstagramDetails(room).username != null
-+                                ? '@${BeeperBridgeUtils.extractInstagramDetails(room).username}'
-+                                : (BeeperBridgeUtils.extractInstagramDetails(room).numericId != null
-+                                    ? 'ID: ${BeeperBridgeUtils.extractInstagramDetails(room).numericId}'
-+                                    : 'Ver perfil en Instagram'),
-+                          ),
-+                          trailing: const Icon(Icons.chevron_right_outlined),
-+                          onTap: () => BeeperAppLauncher.openInstagram(room: room),
-+                        ),
-+                      ],
++                              trailing: Row(
++                                mainAxisSize: MainAxisSize.min,
++                                children: [
++                                  IconButton(
++                                    icon: const Icon(Icons.phone_in_talk_outlined),
++                                    tooltip: 'Llamar por teléfono',
++                                    onPressed: () => BeeperAppLauncher.dialPhone(phone: waPhone),
++                                  ),
++                                  IconButton(
++                                    icon: const Icon(Icons.open_in_new),
++                                    tooltip: 'Abrir app de WhatsApp',
++                                    onPressed: () => BeeperAppLauncher.openWhatsApp(phone: waPhone),
++                                  ),
++                                ],
++                              ),
++                            ),
++                          );
++                        }
++
++                        if (igUserOrId != null && (currentNet == 'instagram' || currentNet == 'instagramgo' || isMerged)) {
++                          final isNumeric = RegExp(r'^\d+$').hasMatch(igUserOrId);
++                          widgets.add(Divider(color: theme.dividerColor));
++                          widgets.add(
++                            ListTile(
++                              leading: CircleAvatar(
++                                backgroundColor: const Color(0xFFE1306C).withValues(alpha: 0.15),
++                                foregroundColor: const Color(0xFFE1306C),
++                                child: const Icon(Icons.camera_alt_outlined),
++                              ),
++                              title: const Text('Abrir en Instagram'),
++                              subtitle: Text(
++                                isNumeric ? 'ID: $igUserOrId' : '@$igUserOrId',
++                              ),
++                              trailing: const Icon(Icons.chevron_right_outlined),
++                              onTap: () => BeeperAppLauncher.openInstagram(userOrId: igUserOrId),
++                            ),
++                          );
++                        }
++
++                        return Column(
++                          mainAxisSize: MainAxisSize.min,
++                          children: widgets,
++                        );
++                      }(),
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -318676,7 +318758,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..048199eef0a93299c45a47edaf7395b8
              ),
            ),
          );
-@@ -371,48 +479,3 @@ class ChatDetailsView extends StatelessWidget {
+@@ -371,48 +488,3 @@ class ChatDetailsView extends StatelessWidget {
      );
    }
  }
@@ -350333,10 +350415,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148445c6984
+index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4adb79768
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,174 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -350354,29 +350436,31 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +class BeeperAppLauncher {
 +  static const MethodChannel _channel = MethodChannel('chat.fluffy.fluffybeep/native_launcher');
 +
-+  /// Robust extraction of WhatsApp phone number from a room or its merged sibling rooms
-+  static String? extractWhatsAppPhone(Room room) {
++  /// Robust extraction of WhatsApp phone number from a room (optionally checking merged sibling rooms)
++  static String? extractWhatsAppPhone(Room room, {bool checkSiblings = false}) {
 +    // 1. Direct extraction from this room
 +    final direct = BeeperBridgeUtils.extractWhatsAppPhone(room);
 +    if (direct != null && direct.isNotEmpty) return direct;
 +
-+    // 2. Check sibling rooms if merged
-+    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
-+    for (final s in siblings) {
-+      if (s.id == room.id) continue;
-+      final sPhone = BeeperBridgeUtils.extractWhatsAppPhone(s);
-+      if (sPhone != null && sPhone.isNotEmpty) return sPhone;
-+    }
++    if (checkSiblings) {
++      // 2. Check sibling rooms if merged
++      final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
++      for (final s in siblings) {
++        if (s.id == room.id) continue;
++        final sPhone = BeeperBridgeUtils.extractWhatsAppPhone(s);
++        if (sPhone != null && sPhone.isNotEmpty) return sPhone;
++      }
 +
-+    // 3. Check matched phone contact
-+    final mergeId = BeeperMergeUtils.getMergeIdForRoom(room.id);
-+    if (mergeId != null) {
-+      final mc = BeeperMergeUtils.getMergedContacts(room.client)[mergeId];
-+      if (mc?.phoneContactId != null && BeeperPhoneContacts.isLoaded) {
-+        final pc = BeeperPhoneContacts.findById(mc!.phoneContactId!);
-+        if (pc != null && pc.normalizedPhones.isNotEmpty) {
-+          final digits = pc.normalizedPhones.first.replaceAll(RegExp(r'\D'), '');
-+          if (digits.isNotEmpty) return digits;
++      // 3. Check matched phone contact
++      final mergeId = BeeperMergeUtils.getMergeIdForRoom(room.id);
++      if (mergeId != null) {
++        final mc = BeeperMergeUtils.getMergedContacts(room.client)[mergeId];
++        if (mc?.phoneContactId != null && BeeperPhoneContacts.isLoaded) {
++          final pc = BeeperPhoneContacts.findById(mc!.phoneContactId!);
++          if (pc != null && pc.normalizedPhones.isNotEmpty) {
++            final digits = pc.normalizedPhones.first.replaceAll(RegExp(r'\D'), '');
++            if (digits.isNotEmpty) return digits;
++          }
 +        }
 +      }
 +    }
@@ -350384,20 +350468,22 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +    return null;
 +  }
 +
-+  /// Robust extraction of Instagram user or numeric ID from a room or its merged sibling rooms
-+  static String? extractInstagramId(Room room) {
++  /// Robust extraction of Instagram user or numeric ID from a room (optionally checking merged sibling rooms)
++  static String? extractInstagramId(Room room, {bool checkSiblings = false}) {
 +    // 1. Direct extraction from this room
 +    final direct = BeeperBridgeUtils.extractInstagramDetails(room);
 +    if (direct.username != null) return direct.username;
 +    if (direct.numericId != null) return direct.numericId;
 +
-+    // 2. Check sibling rooms if merged
-+    final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
-+    for (final s in siblings) {
-+      if (s.id == room.id) continue;
-+      final sIg = BeeperBridgeUtils.extractInstagramDetails(s);
-+      if (sIg.username != null) return sIg.username;
-+      if (sIg.numericId != null) return sIg.numericId;
++    if (checkSiblings) {
++      // 2. Check sibling rooms if merged
++      final siblings = BeeperMergeUtils.getSiblingRooms(room.id);
++      for (final s in siblings) {
++        if (s.id == room.id) continue;
++        final sIg = BeeperBridgeUtils.extractInstagramDetails(s);
++        if (sIg.username != null) return sIg.username;
++        if (sIg.numericId != null) return sIg.numericId;
++      }
 +    }
 +
 +    return null;
@@ -350509,10 +350595,10 @@ index 0000000000000000000000000000000000000000..c60c4086c2c4e35f0c0573e80ff70148
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0f3f22b07
+index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e189840bba7
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1098 @@
+@@ -0,0 +1,1271 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350775,10 +350861,11 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +        if (networkKey == null) {
 +          final localpart = mxid.split(':').first.toLowerCase();
 +          if (localpart.startsWith('@')) {
-+            final rawPrefix = localpart.substring(1);
++            final rawPrefix = localpart.substring(1).replaceFirst(RegExp(r'^_+'), '');
 +            for (final netEntry in networkMap.entries) {
 +              if (rawPrefix.startsWith('${netEntry.key}_') ||
-+                  rawPrefix == '${netEntry.key}bot') {
++                  rawPrefix == '${netEntry.key}bot' ||
++                  rawPrefix.startsWith(netEntry.key)) {
 +                networkKey = getBaseNetworkKey(netEntry.key);
 +                break;
 +              }
@@ -350867,15 +350954,49 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      if (directId != null) {
 +        final localpart = directId.split(':').first.toLowerCase();
 +        if (localpart.startsWith('@')) {
-+          final rawPrefix = localpart.substring(1);
++          final rawPrefix = localpart.substring(1).replaceFirst(RegExp(r'^_+'), '');
 +          for (final netEntry in networkMap.entries) {
 +            if (rawPrefix.startsWith('${netEntry.key}_') ||
-+                rawPrefix == '${netEntry.key}bot') {
++                rawPrefix == '${netEntry.key}bot' ||
++                rawPrefix.startsWith(netEntry.key)) {
 +              networkKey = getBaseNetworkKey(netEntry.key);
 +              break;
 +            }
 +          }
 +        }
++      }
++    }
++
++    if (networkKey == null) {
++      // Check state events types (e.g. fi.mau.whatsapp, com.beeper.instagram, m.bridge)
++      for (final stateKey in room.states.keys) {
++        final lower = stateKey.toLowerCase();
++        for (final netKey in networkMap.keys) {
++          if (lower.contains(netKey)) {
++            networkKey = getBaseNetworkKey(netKey);
++            break;
++          }
++        }
++        if (networkKey != null) break;
++      }
++    }
++
++    if (networkKey == null) {
++      // Check canonical alias & room aliases
++      final allAliases = [
++        if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
++        ...room.aliases,
++        room.id,
++      ];
++      for (final a in allAliases) {
++        final lower = a.toLowerCase();
++        for (final netKey in networkMap.keys) {
++          if (lower.contains(netKey)) {
++            networkKey = getBaseNetworkKey(netKey);
++            break;
++          }
++        }
++        if (networkKey != null) break;
 +      }
 +    }
 +
@@ -350986,19 +351107,46 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +
 +  /// Robust extraction of WhatsApp phone number from a room or its members/bridge state
 +  static String? extractWhatsAppPhone(Room room) {
-+    // 1. Check bridge state events (com.beeper.bridge, m.bridge, fi.mau.whatsapp, uk.half-shot.bridge)
-+    for (final stateKey in const ['com.beeper.bridge', 'm.bridge', 'fi.mau.whatsapp', 'uk.half-shot.bridge']) {
-+      final event = room.states[stateKey]?.values.firstOrNull;
-+      if (event != null) {
++    // 1. Check all bridge state events
++    for (final stateKey in const [
++      'com.beeper.bridge',
++      'm.bridge',
++      'fi.mau.whatsapp',
++      'com.beeper.whatsapp',
++      'uk.half-shot.bridge',
++    ]) {
++      final events = room.states[stateKey]?.values ?? const <Event>[];
++      for (final event in events) {
 +        final content = event.content;
 +        final channel = content['channel'] is Map ? (content['channel'] as Map) : null;
 +        final sender = content['sender'] is Map ? (content['sender'] as Map) : null;
-+        final raw = content['phone'] ?? content['remote_id'] ?? channel?['id'] ?? sender?['id'];
-+        if (raw != null) {
++        final user = content['user'] is Map ? (content['user'] as Map) : null;
++        final beeper = content['beeper'] is Map ? (content['beeper'] as Map) : null;
++
++        final candidates = [
++          content['phone'],
++          content['remote_id'],
++          content['user_id'],
++          content['jid'],
++          content['recipient_id'],
++          content['beeper_guid'],
++          channel?['id'],
++          channel?['phone'],
++          sender?['id'],
++          sender?['phone'],
++          user?['phone'],
++          user?['id'],
++          beeper?['remote_user_id'],
++          beeper?['phone'],
++        ];
++
++        for (final raw in candidates) {
++          if (raw == null) continue;
 +          final str = raw.toString();
-+          if (!str.contains('lid')) {
-+            final digits = str.replaceAll(RegExp(r'\D'), '');
-+            if (digits.length >= 7 && digits.length <= 16) {
++          final match = RegExp(r'(?:whatsapp:)?(?:\+)?(\d{7,16})').firstMatch(str);
++          if (match != null) {
++            final digits = match.group(1)!;
++            if (!str.contains('lid') || digits.length <= 14) {
 +              return digits;
 +            }
 +          }
@@ -351006,29 +351154,66 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      }
 +    }
 +
-+    // 2. Check candidate MXIDs (directChatMatrixID, contactId, room participants)
++    // 2. Check m.room.member events custom fields
++    final memberEvents = room.states['m.room.member']?.values ?? const <Event>[];
++    for (final mEvent in memberEvents) {
++      final content = mEvent.content;
++      final candidates = [
++        content['phone'],
++        content['beeper_phone'],
++        content['beeper_guid'],
++        content['custom_mxid'],
++        content['user_id'],
++        content['jid'],
++      ];
++      for (final raw in candidates) {
++        if (raw == null) continue;
++        final str = raw.toString();
++        final match = RegExp(r'(?:whatsapp:)?(?:\+)?(\d{7,16})').firstMatch(str);
++        if (match != null) {
++          final digits = match.group(1)!;
++          if (!str.contains('lid') || digits.length <= 14) {
++            return digits;
++          }
++        }
++      }
++    }
++
++    // 3. Check canonicalAlias & aliases
++    final allAliases = <String>[
++      if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
++      ...room.aliases,
++    ];
++    for (final alias in allAliases) {
++      final match = RegExp(r'whatsapp[^:]*?(\d{7,16})', caseSensitive: false).firstMatch(alias);
++      if (match != null) {
++        return match.group(1)!;
++      }
++    }
++
++    // 4. Check candidate MXIDs (directChatMatrixID, contactId, room participants, room.id)
 +    final candidateMxids = <String>[
 +      if (room.directChatMatrixID != null) room.directChatMatrixID!,
 +      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
 +      ...room.getParticipants().map((p) => p.id),
++      room.id,
 +    ];
 +
 +    for (final mxid in candidateMxids) {
 +      if (mxid == room.client.userID || isBeeperBot(mxid)) continue;
-+      // Match whatsapp user MXIDs: e.g. @whatsapp_5491112345678:beeper.local, @_whatsapp_acc1_54911...
 +      final match = RegExp(r'(?:whatsapp|w4b)[^:]*?(\d{7,16})', caseSensitive: false).firstMatch(mxid);
 +      if (match != null) {
 +        final digits = match.group(1)!;
-+        if (!mxid.contains('lid')) {
++        if (!mxid.contains('lid') || digits.length <= 14) {
 +          return digits;
 +        }
 +      }
 +    }
 +
-+    // 3. Check room name or member display names (e.g. "+54 9 11 1234-5678" or "Name (+54911...)")
++    // 5. Check room name or member display names (e.g. "+54 9 11 1234-5678" or "Name (+54911...)")
 +    final candidateNames = <String>[
 +      room.name,
-+      ...room.states['m.room.member']?.values.map((v) => v.content.tryGet<String>('displayname') ?? '') ?? <String>[],
++      ...memberEvents.map((v) => v.content.tryGet<String>('displayname') ?? ''),
 +    ];
 +
 +    for (final name in candidateNames) {
@@ -351042,7 +351227,7 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      }
 +    }
 +
-+    // 4. Check room topic
++    // 6. Check room topic
 +    if (room.topic.isNotEmpty) {
 +      final topicMatch = RegExp(r'(?:\+)?(?:[0-9][\s\-\.\(\)]*){7,16}').firstMatch(room.topic);
 +      if (topicMatch != null) {
@@ -351061,35 +351246,94 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +    String? username;
 +    String? numericId;
 +
-+    // 1. Check bridge state events (com.beeper.bridge, m.bridge, fi.mau.instagram, uk.half-shot.bridge)
-+    for (final stateKey in const ['com.beeper.bridge', 'm.bridge', 'fi.mau.instagram', 'uk.half-shot.bridge']) {
-+      final event = room.states[stateKey]?.values.firstOrNull;
-+      if (event != null) {
++    // 1. Check bridge state events
++    for (final stateKey in const [
++      'com.beeper.bridge',
++      'm.bridge',
++      'fi.mau.instagram',
++      'com.beeper.instagram',
++      'uk.half-shot.bridge',
++    ]) {
++      final events = room.states[stateKey]?.values ?? const <Event>[];
++      for (final event in events) {
 +        final content = event.content;
 +        final channel = content['channel'] is Map ? (content['channel'] as Map) : null;
 +        final remoteUser = content['remote_user'] is Map ? (content['remote_user'] as Map) : null;
 +        final sender = content['sender'] is Map ? (content['sender'] as Map) : null;
-+        final u = content['username'] ??
-+            channel?['username'] ??
-+            channel?['displayname'] ??
-+            remoteUser?['username'] ??
-+            remoteUser?['displayname'] ??
-+            sender?['username'] ??
-+            sender?['displayname'] ??
-+            content['name'];
-+        if (u != null && u.toString().isNotEmpty) {
-+          username ??= cleanInstagramUsername(u.toString());
++        final beeper = content['beeper'] is Map ? (content['beeper'] as Map) : null;
++
++        final uCandidates = [
++          content['username'],
++          content['instagram_username'],
++          content['ig_username'],
++          channel?['username'],
++          channel?['displayname'],
++          remoteUser?['username'],
++          remoteUser?['displayname'],
++          sender?['username'],
++          sender?['displayname'],
++          beeper?['username'],
++          content['name'],
++        ];
++
++        for (final u in uCandidates) {
++          if (u != null && u.toString().isNotEmpty) {
++            final cleaned = cleanInstagramUsername(u.toString());
++            if (cleaned.isNotEmpty && RegExp(r'[a-zA-Z]').hasMatch(cleaned)) {
++              username ??= cleaned;
++              break;
++            }
++          }
 +        }
-+        final id = content['id'] ?? channel?['id'] ?? content['remote_id'] ?? sender?['id'] ?? remoteUser?['id'];
-+        if (id != null && id.toString().isNotEmpty) {
-+          numericId ??= id.toString();
++
++        final idCandidates = [
++          content['id'],
++          channel?['id'],
++          content['remote_id'],
++          sender?['id'],
++          remoteUser?['id'],
++          content['beeper_guid'],
++          beeper?['remote_user_id'],
++        ];
++
++        for (final id in idCandidates) {
++          if (id != null && id.toString().isNotEmpty) {
++            final str = id.toString().replaceAll(RegExp(r'^instagram:'), '');
++            if (RegExp(r'^\d+$').hasMatch(str)) {
++              numericId ??= str;
++            } else if (username == null && RegExp(r'[a-zA-Z]').hasMatch(str)) {
++              username = cleanInstagramUsername(str);
++            }
++          }
 +        }
 +      }
 +    }
 +
-+    // 2. Extract from participant displaynames & room name (e.g. "John Doe (@johndoe)" or "@johndoe")
++    // 2. Check m.room.member events custom fields & displaynames
++    final memberEvents = room.states['m.room.member']?.values ?? const <Event>[];
++    for (final mEvent in memberEvents) {
++      final content = mEvent.content;
++      final u = content['username'] ?? content['instagram_username'] ?? content['ig_username'];
++      if (u != null && u.toString().isNotEmpty) {
++        final cleaned = cleanInstagramUsername(u.toString());
++        if (cleaned.isNotEmpty && RegExp(r'[a-zA-Z]').hasMatch(cleaned)) {
++          username ??= cleaned;
++        }
++      }
++      final guid = content['beeper_guid']?.toString();
++      if (guid != null && guid.startsWith('instagram:')) {
++        final part = guid.substring('instagram:'.length);
++        if (RegExp(r'^\d+$').hasMatch(part)) {
++          numericId ??= part;
++        } else if (username == null && RegExp(r'[a-zA-Z]').hasMatch(part)) {
++          username = cleanInstagramUsername(part);
++        }
++      }
++    }
++
++    // 3. Extract from member displaynames & room name (e.g. "John Doe (@johndoe)" or "@johndoe")
 +    final candidateNames = <String>[
-+      ...room.states['m.room.member']?.values.map((v) => v.content.tryGet<String>('displayname') ?? '') ?? <String>[],
++      ...memberEvents.map((v) => v.content.tryGet<String>('displayname') ?? ''),
 +      room.name,
 +    ];
 +
@@ -351097,21 +351341,18 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      if (username != null) break;
 +      if (name.isEmpty) continue;
 +
-+      // Check for "(@username)" or "(username)"
 +      final parenMatch = RegExp(r'\(@?([a-zA-Z0-9._]{1,30})\)').firstMatch(name);
 +      if (parenMatch != null) {
 +        username = parenMatch.group(1);
 +        break;
 +      }
 +
-+      // Check for "@username"
 +      final atMatch = RegExp(r'@([a-zA-Z0-9._]{1,30})').firstMatch(name);
 +      if (atMatch != null) {
 +        username = atMatch.group(1);
 +        break;
 +      }
 +
-+      // If the name is a single word alphanumeric handle (not pure digits)
 +      final cleanName = name.trim();
 +      if (RegExp(r'^[a-zA-Z0-9._]{1,30}$').hasMatch(cleanName) && RegExp(r'[a-zA-Z]').hasMatch(cleanName)) {
 +        username = cleanName;
@@ -351119,7 +351360,24 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      }
 +    }
 +
-+    // 3. Check room topic (e.g. "Instagram DM with @johndoe" or "https://instagram.com/johndoe")
++    // 4. Check canonicalAlias & aliases
++    final allAliases = <String>[
++      if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
++      ...room.aliases,
++    ];
++    for (final alias in allAliases) {
++      final match = RegExp(r'instagram(?:go)?[^:]*?_([^:@]+)(?:@|:|$)', caseSensitive: false).firstMatch(alias);
++      if (match != null) {
++        final part = match.group(1)!;
++        if (RegExp(r'^\d+$').hasMatch(part)) {
++          numericId ??= part;
++        } else if (username == null && RegExp(r'[a-zA-Z]').hasMatch(part)) {
++          username = cleanInstagramUsername(part);
++        }
++      }
++    }
++
++    // 5. Check room topic (e.g. "Instagram DM with @johndoe" or "https://instagram.com/johndoe")
 +    if (username == null && room.topic.isNotEmpty) {
 +      final topicMatch = RegExp(r'instagram\.com/(?:_u/)?([a-zA-Z0-9._]{1,30})', caseSensitive: false).firstMatch(room.topic) ??
 +          RegExp(r'@([a-zA-Z0-9._]{1,30})').firstMatch(room.topic);
@@ -351128,11 +351386,12 @@ index 0000000000000000000000000000000000000000..f5b4d89c42fb22e1b31939afdd2698c0
 +      }
 +    }
 +
-+    // 4. Extract numeric ID or handle from MXID
++    // 6. Extract numeric ID or handle from participant MXIDs
 +    final candidateMxids = <String>[
 +      if (room.directChatMatrixID != null) room.directChatMatrixID!,
 +      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
 +      ...room.getParticipants().map((p) => p.id),
++      room.id,
 +    ];
 +
 +    for (final mxid in candidateMxids) {
@@ -351956,11 +352215,12 @@ index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..36a750227c3d10ae43103a62de4d6f27d994d766
+index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d82eece6f3
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,452 @@
 +import 'dart:collection';
++import 'dart:convert';
 +import 'package:flutter/foundation.dart';
 +import 'package:matrix/matrix.dart';
 +import 'beeper_bridge_utils.dart';
@@ -352055,10 +352315,24 @@ index 0000000000000000000000000000000000000000..36a750227c3d10ae43103a62de4d6f27
 +    _mergeSiblingRooms = <String, List<Room>>{};
 +  }
 +
-+  /// Get all merged contacts from Account Data with O(1) reference caching.
++  /// Get all merged contacts from Account Data (with instant local backup fallback)
 +  static Map<String, MergedContact> getMergedContacts(Client client) {
 +    final event = client.accountData[accountDataKey];
-+    final content = event?.content;
++    dynamic content = event?.content;
++
++    // If account data is not yet available (e.g. offline or during initial startup), fallback to local cache
++    if (content == null || content is! Map || (content['contacts'] is! Map || (content['contacts'] as Map).isEmpty)) {
++      final localBackup = BeeperBridgeUtils.prefs?.getString('beeper_merged_contacts_backup');
++      if (localBackup != null && localBackup.isNotEmpty) {
++        try {
++          final decoded = jsonDecode(localBackup);
++          if (decoded is Map) {
++            content = {'contacts': decoded};
++          }
++        } catch (_) {}
++      }
++    }
++
 +    if (content != null && identical(content, _lastMergeDataRef)) {
 +      return _contactsCache;
 +    }
@@ -352148,7 +352422,13 @@ index 0000000000000000000000000000000000000000..36a750227c3d10ae43103a62de4d6f27
 +    // 3. Trigger UI listeners immediately
 +    mergeChangeNotifier.value++;
 +
-+    // 4. Send to homeserver asynchronously
++    // 4. Save to local SharedPreferences as instant offline/restart backup
++    try {
++      final jsonStr = jsonEncode(contacts);
++      BeeperBridgeUtils.prefs?.setString('beeper_merged_contacts_backup', jsonStr);
++    } catch (_) {}
++
++    // 5. Send to homeserver asynchronously
 +    try {
 +      await client.setAccountData(
 +        client.userID!,
