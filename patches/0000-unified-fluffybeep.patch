@@ -321276,7 +321276,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..38ece10f8347a090ef31bf8b2c5432e3
 +  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..676703e38aa3dd64721c7b4aa234eed5bec31a10 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..628978f3b584a28ec7c3e2241599c6941112e65c 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
 @@ -3,224 +3,457 @@
@@ -321892,7 +321892,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..676703e38aa3dd64721c7b4aa234eed5
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +468,53 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +468,54 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -321955,10 +321955,13 @@ index 8610b92531be84898e03439fa07f16145a6d552c..676703e38aa3dd64721c7b4aa234eed5
                ),
 +            ),
            ],
+-        );
+-      },
 +        ),
-         );
-       },
++      ),
      );
++  },
++);
 +    return body;
    }
  }
