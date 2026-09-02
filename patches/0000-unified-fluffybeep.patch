@@ -350595,10 +350595,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e189840bba7
+index 0000000000000000000000000000000000000000..4310b3d82c4df2e722b4c9c902fd130982634b32
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1271 @@
+@@ -0,0 +1,1291 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -350984,8 +350984,7 @@ index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e18
 +    if (networkKey == null) {
 +      // Check canonical alias & room aliases
 +      final allAliases = [
-+        if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
-+        ...room.aliases,
++        ...getRoomAliases(room),
 +        room.id,
 +      ];
 +      for (final a in allAliases) {
@@ -351105,6 +351104,33 @@ index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e18
 +    return '+$digits';
 +  }
 +
++  /// Get all room aliases from canonical alias and state events
++  static List<String> getRoomAliases(Room room) {
++    final list = <String>[];
++    if (room.canonicalAlias.isNotEmpty) {
++      list.add(room.canonicalAlias);
++    }
++    final aliasesEvents = room.states['m.room.aliases']?.values;
++    if (aliasesEvents != null) {
++      for (final e in aliasesEvents) {
++        final aliases = e.content['aliases'];
++        if (aliases is List) {
++          list.addAll(aliases.whereType<String>());
++        }
++      }
++    }
++    final canonEvents = room.states['m.room.canonical_alias']?.values;
++    if (canonEvents != null) {
++      for (final e in canonEvents) {
++        final alt = e.content['alt_aliases'];
++        if (alt is List) {
++          list.addAll(alt.whereType<String>());
++        }
++      }
++    }
++    return list;
++  }
++
 +  /// Robust extraction of WhatsApp phone number from a room or its members/bridge state
 +  static String? extractWhatsAppPhone(Room room) {
 +    // 1. Check all bridge state events
@@ -351180,10 +351206,7 @@ index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e18
 +    }
 +
 +    // 3. Check canonicalAlias & aliases
-+    final allAliases = <String>[
-+      if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
-+      ...room.aliases,
-+    ];
++    final allAliases = getRoomAliases(room);
 +    for (final alias in allAliases) {
 +      final match = RegExp(r'whatsapp[^:]*?(\d{7,16})', caseSensitive: false).firstMatch(alias);
 +      if (match != null) {
@@ -351361,10 +351384,7 @@ index 0000000000000000000000000000000000000000..386c5e14e1125bf3fbd2c3db513e4e18
 +    }
 +
 +    // 4. Check canonicalAlias & aliases
-+    final allAliases = <String>[
-+      if (room.canonicalAlias.isNotEmpty) room.canonicalAlias,
-+      ...room.aliases,
-+    ];
++    final allAliases = getRoomAliases(room);
 +    for (final alias in allAliases) {
 +      final match = RegExp(r'instagram(?:go)?[^:]*?_([^:@]+)(?:@|:|$)', caseSensitive: false).firstMatch(alias);
 +      if (match != null) {
