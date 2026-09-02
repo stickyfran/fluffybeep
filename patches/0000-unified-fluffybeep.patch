@@ -318026,7 +318026,7 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc31a8e8099 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d426a83a7 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -3,36 +3,64 @@
@@ -318154,7 +318154,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc3
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -92,278 +127,360 @@ class ChatDetailsView extends StatelessWidget {
+@@ -92,327 +127,520 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -318623,74 +318623,116 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc3
 +                        ),
 +                        trailing: const Icon(Icons.chevron_right_outlined),
 +                        onTap: () => showMergeContactPicker(context, room),
++                      ),
++                      ValueListenableBuilder<int>(
++                        valueListenable: BeeperMergeUtils.mergeChangeNotifier,
++                        builder: (context, _, __) {
++                          final currentNet = BeeperBridgeUtils.getRoomNetwork(room)?.key;
++                          final isMerged = BeeperMergeUtils.isRoomMerged(room.id);
++                          final waPhone = BeeperAppLauncher.extractWhatsAppPhone(room, checkSiblings: isMerged);
++                          final igUserOrId = BeeperAppLauncher.extractInstagramId(room, checkSiblings: isMerged);
++
++                          final widgets = <Widget>[];
++
++                          if (currentNet == 'whatsapp' || currentNet == 'whatsappgo' || isMerged || waPhone != null) {
++                            widgets.add(Divider(color: theme.dividerColor));
++                            widgets.add(
++                              ListTile(
++                                leading: CircleAvatar(
++                                  backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.15),
++                                  foregroundColor: const Color(0xFF25D366),
++                                  child: const Icon(Icons.call_outlined),
++                                ),
++                                title: const Text('Abrir en WhatsApp'),
++                                subtitle: Text(
++                                  waPhone != null
++                                      ? BeeperBridgeUtils.formatPhoneNumber(waPhone)
++                                      : 'Sin número detectado (toca para asignar)',
++                                ),
++                                trailing: Row(
++                                  mainAxisSize: MainAxisSize.min,
++                                  children: [
++                                    IconButton(
++                                      icon: const Icon(Icons.edit_outlined),
++                                      tooltip: 'Asignar / Editar número',
++                                      onPressed: () => _showEditWhatsAppDialog(context, room, waPhone),
++                                    ),
++                                    if (waPhone != null) ...[
++                                      IconButton(
++                                        icon: const Icon(Icons.phone_in_talk_outlined),
++                                        tooltip: 'Llamar por teléfono',
++                                        onPressed: () => BeeperAppLauncher.dialPhone(phone: waPhone),
++                                      ),
++                                      IconButton(
++                                        icon: const Icon(Icons.open_in_new),
++                                        tooltip: 'Abrir app de WhatsApp',
++                                        onPressed: () => BeeperAppLauncher.openWhatsApp(phone: waPhone),
++                                      ),
++                                    ],
++                                  ],
++                                ),
++                                onTap: () {
++                                  if (waPhone != null) {
++                                    BeeperAppLauncher.openWhatsApp(phone: waPhone);
++                                  } else {
++                                    _showEditWhatsAppDialog(context, room, waPhone);
++                                  }
++                                },
++                              ),
++                            );
++                          }
++
++                          if (currentNet == 'instagram' || currentNet == 'instagramgo' || isMerged || igUserOrId != null) {
++                            final isNumeric = igUserOrId != null && RegExp(r'^\d+$').hasMatch(igUserOrId);
++                            widgets.add(Divider(color: theme.dividerColor));
++                            widgets.add(
++                              ListTile(
++                                leading: CircleAvatar(
++                                  backgroundColor: const Color(0xFFE1306C).withValues(alpha: 0.15),
++                                  foregroundColor: const Color(0xFFE1306C),
++                                  child: const Icon(Icons.camera_alt_outlined),
++                                ),
++                                title: const Text('Abrir en Instagram'),
++                                subtitle: Text(
++                                  igUserOrId != null
++                                      ? (isNumeric ? 'ID: $igUserOrId (toca para asignar @usuario)' : '@$igUserOrId')
++                                      : 'Sin usuario detectado (toca para asignar)',
++                                ),
++                                trailing: Row(
++                                  mainAxisSize: MainAxisSize.min,
++                                  children: [
++                                    IconButton(
++                                      icon: const Icon(Icons.edit_outlined),
++                                      tooltip: 'Asignar / Editar @usuario',
++                                      onPressed: () => _showEditInstagramDialog(context, room, !isNumeric ? igUserOrId : null),
++                                    ),
++                                    if (igUserOrId != null)
++                                      IconButton(
++                                        icon: const Icon(Icons.open_in_new),
++                                        tooltip: 'Abrir Instagram',
++                                        onPressed: () => BeeperAppLauncher.openInstagram(userOrId: igUserOrId),
++                                      ),
++                                  ],
++                                ),
++                                onTap: () {
++                                  if (igUserOrId != null && !isNumeric) {
++                                    BeeperAppLauncher.openInstagram(userOrId: igUserOrId);
++                                  } else {
++                                    _showEditInstagramDialog(context, room, !isNumeric ? igUserOrId : null);
++                                  }
++                                },
++                              ),
++                            );
++                          }
++
++                          return Column(
++                            mainAxisSize: MainAxisSize.min,
++                            children: widgets,
++                          );
++                        },
                        ),
 -                      onTap: () => context.push(
 -                        '/rooms/${controller.roomId!}/details/members',
-+                      () {
-+                        final currentNet = BeeperBridgeUtils.getRoomNetwork(room)?.key;
-+                        final isMerged = BeeperMergeUtils.isRoomMerged(room.id);
-+                        final waPhone = BeeperAppLauncher.extractWhatsAppPhone(room, checkSiblings: isMerged);
-+                        final igUserOrId = BeeperAppLauncher.extractInstagramId(room, checkSiblings: isMerged);
-+
-+                        final widgets = <Widget>[];
-+
-+                        if (waPhone != null && (currentNet == 'whatsapp' || currentNet == 'whatsappgo' || isMerged)) {
-+                          widgets.add(Divider(color: theme.dividerColor));
-+                          widgets.add(
-+                            ListTile(
-+                              leading: CircleAvatar(
-+                                backgroundColor: const Color(0xFF25D366).withValues(alpha: 0.15),
-+                                foregroundColor: const Color(0xFF25D366),
-+                                child: const Icon(Icons.call_outlined),
-+                              ),
-+                              title: const Text('Abrir en WhatsApp'),
-+                              subtitle: Text(
-+                                BeeperBridgeUtils.formatPhoneNumber(waPhone),
-+                              ),
-+                              trailing: Row(
-+                                mainAxisSize: MainAxisSize.min,
-+                                children: [
-+                                  IconButton(
-+                                    icon: const Icon(Icons.phone_in_talk_outlined),
-+                                    tooltip: 'Llamar por teléfono',
-+                                    onPressed: () => BeeperAppLauncher.dialPhone(phone: waPhone),
-+                                  ),
-+                                  IconButton(
-+                                    icon: const Icon(Icons.open_in_new),
-+                                    tooltip: 'Abrir app de WhatsApp',
-+                                    onPressed: () => BeeperAppLauncher.openWhatsApp(phone: waPhone),
-+                                  ),
-+                                ],
-+                              ),
-+                            ),
-+                          );
-+                        }
-+
-+                        if (igUserOrId != null && (currentNet == 'instagram' || currentNet == 'instagramgo' || isMerged)) {
-+                          final isNumeric = RegExp(r'^\d+$').hasMatch(igUserOrId);
-+                          widgets.add(Divider(color: theme.dividerColor));
-+                          widgets.add(
-+                            ListTile(
-+                              leading: CircleAvatar(
-+                                backgroundColor: const Color(0xFFE1306C).withValues(alpha: 0.15),
-+                                foregroundColor: const Color(0xFFE1306C),
-+                                child: const Icon(Icons.camera_alt_outlined),
-+                              ),
-+                              title: const Text('Abrir en Instagram'),
-+                              subtitle: Text(
-+                                isNumeric ? 'ID: $igUserOrId' : '@$igUserOrId',
-+                              ),
-+                              trailing: const Icon(Icons.chevron_right_outlined),
-+                              onTap: () => BeeperAppLauncher.openInstagram(userOrId: igUserOrId),
-+                            ),
-+                          );
-+                        }
-+
-+                        return Column(
-+                          mainAxisSize: MainAxisSize.min,
-+                          children: widgets,
-+                        );
-+                      }(),
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -318740,14 +318782,14 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc3
 +                  title: Text(
 +                    L10n.of(context).loadCountMoreParticipants(
 +                      (actualMembersCount - members.length),
-                     ),
++                    ),
 +                  ),
 +                  leading: CircleAvatar(
 +                    backgroundColor: theme.scaffoldBackgroundColor,
 +                    child: const Icon(
 +                      Icons.group_outlined,
 +                      color: Colors.grey,
-+                    ),
+                     ),
 +                  ),
 +                  onTap: () => context.push(
 +                    '/rooms/${controller.roomId!}/details/members',
@@ -318758,22 +318800,77 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc3
              ),
            ),
          );
-@@ -371,48 +488,3 @@ class ChatDetailsView extends StatelessWidget {
+       },
      );
    }
- }
--
+-}
+ 
 -class _MainChatDetailsButton extends StatelessWidget {
 -  final VoidCallback onPressed;
 -  final String label;
 -  final IconData icon;
--
++  Future<void> _showEditWhatsAppDialog(BuildContext context, Room room, String? currentPhone) async {
++    final textController = TextEditingController(text: currentPhone ?? '');
++    final result = await showDialog<String>(
++      context: context,
++      builder: (ctx) => AlertDialog(
++        title: const Text('Número de WhatsApp'),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.start,
++          children: [
++            const Text(
++              'Ingresa el número con código de país (ej. +5491112345678):',
++              style: TextStyle(fontSize: 13),
++            ),
++            const SizedBox(height: 12),
++            TextField(
++              controller: textController,
++              keyboardType: TextInputType.phone,
++              autofocus: true,
++              decoration: const InputDecoration(
++                prefixIcon: Icon(Icons.phone_outlined),
++                hintText: '+5491112345678',
++                border: OutlineInputBorder(),
++              ),
++            ),
++          ],
++        ),
++        actions: [
++          if (currentPhone != null && currentPhone.isNotEmpty)
++            TextButton(
++              onPressed: () => Navigator.of(ctx).pop(''),
++              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++            ),
++          TextButton(
++            onPressed: () => Navigator.of(ctx).pop(),
++            child: const Text('Cancelar'),
++          ),
++          ElevatedButton(
++            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
++            child: const Text('Guardar'),
++          ),
++        ],
++      ),
++    );
+ 
 -  const _MainChatDetailsButton({
 -    required this.onPressed,
 -    required this.label,
 -    required this.icon,
 -  });
--
++    if (result != null) {
++      await BeeperMergeUtils.setCustomWhatsAppPhone(room.client, room.id, result.isEmpty ? null : result);
++      if (context.mounted) {
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(
++            content: Text(result.isEmpty ? 'Número eliminado' : 'Número de WhatsApp guardado: $result'),
++          ),
++        );
++      }
++    }
++  }
+ 
 -  @override
 -  Widget build(BuildContext context) {
 -    final theme = Theme.of(context);
@@ -318799,14 +318896,65 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..57ac643522934493de38c68a49b63bc3
 -                  textAlign: .center,
 -                  style: TextStyle(color: theme.colorScheme.secondary),
 -                ),
--              ),
++  Future<void> _showEditInstagramDialog(BuildContext context, Room room, String? currentHandle) async {
++    final textController = TextEditingController(text: currentHandle ?? '');
++    final result = await showDialog<String>(
++      context: context,
++      builder: (ctx) => AlertDialog(
++        title: const Text('Usuario de Instagram'),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.start,
++          children: [
++            const Text(
++              'Ingresa el nombre de usuario de Instagram sin espacios (ej. thiaguirre):',
++              style: TextStyle(fontSize: 13),
++            ),
++            const SizedBox(height: 12),
++            TextField(
++              controller: textController,
++              autofocus: true,
++              decoration: const InputDecoration(
++                prefixText: '@',
++                prefixIcon: Icon(Icons.camera_alt_outlined),
++                hintText: 'usuario',
++                border: OutlineInputBorder(),
+               ),
 -            ],
 -          ),
--        ),
--      ),
--    );
--  }
--}
++            ),
++          ],
+         ),
++        actions: [
++          if (currentHandle != null && currentHandle.isNotEmpty)
++            TextButton(
++              onPressed: () => Navigator.of(ctx).pop(''),
++              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++            ),
++          TextButton(
++            onPressed: () => Navigator.of(ctx).pop(),
++            child: const Text('Cancelar'),
++          ),
++          ElevatedButton(
++            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
++            child: const Text('Guardar'),
++          ),
++        ],
+       ),
+     );
++
++    if (result != null) {
++      await BeeperMergeUtils.setCustomInstagramHandle(room.client, room.id, result.isEmpty ? null : result);
++      if (context.mounted) {
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(
++            content: Text(result.isEmpty ? 'Usuario de Instagram eliminado' : 'Usuario de Instagram guardado: @$result'),
++          ),
++        );
++      }
++    }
+   }
+ }
 diff --git a/lib/pages/chat_details/participant_list_item.dart b/lib/pages/chat_details/participant_list_item.dart
 index 79a561c512a85bfaea9c7570bfd4d9b49598a41f..da2aaf8d60b50b344f0ac8d910b285f540404cf2 100644
 --- a/lib/pages/chat_details/participant_list_item.dart
@@ -350595,10 +350743,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4310b3d82c4df2e722b4c9c902fd130982634b32
+index 0000000000000000000000000000000000000000..e95cce34aded70d354d95e03e6c10b695998a679
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1291 @@
+@@ -0,0 +1,1297 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -351133,6 +351281,12 @@ index 0000000000000000000000000000000000000000..4310b3d82c4df2e722b4c9c902fd1309
 +
 +  /// Robust extraction of WhatsApp phone number from a room or its members/bridge state
 +  static String? extractWhatsAppPhone(Room room) {
++    // 0. Check custom assigned WhatsApp phone
++    final customPhone = BeeperMergeUtils.getCustomWhatsAppPhone(room.id);
++    if (customPhone != null && customPhone.isNotEmpty) {
++      return customPhone;
++    }
++
 +    // 1. Check all bridge state events
 +    for (final stateKey in const [
 +      'com.beeper.bridge',
@@ -351266,7 +351420,7 @@ index 0000000000000000000000000000000000000000..4310b3d82c4df2e722b4c9c902fd1309
 +
 +  /// Robust extraction of Instagram username and numeric ID from room or bridge events
 +  static ({String? username, String? numericId}) extractInstagramDetails(Room room) {
-+    String? username;
++    String? username = BeeperMergeUtils.getCustomInstagramHandle(room.id);
 +    String? numericId;
 +
 +    // 1. Check bridge state events
@@ -352235,10 +352389,10 @@ index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d82eece6f3
+index 0000000000000000000000000000000000000000..0275e3df4ccbcf97b6b641ca0fa39597ebc57f6b
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,452 @@
+@@ -0,0 +1,538 @@
 +import 'dart:collection';
 +import 'dart:convert';
 +import 'package:flutter/foundation.dart';
@@ -352253,6 +352407,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +  final String? avatarMxc;
 +  final List<String> roomIds;
 +  final String? phoneContactId;
++  final String? customWhatsAppPhone;
++  final String? customInstagramHandle;
 +  final int createdAt;
 +
 +  const MergedContact({
@@ -352261,6 +352417,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +    this.avatarMxc,
 +    required this.roomIds,
 +    this.phoneContactId,
++    this.customWhatsAppPhone,
++    this.customInstagramHandle,
 +    required this.createdAt,
 +  });
 +
@@ -352269,6 +352427,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +    if (avatarMxc != null) 'avatarMxc': avatarMxc,
 +    'roomIds': roomIds,
 +    if (phoneContactId != null) 'phoneContactId': phoneContactId,
++    if (customWhatsAppPhone != null) 'customWhatsAppPhone': customWhatsAppPhone,
++    if (customInstagramHandle != null) 'customInstagramHandle': customInstagramHandle,
 +    'createdAt': createdAt,
 +  };
 +
@@ -352280,6 +352440,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +        ? List<String>.from((json['roomIds'] as List).whereType<String>())
 +        : <String>[],
 +    phoneContactId: json['phoneContactId']?.toString(),
++    customWhatsAppPhone: json['customWhatsAppPhone']?.toString(),
++    customInstagramHandle: json['customInstagramHandle']?.toString(),
 +    createdAt: json['createdAt'] is int
 +        ? json['createdAt'] as int
 +        : (DateTime.now().millisecondsSinceEpoch ~/ 1000),
@@ -352290,6 +352452,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +    String? avatarMxc,
 +    List<String>? roomIds,
 +    String? phoneContactId,
++    String? customWhatsAppPhone,
++    String? customInstagramHandle,
 +  }) {
 +    return MergedContact(
 +      id: id,
@@ -352297,6 +352461,8 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +      avatarMxc: avatarMxc ?? this.avatarMxc,
 +      roomIds: roomIds ?? this.roomIds,
 +      phoneContactId: phoneContactId ?? this.phoneContactId,
++      customWhatsAppPhone: customWhatsAppPhone ?? this.customWhatsAppPhone,
++      customInstagramHandle: customInstagramHandle ?? this.customInstagramHandle,
 +      createdAt: createdAt,
 +    );
 +  }
@@ -352395,6 +352561,80 @@ index 0000000000000000000000000000000000000000..ea4f2ff4522016fb71b4fdc3ffd8b3d8
 +  /// Get sibling rooms for a roomId (O(1))
 +  static List<Room> getSiblingRooms(String roomId) =>
 +      _mergeSiblingRooms[roomId] ?? const <Room>[];
++
++  /// Get custom assigned WhatsApp phone for a room or its merged contact
++  static String? getCustomWhatsAppPhone(String roomId) {
++    final mergeId = _roomToMergeId[roomId];
++    if (mergeId != null) {
++      final mc = _contactsCache[mergeId];
++      if (mc?.customWhatsAppPhone != null && mc!.customWhatsAppPhone!.isNotEmpty) {
++        return mc.customWhatsAppPhone;
++      }
++    }
++    return BeeperBridgeUtils.prefs?.getString('custom_wa_phone_$roomId');
++  }
++
++  /// Get custom assigned Instagram handle for a room or its merged contact
++  static String? getCustomInstagramHandle(String roomId) {
++    final mergeId = _roomToMergeId[roomId];
++    if (mergeId != null) {
++      final mc = _contactsCache[mergeId];
++      if (mc?.customInstagramHandle != null && mc!.customInstagramHandle!.isNotEmpty) {
++        return mc.customInstagramHandle;
++      }
++    }
++    return BeeperBridgeUtils.prefs?.getString('custom_ig_handle_$roomId');
++  }
++
++  /// Set custom assigned WhatsApp phone for a room or its merged contact
++  static Future<void> setCustomWhatsAppPhone(Client client, String roomId, String? phone) async {
++    final clean = phone?.replaceAll(RegExp(r'\D'), '');
++    if (clean != null && clean.isNotEmpty) {
++      await BeeperBridgeUtils.prefs?.setString('custom_wa_phone_$roomId', clean);
++    } else {
++      await BeeperBridgeUtils.prefs?.remove('custom_wa_phone_$roomId');
++    }
++    final mergeId = _roomToMergeId[roomId];
++    if (mergeId != null) {
++      final current = getMergedContacts(client);
++      final mc = current[mergeId];
++      if (mc != null) {
++        final updated = mc.copyWith(customWhatsAppPhone: clean);
++        final map = <String, dynamic>{};
++        for (final e in current.entries) {
++          map[e.key] = e.key == mergeId ? updated.toJson() : e.value.toJson();
++        }
++        await _save(client, map);
++      }
++    }
++    mergeChangeNotifier.value++;
++  }
++
++  /// Set custom assigned Instagram handle for a room or its merged contact
++  static Future<void> setCustomInstagramHandle(Client client, String roomId, String? handle) async {
++    final clean = handle != null && handle.trim().isNotEmpty
++        ? BeeperBridgeUtils.cleanInstagramUsername(handle)
++        : null;
++    if (clean != null && clean.isNotEmpty) {
++      await BeeperBridgeUtils.prefs?.setString('custom_ig_handle_$roomId', clean);
++    } else {
++      await BeeperBridgeUtils.prefs?.remove('custom_ig_handle_$roomId');
++    }
++    final mergeId = _roomToMergeId[roomId];
++    if (mergeId != null) {
++      final current = getMergedContacts(client);
++      final mc = current[mergeId];
++      if (mc != null) {
++        final updated = mc.copyWith(customInstagramHandle: clean);
++        final map = <String, dynamic>{};
++        for (final e in current.entries) {
++          map[e.key] = e.key == mergeId ? updated.toJson() : e.value.toJson();
++        }
++        await _save(client, map);
++      }
++    }
++    mergeChangeNotifier.value++;
++  }
 +
 +  /// Updates the sibling rooms cache with active Matrix Client instance
 +  static void updateSiblingRooms(Client client) {
