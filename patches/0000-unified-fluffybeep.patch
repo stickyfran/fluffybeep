@@ -321276,10 +321276,10 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..38ece10f8347a090ef31bf8b2c5432e3
 +  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..b8af32eacce0ca49d0119bf4acb7fd9a62ba6ab2 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..676703e38aa3dd64721c7b4aa234eed5bec31a10 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -3,224 +3,439 @@
+@@ -3,224 +3,457 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -321508,6 +321508,10 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b8af32eacce0ca49d0119bf4acb7fd9a
 +          return bTs.compareTo(aTs);
 +        });
 +
++        final filterKey = ValueKey(
++          '${widget.controller.activeFilter}_${widget.controller.activeTag}_${widget.controller.activeSpaceId}_$isSearching',
++        );
++
 +        return GestureDetector(
 +          onHorizontalDragEnd: (details) {
 +            if (details.primaryVelocity == null) return;
@@ -321549,8 +321553,22 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b8af32eacce0ca49d0119bf4acb7fd9a
 +              }
 +            }
 +          },
-+          child: CustomScrollView(
-+              
++          child: AnimatedSwitcher(
++            duration: const Duration(milliseconds: 220),
++            switchInCurve: Curves.easeOutCubic,
++            switchOutCurve: Curves.easeInCubic,
++            transitionBuilder: (child, animation) => FadeTransition(
++              opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
++              child: SlideTransition(
++                position: Tween<Offset>(
++                  begin: const Offset(0.015, 0.0),
++                  end: Offset.zero,
++                ).animate(animation),
++                child: child,
++              ),
++            ),
++            child: CustomScrollView(
++              key: filterKey,
 +              controller: widget.controller.scrollController,
 +              slivers: [
 +                ChatListHeader(controller: widget.controller),
@@ -321874,7 +321892,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b8af32eacce0ca49d0119bf4acb7fd9a
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +450,53 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +468,53 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -321946,7 +321964,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..b8af32eacce0ca49d0119bf4acb7fd9a
  }
  
 diff --git a/lib/pages/chat_list/chat_list_header.dart b/lib/pages/chat_list/chat_list_header.dart
-index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde773374e49a902 100644
+index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb361a010d 100644
 --- a/lib/pages/chat_list/chat_list_header.dart
 +++ b/lib/pages/chat_list/chat_list_header.dart
 @@ -14,7 +14,7 @@ import 'package:matrix/matrix.dart';
@@ -321958,7 +321976,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
    final ChatListController controller;
    final bool globalSearch;
  
-@@ -24,10 +24,30 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -24,10 +24,57 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
      this.globalSearch = true,
    });
  
@@ -321973,6 +321991,24 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 +  Stream<SyncStatusUpdate>? _syncStatusStream;
 +  Client? _cachedClient;
 +
++  @override
++  void initState() {
++    super.initState();
++    widget.controller.searchFocusNode.addListener(_onStateChange);
++    widget.controller.searchController.addListener(_onStateChange);
++  }
++
++  @override
++  void dispose() {
++    widget.controller.searchFocusNode.removeListener(_onStateChange);
++    widget.controller.searchController.removeListener(_onStateChange);
++    super.dispose();
++  }
++
++  void _onStateChange() {
++    if (mounted) setState(() {});
++  }
++
    @override
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
@@ -321986,10 +322022,19 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 +    if (AppSettings.searchStyle.value == 'bottom_fab') {
 +      return const SliverToBoxAdapter(child: SizedBox.shrink());
 +    }
++
++    final isFocused = widget.controller.searchFocusNode.hasFocus ||
++        widget.controller.searchController.text.isNotEmpty ||
++        widget.controller.isSearchMode;
++    final isDark = theme.brightness == Brightness.dark;
++    final unfocusedFillColor = isDark
++        ? theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.45)
++        : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.60);
++    final focusedFillColor = theme.colorScheme.secondaryContainer;
  
      return SliverAppBar(
        floating: true,
-@@ -37,7 +57,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -37,7 +84,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
        backgroundColor: Colors.transparent,
        automaticallyImplyLeading: false,
        title: StreamBuilder(
@@ -321998,7 +322043,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
          builder: (context, snapshot) {
            final status =
                client.onSyncStatus.value ??
-@@ -46,12 +66,13 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -46,15 +93,16 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                client.onSync.value != null &&
                status.status != SyncStatus.error &&
                client.prevBatch != null;
@@ -322014,8 +322059,18 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 +                widget.controller.onSearchEnter(text, globalSearch: widget.globalSearch),
              decoration: InputDecoration(
                filled: true,
-               fillColor: theme.colorScheme.secondaryContainer,
-@@ -68,19 +89,19 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+-              fillColor: theme.colorScheme.secondaryContainer,
++              fillColor: isFocused ? focusedFillColor : unfocusedFillColor,
+               border: OutlineInputBorder(
+                 borderSide: BorderSide.none,
+                 borderRadius: BorderRadius.circular(99),
+@@ -63,24 +111,24 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+                   ? L10n.of(context).searchChatsRooms
+                   : status.calcLocalizedString(context),
+               hintStyle: TextStyle(
+-                color: theme.colorScheme.onPrimaryContainer,
++                color: theme.colorScheme.onPrimaryContainer.withValues(alpha: isFocused ? 1.0 : 0.75),
+                 fontWeight: FontWeight.normal,
                ),
  
                prefixIcon: hide
@@ -322040,7 +322095,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
                              icon: Icon(
                                Icons.search_outlined,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -88,7 +109,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -88,7 +136,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                            )
                          : IconButton(
                              tooltip: L10n.of(context).displayNavigationRail,
@@ -322049,7 +322104,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
                              icon: Icon(
                                Icons.menu,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -104,8 +125,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -104,8 +152,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                          ),
                        ),
                      ),
@@ -322060,7 +322115,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
                          ? const Padding(
                              padding: EdgeInsets.symmetric(
                                vertical: 10.0,
-@@ -119,7 +140,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -119,7 +167,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                            )
                          : TextButton.icon(
@@ -322069,7 +322124,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
                              style: TextButton.styleFrom(
                                shape: RoundedRectangleBorder(
                                  borderRadius: BorderRadius.circular(99),
-@@ -128,12 +149,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -128,12 +176,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                              icon: const Icon(Icons.edit_outlined, size: 16),
                              label: Text(
@@ -322084,7 +322139,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
              ),
            );
          },
-@@ -141,6 +162,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -141,6 +189,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
      );
    }
  
@@ -322092,7 +322147,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..305e478a853ba188f16be976cde77337
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793a965b5e6 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..91249ae6f0f84fb272cf1580189f40a79fa22cab 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -322132,7 +322187,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,261 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,264 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -322213,6 +322268,9 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
 +          lastEvent?.type != oldLastEvent?.type ||
 +          lastEvent?.redacted != oldLastEvent?.redacted) {
 +        _initLocalizedBodyFuture();
++        if (lastEvent?.eventId != oldLastEvent?.eventId && lastEvent != null) {
++          _sizeController.forward(from: 0.85);
++        }
 +      }
 +    }
 +  }
@@ -322518,7 +322576,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +312,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +315,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -322527,7 +322585,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +323,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +326,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -322536,7 +322594,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +334,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +337,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -322575,7 +322633,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +351,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +354,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -322598,7 +322656,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +379,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +382,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -322607,7 +322665,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +397,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +400,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -322621,7 +322679,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +410,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +413,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -322647,7 +322705,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,70 +424,179 @@ class ChatListItem extends StatelessWidget {
+@@ -336,70 +427,179 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -322870,7 +322928,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0d58d60f526db37e13c79e84869e4793
        ),
      );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
-index 0db2f7422da7acfd9a5c47694a13613cfa8e40b1..77e48154afce644128a3218e53e246d0096b4f22 100644
+index 0db2f7422da7acfd9a5c47694a13613cfa8e40b1..e431b1670f4e2b85929dbb0fb204d72fd0039b7c 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
 +++ b/lib/pages/chat_list/chat_list_view.dart
 @@ -1,114 +1,147 @@
@@ -323106,8 +323164,8 @@ index 0db2f7422da7acfd9a5c47694a13613cfa8e40b1..77e48154afce644128a3218e53e246d0
 +                                const SizedBox(width: 8),
 +                                FloatingActionButton(
 +                                  heroTag: 'profile_avatar_fab',
-+                                  elevation: 6,
-+                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
++                                  elevation: 2,
++                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.70),
 +                                  onPressed: () {},
 +                                  child: ClientChooserButton(controller),
 +                                ),
@@ -325135,10 +325193,10 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
 +}
 diff --git a/lib/pages/chat_list/search_chat_fab.dart b/lib/pages/chat_list/search_chat_fab.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5780cab497ae0420c5b02638c27212ea264acc11
+index 0000000000000000000000000000000000000000..b9bcf005e8aa19c7e7140087e7efffde7eb63725
 --- /dev/null
 +++ b/lib/pages/chat_list/search_chat_fab.dart
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,78 @@
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_list/chat_list.dart';
@@ -325160,11 +325218,37 @@ index 0000000000000000000000000000000000000000..5780cab497ae0420c5b02638c27212ea
 +
 +class _SearchChatFabState extends State<SearchChatFab> {
 +  @override
++  void initState() {
++    super.initState();
++    widget.controller.searchFocusNode.addListener(_onStateChange);
++    widget.controller.searchController.addListener(_onStateChange);
++  }
++
++  @override
++  void dispose() {
++    widget.controller.searchFocusNode.removeListener(_onStateChange);
++    widget.controller.searchController.removeListener(_onStateChange);
++    super.dispose();
++  }
++
++  void _onStateChange() {
++    if (mounted) setState(() {});
++  }
++
++  @override
 +  Widget build(BuildContext context) {
++    final isFocused = widget.controller.searchFocusNode.hasFocus ||
++        widget.controller.searchController.text.isNotEmpty ||
++        widget.controller.isSearchMode;
++    final theme = Theme.of(context);
++    final bgColor = isFocused
++        ? theme.colorScheme.surfaceContainerHigh
++        : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.65);
++
 +    return Material(
-+      elevation: 6,
++      elevation: isFocused ? 6 : 2,
 +      borderRadius: BorderRadius.circular(28),
-+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
++      color: bgColor,
 +      child: TextField(
 +        controller: widget.controller.searchController,
 +        focusNode: widget.controller.searchFocusNode,
@@ -335358,10 +335442,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27ebf27b572f
+index 0000000000000000000000000000000000000000..55e8c9ba9daf7b996f53f16a88f01e1420cd9f28
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,651 @@
+@@ -0,0 +1,656 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -335377,21 +335461,24 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +import '../../widgets/avatar.dart';
 +import '../../widgets/matrix.dart';
 +
-+Future<void> showMergeContactPicker(BuildContext context, Room initialRoom) async {
++Future<void> showMergeContactPicker(BuildContext context, [Room? initialRoom]) async {
++  final client = initialRoom?.client ?? Matrix.of(context).client;
 +  await showModalBottomSheet<void>(
 +    context: context,
 +    isScrollControlled: true,
 +    backgroundColor: Colors.transparent,
-+    builder: (ctx) => MergeContactPicker(initialRoom: initialRoom),
++    builder: (ctx) => MergeContactPicker(initialRoom: initialRoom, client: client),
 +  );
 +}
 +
 +class MergeContactPicker extends StatefulWidget {
-+  final Room initialRoom;
++  final Room? initialRoom;
++  final Client client;
 +
 +  const MergeContactPicker({
 +    super.key,
-+    required this.initialRoom,
++    this.initialRoom,
++    required this.client,
 +  });
 +
 +  @override
@@ -335434,23 +335521,25 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +  @override
 +  void initState() {
 +    super.initState();
-+    final client = widget.initialRoom.client;
++    final client = widget.client;
 +
-+    _existingMergeId = BeeperMergeUtils.getMergeIdForRoom(widget.initialRoom.id);
-+    if (_existingMergeId != null) {
-+      final siblings = BeeperMergeUtils.getSiblingRooms(widget.initialRoom.id);
-+      for (final s in siblings) {
-+        _selectedRoomIds.add(s.id);
++    if (widget.initialRoom != null) {
++      _existingMergeId = BeeperMergeUtils.getMergeIdForRoom(widget.initialRoom!.id);
++      if (_existingMergeId != null) {
++        final siblings = BeeperMergeUtils.getSiblingRooms(widget.initialRoom!.id);
++        for (final s in siblings) {
++          _selectedRoomIds.add(s.id);
++        }
++        final mc = BeeperMergeUtils.getMergedContacts(client)[_existingMergeId];
++        if (mc != null) {
++          _nameController.text = mc.displayName;
++          _matchedPhoneContactId = mc.phoneContactId;
++        }
++      } else {
++        _selectedRoomIds.add(widget.initialRoom!.id);
++        final initialData = BeeperBridgeUtils.getRoomData(widget.initialRoom!);
++        _nameController.text = initialData.displayName ?? widget.initialRoom!.name;
 +      }
-+      final mc = BeeperMergeUtils.getMergedContacts(client)[_existingMergeId];
-+      if (mc != null) {
-+        _nameController.text = mc.displayName;
-+        _matchedPhoneContactId = mc.phoneContactId;
-+      }
-+    } else {
-+      _selectedRoomIds.add(widget.initialRoom.id);
-+      final initialData = BeeperBridgeUtils.getRoomData(widget.initialRoom);
-+      _nameController.text = initialData.displayName ?? widget.initialRoom.name;
 +    }
 +
 +    _buildCachedRoomItems();
@@ -335467,7 +335556,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +  }
 +
 +  void _buildCachedRoomItems() {
-+    final client = widget.initialRoom.client;
++    final client = widget.client;
 +    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
 +    final items = <_MergePickerRoomItem>[];
 +
@@ -335477,7 +335566,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +            .map((id) => client.getRoomById(id))
 +            .whereType<Room>()
 +            .toList()
-+        : [widget.initialRoom];
++        : (widget.initialRoom != null ? [widget.initialRoom!] : <Room>[]);
 +
 +    // Precalculate source strings once to avoid redundant state queries
 +    final sourceTexts = <String>[];
@@ -335561,7 +335650,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +  }
 +
 +  void _computeSuggestions() {
-+    final client = widget.initialRoom.client;
++    final client = widget.client;
 +    _suggestions = BeeperMergeUtils.getSuggestedMerges(
 +      client,
 +      BeeperPhoneContacts.isLoaded ? BeeperPhoneContacts.contacts : null,
@@ -335579,7 +335668,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +  void _checkPhoneMatch() {
 +    if (_matchedPhoneContactId != null) return;
 +    for (final rId in _selectedRoomIds) {
-+      final room = widget.initialRoom.client.getRoomById(rId);
++      final room = widget.client.getRoomById(rId);
 +      if (room == null) continue;
 +      final beeperData = BeeperBridgeUtils.getRoomData(room);
 +      final contactId = beeperData.contactId ?? room.directChatMatrixID;
@@ -335589,7 +335678,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +          final pc = BeeperPhoneContacts.findByPhone(phone);
 +          if (pc != null) {
 +            _matchedPhoneContactId = pc.id;
-+            if (_nameController.text.isEmpty || _nameController.text == widget.initialRoom.name) {
++            if (_nameController.text.isEmpty || (widget.initialRoom != null && _nameController.text == widget.initialRoom!.name)) {
 +              _nameController.text = pc.displayName;
 +            }
 +            break;
@@ -335618,7 +335707,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +  }
 +
 +  Future<void> _saveMerge() async {
-+    final client = widget.initialRoom.client;
++    final client = widget.client;
 +    final name = _nameController.text.trim();
 +    if (name.isEmpty || _selectedRoomIds.length < 2) return;
 +
@@ -335640,7 +335729,7 @@ index 0000000000000000000000000000000000000000..15fd764d8c093488da53bc8a4dcb27eb
 +
 +  Future<void> _unmerge() async {
 +    if (_existingMergeId == null) return;
-+    final client = widget.initialRoom.client;
++    final client = widget.client;
 +    await BeeperMergeUtils.removeMerge(client, _existingMergeId!);
 +    if (mounted) {
 +      Navigator.of(context).pop();
@@ -340012,10 +340101,10 @@ index 627a2ed7a0fe8b069cce1b08768ef1d7159a8c64..8a74184d8cbd563106ee874ee9f6a1d5
 +}
 diff --git a/lib/pages/settings_chat/merged_contacts_settings.dart b/lib/pages/settings_chat/merged_contacts_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc01754c4f
+index 0000000000000000000000000000000000000000..739fa9b667954cf828dce2a2aebf24646efaf313
 --- /dev/null
 +++ b/lib/pages/settings_chat/merged_contacts_settings.dart
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,269 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -340216,10 +340305,12 @@ index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc
 +                      ],
 +                    ),
 +                    subtitle: Text(
-+                      rooms.map((r) {
-+                        final net = BeeperBridgeUtils.getRoomNetwork(r);
-+                        return net?.name ?? r.name;
-+                      }).join(' • '),
++                      rooms.isNotEmpty
++                          ? rooms.map((r) {
++                              final net = BeeperBridgeUtils.getRoomNetwork(r);
++                              return net?.name ?? r.name;
++                            }).join(' • ')
++                          : '${contact.roomIds.length} chats vinculados',
 +                      maxLines: 1,
 +                      overflow: TextOverflow.ellipsis,
 +                      style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
@@ -340227,8 +340318,8 @@ index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc
 +                    trailing: PopupMenuButton<String>(
 +                      icon: const Icon(Icons.more_vert),
 +                      onSelected: (action) async {
-+                        if (action == 'edit' && rooms.isNotEmpty) {
-+                          await showMergeContactPicker(context, rooms.first);
++                        if (action == 'edit') {
++                          await showMergeContactPicker(context, rooms.isNotEmpty ? rooms.first : null);
 +                          if (mounted) setState(() {});
 +                        } else if (action == 'unmerge') {
 +                          final consent = await showOkCancelAlertDialog(
@@ -340268,10 +340359,8 @@ index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc
 +                      ],
 +                    ),
 +                    onTap: () async {
-+                      if (rooms.isNotEmpty) {
-+                        await showMergeContactPicker(context, rooms.first);
-+                        if (mounted) setState(() {});
-+                      }
++                      await showMergeContactPicker(context, rooms.isNotEmpty ? rooms.first : null);
++                      if (mounted) setState(() {});
 +                    },
 +                  );
 +                },
@@ -340281,84 +340370,8 @@ index 0000000000000000000000000000000000000000..3e57021cf3c1c5d6c1fdab6d594e7ecc
 +  }
 +
 +  Future<void> _pickRoomToMerge(BuildContext context, Client client) async {
-+    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
-+    if (nonSpaceRooms.isEmpty) return;
-+
-+    final selectedRoom = await showDialog<Room>(
-+      context: context,
-+      builder: (ctx) {
-+        String filterText = '';
-+        return StatefulBuilder(
-+          builder: (dialogCtx, setDialogState) {
-+            final filtered = filterText.isEmpty
-+                ? nonSpaceRooms
-+                : nonSpaceRooms.where((r) {
-+                    final data = BeeperBridgeUtils.getRoomData(r);
-+                    final name = (data.displayName ?? r.name).toLowerCase();
-+                    return name.contains(filterText.toLowerCase());
-+                  }).toList();
-+
-+            return AlertDialog(
-+              title: const Text('Seleccionar chat inicial'),
-+              content: SizedBox(
-+                width: double.maxFinite,
-+                height: 400,
-+                child: Column(
-+                  children: [
-+                    TextField(
-+                      decoration: const InputDecoration(
-+                        hintText: 'Buscar chat...',
-+                        prefixIcon: Icon(Icons.search),
-+                        isDense: true,
-+                      ),
-+                      onChanged: (text) {
-+                        setDialogState(() {
-+                          filterText = text;
-+                        });
-+                      },
-+                    ),
-+                    const SizedBox(height: 8),
-+                    Expanded(
-+                      child: ListView.builder(
-+                        itemCount: filtered.length,
-+                        itemBuilder: (context, index) {
-+                          final r = filtered[index];
-+                          final data = BeeperBridgeUtils.getRoomData(r);
-+                          final net = BeeperBridgeUtils.getRoomNetwork(r);
-+                          final dName = data.displayName ?? r.name;
-+                          return ListTile(
-+                            dense: true,
-+                            leading: Avatar(
-+                              mxContent: data.avatarUrl,
-+                              name: dName,
-+                              size: 32,
-+                            ),
-+                            title: Text(dName, maxLines: 1, overflow: TextOverflow.ellipsis),
-+                            subtitle: Text(net?.name ?? r.id, maxLines: 1, overflow: TextOverflow.ellipsis),
-+                            onTap: () => Navigator.of(ctx).pop(r),
-+                          );
-+                        },
-+                      ),
-+                    ),
-+                  ],
-+                ),
-+              ),
-+              actions: [
-+                TextButton(
-+                  onPressed: () => Navigator.of(ctx).pop(),
-+                  child: const Text('Cancelar'),
-+                ),
-+              ],
-+            );
-+          },
-+        );
-+      },
-+    );
-+
-+    if (selectedRoom != null && mounted) {
-+      await showMergeContactPicker(context, selectedRoom);
-+      if (mounted) setState(() {});
-+    }
++    await showMergeContactPicker(context, null);
++    if (mounted) setState(() {});
 +  }
 +}
 diff --git a/lib/pages/settings_chat/settings_chat.dart b/lib/pages/settings_chat/settings_chat.dart
@@ -362715,10 +362728,10 @@ index ceab2dc2629e2c12206cbd07e1c3792f9913bf18..b88eb20966f6c131ce7bc13746dd2ffc
 +        );
 +}
 diff --git a/lib/utils/voip_plugin.dart b/lib/utils/voip_plugin.dart
-index 903cc7fea791578cd261dc184b6d741e330dca91..2884588baab3eaf8239ffe22e9de450356c15897 100644
+index 903cc7fea791578cd261dc184b6d741e330dca91..a8faab40e697ca3e66d994d0ab74348911af01cb 100644
 --- a/lib/utils/voip_plugin.dart
 +++ b/lib/utils/voip_plugin.dart
-@@ -1,173 +1,173 @@
+@@ -1,173 +1,188 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -362910,6 +362923,8 @@ index 903cc7fea791578cd261dc184b6d741e330dca91..2884588baab3eaf8239ffe22e9de4503
 +
 +import '../../utils/voip/user_media_manager.dart';
 +import '../widgets/matrix.dart';
++import 'beeper_bridge_utils.dart';
++import 'beeper_app_launcher.dart';
 +
 +class VoipPlugin with WidgetsBindingObserver implements WebRTCDelegate {
 +  final MatrixState matrix;
@@ -362995,6 +363010,19 @@ index 903cc7fea791578cd261dc184b6d741e330dca91..2884588baab3eaf8239ffe22e9de4503
 +
 +  @override
 +  Future<void> handleNewCall(CallSession call) async {
++    final room = call.room;
++    final netKey = room != null ? BeeperBridgeUtils.getRoomNetwork(room)?.key : null;
++    final isWhatsApp = netKey == 'whatsapp' || netKey == 'whatsappgo';
++
++    if (isWhatsApp && call.direction == CallDirection.kIncoming) {
++      // 1. Play ringtone and vibrate
++      await playRingtone();
++      // 2. Force open WhatsApp targeting the custom package name
++      if (room != null) {
++        await BeeperAppLauncher.openWhatsApp(room: room);
++      }
++    }
++
 +    if (PlatformInfos.isAndroid) {
 +      try {
 +        final wasForeground = await FlutterForegroundTask.isAppOnForeground;
