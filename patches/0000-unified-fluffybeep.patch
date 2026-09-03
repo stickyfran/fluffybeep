@@ -320272,7 +320272,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f75bb2086e 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..dce99b1a4c3484285fba02307ba8013465f0ca5d 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -321289,8 +321289,8 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
 +                if (roomUpdate.timeline?.events?.isNotEmpty == true ||
 +                    roomUpdate.state?.isNotEmpty == true ||
 +                    roomUpdate.unreadNotifications != null ||
-+                    roomUpdate.ephemeral?.events?.isNotEmpty == true ||
-+                    roomUpdate.accountData?.events?.isNotEmpty == true) {
++                    roomUpdate.ephemeral?.isNotEmpty == true ||
++                    roomUpdate.accountData?.isNotEmpty == true) {
 +                  BeeperBridgeUtils.invalidateLastMessageTime(roomId);
 +                  _pendingChangedRoomIds.add(roomId);
 +                }
@@ -321343,54 +321343,23 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
      _clientStream.close();
      super.dispose();
    }
-@@ -525,24 +1197,29 @@ class ChatListController extends State<ChatList>
-               ],
-             ),
-           ),
--          PopupMenuItem(
--            value: ChatContextAction.markUnread,
--            child: Row(
--              mainAxisSize: .min,
--              children: [
--                Icon(
+@@ -531,13 +1203,13 @@ class ChatListController extends State<ChatList>
+               mainAxisSize: .min,
+               children: [
+                 Icon(
 -                  room.markedUnread
--                      ? Icons.mark_as_unread
--                      : Icons.mark_as_unread_outlined,
--                ),
--                const SizedBox(width: 12),
--                Text(
--                  room.markedUnread
--                      ? L10n.of(context).markAsRead
--                      : L10n.of(context).markAsUnread,
-+          Builder(
-+            builder: (context) {
-+              final isUnread = room.isUnread || room.isUnreadOrInvited || room.hasNewMessages || room.notificationCount > 0;
-+              return PopupMenuItem(
-+                value: ChatContextAction.markUnread,
-+                child: Row(
-+                  mainAxisSize: .min,
-+                  children: [
-+                    Icon(
-+                      isUnread
-+                          ? Icons.mark_as_unread
-+                          : Icons.mark_as_unread_outlined,
-+                    ),
-+                    const SizedBox(width: 12),
-+                    Text(
-+                      isUnread
-+                          ? L10n.of(context).markAsRead
-+                          : L10n.of(context).markAsUnread,
-+                    ),
-+                  ],
++                  (room.isUnread || room.isUnreadOrInvited || room.hasNewMessages || room.notificationCount > 0)
+                       ? Icons.mark_as_unread
+                       : Icons.mark_as_unread_outlined,
                  ),
--              ],
--            ),
-+              );
-+            },
-           ),
-           if (!room.isLowPriority)
-             PopupMenuItem(
-@@ -644,19 +1321,18 @@ class ChatListController extends State<ChatList>
+                 const SizedBox(width: 12),
+                 Text(
+-                  room.markedUnread
++                  (room.isUnread || room.isUnreadOrInvited || room.hasNewMessages || room.notificationCount > 0)
+                       ? L10n.of(context).markAsRead
+                       : L10n.of(context).markAsUnread,
+                 ),
+@@ -644,19 +1316,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -321422,7 +321391,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1356,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1351,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -321462,7 +321431,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
          ],
        );
      }
-@@ -700,7 +1409,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1404,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -321486,7 +321455,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1525,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1520,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -321612,7 +321581,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
      }
    }
  
-@@ -864,6 +1699,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1694,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -321620,7 +321589,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1750,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1745,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -321634,7 +321603,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..e37b019d254e6d7d724a531d49b3d2f7
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1874,7 @@ enum ChatContextAction {
+@@ -1039,4 +1869,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -325797,10 +325766,10 @@ index 13d6fe73c0bd33a8ca518f476ecbe5d0397dcf7d..d88172fd98a80acd1ec461a4746644b9
 +  }
 +}
 diff --git a/lib/pages/chat_list/space_view.dart b/lib/pages/chat_list/space_view.dart
-index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd357c46e027 100644
+index 558056ea899b772be608de1907f4d60c45a5956c..d70d1928350571ffa64e11c522e99a60163bf6b1 100644
 --- a/lib/pages/chat_list/space_view.dart
 +++ b/lib/pages/chat_list/space_view.dart
-@@ -8,6 +8,8 @@ import 'dart:convert';
+@@ -8,9 +8,12 @@ import 'dart:convert';
  
  import 'package:collection/collection.dart';
  import 'package:fluffychat/config/app_config.dart';
@@ -325809,7 +325778,11 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
  import 'package:fluffychat/l10n/l10n.dart';
  import 'package:fluffychat/pages/chat_list/unread_bubble.dart';
  import 'package:fluffychat/utils/localized_exception_extension.dart';
-@@ -32,7 +34,7 @@ enum SpaceChildAction {
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
+ import 'package:fluffychat/utils/stream_extension.dart';
+ import 'package:fluffychat/utils/string_color.dart';
+ import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+@@ -32,7 +35,7 @@ enum SpaceChildAction {
    leave,
  }
  
@@ -325818,7 +325791,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
  
  class SpaceView extends StatefulWidget {
    final String spaceId;
-@@ -53,6 +55,8 @@ class SpaceView extends StatefulWidget {
+@@ -53,6 +56,8 @@ class SpaceView extends StatefulWidget {
  }
  
  class _SpaceViewState extends State<SpaceView> {
@@ -325827,7 +325800,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
    final List<SpaceRoomsChunk$2> _discoveredChildren = [];
    final TextEditingController _filterController = TextEditingController();
    String? _nextBatch;
-@@ -178,8 +182,15 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -178,8 +183,15 @@ class _SpaceViewState extends State<SpaceView> {
          if (!mounted) return;
          context.push('/rooms/${widget.spaceId}/details');
          break;
@@ -325845,7 +325818,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
          break;
        case SpaceActions.leave:
          final confirmed = await showOkCancelAlertDialog(
-@@ -353,7 +364,10 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -353,7 +365,10 @@ class _SpaceViewState extends State<SpaceView> {
        case SpaceChildAction.markAsRead:
          await showFutureLoadingDialog(
            context: context,
@@ -325857,7 +325830,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
          );
        case SpaceChildAction.leave:
          await showFutureLoadingDialog(
-@@ -372,19 +386,122 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -372,19 +387,122 @@ class _SpaceViewState extends State<SpaceView> {
          room?.getLocalizedDisplayname() ?? L10n.of(context).nothingFound;
      const avatarSize = Avatar.defaultSize / 1.5;
      final isAdmin = room?.canChangeStateEvent(EventTypes.SpaceChild) == true;
@@ -325984,7 +325957,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                        floating: true,
                        scrolledUnderElevation: 0,
                        backgroundColor: Colors.transparent,
-@@ -414,60 +531,13 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -414,60 +532,13 @@ class _SpaceViewState extends State<SpaceView> {
                                color: theme.colorScheme.onPrimaryContainer,
                              ),
                            ),
@@ -326048,7 +326021,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                            if (_noMoreRooms) {
                              return const SizedBox.shrink();
                            }
-@@ -484,7 +554,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -484,7 +555,7 @@ class _SpaceViewState extends State<SpaceView> {
                              ),
                            );
                          }
@@ -326057,7 +326030,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                          var joinedRoom = room.client.getRoomById(item.roomId);
                          final displayname =
                              item.name ??
-@@ -492,9 +562,6 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -492,9 +563,6 @@ class _SpaceViewState extends State<SpaceView> {
                              joinedRoom?.getLocalizedDisplayname() ??
                              L10n.of(context).emptyChat;
                          final avatarUrl = item.avatarUrl ?? joinedRoom?.avatar;
@@ -326067,7 +326040,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                          if (joinedRoom?.membership == Membership.leave) {
                            joinedRoom = null;
                          }
-@@ -532,8 +599,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -532,8 +600,7 @@ class _SpaceViewState extends State<SpaceView> {
                                          item.roomId,
                                        )
                                      : null,
@@ -326077,7 +326050,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                                      ? SizedBox.square(
                                          dimension: avatarSize,
                                          child: IconButton(
-@@ -547,11 +613,13 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -547,11 +614,13 @@ class _SpaceViewState extends State<SpaceView> {
                                                  .colorScheme
                                                  .tertiaryContainer,
                                            ),
@@ -326096,7 +326069,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                                            icon: const Icon(Icons.edit_outlined),
                                          ),
                                        )
-@@ -562,7 +630,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -562,7 +631,7 @@ class _SpaceViewState extends State<SpaceView> {
                                          backgroundColor:
                                              theme.colorScheme.surfaceContainer,
                                          textColor:
@@ -326105,7 +326078,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..a5cc9921c39d65ae089a0bca4756cd35
                                              theme.colorScheme.onSurface,
                                          shapeBorder: item.roomType == 'm.space'
                                              ? RoundedSuperellipseBorder(
-@@ -587,14 +655,20 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -587,14 +656,20 @@ class _SpaceViewState extends State<SpaceView> {
                                  title: Row(
                                    children: [
                                      Expanded(
@@ -347552,7 +347525,7 @@ index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..e9d6f65fed49421c765d7d6d3c3ed33d
 +  Widget build(BuildContext context) => SettingsStyleView(this);
 +}
 diff --git a/lib/pages/settings_style/settings_style_view.dart b/lib/pages/settings_style/settings_style_view.dart
-index 916eff68379a38f84d30dfc7ca90701e1e329544..bad0ac6920877feb2fcb18615a21caca79428b06 100644
+index 916eff68379a38f84d30dfc7ca90701e1e329544..4fd2ad04fa9f58efad3437097f04d94ab3467b0f 100644
 --- a/lib/pages/settings_style/settings_style_view.dart
 +++ b/lib/pages/settings_style/settings_style_view.dart
 @@ -1,349 +1,386 @@
@@ -348124,7 +348097,7 @@ index 916eff68379a38f84d30dfc7ca90701e1e329544..bad0ac6920877feb2fcb18615a21caca
 +                                        : 12,
 +                                    bottom: 12,
 +                                  ),
-+                                  Builder(
++                                  child: Builder(
 +                                    builder: (context) {
 +                                      final useNeutralDark = theme.brightness == Brightness.dark &&
 +                                          AppSettings.neutralBubblesInDarkMode.value;
