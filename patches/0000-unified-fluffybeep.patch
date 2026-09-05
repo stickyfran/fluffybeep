@@ -307558,7 +307558,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb890061f58b 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089c7e99483 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -307909,7 +307909,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb89
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -449,30 +658,105 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +658,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -307921,6 +307921,17 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb89
 -                            child: InkWell(
 -                              borderRadius: BorderRadius.circular(
 -                                AppConfig.borderRadius,
+-                              ),
+-                              onTap: _toggleSpeed,
+-                              child: SizedBox(
+-                                width: 32,
+-                                height: 20,
+-                                child: Center(
+-                                  child: Text(
+-                                    '${audioPlayer?.speed}x',
+-                                    style: TextStyle(
+-                                      color: widget.color,
+-                                      fontSize: 9,
 +                          secondChild: Row(
 +                            mainAxisSize: MainAxisSize.min,
 +                            children: [
@@ -307945,96 +307956,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb89
 +                                          fontSize: 9,
 +                                        ),
 +                                      ),
-+                                    ),
-+                                  ),
-+                                ),
-                               ),
--                              onTap: _toggleSpeed,
--                              child: SizedBox(
--                                width: 32,
--                                height: 20,
--                                child: Center(
--                                  child: Text(
--                                    '${audioPlayer?.speed}x',
--                                    style: TextStyle(
--                                      color: widget.color,
--                                      fontSize: 9,
-+                              const SizedBox(width: 4),
-+                              Tooltip(
-+                                message: AppSettings.audioPlaybackOutput.value == 'earpiece'
-+                                    ? 'Auricular de llamada (forzado)'
-+                                    : AppSettings.audioPlaybackOutput.value == 'speaker'
-+                                        ? 'Altavoz (forzado)'
-+                                        : 'Automático (sensor de proximidad)',
-+                                child: Material(
-+                                  color: AppSettings.audioPlaybackOutput.value == 'auto'
-+                                      ? widget.color.withAlpha(96)
-+                                      : widget.color.withAlpha(64),
-+                                  borderRadius: BorderRadius.circular(
-+                                    AppConfig.borderRadius,
-+                                  ),
-+                                  child: InkWell(
-+                                    borderRadius: BorderRadius.circular(
-+                                      AppConfig.borderRadius,
-+                                    ),
-+                                    onTap: _toggleOutput,
-+                                    child: SizedBox(
-+                                      width: 24,
-+                                      height: 20,
-+                                      child: Center(
-+                                        child: Icon(
-+                                          AppSettings.audioPlaybackOutput.value == 'earpiece'
-+                                              ? Icons.phone_in_talk_outlined
-+                                              : AppSettings.audioPlaybackOutput.value == 'speaker'
-+                                                  ? Icons.volume_up_outlined
-+                                                  : Icons.hearing_outlined,
-+                                          size: 14,
-+                                          color: widget.color,
-+                                        ),
-+                                      ),
                                      ),
                                    ),
                                  ),
                                ),
 -                            ),
-+                              const SizedBox(width: 4),
-+                              ValueListenableBuilder<bool>(
-+                                valueListenable: matrix.continuousAudioPlaybackNotifier,
-+                                builder: (context, continuous, _) {
-+                                  return Material(
-+                                    color: continuous
-+                                        ? widget.color.withAlpha(128)
-+                                        : widget.color.withAlpha(64),
-+                                    borderRadius: BorderRadius.circular(
-+                                      AppConfig.borderRadius,
-+                                    ),
-+                                    child: InkWell(
-+                                      borderRadius: BorderRadius.circular(
-+                                        AppConfig.borderRadius,
-+                                      ),
-+                                      onTap: () {
-+                                        matrix.continuousAudioPlaybackNotifier.value = !continuous;
-+                                      },
-+                                      child: SizedBox(
-+                                        width: 24,
-+                                        height: 20,
-+                                        child: Center(
-+                                          child: Icon(
-+                                            Icons.playlist_play_rounded,
-+                                            size: 16,
-+                                            color: continuous ? Colors.white : widget.color,
-+                                          ),
-+                                        ),
-+                                      ),
-+                                    ),
-+                                  );
-+                                },
-+                              ),
 +                            ],
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +795,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +725,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -308042,159 +307973,276 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb89
                  ],
                ),
              );
-@@ -519,6 +804,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +734,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
 +
 +  Widget _buildTranscriptionSection(BuildContext context) {
-+    if (_transcription != null && _transcription!.isNotEmpty) {
-+      return Container(
-+        margin: const EdgeInsets.only(top: 8),
-+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-+        decoration: BoxDecoration(
-+          color: widget.color.withValues(alpha: 0.08),
-+          borderRadius: BorderRadius.circular(10),
-+          border: Border(
-+            left: BorderSide(
-+              color: widget.color.withValues(alpha: 0.8),
-+              width: 3.5,
++    return Column(
++      mainAxisSize: MainAxisSize.min,
++      crossAxisAlignment: CrossAxisAlignment.start,
++      children: [
++        if (_transcription != null && _transcription!.isNotEmpty)
++          Container(
++            margin: const EdgeInsets.only(top: 8),
++            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
++            decoration: BoxDecoration(
++              color: widget.color.withValues(alpha: 0.08),
++              borderRadius: BorderRadius.circular(10),
++              border: Border(
++                left: BorderSide(
++                  color: widget.color.withValues(alpha: 0.8),
++                  width: 3.5,
++                ),
++              ),
 +            ),
-+          ),
-+        ),
-+        child: Column(
-+          crossAxisAlignment: CrossAxisAlignment.start,
-+          mainAxisSize: MainAxisSize.min,
-+          children: [
-+            Row(
-+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              mainAxisSize: MainAxisSize.min,
 +              children: [
 +                Row(
-+                  mainAxisSize: MainAxisSize.min,
++                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
 +                  children: [
-+                    Icon(
-+                      Icons.format_quote_rounded,
-+                      size: 14,
-+                      color: widget.color.withValues(alpha: 0.7),
++                    Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        Icon(
++                          Icons.format_quote_rounded,
++                          size: 14,
++                          color: widget.color.withValues(alpha: 0.7),
++                        ),
++                        const SizedBox(width: 4),
++                        Text(
++                          'Transcripción',
++                          style: TextStyle(
++                            color: widget.color.withValues(alpha: 0.8),
++                            fontSize: 11,
++                            fontWeight: FontWeight.bold,
++                          ),
++                        ),
++                      ],
 +                    ),
-+                    const SizedBox(width: 4),
-+                    Text(
-+                      'Transcripción',
-+                      style: TextStyle(
-+                        color: widget.color.withValues(alpha: 0.8),
-+                        fontSize: 11,
-+                        fontWeight: FontWeight.bold,
++                    InkWell(
++                      borderRadius: BorderRadius.circular(12),
++                      onTap: () {
++                        Clipboard.setData(ClipboardData(text: _transcription!));
++                        ScaffoldMessenger.of(context).showSnackBar(
++                          const SnackBar(
++                            content: Text('Transcripción copiada al portapapeles'),
++                            duration: Duration(seconds: 2),
++                          ),
++                        );
++                      },
++                      child: Padding(
++                        padding: const EdgeInsets.all(2.0),
++                        child: Icon(
++                          Icons.copy_rounded,
++                          size: 14,
++                          color: widget.color.withValues(alpha: 0.7),
++                        ),
 +                      ),
 +                    ),
 +                  ],
 +                ),
-+                InkWell(
-+                  borderRadius: BorderRadius.circular(12),
-+                  onTap: () {
-+                    Clipboard.setData(ClipboardData(text: _transcription!));
-+                    ScaffoldMessenger.of(context).showSnackBar(
-+                      const SnackBar(
-+                        content: Text('Transcripción copiada al portapapeles'),
-+                        duration: Duration(seconds: 2),
-+                      ),
-+                    );
-+                  },
-+                  child: Padding(
-+                    padding: const EdgeInsets.all(2.0),
-+                    child: Icon(
-+                      Icons.copy_rounded,
-+                      size: 14,
-+                      color: widget.color.withValues(alpha: 0.7),
-+                    ),
++                const SizedBox(height: 4),
++                SelectableText(
++                  _transcription!,
++                  style: TextStyle(
++                    color: widget.color,
++                    fontSize: widget.fontSize - 1.5,
++                    height: 1.3,
++                    fontStyle: FontStyle.italic,
 +                  ),
 +                ),
 +              ],
 +            ),
-+            const SizedBox(height: 4),
-+            SelectableText(
-+              _transcription!,
-+              style: TextStyle(
-+                color: widget.color,
-+                fontSize: widget.fontSize - 1.5,
-+                height: 1.3,
-+                fontStyle: FontStyle.italic,
-+              ),
-+            ),
-+          ],
-+        ),
-+      );
-+    }
-+
-+    if (_isTranscribing) {
-+      return Container(
-+        margin: const EdgeInsets.only(top: 6),
-+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-+        decoration: BoxDecoration(
-+          color: widget.color.withValues(alpha: 0.08),
-+          borderRadius: BorderRadius.circular(16),
-+        ),
-+        child: Row(
-+          mainAxisSize: MainAxisSize.min,
-+          children: [
-+            SizedBox(
-+              width: 12,
-+              height: 12,
-+              child: CircularProgressIndicator(
-+                strokeWidth: 2,
-+                color: widget.color,
-+                value: _transcriptionProgress,
-+              ),
-+            ),
-+            const SizedBox(width: 8),
-+            Text(
-+              _transcriptionProgress != null
-+                  ? 'Transcribiendo (${(_transcriptionProgress! * 100).toInt()}%)...'
-+                  : 'Transcribiendo audio...',
-+              style: TextStyle(
-+                color: widget.color,
-+                fontSize: 11,
-+              ),
-+            ),
-+          ],
-+        ),
-+      );
-+    }
-+
-+    return Padding(
-+      padding: const EdgeInsets.only(top: 6),
-+      child: Align(
-+        alignment: Alignment.centerLeft,
-+        child: Material(
-+          color: widget.color.withValues(alpha: 0.08),
-+          borderRadius: BorderRadius.circular(16),
-+          child: InkWell(
-+            borderRadius: BorderRadius.circular(16),
-+            onTap: _transcribeAudio,
-+            child: Padding(
-+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-+              child: Row(
-+                mainAxisSize: MainAxisSize.min,
-+                children: [
-+                  Icon(
-+                    Icons.subtitles_outlined,
-+                    size: 13,
-+                    color: widget.color,
-+                  ),
-+                  const SizedBox(width: 5),
-+                  Text(
-+                    'Transcribir',
-+                    style: TextStyle(
-+                      color: widget.color,
-+                      fontSize: 11,
-+                      fontWeight: FontWeight.w600,
++          ),
++        Padding(
++          padding: const EdgeInsets.only(top: 6),
++          child: Row(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              if (_transcription == null || _transcription!.isEmpty) ...[
++                if (_isTranscribing)
++                  Container(
++                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
++                    decoration: BoxDecoration(
++                      color: widget.color.withValues(alpha: 0.08),
++                      borderRadius: BorderRadius.circular(16),
++                    ),
++                    child: Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        SizedBox(
++                          width: 12,
++                          height: 12,
++                          child: CircularProgressIndicator(
++                            strokeWidth: 2,
++                            color: widget.color,
++                            value: _transcriptionProgress,
++                          ),
++                        ),
++                        const SizedBox(width: 8),
++                        Text(
++                          _transcriptionProgress != null
++                              ? 'Transcribiendo (${(_transcriptionProgress! * 100).toInt()}%)...'
++                              : 'Transcribiendo audio...',
++                          style: TextStyle(
++                            color: widget.color,
++                            fontSize: 11,
++                          ),
++                        ),
++                      ],
++                    ),
++                  )
++                else
++                  Material(
++                    color: widget.color.withValues(alpha: 0.08),
++                    borderRadius: BorderRadius.circular(16),
++                    child: InkWell(
++                      borderRadius: BorderRadius.circular(16),
++                      onTap: _transcribeAudio,
++                      child: Padding(
++                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
++                        child: Row(
++                          mainAxisSize: MainAxisSize.min,
++                          children: [
++                            Icon(
++                              Icons.subtitles_outlined,
++                              size: 14,
++                              color: widget.color,
++                            ),
++                            const SizedBox(width: 5),
++                            Text(
++                              'Transcribir',
++                              style: TextStyle(
++                                color: widget.color,
++                                fontSize: 11,
++                                fontWeight: FontWeight.w600,
++                              ),
++                            ),
++                          ],
++                        ),
++                      ),
 +                    ),
 +                  ),
-+                ],
-+              ),
++                const SizedBox(width: 8),
++              ],
++              _buildPlaybackOutputButton(),
++              const SizedBox(width: 6),
++              _buildContinuousPlaybackButton(),
++            ],
++          ),
++        ),
++      ],
++    );
++  }
++
++  Widget _buildPlaybackOutputButton() {
++    final mode = AppSettings.audioPlaybackOutput.value;
++    final isAuto = mode == 'auto';
++    final isEarpiece = mode == 'earpiece';
++
++    final label = isEarpiece
++        ? 'Oreja'
++        : isAuto
++            ? 'Auto'
++            : 'Altavoz';
++
++    final icon = isEarpiece
++        ? Icons.phone_in_talk_outlined
++        : isAuto
++            ? Icons.hearing_outlined
++            : Icons.volume_up_outlined;
++
++    final tooltip = isEarpiece
++        ? 'Auricular de llamada (forzado a oreja)'
++        : isAuto
++            ? 'Automático (conmuta al acercar al oído)'
++            : 'Altavoz (forzado exterior)';
++
++    return Tooltip(
++      message: tooltip,
++      child: Material(
++        color: isAuto
++            ? widget.color.withValues(alpha: 0.12)
++            : widget.color.withValues(alpha: 0.08),
++        borderRadius: BorderRadius.circular(16),
++        child: InkWell(
++          borderRadius: BorderRadius.circular(16),
++          onTap: _toggleOutput,
++          child: Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
++            child: Row(
++              mainAxisSize: MainAxisSize.min,
++              children: [
++                Icon(
++                  icon,
++                  size: 15,
++                  color: widget.color,
++                ),
++                const SizedBox(width: 4),
++                Text(
++                  label,
++                  style: TextStyle(
++                    color: widget.color,
++                    fontSize: 11,
++                    fontWeight: isAuto ? FontWeight.bold : FontWeight.w600,
++                  ),
++                ),
++              ],
 +            ),
 +          ),
 +        ),
 +      ),
++    );
++  }
++
++  Widget _buildContinuousPlaybackButton() {
++    return ValueListenableBuilder<bool>(
++      valueListenable: matrix.continuousAudioPlaybackNotifier,
++      builder: (context, continuous, _) {
++        return Tooltip(
++          message: continuous
++              ? 'Reproducción continua activada'
++              : 'Reproducción continua desactivada',
++          child: Material(
++            color: continuous
++                ? widget.color.withValues(alpha: 0.22)
++                : widget.color.withValues(alpha: 0.08),
++            borderRadius: BorderRadius.circular(16),
++            child: InkWell(
++              borderRadius: BorderRadius.circular(16),
++              onTap: () {
++                matrix.continuousAudioPlaybackNotifier.value = !continuous;
++              },
++              child: Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
++                child: Row(
++                  mainAxisSize: MainAxisSize.min,
++                  children: [
++                    Icon(
++                      Icons.playlist_play_rounded,
++                      size: 18,
++                      color: widget.color,
++                    ),
++                    const SizedBox(width: 2),
++                    Text(
++                      'Auto',
++                      style: TextStyle(
++                        color: widget.color,
++                        fontSize: 11,
++                        fontWeight: continuous ? FontWeight.bold : FontWeight.w500,
++                      ),
++                    ),
++                  ],
++                ),
++              ),
++            ),
++          ),
++        );
++      },
 +    );
 +  }
  }
