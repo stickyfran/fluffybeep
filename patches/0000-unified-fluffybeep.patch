@@ -14281,10 +14281,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..eb328d1b615fd28567e1d1acbbc1b77f55d39195 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d49e83474 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,218 @@
+@@ -1,31 +1,420 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14325,6 +14325,14 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..eb328d1b615fd28567e1d1acbbc1b77f
 +import android.content.Context
 +import android.content.Intent
 +import android.net.Uri
++import android.os.Build
++import android.os.PowerManager
++import android.hardware.Sensor
++import android.hardware.SensorEvent
++import android.hardware.SensorEventListener
++import android.hardware.SensorManager
++import android.media.AudioDeviceInfo
++import android.media.AudioManager
 +
 +class MainActivity : FlutterFragmentActivity() {
 +
@@ -14338,6 +14346,7 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..eb328d1b615fd28567e1d1acbbc1b77f
 +
 +    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
 +        setupMethodChannel(flutterEngine, this)
++        AudioRouteManager.setup(flutterEngine, this)
 +    }
 +
 +    companion object {
@@ -14527,12 +14536,205 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..eb328d1b615fd28567e1d1acbbc1b77f
 +        fun provideEngine(context: Context): FlutterEngine {
 +            val eng = engine ?: FlutterEngine(context, emptyArray(), true, false).also {
 +                setupMethodChannel(it, context)
++                AudioRouteManager.setup(it, context)
 +            }
 +            engine = eng
 +            return eng
 +        }
 +    }
 +}
++
++object AudioRouteManager : SensorEventListener {
++    private const val AUDIO_CHANNEL = "chat.fluffy.fluffybeep/audio_router"
++    private var methodChannel: MethodChannel? = null
++    private var appContext: Context? = null
++    private var audioManager: AudioManager? = null
++    private var sensorManager: SensorManager? = null
++    private var proximitySensor: Sensor? = null
++    private var proximityWakeLock: PowerManager.WakeLock? = null
++
++    private var currentMode: String = "auto" // auto, speaker, earpiece
++    private var isSessionActive: Boolean = false
++    private var isNearEar: Boolean = false
++
++    fun setup(flutterEngine: FlutterEngine, context: Context) {
++        appContext = context.applicationContext
++        audioManager = appContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
++        sensorManager = appContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
++        proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
++
++        val powerManager = appContext?.getSystemService(Context.POWER_SERVICE) as? PowerManager
++        if (powerManager != null && powerManager.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
++            try {
++                proximityWakeLock = powerManager.newWakeLock(
++                    PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
++                    "fluffybeep:proximity_screen_off"
++                )
++            } catch (_: Exception) {}
++        }
++
++        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AUDIO_CHANNEL).apply {
++            setMethodCallHandler { call, result ->
++                when (call.method) {
++                    "startSession" -> {
++                        val mode = call.argument<String>("mode") ?: "auto"
++                        startSession(mode)
++                        result.success(true)
++                    }
++                    "stopSession" -> {
++                        stopSession()
++                        result.success(true)
++                    }
++                    "setOutputMode" -> {
++                        val mode = call.argument<String>("mode") ?: "auto"
++                        setOutputMode(mode)
++                        result.success(true)
++                    }
++                    "isNear" -> {
++                        result.success(isNearEar)
++                    }
++                    else -> result.notImplemented()
++                }
++            }
++        }
++    }
++
++    private fun startSession(mode: String) {
++        currentMode = mode
++        isSessionActive = true
++        applyRoutingForCurrentState()
++        registerProximityListener()
++    }
++
++    private fun setOutputMode(mode: String) {
++        currentMode = mode
++        if (isSessionActive) {
++            applyRoutingForCurrentState()
++        }
++    }
++
++    private fun stopSession() {
++        isSessionActive = false
++        unregisterProximityListener()
++        releaseWakeLock()
++
++        val am = audioManager ?: return
++        try {
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                am.clearCommunicationDevice()
++            }
++            @Suppress("DEPRECATION")
++            am.isSpeakerphoneOn = false
++            am.mode = AudioManager.MODE_NORMAL
++        } catch (_: Exception) {}
++    }
++
++    private fun applyRoutingForCurrentState() {
++        val am = audioManager ?: return
++        try {
++            am.mode = AudioManager.MODE_IN_COMMUNICATION
++
++            val shouldRouteToEarpiece = when (currentMode) {
++                "earpiece" -> true
++                "speaker" -> false
++                "auto" -> isNearEar
++                else -> isNearEar
++            }
++
++            if (shouldRouteToEarpiece) {
++                routeToEarpiece(am)
++                if (currentMode == "auto" || currentMode == "earpiece") {
++                    acquireWakeLock()
++                }
++            } else {
++                routeToSpeaker(am)
++                if (currentMode == "auto") {
++                    releaseWakeLock()
++                }
++            }
++        } catch (_: Exception) {}
++    }
++
++    private fun routeToEarpiece(am: AudioManager) {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++            val devices = am.availableCommunicationDevices
++            val earpiece = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
++            if (earpiece != null) {
++                am.setCommunicationDevice(earpiece)
++                return
++            }
++        }
++        @Suppress("DEPRECATION")
++        am.isSpeakerphoneOn = false
++    }
++
++    private fun routeToSpeaker(am: AudioManager) {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++            val devices = am.availableCommunicationDevices
++            val speaker = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
++            if (speaker != null) {
++                am.setCommunicationDevice(speaker)
++                return
++            }
++        }
++        @Suppress("DEPRECATION")
++        am.isSpeakerphoneOn = true
++    }
++
++    private fun registerProximityListener() {
++        val sm = sensorManager ?: return
++        val sensor = proximitySensor ?: return
++        try {
++            sm.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
++        } catch (_: Exception) {}
++    }
++
++    private fun unregisterProximityListener() {
++        val sm = sensorManager ?: return
++        try {
++            sm.unregisterListener(this)
++        } catch (_: Exception) {}
++        isNearEar = false
++    }
++
++    private fun acquireWakeLock() {
++        val lock = proximityWakeLock ?: return
++        try {
++            if (!lock.isHeld) {
++                lock.acquire(30 * 60 * 1000L /* 30 minutes max safeguard */)
++            }
++        } catch (_: Exception) {}
++    }
++
++    private fun releaseWakeLock() {
++        val lock = proximityWakeLock ?: return
++        try {
++            if (lock.isHeld) {
++                lock.release()
++            }
++        } catch (_: Exception) {}
++    }
++
++    override fun onSensorChanged(event: SensorEvent?) {
++        if (event?.sensor?.type != Sensor.TYPE_PROXIMITY) return
++        val distance = event.values.firstOrNull() ?: return
++        val maxRange = event.sensor.maximumRange
++
++        val wasNear = isNearEar
++        // Near threshold logic: distance < maxRange and typically <= 5 cm
++        isNearEar = distance < maxRange && distance < 5.0f
++
++        if (wasNear != isNearEar) {
++            methodChannel?.invokeMethod("onProximityChanged", isNearEar)
++            if (isSessionActive && currentMode == "auto") {
++                applyRoutingForCurrentState()
++            }
++        }
++    }
++
++    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
++}
++
 +
 diff --git a/android/app/src/main/res/drawable-night-v21/launch_background.xml b/android/app/src/main/res/drawable-night-v21/launch_background.xml
 index 3fe6b2e8821ee859d652350db1310b5f51698871..89832c8c4c407a922c01f5eedadd033454023bd3 100644
@@ -33874,10 +34076,10 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..1a8b43cb4ac663cc1e1292c2da95db3d
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..ae2ff965c6d17870b1a59e0d260c68873575bf16 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..cd1eb18315a5d756eb09a2d7b4667b32bf864ae1 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,224 +1,227 @@
+@@ -1,224 +1,228 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -34151,7 +34353,8 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..ae2ff965c6d17870b1a59e0d260c6887
 +  showStickersButtonInInput<bool>('chat.fluffy.show_stickers_button_in_input', false),
 +  useMessageBubbleGradient<bool>('chat.fluffy.use_message_bubble_gradient', true),
 +  neutralBubblesInDarkMode<bool>('chat.fluffy.neutral_bubbles_dark_mode', false),
-+  audioPlaybackOutput<String>('chat.fluffy.audio_playback_output', 'speaker'),
++  audioPlaybackOutput<String>('chat.fluffy.audio_playback_output', 'auto'),
++  audioEarpieceDelaySeconds<int>('chat.fluffy.audio_earpiece_delay_seconds', 2),
 +  displayNavigationRail<bool>('chat.fluffy.display_navigation_rail', false),
 +  experimentalVoip<bool>('chat.fluffy.experimental_voip', false),
 +  shareKeysWith<String>('chat.fluffy.share_keys_with_2', 'all'),
@@ -307355,10 +307558,10 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e0d6cb1f3 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..a268734301bb20498a082b319259edba2e506ed2 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
-@@ -7,14 +7,18 @@ import 'dart:async';
+@@ -7,21 +7,27 @@ import 'dart:async';
  import 'dart:io';
  
  import 'package:async/async.dart';
@@ -307377,15 +307580,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
  import 'package:flutter_linkify/flutter_linkify.dart';
  import 'package:just_audio/just_audio.dart';
  import 'package:matrix/matrix.dart';
-@@ -22,6 +26,7 @@ import 'package:opus_caf_converter_dart/opus_caf_converter_dart.dart';
+ import 'package:opus_caf_converter_dart/opus_caf_converter_dart.dart';
  import 'package:path_provider/path_provider.dart';
  
++import '../../../utils/audio_router_service.dart';
  import '../../../utils/matrix_sdk_extensions/event_extension.dart';
 +import '../../../utils/transcription_service.dart';
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -53,12 +58,21 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -53,12 +59,21 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
    double? _downloadProgress;
  
@@ -307407,7 +307611,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
      super.dispose();
      final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
          ? null
-@@ -70,7 +84,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -70,7 +85,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              MaterialBanner(
                padding: EdgeInsets.zero,
                leading: StreamBuilder(
@@ -307416,7 +307620,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
                  builder: (context, _) => IconButton(
                    onPressed: () {
                      if (audioPlayer.isAtEndPosition) {
-@@ -87,7 +101,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -87,7 +102,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                  ),
                ),
                content: StreamBuilder(
@@ -307425,7 +307629,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
                  builder: (context, _) => GestureDetector(
                    onTap: () => FluffyChatApp.router.go(
                      '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -179,7 +193,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -124,6 +139,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+       audioPlayer.pause();
+       audioPlayer.dispose();
+       matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
++      AudioRouterService.instance.stopSession();
+     }
+   }
+ 
+@@ -179,7 +195,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
          await file.writeAsBytes(matrixFile.bytes);
  
          if (Platform.isIOS &&
@@ -307436,30 +307648,64 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -204,6 +220,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -203,8 +221,23 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+     if (!context.mounted) return;
      if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
  
++    final outputMode = AppSettings.audioPlaybackOutput.value; // 'auto', 'speaker', 'earpiece'
      final audioPlayer = matrix.audioPlayer = AudioPlayer();
+ 
 +    if (PlatformInfos.isMobile) {
 +      try {
-+        final isEarpiece = AppSettings.audioPlaybackOutput.value == 'earpiece';
 +        final session = await AudioSession.instance;
 +        await session.configure(
-+          isEarpiece
++          outputMode == 'earpiece'
 +              ? const AudioSessionConfiguration.speech()
 +              : const AudioSessionConfiguration.music(),
 +        );
 +      } catch (e) {
 +        Logs().w('Failed to configure audio session', e);
 +      }
++      await AudioRouterService.instance.startSession(outputMode);
 +    }
- 
++
      if (file != null) {
        audioPlayer.setFilePath(file.path);
-@@ -216,11 +245,77 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+     } else {
+@@ -216,11 +249,121 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      }
      if (!mounted) return;
  
++    // Smart delay if earpiece forced and delay > 0
++    final delaySeconds = AppSettings.audioEarpieceDelaySeconds.value;
++    if (outputMode == 'earpiece' && delaySeconds > 0) {
++      final completer = Completer<void>();
++      VoidCallback? listener;
++
++      // Shortcut: if phone is put to ear, start immediately!
++      listener = () {
++        if (AudioRouterService.instance.isNearEarNotifier.value) {
++          if (!completer.isCompleted) completer.complete();
++        }
++      };
++      AudioRouterService.instance.isNearEarNotifier.addListener(listener);
++
++      // Check if already near
++      if (AudioRouterService.instance.isNearEarNotifier.value) {
++        completer.complete();
++      } else {
++        Future.delayed(Duration(seconds: delaySeconds), () {
++          if (!completer.isCompleted) completer.complete();
++        });
++      }
++
++      await completer.future;
++      AudioRouterService.instance.isNearEarNotifier.removeListener(listener);
++    }
++
++    if (!mounted) return;
++    if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
++
 +    _listenForCompletion(audioPlayer);
      audioPlayer.play().onError(
        ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
@@ -307468,8 +307714,14 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
  
 +  Future<void> _toggleOutput() async {
 +    final current = AppSettings.audioPlaybackOutput.value;
-+    final next = current == 'earpiece' ? 'speaker' : 'earpiece';
++    // Cycle: auto -> speaker -> earpiece -> auto
++    final next = current == 'auto'
++        ? 'speaker'
++        : current == 'speaker'
++            ? 'earpiece'
++            : 'auto';
 +    await AppSettings.audioPlaybackOutput.setItem(next);
++
 +    if (PlatformInfos.isMobile) {
 +      try {
 +        final session = await AudioSession.instance;
@@ -307481,6 +307733,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
 +      } catch (e) {
 +        Logs().w('Failed to switch audio session output', e);
 +      }
++      await AudioRouterService.instance.setOutputMode(next);
 +    }
 +    if (mounted) setState(() {});
 +  }
@@ -307489,9 +307742,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
 +    _playerCompleteSub?.cancel();
 +    _playerCompleteSub = player.playerStateStream.listen((state) {
 +      if (state.processingState == ProcessingState.completed) {
++        AudioRouterService.instance.stopSession();
 +        if (matrix.continuousAudioPlaybackNotifier.value) {
 +          _playNextAudioInRoom();
 +        }
++      } else if (!state.playing && state.processingState != ProcessingState.loading && state.processingState != ProcessingState.buffering) {
++        // Paused
++        AudioRouterService.instance.stopSession();
++      } else if (state.playing) {
++        // Resumed
++        AudioRouterService.instance.startSession(AppSettings.audioPlaybackOutput.value);
 +      }
 +    });
 +  }
@@ -307534,7 +307794,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
    Future<void> _toggleSpeed() async {
      final audioPlayer = matrix.audioPlayer;
      if (audioPlayer == null) return;
-@@ -246,12 +341,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +389,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -307550,7 +307810,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +362,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +410,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -307625,7 +307885,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +459,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +507,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -307649,7 +307909,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -449,30 +610,94 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +658,105 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -307700,26 +307960,37 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
 -                                      color: widget.color,
 -                                      fontSize: 9,
 +                              const SizedBox(width: 4),
-+                              Material(
-+                                color: widget.color.withAlpha(64),
-+                                borderRadius: BorderRadius.circular(
-+                                  AppConfig.borderRadius,
-+                                ),
-+                                child: InkWell(
++                              Tooltip(
++                                message: AppSettings.audioPlaybackOutput.value == 'earpiece'
++                                    ? 'Auricular de llamada (forzado)'
++                                    : AppSettings.audioPlaybackOutput.value == 'speaker'
++                                        ? 'Altavoz (forzado)'
++                                        : 'Automático (sensor de proximidad)',
++                                child: Material(
++                                  color: AppSettings.audioPlaybackOutput.value == 'auto'
++                                      ? widget.color.withAlpha(96)
++                                      : widget.color.withAlpha(64),
 +                                  borderRadius: BorderRadius.circular(
 +                                    AppConfig.borderRadius,
 +                                  ),
-+                                  onTap: _toggleOutput,
-+                                  child: SizedBox(
-+                                    width: 24,
-+                                    height: 20,
-+                                    child: Center(
-+                                      child: Icon(
-+                                        AppSettings.audioPlaybackOutput.value == 'earpiece'
-+                                            ? Icons.phone_in_talk_outlined
-+                                            : Icons.volume_up_outlined,
-+                                        size: 14,
-+                                        color: widget.color,
++                                  child: InkWell(
++                                    borderRadius: BorderRadius.circular(
++                                      AppConfig.borderRadius,
++                                    ),
++                                    onTap: _toggleOutput,
++                                    child: SizedBox(
++                                      width: 24,
++                                      height: 20,
++                                      child: Center(
++                                        child: Icon(
++                                          AppSettings.audioPlaybackOutput.value == 'earpiece'
++                                              ? Icons.phone_in_talk_outlined
++                                              : AppSettings.audioPlaybackOutput.value == 'speaker'
++                                                  ? Icons.volume_up_outlined
++                                                  : Icons.hearing_outlined,
++                                          size: 14,
++                                          color: widget.color,
++                                        ),
 +                                      ),
                                      ),
                                    ),
@@ -307763,7 +308034,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +736,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +795,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -307771,7 +308042,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e
                  ],
                ),
              );
-@@ -519,6 +745,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +804,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -342213,10 +342484,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..23557a8a7d87550f2dc8cfea1b0d4fa7452dec42 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8aacf60c2bbb605b777a617e2e671e3aadac4360 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,305 @@
+@@ -1,181 +1,374 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -342485,10 +342756,18 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..23557a8a7d87550f2dc8cfea1b0d4fa7
 +                  title: const Text('Salida de audio predeterminada'),
 +                  subtitle: Text(
 +                    AppSettings.audioPlaybackOutput.value == 'earpiece'
-+                        ? 'Auricular de llamada (oreja)'
-+                        : 'Altavoz (predeterminado)',
++                        ? '📞 Auricular de llamada (oreja forzado)'
++                        : AppSettings.audioPlaybackOutput.value == 'speaker'
++                            ? '🔊 Altavoz (forzado)'
++                            : '🔄 Automático (sensor de proximidad)',
 +                  ),
-+                  trailing: const Icon(Icons.volume_up_outlined),
++                  trailing: Icon(
++                    AppSettings.audioPlaybackOutput.value == 'earpiece'
++                        ? Icons.phone_in_talk_outlined
++                        : AppSettings.audioPlaybackOutput.value == 'speaker'
++                            ? Icons.volume_up_outlined
++                            : Icons.hearing_outlined,
++                  ),
 +                  onTap: () async {
 +                    final selected = await showDialog<String>(
 +                      context: context,
@@ -342496,17 +342775,24 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..23557a8a7d87550f2dc8cfea1b0d4fa7
 +                        title: const Text('Salida de audio predeterminada'),
 +                        children: [
 +                          SimpleDialogOption(
++                            onPressed: () => Navigator.pop(ctx, 'auto'),
++                            child: const Padding(
++                              padding: EdgeInsets.symmetric(vertical: 8.0),
++                              child: Text('🔄 Automático (sensor de proximidad) [Recomendado]'),
++                            ),
++                          ),
++                          SimpleDialogOption(
 +                            onPressed: () => Navigator.pop(ctx, 'speaker'),
 +                            child: const Padding(
 +                              padding: EdgeInsets.symmetric(vertical: 8.0),
-+                              child: Text('🔊 Altavoz (predeterminado)'),
++                              child: Text('🔊 Altavoz (forzado)'),
 +                            ),
 +                          ),
 +                          SimpleDialogOption(
 +                            onPressed: () => Navigator.pop(ctx, 'earpiece'),
 +                            child: const Padding(
 +                              padding: EdgeInsets.symmetric(vertical: 8.0),
-+                              child: Text('📞 Auricular de llamada (oreja)'),
++                              child: Text('📞 Auricular de llamada (oreja forzado)'),
 +                            ),
 +                          ),
 +                        ],
@@ -342514,6 +342800,60 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..23557a8a7d87550f2dc8cfea1b0d4fa7
 +                    );
 +                    if (selected != null) {
 +                      await AppSettings.audioPlaybackOutput.setItem(selected);
++                      setTileState(() {});
++                      controller.refresh();
++                    }
++                  },
++                ),
++              ),
++              StatefulBuilder(
++                builder: (context, setTileState) => ListTile(
++                  title: const Text('Tiempo para acercar al oído'),
++                  subtitle: Text(
++                    AppSettings.audioEarpieceDelaySeconds.value == 0
++                        ? 'Sin espera (inmediato)'
++                        : '${AppSettings.audioEarpieceDelaySeconds.value} segundos (cancela antes si detecta la oreja)',
++                  ),
++                  trailing: const Icon(Icons.timer_outlined),
++                  onTap: () async {
++                    final selected = await showDialog<int>(
++                      context: context,
++                      builder: (ctx) => SimpleDialog(
++                        title: const Text('Tiempo para acercar al oído'),
++                        children: [
++                          SimpleDialogOption(
++                            onPressed: () => Navigator.pop(ctx, 0),
++                            child: const Padding(
++                              padding: EdgeInsets.symmetric(vertical: 8.0),
++                              child: Text('⚡ Inmediato (0 segundos)'),
++                            ),
++                          ),
++                          SimpleDialogOption(
++                            onPressed: () => Navigator.pop(ctx, 1),
++                            child: const Padding(
++                              padding: EdgeInsets.symmetric(vertical: 8.0),
++                              child: Text('⏱️ 1 segundo'),
++                            ),
++                          ),
++                          SimpleDialogOption(
++                            onPressed: () => Navigator.pop(ctx, 2),
++                            child: const Padding(
++                              padding: EdgeInsets.symmetric(vertical: 8.0),
++                              child: Text('⏱️ 2 segundos (Recomendado)'),
++                            ),
++                          ),
++                          SimpleDialogOption(
++                            onPressed: () => Navigator.pop(ctx, 3),
++                            child: const Padding(
++                              padding: EdgeInsets.symmetric(vertical: 8.0),
++                              child: Text('⏱️ 3 segundos'),
++                            ),
++                          ),
++                        ],
++                      ),
++                    );
++                    if (selected != null) {
++                      await AppSettings.audioEarpieceDelaySeconds.setItem(selected);
 +                      setTileState(() {});
 +                      controller.refresh();
 +                    }
@@ -351616,6 +351956,89 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +      ultimasActividades: actividades,
 +      proximosEventos: proximos.take(5).toList(),
 +    );
++  }
++}
+diff --git a/lib/utils/audio_router_service.dart b/lib/utils/audio_router_service.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2d89851148e8d260021daa41a69644b8e4e9dc1
+--- /dev/null
++++ b/lib/utils/audio_router_service.dart
+@@ -0,0 +1,77 @@
++// SPDX-FileCopyrightText: 2026 Contributors to FluffyBeep
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:async';
++import 'package:flutter/foundation.dart';
++import 'package:flutter/services.dart';
++import 'package:matrix/matrix.dart';
++
++class AudioRouterService {
++  AudioRouterService._internal() {
++    _channel.setMethodCallHandler(_handleNativeCall);
++  }
++
++  static final AudioRouterService instance = AudioRouterService._internal();
++
++  static const MethodChannel _channel =
++      MethodChannel('chat.fluffy.fluffybeep/audio_router');
++
++  final ValueNotifier<bool> isNearEarNotifier = ValueNotifier<bool>(false);
++  bool _isSessionActive = false;
++  String _currentMode = 'auto'; // 'auto', 'speaker', 'earpiece'
++
++  bool get isSessionActive => _isSessionActive;
++  String get currentMode => _currentMode;
++
++  Future<void> _handleNativeCall(MethodCall call) async {
++    if (call.method == 'onProximityChanged') {
++      final isNear = call.arguments as bool? ?? false;
++      isNearEarNotifier.value = isNear;
++      Logs().v('Proximity sensor changed: isNear=$isNear');
++    }
++  }
++
++  /// Start an audio routing session with mode: 'auto' | 'speaker' | 'earpiece'
++  Future<void> startSession(String mode) async {
++    _currentMode = mode;
++    _isSessionActive = true;
++    try {
++      await _channel.invokeMethod('startSession', {'mode': mode});
++    } catch (e, s) {
++      Logs().w('AudioRouterService.startSession failed', e, s);
++    }
++  }
++
++  /// Change the routing mode dynamically during an active playback
++  Future<void> setOutputMode(String mode) async {
++    _currentMode = mode;
++    if (!_isSessionActive) return;
++    try {
++      await _channel.invokeMethod('setOutputMode', {'mode': mode});
++    } catch (e, s) {
++      Logs().w('AudioRouterService.setOutputMode failed', e, s);
++    }
++  }
++
++  /// Stop audio routing session, restore AudioManager to NORMAL and release WakeLock
++  Future<void> stopSession() async {
++    if (!_isSessionActive) return;
++    _isSessionActive = false;
++    isNearEarNotifier.value = false;
++    try {
++      await _channel.invokeMethod('stopSession');
++    } catch (e, s) {
++      Logs().w('AudioRouterService.stopSession failed', e, s);
++    }
++  }
++
++  /// Queries whether the phone is currently near the ear
++  Future<bool> isNear() async {
++    try {
++      final res = await _channel.invokeMethod<bool>('isNear');
++      return res ?? false;
++    } catch (_) {
++      return false;
++    }
 +  }
 +}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
