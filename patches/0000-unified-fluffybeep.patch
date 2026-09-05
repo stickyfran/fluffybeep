@@ -300948,10 +300948,10 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..cb0bb4cf291bc15d3716812715a588af
 +}
 diff --git a/lib/models/contact_profile.dart b/lib/models/contact_profile.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac7385352da950b
+index 0000000000000000000000000000000000000000..e3a03159134f7df3287cf7cae43d0db2516d1c80
 --- /dev/null
 +++ b/lib/models/contact_profile.dart
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,215 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -300962,6 +300962,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +  final String? direccion;
 +  final String? profesion;
 +  final String? estudiosFormales;
++  final String? hobbiesIntereses;
 +  final List<String> ultimasActividades;
 +  final List<String> proximosEventos;
 +  final List<String> eventosPasados;
@@ -300977,6 +300978,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +    this.direccion,
 +    this.profesion,
 +    this.estudiosFormales,
++    this.hobbiesIntereses,
 +    this.ultimasActividades = const [],
 +    this.proximosEventos = const [],
 +    this.eventosPasados = const [],
@@ -300993,6 +300995,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +      (direccion == null || direccion!.trim().isEmpty) &&
 +      (profesion == null || profesion!.trim().isEmpty) &&
 +      (estudiosFormales == null || estudiosFormales!.trim().isEmpty) &&
++      (hobbiesIntereses == null || hobbiesIntereses!.trim().isEmpty) &&
 +      ultimasActividades.isEmpty &&
 +      proximosEventos.isEmpty &&
 +      eventosPasados.isEmpty &&
@@ -301030,6 +301033,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +      direccion: parseString(json['direccion']),
 +      profesion: parseString(json['profesion']),
 +      estudiosFormales: parseString(json['estudios_formales']),
++      hobbiesIntereses: parseString(json['hobbies_intereses']),
 +      ultimasActividades: parseList(json['ultimas_actividades_relevantes']),
 +      proximosEventos: parseList(json['proximos_eventos']),
 +      eventosPasados: parseList(json['eventos_pasados']),
@@ -301048,6 +301052,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +      if (direccion != null) 'direccion': direccion,
 +      if (profesion != null) 'profesion': profesion,
 +      if (estudiosFormales != null) 'estudios_formales': estudiosFormales,
++      if (hobbiesIntereses != null) 'hobbies_intereses': hobbiesIntereses,
 +      'ultimas_actividades_relevantes': ultimasActividades,
 +      'proximos_eventos': proximosEventos,
 +      'eventos_pasados': eventosPasados,
@@ -301078,6 +301083,9 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +    final mergedEstudios = (suggested.estudiosFormales != null && suggested.estudiosFormales!.trim().isNotEmpty)
 +        ? suggested.estudiosFormales
 +        : estudiosFormales;
++    final mergedHobbies = (suggested.hobbiesIntereses != null && suggested.hobbiesIntereses!.trim().isNotEmpty)
++        ? suggested.hobbiesIntereses
++        : hobbiesIntereses;
 +    final mergedNotas = (suggested.notasLibres != null && suggested.notasLibres!.trim().isNotEmpty)
 +        ? suggested.notasLibres
 +        : notasLibres;
@@ -301113,6 +301121,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +      direccion: mergedDireccion,
 +      profesion: mergedProfesion,
 +      estudiosFormales: mergedEstudios,
++      hobbiesIntereses: mergedHobbies,
 +      ultimasActividades: mergedActividades,
 +      proximosEventos: mergedProximos,
 +      eventosPasados: cappedEventosPasados,
@@ -301130,6 +301139,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +    String? direccion,
 +    String? profesion,
 +    String? estudiosFormales,
++    String? hobbiesIntereses,
 +    List<String>? ultimasActividades,
 +    List<String>? proximosEventos,
 +    List<String>? eventosPasados,
@@ -301145,6 +301155,7 @@ index 0000000000000000000000000000000000000000..8bb6b57441e9776a76c1c6bccac73853
 +      direccion: direccion ?? this.direccion,
 +      profesion: profesion ?? this.profesion,
 +      estudiosFormales: estudiosFormales ?? this.estudiosFormales,
++      hobbiesIntereses: hobbiesIntereses ?? this.hobbiesIntereses,
 +      ultimasActividades: ultimasActividades ?? this.ultimasActividades,
 +      proximosEventos: proximosEventos ?? this.proximosEventos,
 +      eventosPasados: eventosPasados ?? this.eventosPasados,
@@ -319157,7 +319168,7 @@ index 0000000000000000000000000000000000000000..659d2009c4d0bbd0c0dee473565fc34e
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..b9592b7eab4edf4b47679414a520a15aa7e83781 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d6788aa0c 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -3,36 +3,66 @@
@@ -319676,14 +319687,14 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..b9592b7eab4edf4b47679414a520a15a
 +                        ),
 +                        const SizedBox(height: 16),
 +                      ],
-+                      // 1. Galería, Archivos, Audios y Links (debajo de la descripción)
++                      // 1. Ficha y notas del contacto (INLINE, inmediatamente luego de la descripción)
++                      ContactProfileInlineCard(room: room),
++                      const SizedBox(height: 8),
++                      // 2. Galería, Archivos, Audios y Links
 +                      Padding(
 +                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
 +                        child: ChatDetailsMediaTabs(room: room),
 +                      ),
-+                      const SizedBox(height: 8),
-+                      // 2. Ficha y notas del contacto (INLINE, no dentro de un botón)
-+                      ContactProfileInlineCard(room: room),
 +                      const SizedBox(height: 8),
 +                      if (!room.isDirectChat) ...[
                          Divider(color: theme.dividerColor),
@@ -320087,10 +320098,10 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..b9592b7eab4edf4b47679414a520a15a
  }
 diff --git a/lib/pages/chat_details/contact_profile_inline_card.dart b/lib/pages/chat_details/contact_profile_inline_card.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e8759e48b
+index 0000000000000000000000000000000000000000..0102e7ced9ac88c3395907af44575c15f635f787
 --- /dev/null
 +++ b/lib/pages/chat_details/contact_profile_inline_card.dart
-@@ -0,0 +1,534 @@
+@@ -0,0 +1,559 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -320127,6 +320138,7 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +  final _direccionCtrl = TextEditingController();
 +  final _profesionCtrl = TextEditingController();
 +  final _estudiosCtrl = TextEditingController();
++  final _hobbiesCtrl = TextEditingController();
 +  final _notasCtrl = TextEditingController();
 +
 +  @override
@@ -320142,6 +320154,7 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +    _direccionCtrl.dispose();
 +    _profesionCtrl.dispose();
 +    _estudiosCtrl.dispose();
++    _hobbiesCtrl.dispose();
 +    _notasCtrl.dispose();
 +    super.dispose();
 +  }
@@ -320152,10 +320165,20 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +      widget.room.client,
 +      widget.room.id,
 +    );
++
++    // Auto-completar nombre si no fue especificado manualmente
++    var effectiveProfile = loaded;
++    if (loaded.nombre == null || loaded.nombre!.trim().isEmpty) {
++      final autoName = AiProfileService.resolveContactName(widget.room, profile: loaded);
++      if (autoName.isNotEmpty) {
++        effectiveProfile = loaded.copyWith(nombre: autoName);
++      }
++    }
++
 +    if (!mounted) return;
 +    setState(() {
-+      _profile = loaded;
-+      _initControllers(loaded);
++      _profile = effectiveProfile;
++      _initControllers(effectiveProfile);
 +      _isLoading = false;
 +    });
 +  }
@@ -320166,6 +320189,7 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +    _direccionCtrl.text = p.direccion ?? '';
 +    _profesionCtrl.text = p.profesion ?? '';
 +    _estudiosCtrl.text = p.estudiosFormales ?? '';
++    _hobbiesCtrl.text = p.hobbiesIntereses ?? '';
 +    _notasCtrl.text = p.notasLibres ?? '';
 +  }
 +
@@ -320176,6 +320200,7 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +      direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
 +      profesion: _profesionCtrl.text.trim().isNotEmpty ? _profesionCtrl.text.trim() : null,
 +      estudiosFormales: _estudiosCtrl.text.trim().isNotEmpty ? _estudiosCtrl.text.trim() : null,
++      hobbiesIntereses: _hobbiesCtrl.text.trim().isNotEmpty ? _hobbiesCtrl.text.trim() : null,
 +      notasLibres: _notasCtrl.text.trim().isNotEmpty ? _notasCtrl.text.trim() : null,
 +      updatedAt: DateTime.now().millisecondsSinceEpoch,
 +    );
@@ -320461,6 +320486,15 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +        ),
 +        const SizedBox(height: 10),
 +        TextField(
++          controller: _hobbiesCtrl,
++          decoration: const InputDecoration(
++            labelText: 'Hobbies e Intereses',
++            prefixIcon: Icon(Icons.sports_esports_outlined),
++            isDense: true,
++          ),
++        ),
++        const SizedBox(height: 10),
++        TextField(
 +          controller: _notasCtrl,
 +          maxLines: 3,
 +          decoration: const InputDecoration(
@@ -320506,6 +320540,8 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +        _buildInfoRow(Icons.work_outline, 'Profesión', _profile.profesion ?? 'Sin especificar'),
 +        const Divider(height: 12),
 +        _buildInfoRow(Icons.school_outlined, 'Estudios', _profile.estudiosFormales ?? 'Sin especificar'),
++        const Divider(height: 12),
++        _buildInfoRow(Icons.sports_esports_outlined, 'Hobbies', _profile.hobbiesIntereses ?? 'Sin especificar'),
 +
 +        // Próximos Eventos
 +        if (_profile.proximosEventos.isNotEmpty) ...[
@@ -320627,10 +320663,10 @@ index 0000000000000000000000000000000000000000..303deb3bb8749c1b8de3851a6f9d0e1e
 +}
 diff --git a/lib/pages/chat_details/contact_profile_sheet.dart b/lib/pages/chat_details/contact_profile_sheet.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3ca353c73
+index 0000000000000000000000000000000000000000..f26729e5ba0caac3bf302d3b0a0312797b4ee444
 --- /dev/null
 +++ b/lib/pages/chat_details/contact_profile_sheet.dart
-@@ -0,0 +1,424 @@
+@@ -0,0 +1,447 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -320662,6 +320698,7 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +  final _direccionCtrl = TextEditingController();
 +  final _profesionCtrl = TextEditingController();
 +  final _estudiosCtrl = TextEditingController();
++  final _hobbiesCtrl = TextEditingController();
 +  final _notasCtrl = TextEditingController();
 +
 +  @override
@@ -320677,6 +320714,7 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +    _direccionCtrl.dispose();
 +    _profesionCtrl.dispose();
 +    _estudiosCtrl.dispose();
++    _hobbiesCtrl.dispose();
 +    _notasCtrl.dispose();
 +    super.dispose();
 +  }
@@ -320687,10 +320725,19 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +      widget.room.client,
 +      widget.room.id,
 +    );
++
++    var effectiveProfile = loaded;
++    if (loaded.nombre == null || loaded.nombre!.trim().isEmpty) {
++      final autoName = AiProfileService.resolveContactName(widget.room, profile: loaded);
++      if (autoName.isNotEmpty) {
++        effectiveProfile = loaded.copyWith(nombre: autoName);
++      }
++    }
++
 +    if (!mounted) return;
 +    setState(() {
-+      _profile = loaded;
-+      _initControllers(loaded);
++      _profile = effectiveProfile;
++      _initControllers(effectiveProfile);
 +      _isLoading = false;
 +    });
 +  }
@@ -320701,6 +320748,7 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +    _direccionCtrl.text = p.direccion ?? '';
 +    _profesionCtrl.text = p.profesion ?? '';
 +    _estudiosCtrl.text = p.estudiosFormales ?? '';
++    _hobbiesCtrl.text = p.hobbiesIntereses ?? '';
 +    _notasCtrl.text = p.notasLibres ?? '';
 +  }
 +
@@ -320711,6 +320759,7 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +      direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
 +      profesion: _profesionCtrl.text.trim().isNotEmpty ? _profesionCtrl.text.trim() : null,
 +      estudiosFormales: _estudiosCtrl.text.trim().isNotEmpty ? _estudiosCtrl.text.trim() : null,
++      hobbiesIntereses: _hobbiesCtrl.text.trim().isNotEmpty ? _hobbiesCtrl.text.trim() : null,
 +      notasLibres: _notasCtrl.text.trim().isNotEmpty ? _notasCtrl.text.trim() : null,
 +      updatedAt: DateTime.now().millisecondsSinceEpoch,
 +    );
@@ -320900,6 +320949,14 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +          ),
 +          const SizedBox(height: 12),
 +          TextField(
++            controller: _hobbiesCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Hobbies e Intereses',
++              prefixIcon: Icon(Icons.sports_esports_outlined),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
 +            controller: _notasCtrl,
 +            maxLines: 4,
 +            decoration: const InputDecoration(
@@ -320940,6 +320997,8 @@ index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3
 +                _buildInfoRow(Icons.work_outline, 'Profesión', _profile.profesion ?? 'Sin especificar'),
 +                const Divider(height: 16),
 +                _buildInfoRow(Icons.school_outlined, 'Estudios', _profile.estudiosFormales ?? 'Sin especificar'),
++                const Divider(height: 16),
++                _buildInfoRow(Icons.sports_esports_outlined, 'Hobbies', _profile.hobbiesIntereses ?? 'Sin especificar'),
 +              ],
 +            ),
 +          ),
@@ -351667,22 +351726,24 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +}
 diff --git a/lib/utils/ai_profile_service.dart b/lib/utils/ai_profile_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735b9aa2806
+index 0000000000000000000000000000000000000000..4799c8ce89d14ca7faa46981db853bb09d8baff9
 --- /dev/null
 +++ b/lib/utils/ai_profile_service.dart
-@@ -0,0 +1,335 @@
+@@ -0,0 +1,461 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
 +import 'dart:convert';
 +import 'package:http/http.dart' as http;
++import 'package:intl/intl.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +import 'package:fluffychat/models/contact_profile.dart';
 +import 'beeper_bridge_utils.dart';
 +import 'beeper_merge_utils.dart';
 +import 'file_logger.dart';
++import 'transcription_service.dart';
 +
 +class ChatExtractionResult {
 +  final String textContext;
@@ -351705,10 +351766,13 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +/// 3. Heurísticas offline inteligentes de extracción si la IA externa/local no está activa.
 +/// 4. Sistema de CHECKPOINTS para no reprocesar mensajes ya leídos ni sobrepensar.
 +/// 5. Soporte para chats fusionados (combina mensajes de WhatsApp, Instagram, etc.).
++/// 6. Inclusión de marcas temporales legibles [YYYY-MM-DD HH:mm] y transcripciones de notas de voz.
 +class AiProfileService {
 +  static const String prefAiEndpointKey = 'ai_profile_endpoint';
 +  static const String prefAiApiKey = 'ai_profile_api_key';
 +  static const String prefAiModelKey = 'ai_profile_model';
++
++  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 +
 +  /// Extrae el texto limpio de mensajes posteriores al último checkpoint registrado en [currentProfile].
 +  /// Si [forceFull] es true, procesa todo el historial disponible sin considerar el checkpoint.
@@ -351737,7 +351801,7 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +      }
 +    }
 +
-+    final candidateEvents = <({Event event, String networkLabel})>[];
++    final candidateEvents = <({Event event, String networkLabel, String contentText})>[];
 +
 +    for (final targetRoom in targetRooms) {
 +      final net = BeeperBridgeUtils.getRoomNetwork(targetRoom)?.name ??
@@ -351761,10 +351825,6 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +
 +      for (final event in localEvents) {
 +        if (event.type != EventTypes.Message) continue;
-+        if (event.content['msgtype'] != MessageTypes.Text) continue;
-+
-+        final body = event.content['body']?.toString().trim() ?? '';
-+        if (body.isEmpty) continue;
 +
 +        final ts = event.originServerTs.millisecondsSinceEpoch;
 +
@@ -351776,7 +351836,23 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +          continue;
 +        }
 +
-+        candidateEvents.add((event: event, networkLabel: net));
++        final msgType = event.content['msgtype'];
++        String body = '';
++
++        if (msgType == MessageTypes.Text) {
++          body = event.content['body']?.toString().trim() ?? '';
++        } else if (msgType == MessageTypes.Audio) {
++          // Consultar si hay transcripción de la nota de voz
++          final transcription = TranscriptionService().getCachedTranscription(event.eventId) ??
++              await TranscriptionService().getTranscription(event.eventId);
++          if (transcription != null && transcription.trim().isNotEmpty) {
++            body = '[Nota de voz]: ${transcription.trim()}';
++          }
++        }
++
++        if (body.isEmpty) continue;
++
++        candidateEvents.add((event: event, networkLabel: net, contentText: body));
 +      }
 +    }
 +
@@ -351801,10 +351877,11 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +    for (final item in limitedCandidates) {
 +      final event = item.event;
 +      final sender = (event.senderId == myUserId) ? 'Yo' : 'Contacto';
-+      final body = event.content['body']?.toString().trim() ?? '';
++      final body = item.contentText;
 +      final label = isMerged ? '[${item.networkLabel}] ' : '';
++      final timeStr = _dateFormat.format(event.originServerTs.toLocal());
 +
-+      buffer.writeln('$label$sender: $body');
++      buffer.writeln('[$timeStr] $label$sender: $body');
 +
 +      newestEventId = event.eventId;
 +      newestEventTimestamp = event.originServerTs.millisecondsSinceEpoch;
@@ -351818,12 +351895,36 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +    );
 +  }
 +
++  /// Resuelve el mejor nombre conocido para el contacto
++  static String resolveContactName(Room room, {ContactProfile? profile}) {
++    if (profile?.nombre != null && profile!.nombre!.trim().isNotEmpty) {
++      return profile.nombre!.trim();
++    }
++    final cached = BeeperBridgeUtils.getCachedName(room.id);
++    if (cached != null && cached.trim().isNotEmpty && !cached.startsWith('@')) {
++      return cached.trim();
++    }
++    final calc = room.calcDisplayname().trim();
++    if (calc.isNotEmpty && !calc.startsWith('@') && !calc.startsWith('!')) {
++      return calc;
++    }
++    if (room.isDirectChat && room.directChatMatrixID != null) {
++      final user = room.getUser(room.directChatMatrixID!);
++      if (user != null && user.calcDisplayname().isNotEmpty) {
++        return user.calcDisplayname();
++      }
++    }
++    return '';
++  }
++
 +  /// Ejecuta la actualización asistida por IA comparando el perfil actual con los nuevos mensajes.
 +  static Future<ContactProfile> analyzeAndMergeProfile({
 +    required Room room,
 +    required ContactProfile currentProfile,
 +    bool forceFull = false,
 +  }) async {
++    final contactName = resolveContactName(room, profile: currentProfile);
++
 +    final extraction = await extractChatContext(
 +      room,
 +      currentProfile: currentProfile,
@@ -351832,6 +351933,10 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +
 +    if (extraction.textContext.trim().isEmpty) {
 +      FileLogger.log('[AiProfileService] No new messages to analyze since last checkpoint.');
++      // Si el perfil no tenía nombre y lo conocemos de la sala, lo completamos
++      if ((currentProfile.nombre == null || currentProfile.nombre!.isEmpty) && contactName.isNotEmpty) {
++        return currentProfile.copyWith(nombre: contactName);
++      }
 +      return currentProfile;
 +    }
 +
@@ -351850,6 +351955,7 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +          apiKey: apiKey,
 +          model: model,
 +          currentProfile: currentProfile,
++          contactName: contactName,
 +          chatText: extraction.textContext,
 +        );
 +      } catch (e) {
@@ -351858,10 +351964,13 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +    }
 +
 +    // Fallback inteligente: extractor heurístico por expresiones regulares
-+    suggested ??= _heuristicExtraction(extraction.textContext, currentProfile);
++    suggested ??= _heuristicExtraction(extraction.textContext, currentProfile, contactName: contactName);
 +
 +    // Integrar checkpoint en la sugerencia
 +    final updatedProfileWithCheckpoint = suggested.copyWith(
++      nombre: (suggested.nombre != null && suggested.nombre!.isNotEmpty)
++          ? suggested.nombre
++          : (currentProfile.nombre ?? (contactName.isNotEmpty ? contactName : null)),
 +      lastProcessedEventId: extraction.newestEventId ?? currentProfile.lastProcessedEventId,
 +      lastProcessedTimestamp: extraction.newestEventTimestamp ?? currentProfile.lastProcessedTimestamp,
 +      lastAnalysisTime: DateTime.now().millisecondsSinceEpoch,
@@ -351875,36 +351984,53 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +    String? apiKey,
 +    required String model,
 +    required ContactProfile currentProfile,
++    required String contactName,
 +    required String chatText,
 +  }) async {
-+    final systemPrompt = '''
-+Eres un asistente de gestión de contactos personales.
-+Tu objetivo es analizar los nuevos mensajes de una conversación y extraer información verídica para el perfil del contacto.
++    final nowStr = _dateFormat.format(DateTime.now());
 +
-+REGLAS ESTRICTAS:
-+1. PRESERVACIÓN: Si en los nuevos mensajes NO se menciona nueva información sobre un campo, NO inventes nada y déjalo null.
-+2. FORMATO OBLIGATORIO: Responde ÚNICAMENTE con un objeto JSON válido con exactamente esta estructura:
++    final systemPrompt = '''
++Eres un asistente ultra preciso de gestión de contactos personales y síntesis de conversaciones.
++Tu objetivo es analizar los mensajes recientes entre el usuario ("Yo") y el "Contacto" para extraer o actualizar una ficha verídica del contacto.
++
++REGLAS ESTRICTAS DE EXTRACCIÓN:
++1. PRESERVACIÓN: Si en los mensajes no se menciona nueva información verificable de un campo, NO inventes nada y devuelve null en ese campo.
++2. NOMBRE: Si se conoce el nombre por la conversación o por el sistema, consérvalo.
++3. PROFESIÓN / OFICIO / TRABAJO: Extrae a qué se dedica el contacto (p.ej. "Desarrollador de software", "Arquitecta", "Médico", "Atención al cliente en X").
++4. ESTUDIOS FORMALES: Menciones de carreras, facultades, títulos, postgrados o secundario (p.ej. "Ingeniería en la UBA", "Abogacía").
++5. HOBBIES E INTERESES: Pasatiempos, deportes, aficiones, gustos o actividades recreativas habituales (p.ej. "Toca la guitarra, juega al pádel, fanático de la fotografía").
++6. PRÓXIMOS EVENTOS (MUY IMPORTANTE):
++   - NUNCA agregues preguntas sueltas como eventos (ESTÁ PROHIBIDO poner frases como "¿dónde nos vemos exactamente?" o "¿a qué hora?").
++   - Los eventos deben tener CONTEXTO y SENTIDO completo: Quién, Cuándo (fecha/hora estimada o exacta calculada a partir de la fecha de referencia) y Dónde o Qué harán.
++   - Si acordaron una cita: "[YYYY-MM-DD HH:mm] Encuentro en Bar X para cenar".
++   - Si están debatiendo o evaluando opciones ("en disputa"): "[Fecha/Día tentativo] En disputa: Lugares (Lugar A vs Lugar B) / Horarios (20:00 vs 21:30)".
++   - Si no hay planes concretos ni acuerdos en debate, deja la lista vacía [].
++7. FORMATO OBLIGATORIO: Responde ÚNICAMENTE con un JSON válido con exactamente esta estructura:
 +{
 +  "nombre": string o null,
 +  "cumpleanos": string o null,
 +  "direccion": string o null,
 +  "profesion": string o null,
 +  "estudios_formales": string o null,
-+  "ultimas_actividades_relevantes": [lista de strings],
-+  "proximos_eventos": [lista de strings],
++  "hobbies_intereses": string o null,
++  "ultimas_actividades_relevantes": [lista de strings breves],
++  "proximos_eventos": [lista de strings con fecha y contexto completo],
 +  "eventos_pasados": [lista de strings (máximo 10)],
 +  "notas_libres": string o null
 +}
 +''';
 +
 +    final userPrompt = '''
-+PERFIL ACTUAL DEL CONTACTO:
++FECHA ACTUAL DE REFERENCIA (HOY): $nowStr
++NOMBRE REGISTRADO DEL CONTACTO: ${contactName.isNotEmpty ? contactName : "Desconocido"}
++
++PERFIL ACTUAL PREVIO:
 +${jsonEncode(currentProfile.toJson())}
 +
-+MENSAJES RECIENTES A ANALIZAR:
++MENSAJES RECIENTES A ANALIZAR (con marca temporal [YYYY-MM-DD HH:mm]):
 +$chatText
 +
-+Actualiza los campos relevantes basándote estrictamente en los mensajes.
++Analiza con rigor la conversación y actualiza el JSON según las reglas indicadas.
 +''';
 +
 +    final uri = Uri.parse(endpoint);
@@ -351921,7 +352047,7 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +          {'role': 'system', 'content': systemPrompt},
 +          {'role': 'user', 'content': userPrompt},
 +        ],
-+        'temperature': 0.2,
++        'temperature': 0.1,
 +      };
 +    } else {
 +      body = {
@@ -351935,7 +352061,7 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +
 +    final response = await http
 +        .post(uri, headers: headers, body: jsonEncode(body))
-+        .timeout(const Duration(seconds: 30));
++        .timeout(const Duration(seconds: 35));
 +
 +    if (response.statusCode >= 200 && response.statusCode < 300) {
 +      final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
@@ -351963,49 +352089,108 @@ index 0000000000000000000000000000000000000000..0095228539dca3a099c560e4c95fc735
 +  }
 +
 +  /// Extractor heurístico rápido offline para detectar menciones comunes cuando no hay LLM
-+  static ContactProfile _heuristicExtraction(String text, ContactProfile current) {
++  static ContactProfile _heuristicExtraction(
++    String text,
++    ContactProfile current, {
++    String contactName = '',
++  }) {
 +    String? foundCumple;
 +    String? foundDireccion;
++    String? foundProfesion;
++    String? foundEstudios;
++    String? foundHobbies;
 +    final actividades = <String>[];
 +    final proximos = <String>[];
 +
 +    final lines = text.split('\n');
-+    for (final line in lines) {
++    for (int i = 0; i < lines.length; i++) {
++      final line = lines[i];
 +      final l = line.toLowerCase();
 +
++      // Extraer timestamp si existe: [YYYY-MM-DD HH:mm]
++      final tsMatch = RegExp(r'^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\]').firstMatch(line);
++      final msgDate = tsMatch?.group(1);
++
++      // Limpiar prefijos de metadata
++      final cleanText = line
++          .replaceFirst(RegExp(r'^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\]\s*'), '')
++          .replaceFirst(RegExp(r'^(\[[^\]]+\]\s*)?(Yo|Contacto):\s*', caseSensitive: false), '')
++          .trim();
++
++      // Cumpleaños
 +      if (foundCumple == null && (l.contains('cumple') || l.contains('cumpleaños') || l.contains('nací el'))) {
-+        foundCumple = line.replaceFirst(RegExp(r'^(\[[^\]]+\]\s*)?(Yo|Contacto):\s*', caseSensitive: false), '').trim();
++        if (!cleanText.contains('?') && !cleanText.startsWith('¿')) {
++          foundCumple = cleanText;
++        }
 +      }
 +
-+      if (foundDireccion == null && (l.contains('vivo en') || l.contains('mi dirección') || l.contains('me mudé a'))) {
-+        foundDireccion = line.replaceFirst(RegExp(r'^(\[[^\]]+\]\s*)?(Yo|Contacto):\s*', caseSensitive: false), '').trim();
++      // Dirección / Residencia
++      if (foundDireccion == null && (l.contains('vivo en') || l.contains('mi dirección es') || l.contains('me mudé a') || l.contains('vivo por'))) {
++        if (!cleanText.contains('?') && !cleanText.startsWith('¿')) {
++          foundDireccion = cleanText;
++        }
 +      }
 +
-+      if (l.contains('el lunes') ||
-+          l.contains('el martes') ||
-+          l.contains('el miércoles') ||
-+          l.contains('el jueves') ||
-+          l.contains('el viernes') ||
-+          l.contains('el sábado') ||
-+          l.contains('el domingo') ||
-+          l.contains('mañana') ||
-+          l.contains('la semana que viene') ||
-+          l.contains('nos vemos')) {
-+        final cleaned = line.replaceFirst(RegExp(r'^(\[[^\]]+\]\s*)?(Yo|Contacto):\s*', caseSensitive: false), '').trim();
-+        if (cleaned.length > 8 && !proximos.contains(cleaned)) {
-+          proximos.add(cleaned);
++      // Profesión / Trabajo
++      if (foundProfesion == null && (l.contains('trabajo de') || l.contains('trabajo en') || l.contains('soy arquitect') || l.contains('soy medic') || l.contains('soy abogad') || l.contains('soy programad') || l.contains('soy diseñad') || l.contains('soy ingenier'))) {
++        if (!cleanText.contains('?') && !cleanText.startsWith('¿')) {
++          foundProfesion = cleanText;
++        }
++      }
++
++      // Estudios
++      if (foundEstudios == null && (l.contains('estudio en') || l.contains('facultad de') || l.contains('estudio ingenier') || l.contains('estudio medic') || l.contains('estudio abogac') || l.contains('estudio programac'))) {
++        if (!cleanText.contains('?') && !cleanText.startsWith('¿')) {
++          foundEstudios = cleanText;
++        }
++      }
++
++      // Hobbies
++      if (foundHobbies == null && (l.contains('juego al') || l.contains('hago crossfit') || l.contains('hago yoga') || l.contains('toco la') || l.contains('entreno en') || l.contains('fanático de'))) {
++        if (!cleanText.contains('?') && !cleanText.startsWith('¿')) {
++          foundHobbies = cleanText;
++        }
++      }
++
++      // Próximos eventos: filtrar preguntas estrictamente
++      final isQuestion = cleanText.endsWith('?') || cleanText.startsWith('¿') || cleanText.startsWith('donde') || cleanText.startsWith('a que hora') || cleanText.startsWith('cuando');
++
++      if (!isQuestion) {
++        final hasTimeAnchor = l.contains('el lunes') ||
++            l.contains('el martes') ||
++            l.contains('el miércoles') ||
++            l.contains('el jueves') ||
++            l.contains('el viernes') ||
++            l.contains('el sábado') ||
++            l.contains('el domingo') ||
++            l.contains('mañana') ||
++            l.contains('la semana que viene') ||
++            l.contains('nos vemos en') ||
++            l.contains('quedamos en') ||
++            l.contains('juntamos en');
++
++        if (hasTimeAnchor && cleanText.length > 8) {
++          final entry = (msgDate != null) ? '[$msgDate] $cleanText' : cleanText;
++          if (!proximos.contains(entry)) {
++            proximos.add(entry);
++          }
 +        }
 +      }
 +    }
 +
 +    return ContactProfile(
++      nombre: contactName.isNotEmpty ? contactName : null,
 +      cumpleanos: foundCumple,
 +      direccion: foundDireccion,
++      profesion: foundProfesion,
++      estudiosFormales: foundEstudios,
++      hobbiesIntereses: foundHobbies,
 +      ultimasActividades: actividades,
 +      proximosEventos: proximos.take(5).toList(),
 +    );
 +  }
 +}
++
 diff --git a/lib/utils/audio_router_service.dart b/lib/utils/audio_router_service.dart
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d89851148e8d260021daa41a69644b8e4e9dc1
