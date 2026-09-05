@@ -34094,10 +34094,10 @@ index bd83769b216b413ef00b18bfe7b7867a7d17028e..1a8b43cb4ac663cc1e1292c2da95db3d
 +  }
 +}
 diff --git a/lib/config/setting_keys.dart b/lib/config/setting_keys.dart
-index 42ff114446b2127150ecfb35c1edaca19052ce37..cd1eb18315a5d756eb09a2d7b4667b32bf864ae1 100644
+index 42ff114446b2127150ecfb35c1edaca19052ce37..36ab1d18cdb9130c728a120975661474e875b2d2 100644
 --- a/lib/config/setting_keys.dart
 +++ b/lib/config/setting_keys.dart
-@@ -1,224 +1,228 @@
+@@ -1,224 +1,232 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -34371,6 +34371,7 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..cd1eb18315a5d756eb09a2d7b4667b32
 +  showStickersButtonInInput<bool>('chat.fluffy.show_stickers_button_in_input', false),
 +  useMessageBubbleGradient<bool>('chat.fluffy.use_message_bubble_gradient', true),
 +  neutralBubblesInDarkMode<bool>('chat.fluffy.neutral_bubbles_dark_mode', false),
++  useSquircleAvatars<bool>('chat.fluffy.use_squircle_avatars', false),
 +  audioPlaybackOutput<String>('chat.fluffy.audio_playback_output', 'auto'),
 +  audioEarpieceDelaySeconds<int>('chat.fluffy.audio_earpiece_delay_seconds', 2),
 +  displayNavigationRail<bool>('chat.fluffy.display_navigation_rail', false),
@@ -34411,6 +34412,9 @@ index 42ff114446b2127150ecfb35c1edaca19052ce37..cd1eb18315a5d756eb09a2d7b4667b32
 +  whisperPrompt<String>('chat.fluffy.whisper_prompt', 'Transcripción de audio en español rioplatense (Argentina).'),
 +  searchStyle<String>('chat.fluffy.search_style', 'bottom_fab'),
 +  hideNetworkPrefixInNotification<bool>('beeper.hide_network_prefix_in_notification', true),
++  aiEndpoint<String>('ai_profile_endpoint', ''),
++  aiApiKey<String>('ai_profile_api_key', ''),
++  aiModel<String>('ai_profile_model', 'llama3.2'),
 +  instagramPackageName<String>('beeper.instagram_package_name', 'com.instagram.android'),
 +  whatsappPackageName<String>('beeper.whatsapp_package_name', 'com.whatsapp');
 +
@@ -320726,7 +320730,7 @@ index 0000000000000000000000000000000000000000..0102e7ced9ac88c3395907af44575c15
 +}
 diff --git a/lib/pages/chat_details/contact_profile_sheet.dart b/lib/pages/chat_details/contact_profile_sheet.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f26729e5ba0caac3bf302d3b0a0312797b4ee444
+index 0000000000000000000000000000000000000000..f6a8ca3d1b6d81fa9f902bad180492613264ec26
 --- /dev/null
 +++ b/lib/pages/chat_details/contact_profile_sheet.dart
 @@ -0,0 +1,447 @@
@@ -320869,7 +320873,7 @@ index 0000000000000000000000000000000000000000..f26729e5ba0caac3bf302d3b0a031279
 +      if (mounted) {
 +        ScaffoldMessenger.of(context).showSnackBar(
 +          const SnackBar(
-+            content: Text('✨ Perfil y eventos actualizados con IA'),
++            content: Text('Perfil y eventos actualizados con IA'),
 +          ),
 +        );
 +      }
@@ -320939,7 +320943,7 @@ index 0000000000000000000000000000000000000000..f26729e5ba0caac3bf302d3b0a031279
 +                                height: 20,
 +                                child: CircularProgressIndicator(strokeWidth: 2),
 +                              )
-+                            : const Icon(Icons.auto_awesome, color: Colors.amber),
++                            : const Icon(Icons.psychology_outlined, color: Colors.blueAccent),
 +                        onPressed: _isAnalyzing ? null : _runAiAnalysis,
 +                      ),
 +                    ],
@@ -321125,8 +321129,8 @@ index 0000000000000000000000000000000000000000..f26729e5ba0caac3bf302d3b0a031279
 +        // Botón rápido de análisis con IA
 +        OutlinedButton.icon(
 +          onPressed: _isAnalyzing ? null : _runAiAnalysis,
-+          icon: const Icon(Icons.auto_awesome, color: Colors.amber),
-+          label: const Text('✨ Actualizar perfil leyendo el chat con IA'),
++          icon: const Icon(Icons.psychology_outlined, color: Colors.blueAccent),
++          label: const Text('Actualizar perfil leyendo el chat con IA'),
 +        ),
 +      ],
 +    );
@@ -324365,7 +324369,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc450209127d47be8 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..bbb316f02a769ab67916cb7a12975ef63ed327df 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -324405,7 +324409,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,273 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,283 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -324573,6 +324577,96 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
          lastEvent != null &&
 -        room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
 -    final space = this.space;
+-
+-    return Padding(
+-      padding: const EdgeInsets.symmetric(horizontal: 8),
+-      child: Material(
+-        borderRadius: BorderRadius.circular(AppConfig.borderRadius),
+-        clipBehavior: Clip.hardEdge,
+-        color: backgroundColor,
+-        child: FutureBuilder(
+-          future: room.name.isEmpty ? room.loadHeroUsers() : null,
+-          builder: (context, _) => HoverBuilder(
+-            builder: (context, listTileHovered) => ListTile(
+-              minVerticalPadding: 16,
+-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+-              onLongPress: () => onLongPress?.call(context),
+-              leading: HoverBuilder(
+-                builder: (context, hovered) => AnimatedScale(
+-                  duration: FluffyThemes.animationDuration,
+-                  curve: FluffyThemes.animationCurve,
+-                  scale: hovered ? 1.1 : 1.0,
+-                  child: SizedBox(
+-                    width: Avatar.defaultSize,
+-                    height: Avatar.defaultSize,
+-                    child: Stack(
+-                      children: [
+-                        if (space != null)
+-                          Positioned(
+-                            top: 0,
+-                            left: 0,
+-                            child: Avatar(
+-                              shapeBorder: RoundedSuperellipseBorder(
+-                                side: BorderSide(
+-                                  width: 2,
+-                                  color:
+-                                      backgroundColor ??
+-                                      theme.colorScheme.surface,
+-                                ),
+-                                borderRadius: BorderRadius.circular(
+-                                  AppConfig.spaceBorderRadius * 0.75,
+-                                ),
+-                              ),
+-                              borderRadius: BorderRadius.circular(
+-                                AppConfig.spaceBorderRadius * 0.75,
+-                              ),
+-                              mxContent: space.avatar,
+-                              size: Avatar.defaultSize * 0.75,
+-                              name: space.getLocalizedDisplayname(),
+-                              onTap: () => onLongPress?.call(context),
+-                            ),
+-                          ),
+-                        Positioned(
+-                          bottom: 0,
+-                          right: 0,
+-                          child: Avatar(
+-                            shapeBorder: space == null
+-                                ? room.isSpace
+-                                      ? RoundedSuperellipseBorder(
+-                                          side: BorderSide(
+-                                            width: 1,
+-                                            color: theme.dividerColor,
+-                                          ),
+-                                          borderRadius: BorderRadius.circular(
+-                                            AppConfig.spaceBorderRadius,
+-                                          ),
+-                                        )
+-                                      : null
+-                                : RoundedRectangleBorder(
+-                                    side: BorderSide(
+-                                      width: 2,
+-                                      color:
+-                                          backgroundColor ??
+-                                          theme.colorScheme.surface,
+-                                    ),
+-                                    borderRadius: BorderRadius.circular(
+-                                      Avatar.defaultSize,
+-                                    ),
+-                                  ),
+-                            borderRadius: room.isSpace
+-                                ? BorderRadius.circular(
+-                                    AppConfig.spaceBorderRadius,
+-                                  )
+-                                : null,
+-                            mxContent: room.avatar,
+-                            size: space != null
+-                                ? Avatar.defaultSize * 0.75
+-                                : Avatar.defaultSize,
+-                            name: displayname,
+-                            presenceUserId: directChatMatrixId,
+-                            presenceBackgroundColor: backgroundColor,
+-                            onTap: () => onLongPress?.call(context),
+-                          ),
 +        widget.room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
 +    final space = isBeeperFakeDM ? null : widget.space;
 +    final mxContent = beeperData.avatarUrl;
@@ -324633,13 +324727,40 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
 +              bottom: 0,
 +              right: 0,
 +              child: Avatar(
-+                shapeBorder: RoundedRectangleBorder(
-+                  side: BorderSide(
-+                    width: 2,
-+                    color: backgroundColor ?? theme.colorScheme.surface,
-+                  ),
-+                  borderRadius: BorderRadius.circular(Avatar.defaultSize),
-+                ),
++                shapeBorder: AppSettings.useSquircleAvatars.value
++                    ? RoundedSuperellipseBorder(
++                        side: BorderSide(
++                          width: 2,
++                          color: backgroundColor ?? theme.colorScheme.surface,
+                         ),
+-                        Positioned(
+-                          top: 0,
+-                          right: 0,
+-                          child: GestureDetector(
+-                            onTap: () => onLongPress?.call(context),
+-                            child: AnimatedScale(
+-                              duration: FluffyThemes.animationDuration,
+-                              curve: FluffyThemes.animationCurve,
+-                              scale: listTileHovered ? 1.0 : 0.0,
+-                              child: Material(
+-                                color: backgroundColor,
+-                                borderRadius: BorderRadius.circular(16),
+-                                child: const Icon(
+-                                  Icons.arrow_drop_down_circle_outlined,
+-                                  size: 18,
+-                                ),
+-                              ),
++                        borderRadius: BorderRadius.circular(
++                          Avatar.defaultSize * 0.75 * 0.28,
++                        ),
++                      )
++                    : RoundedRectangleBorder(
++                        side: BorderSide(
++                          width: 2,
++                          color: backgroundColor ?? theme.colorScheme.surface,
++                        ),
++                        borderRadius: BorderRadius.circular(Avatar.defaultSize),
++                      ),
 +                mxContent: mxContent,
 +                size: Avatar.defaultSize * 0.75,
 +                name: displayname,
@@ -324652,53 +324773,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
 +        ),
 +      );
 +    }
- 
--    return Padding(
--      padding: const EdgeInsets.symmetric(horizontal: 8),
--      child: Material(
--        borderRadius: BorderRadius.circular(AppConfig.borderRadius),
--        clipBehavior: Clip.hardEdge,
--        color: backgroundColor,
--        child: FutureBuilder(
--          future: room.name.isEmpty ? room.loadHeroUsers() : null,
--          builder: (context, _) => HoverBuilder(
--            builder: (context, listTileHovered) => ListTile(
--              minVerticalPadding: 16,
--              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
--              onLongPress: () => onLongPress?.call(context),
--              leading: HoverBuilder(
--                builder: (context, hovered) => AnimatedScale(
--                  duration: FluffyThemes.animationDuration,
--                  curve: FluffyThemes.animationCurve,
--                  scale: hovered ? 1.1 : 1.0,
--                  child: SizedBox(
--                    width: Avatar.defaultSize,
--                    height: Avatar.defaultSize,
--                    child: Stack(
--                      children: [
--                        if (space != null)
--                          Positioned(
--                            top: 0,
--                            left: 0,
--                            child: Avatar(
--                              shapeBorder: RoundedSuperellipseBorder(
--                                side: BorderSide(
--                                  width: 2,
--                                  color:
--                                      backgroundColor ??
--                                      theme.colorScheme.surface,
--                                ),
--                                borderRadius: BorderRadius.circular(
--                                  AppConfig.spaceBorderRadius * 0.75,
--                                ),
--                              ),
--                              borderRadius: BorderRadius.circular(
--                                AppConfig.spaceBorderRadius * 0.75,
--                              ),
--                              mxContent: space.avatar,
--                              size: Avatar.defaultSize * 0.75,
--                              name: space.getLocalizedDisplayname(),
--                              onTap: () => onLongPress?.call(context),
++
 +    Widget buildTile(bool listTileHovered) => ListTile(
 +      minVerticalPadding: 16,
 +      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -324730,68 +324805,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
 +                              size: 18,
                              ),
                            ),
--                        Positioned(
--                          bottom: 0,
--                          right: 0,
--                          child: Avatar(
--                            shapeBorder: space == null
--                                ? room.isSpace
--                                      ? RoundedSuperellipseBorder(
--                                          side: BorderSide(
--                                            width: 1,
--                                            color: theme.dividerColor,
--                                          ),
--                                          borderRadius: BorderRadius.circular(
--                                            AppConfig.spaceBorderRadius,
--                                          ),
--                                        )
--                                      : null
--                                : RoundedRectangleBorder(
--                                    side: BorderSide(
--                                      width: 2,
--                                      color:
--                                          backgroundColor ??
--                                          theme.colorScheme.surface,
--                                    ),
--                                    borderRadius: BorderRadius.circular(
--                                      Avatar.defaultSize,
--                                    ),
--                                  ),
--                            borderRadius: room.isSpace
--                                ? BorderRadius.circular(
--                                    AppConfig.spaceBorderRadius,
--                                  )
--                                : null,
--                            mxContent: room.avatar,
--                            size: space != null
--                                ? Avatar.defaultSize * 0.75
--                                : Avatar.defaultSize,
--                            name: displayname,
--                            presenceUserId: directChatMatrixId,
--                            presenceBackgroundColor: backgroundColor,
--                            onTap: () => onLongPress?.call(context),
--                          ),
                          ),
--                        Positioned(
--                          top: 0,
--                          right: 0,
--                          child: GestureDetector(
--                            onTap: () => onLongPress?.call(context),
--                            child: AnimatedScale(
--                              duration: FluffyThemes.animationDuration,
--                              curve: FluffyThemes.animationCurve,
--                              scale: listTileHovered ? 1.0 : 0.0,
--                              child: Material(
--                                color: backgroundColor,
--                                borderRadius: BorderRadius.circular(16),
--                                child: const Icon(
--                                  Icons.arrow_drop_down_circle_outlined,
--                                  size: 18,
--                                ),
--                              ),
--                            ),
--                          ),
--                        ),
 -                      ],
 +                      ),
                      ),
@@ -324803,7 +324817,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +324,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +334,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -324812,7 +324826,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +335,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +345,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -324821,7 +324835,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +346,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +356,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -324860,7 +324874,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +363,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +373,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -324883,7 +324897,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +391,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +401,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -324892,7 +324906,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +409,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +419,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -324906,7 +324920,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +422,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +432,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -324932,7 +324946,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc4502091
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,70 +436,179 @@ class ChatListItem extends StatelessWidget {
+@@ -336,70 +446,179 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -329542,6 +329556,447 @@ index 5631170988627c4e09f7e3249b495e39719ae02a..ce157294f848af0a347500f755673f62
 +    );
 +  }
 +}
+diff --git a/lib/pages/chat_search/chat_ai_query_sheet.dart b/lib/pages/chat_search/chat_ai_query_sheet.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..4a7871c3677b3223bb1dda5a335c24756bfdea46
+--- /dev/null
++++ b/lib/pages/chat_search/chat_ai_query_sheet.dart
+@@ -0,0 +1,435 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import 'package:fluffychat/config/setting_keys.dart';
++import 'package:fluffychat/utils/ai_profile_service.dart';
++import 'package:fluffychat/utils/chat_ai_query_service.dart';
++
++class ChatAiQuerySheet extends StatefulWidget {
++  final Room room;
++
++  const ChatAiQuerySheet({super.key, required this.room});
++
++  @override
++  State<ChatAiQuerySheet> createState() => _ChatAiQuerySheetState();
++}
++
++class _ChatAiQuerySheetState extends State<ChatAiQuerySheet> {
++  final TextEditingController _questionController = TextEditingController();
++  final ScrollController _scrollController = ScrollController();
++  final List<ChatAiQueryItem> _items = [];
++  bool _isLoading = false;
++  int _historyDepth = 200;
++
++  final List<String> _suggestedQueries = [
++    '¿Qué planes o citas acordamos?',
++    '¿Mencionó alguna dirección, lugar o dato clave?',
++    '¿Cuáles son los últimos temas importantes?',
++    '¿Hay algún pago, dinero o tarea pendiente?',
++  ];
++
++  @override
++  void dispose() {
++    _questionController.dispose();
++    _scrollController.dispose();
++    // Liberar la lista de consultas de la memoria
++    _items.clear();
++    super.dispose();
++  }
++
++  void _clearQueries() {
++    setState(() {
++      _items.clear();
++    });
++  }
++
++  Future<void> _submitQuery([String? predefinedQuestion]) async {
++    final text = (predefinedQuestion ?? _questionController.text).trim();
++    if (text.isEmpty || _isLoading) return;
++
++    _questionController.clear();
++    FocusScope.of(context).unfocus();
++
++    final newItem = ChatAiQueryItem(
++      question: text,
++      isLoading: true,
++      timestamp: DateTime.now(),
++    );
++
++    setState(() {
++      _items.add(newItem);
++      _isLoading = true;
++    });
++
++    _scrollToBottom();
++
++    try {
++      final answer = await ChatAiQueryService.askChatQuestion(
++        room: widget.room,
++        question: text,
++        chatHistoryDepth: _historyDepth,
++      );
++
++      if (!mounted) return;
++      setState(() {
++        final index = _items.indexOf(newItem);
++        if (index != -1) {
++          _items[index] = newItem.copyWith(
++            answer: answer,
++            isLoading: false,
++          );
++        }
++        _isLoading = false;
++      });
++    } catch (e) {
++      if (!mounted) return;
++      setState(() {
++        final index = _items.indexOf(newItem);
++        if (index != -1) {
++          _items[index] = newItem.copyWith(
++            error: e.toString(),
++            isLoading: false,
++          );
++        }
++        _isLoading = false;
++      });
++    }
++
++    _scrollToBottom();
++  }
++
++  void _scrollToBottom() {
++    WidgetsBinding.instance.addPostFrameCallback((_) {
++      if (_scrollController.hasClients) {
++        _scrollController.animateTo(
++          _scrollController.position.maxScrollExtent,
++          duration: const Duration(milliseconds: 300),
++          curve: Curves.easeOut,
++        );
++      }
++    });
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final contactName = AiProfileService.resolveContactName(widget.room);
++    final title = contactName.isNotEmpty ? contactName : widget.room.getLocalizedDisplayname();
++    final currentModel = AppSettings.aiModel.value.trim().isEmpty ? 'llama3.2' : AppSettings.aiModel.value.trim();
++
++    return DraggableScrollableSheet(
++      initialChildSize: 0.85,
++      minChildSize: 0.45,
++      maxChildSize: 0.95,
++      expand: false,
++      builder: (context, sheetScrollController) {
++        return Container(
++          decoration: BoxDecoration(
++            color: theme.scaffoldBackgroundColor,
++            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
++          ),
++          child: Column(
++            crossAxisAlignment: CrossAxisAlignment.stretch,
++            children: [
++              // Barra superior / Tirador
++              Center(
++                child: Container(
++                  margin: const EdgeInsets.only(top: 12, bottom: 8),
++                  width: 40,
++                  height: 4,
++                  decoration: BoxDecoration(
++                    color: theme.dividerColor,
++                    borderRadius: BorderRadius.circular(2),
++                  ),
++                ),
++              ),
++              Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
++                child: Row(
++                  children: [
++                    const Icon(Icons.psychology_outlined, color: Colors.blueAccent),
++                    const SizedBox(width: 8),
++                    Expanded(
++                      child: Column(
++                        crossAxisAlignment: CrossAxisAlignment.start,
++                        children: [
++                          Text(
++                            'Consultar chat con IA',
++                            style: theme.textTheme.titleMedium?.copyWith(
++                              fontWeight: FontWeight.bold,
++                            ),
++                          ),
++                          Text(
++                            '$title • $currentModel',
++                            style: theme.textTheme.bodySmall?.copyWith(
++                              color: theme.colorScheme.onSurfaceVariant,
++                            ),
++                            maxLines: 1,
++                            overflow: TextOverflow.ellipsis,
++                          ),
++                        ],
++                      ),
++                    ),
++                    if (_items.isNotEmpty)
++                      IconButton(
++                        tooltip: 'Limpiar consultas',
++                        icon: const Icon(Icons.cleaning_services_outlined),
++                        onPressed: _clearQueries,
++                      ),
++                    IconButton(
++                      tooltip: 'Profundidad de historial',
++                      icon: const Icon(Icons.tune_outlined),
++                      onPressed: () => _showDepthPicker(context),
++                    ),
++                  ],
++                ),
++              ),
++              const Divider(height: 1),
++
++              // Contenido principal: historial de Q&A o sugerencias
++              Expanded(
++                child: _items.isEmpty
++                    ? _buildEmptyState(theme)
++                    : ListView.builder(
++                        controller: _scrollController,
++                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
++                        itemCount: _items.length,
++                        itemBuilder: (context, index) {
++                          return _buildQueryCard(theme, _items[index]);
++                        },
++                      ),
++              ),
++
++              // Barra de sugerencias si la lista tiene pocos items
++              if (_items.isEmpty)
++                SizedBox(
++                  height: 44,
++                  child: ListView.separated(
++                    scrollDirection: Axis.horizontal,
++                    padding: const EdgeInsets.symmetric(horizontal: 16),
++                    itemCount: _suggestedQueries.length,
++                    separatorBuilder: (_, __) => const SizedBox(width: 8),
++                    itemBuilder: (context, i) {
++                      final query = _suggestedQueries[i];
++                      return ActionChip(
++                        label: Text(query, style: const TextStyle(fontSize: 12)),
++                        onPressed: _isLoading ? null : () => _submitQuery(query),
++                      );
++                    },
++                  ),
++                ),
++
++              const SizedBox(height: 8),
++
++              // Campo de entrada de texto
++              Padding(
++                padding: EdgeInsets.only(
++                  left: 12,
++                  right: 12,
++                  bottom: MediaQuery.of(context).viewInsets.bottom + 12,
++                ),
++                child: Row(
++                  children: [
++                    Expanded(
++                      child: TextField(
++                        controller: _questionController,
++                        textInputAction: TextInputAction.send,
++                        onSubmitted: (_) => _submitQuery(),
++                        decoration: InputDecoration(
++                          hintText: 'Pregunta algo sobre el chat...',
++                          isDense: true,
++                          filled: true,
++                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
++                          border: OutlineInputBorder(
++                            borderRadius: BorderRadius.circular(24),
++                            borderSide: BorderSide.none,
++                          ),
++                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
++                        ),
++                      ),
++                    ),
++                    const SizedBox(width: 8),
++                    IconButton.filled(
++                      onPressed: _isLoading ? null : () => _submitQuery(),
++                      icon: _isLoading
++                          ? const SizedBox(
++                              width: 18,
++                              height: 18,
++                              child: CircularProgressIndicator(
++                                strokeWidth: 2,
++                                color: Colors.white,
++                              ),
++                            )
++                          : const Icon(Icons.send),
++                    ),
++                  ],
++                ),
++              ),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
++  Widget _buildEmptyState(ThemeData theme) {
++    return Center(
++      child: Padding(
++        padding: const EdgeInsets.all(32.0),
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            Icon(
++              Icons.chat_bubble_outline,
++              size: 48,
++              color: theme.colorScheme.outline,
++            ),
++            const SizedBox(height: 16),
++            Text(
++              'Consulta cualquier detalle del chat',
++              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
++            ),
++            const SizedBox(height: 8),
++            Text(
++              'En lugar de buscar mensaje por mensaje, pregúntale a la IA sobre fechas, acuerdos, direcciones o resúmenes de la conversación.',
++              textAlign: TextAlign.center,
++              style: theme.textTheme.bodySmall?.copyWith(
++                color: theme.colorScheme.onSurfaceVariant,
++              ),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
++  Widget _buildQueryCard(ThemeData theme, ChatAiQueryItem item) {
++    return Padding(
++      padding: const EdgeInsets.only(bottom: 16.0),
++      child: Column(
++        crossAxisAlignment: CrossAxisAlignment.stretch,
++        children: [
++          // Pregunta del usuario
++          Align(
++            alignment: Alignment.centerRight,
++            child: Container(
++              margin: const EdgeInsets.only(left: 48),
++              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
++              decoration: BoxDecoration(
++                color: theme.colorScheme.primaryContainer,
++                borderRadius: BorderRadius.circular(16).copyWith(
++                  bottomRight: const Radius.circular(2),
++                ),
++              ),
++              child: Text(
++                item.question,
++                style: TextStyle(
++                  color: theme.colorScheme.onPrimaryContainer,
++                  fontWeight: FontWeight.w500,
++                ),
++              ),
++            ),
++          ),
++          const SizedBox(height: 8),
++
++          // Respuesta de la IA
++          Align(
++            alignment: Alignment.centerLeft,
++            child: Container(
++              margin: const EdgeInsets.only(right: 32),
++              padding: const EdgeInsets.all(14),
++              decoration: BoxDecoration(
++                color: theme.colorScheme.surfaceContainerHigh,
++                borderRadius: BorderRadius.circular(16).copyWith(
++                  bottomLeft: const Radius.circular(2),
++                ),
++              ),
++              child: item.isLoading
++                  ? const Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        SizedBox(
++                          width: 16,
++                          height: 16,
++                          child: CircularProgressIndicator(strokeWidth: 2),
++                        ),
++                        SizedBox(width: 12),
++                        Text('Buscando en la conversación...', style: TextStyle(fontSize: 13)),
++                      ],
++                    )
++                  : item.error != null
++                      ? Row(
++                          crossAxisAlignment: CrossAxisAlignment.start,
++                          children: [
++                            const Icon(Icons.error_outline, color: Colors.red, size: 18),
++                            const SizedBox(width: 8),
++                            Expanded(
++                              child: Text(
++                                item.error!,
++                                style: TextStyle(
++                                  color: theme.colorScheme.error,
++                                  fontSize: 13,
++                                ),
++                              ),
++                            ),
++                          ],
++                        )
++                      : SelectableText(
++                          item.answer ?? '',
++                          style: const TextStyle(fontSize: 14, height: 1.4),
++                        ),
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++
++  void _showDepthPicker(BuildContext context) {
++    showModalBottomSheet(
++      context: context,
++      builder: (ctx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            const ListTile(
++              leading: Icon(Icons.tune_outlined),
++              title: Text('Alcance del historial a consultar'),
++              subtitle: Text('Más mensajes dan más contexto, pero pueden tardar más.'),
++            ),
++            RadioListTile<int>(
++              title: const Text('Últimos 100 mensajes (Rápido)'),
++              value: 100,
++              groupValue: _historyDepth,
++              onChanged: (val) {
++                if (val != null) setState(() => _historyDepth = val);
++                Navigator.pop(ctx);
++              },
++            ),
++            RadioListTile<int>(
++              title: const Text('Últimos 200 mensajes (Recomendado)'),
++              value: 200,
++              groupValue: _historyDepth,
++              onChanged: (val) {
++                if (val != null) setState(() => _historyDepth = val);
++                Navigator.pop(ctx);
++              },
++            ),
++            RadioListTile<int>(
++              title: const Text('Últimos 500 mensajes (Extenso)'),
++              value: 500,
++              groupValue: _historyDepth,
++              onChanged: (val) {
++                if (val != null) setState(() => _historyDepth = val);
++                Navigator.pop(ctx);
++              },
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
 diff --git a/lib/pages/chat_search/chat_search_files_tab.dart b/lib/pages/chat_search/chat_search_files_tab.dart
 index e0bc810205205d770e34c1eb9ddc3fcf93ac35ff..a8837011131554881655ee9df338d106968caa4b 100644
 --- a/lib/pages/chat_search/chat_search_files_tab.dart
@@ -330643,10 +331098,10 @@ index e56ebb50dbd0f9e4348bc30552480c03c28457ae..262679b4916b57eb1936f2d2f0a21ecc
 +  Widget build(BuildContext context) => ChatSearchView(this);
 +}
 diff --git a/lib/pages/chat_search/chat_search_view.dart b/lib/pages/chat_search/chat_search_view.dart
-index e90a4ecfc0269dd56d2f3f916faada960e69dc30..34fd00e249ba81ceb3d495c8da3945104251eb02 100644
+index e90a4ecfc0269dd56d2f3f916faada960e69dc30..ef515d19fbc4ca8f9820077ac651c42f5ed8629a 100644
 --- a/lib/pages/chat_search/chat_search_view.dart
 +++ b/lib/pages/chat_search/chat_search_view.dart
-@@ -1,122 +1,122 @@
+@@ -1,122 +1,135 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -330776,6 +331231,7 @@ index e90a4ecfc0269dd56d2f3f916faada960e69dc30..34fd00e249ba81ceb3d495c8da394510
 +
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
++import 'package:fluffychat/pages/chat_search/chat_ai_query_sheet.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_files_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_images_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_message_tab.dart';
@@ -330815,6 +331271,18 @@ index e90a4ecfc0269dd56d2f3f916faada960e69dc30..34fd00e249ba81ceb3d495c8da394510
 +            room.getLocalizedDisplayname(MatrixLocals(L10n.of(context))),
 +          ),
 +        ),
++        actions: [
++          IconButton(
++            tooltip: 'Preguntar con IA',
++            icon: const Icon(Icons.psychology_outlined, color: Colors.blueAccent),
++            onPressed: () => showModalBottomSheet(
++              context: context,
++              isScrollControlled: true,
++              backgroundColor: Colors.transparent,
++              builder: (context) => ChatAiQuerySheet(room: room),
++            ),
++          ),
++        ],
 +      ),
 +      body: MaxWidthBody(
 +        withScrolling: false,
@@ -342654,10 +343122,10 @@ index 198764eb6f0dd37af31c017dfc55acc3645e7af8..bf1edc3b21dabf5fd9e0ef155cc5f3d6
 +  Widget build(BuildContext context) => SettingsChatView(this);
 +}
 diff --git a/lib/pages/settings_chat/settings_chat_view.dart b/lib/pages/settings_chat/settings_chat_view.dart
-index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8aacf60c2bbb605b777a617e2e671e3aadac4360 100644
+index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..99a0a6d92f4aa5ccab062e1d2270ea9b13a5f2cd 100644
 --- a/lib/pages/settings_chat/settings_chat_view.dart
 +++ b/lib/pages/settings_chat/settings_chat_view.dart
-@@ -1,181 +1,374 @@
+@@ -1,181 +1,447 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -343201,6 +343669,79 @@ index cbd8b80c4db9e47b00e77b55b2d4112cf929c561..8aacf60c2bbb605b777a617e2e671e3a
 +                  );
 +                  if (prompt != null) {
 +                    await AppSettings.whisperPrompt.setItem(prompt);
++                    controller.refresh();
++                  }
++                },
++              ),
++              Divider(color: theme.dividerColor),
++              ListTile(
++                title: Text(
++                  'Servidor de IA (Consultas y Fichas)',
++                  style: TextStyle(
++                    color: theme.colorScheme.secondary,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++              ),
++              ListTile(
++                title: const Text('Endpoint / URL del servidor'),
++                subtitle: Text(
++                  AppSettings.aiEndpoint.value.isEmpty
++                      ? 'Sin configurar (ej. http://localhost:11434/v1/chat/completions)'
++                      : AppSettings.aiEndpoint.value,
++                ),
++                onTap: () async {
++                  final endpoint = await showTextInputDialog(
++                    context: context,
++                    title: 'Endpoint de IA',
++                    initialText: AppSettings.aiEndpoint.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (endpoint != null) {
++                    await AppSettings.aiEndpoint.setItem(endpoint.trim());
++                    controller.refresh();
++                  }
++                },
++              ),
++              ListTile(
++                title: const Text('API Key (opcional)'),
++                subtitle: Text(
++                  AppSettings.aiApiKey.value.isEmpty
++                      ? 'No requerida para Ollama / localhost'
++                      : '••••••••••••••••',
++                ),
++                onTap: () async {
++                  final key = await showTextInputDialog(
++                    context: context,
++                    title: 'API Key',
++                    initialText: AppSettings.aiApiKey.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (key != null) {
++                    await AppSettings.aiApiKey.setItem(key.trim());
++                    controller.refresh();
++                  }
++                },
++              ),
++              ListTile(
++                title: const Text('Modelo de IA'),
++                subtitle: Text(
++                  AppSettings.aiModel.value.isEmpty
++                      ? 'llama3.2'
++                      : AppSettings.aiModel.value,
++                ),
++                onTap: () async {
++                  final model = await showTextInputDialog(
++                    context: context,
++                    title: 'Nombre del modelo',
++                    initialText: AppSettings.aiModel.value.isEmpty ? 'llama3.2' : AppSettings.aiModel.value,
++                    okLabel: 'Guardar',
++                    cancelLabel: 'Cancelar',
++                  );
++                  if (model != null) {
++                    await AppSettings.aiModel.setItem(model.trim());
 +                    controller.refresh();
 +                  }
 +                },
@@ -349187,10 +349728,10 @@ index 3485e73e93a486f7dc1918b462f8c14a96afe8df..18a6bfef0b7ff609f41552e53cab7bd1
 +  }
 +}
 diff --git a/lib/pages/settings_style/settings_style.dart b/lib/pages/settings_style/settings_style.dart
-index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..e9d6f65fed49421c765d7d6d3c3ed33d878f329e 100644
+index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..1def15a47370836add47900bfcac53373b628294 100644
 --- a/lib/pages/settings_style/settings_style.dart
 +++ b/lib/pages/settings_style/settings_style.dart
-@@ -1,141 +1,151 @@
+@@ -1,141 +1,156 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -349480,14 +350021,19 @@ index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..e9d6f65fed49421c765d7d6d3c3ed33d
 +    setState(() {});
 +  }
 +
++  Future<void> toggleUseSquircleAvatars(bool value) async {
++    await AppSettings.useSquircleAvatars.setItem(value);
++    setState(() {});
++  }
++
 +  @override
 +  Widget build(BuildContext context) => SettingsStyleView(this);
 +}
 diff --git a/lib/pages/settings_style/settings_style_view.dart b/lib/pages/settings_style/settings_style_view.dart
-index 916eff68379a38f84d30dfc7ca90701e1e329544..4fd2ad04fa9f58efad3437097f04d94ab3467b0f 100644
+index 916eff68379a38f84d30dfc7ca90701e1e329544..2b99beddb60bdf44d28592fe2e72d73d8796677e 100644
 --- a/lib/pages/settings_style/settings_style_view.dart
 +++ b/lib/pages/settings_style/settings_style_view.dart
-@@ -1,349 +1,386 @@
+@@ -1,349 +1,394 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -350216,6 +350762,14 @@ index 916eff68379a38f84d30dfc7ca90701e1e329544..4fd2ad04fa9f58efad3437097f04d94a
 +                'Muestra los mensajes enviados con fondo oscuro neutro similar a los recibidos',
 +              ),
 +              onChanged: controller.toggleNeutralBubblesInDarkMode,
++            ),
++            SwitchListTile.adaptive(
++              value: AppSettings.useSquircleAvatars.value,
++              title: const Text('Avatares squircle'),
++              subtitle: const Text(
++                'Muestra los avatares en formato squircle en lugar de círculos',
++              ),
++              onChanged: controller.toggleUseSquircleAvatars,
 +            ),
 +          ],
 +        ),
@@ -356327,6 +356881,169 @@ index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f
 +      debugPrint('BeeperVideoThumbnailCache error for ${event.eventId}: $e');
 +    }
 +    return null;
++  }
++}
+diff --git a/lib/utils/chat_ai_query_service.dart b/lib/utils/chat_ai_query_service.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..1716e0a27b2357ffa51fa0c43858777f710535f7
+--- /dev/null
++++ b/lib/utils/chat_ai_query_service.dart
+@@ -0,0 +1,157 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:convert';
++import 'package:http/http.dart' as http;
++import 'package:intl/intl.dart';
++import 'package:matrix/matrix.dart';
++import 'package:fluffychat/config/setting_keys.dart';
++import 'ai_profile_service.dart';
++import 'file_logger.dart';
++
++class ChatAiQueryItem {
++  final String question;
++  final String? answer;
++  final bool isLoading;
++  final String? error;
++  final DateTime timestamp;
++
++  const ChatAiQueryItem({
++    required this.question,
++    this.answer,
++    this.isLoading = false,
++    this.error,
++    required this.timestamp,
++  });
++
++  ChatAiQueryItem copyWith({
++    String? question,
++    String? answer,
++    bool? isLoading,
++    String? error,
++    DateTime? timestamp,
++  }) {
++    return ChatAiQueryItem(
++      question: question ?? this.question,
++      answer: answer ?? this.answer,
++      isLoading: isLoading ?? this.isLoading,
++      error: error ?? this.error,
++      timestamp: timestamp ?? this.timestamp,
++    );
++  }
++}
++
++/// Servicio desacoplado y sin estado persistente en SQLite para responder preguntas
++/// sobre el historial de un chat utilizando un modelo de lenguaje (Ollama o API compatible OpenAI).
++class ChatAiQueryService {
++  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
++
++  /// Consulta al modelo sobre la conversación en [room].
++  /// [chatHistoryDepth] define cuántos mensajes recientes extraer (ej. 200).
++  static Future<String> askChatQuestion({
++    required Room room,
++    required String question,
++    int chatHistoryDepth = 200,
++  }) async {
++    final endpoint = AppSettings.aiEndpoint.value.trim();
++    final apiKey = AppSettings.aiApiKey.value.trim();
++    final model = AppSettings.aiModel.value.trim().isEmpty ? 'llama3.2' : AppSettings.aiModel.value.trim();
++
++    if (endpoint.isEmpty) {
++      throw 'No hay un servidor de IA configurado. Configura el Endpoint en Ajustes > Ajustes de Chat > Configuración de IA (ej. Ollama local o API OpenAI/Groq).';
++    }
++
++    // 1. Extraer el contexto limpio del chat con marcas temporales y notas de voz transcriptas
++    final extraction = await AiProfileService.extractChatContext(
++      room,
++      forceFull: true,
++      maxMessages: chatHistoryDepth,
++    );
++
++    if (extraction.textContext.trim().isEmpty) {
++      return 'No hay suficientes mensajes o historial en este chat para responder a la consulta.';
++    }
++
++    final contactName = AiProfileService.resolveContactName(room);
++    final nowStr = _dateFormat.format(DateTime.now());
++
++    final systemPrompt = '''
++Eres un asistente ultra preciso de búsqueda e interpretación de conversaciones de mensajería.
++Tu objetivo es responder de forma directa, útil y honesta a la pregunta del usuario sobre el chat.
++El interlocutor es "${contactName.isNotEmpty ? contactName : 'Contacto'}" y el usuario es "Yo".
++
++REGLAS ESTRICTAS DE RESPUESTA:
++1. BASADO EXCLUSIVAMENTE EN EL TEXTO: Responde ÚNICAMENTE con información que esté explícita o claramente evidenciada en los mensajes proporcionados.
++2. CERO ALUCINACIONES: Si la pregunta indaga sobre algo que NO fue mencionado o no está claro en los mensajes, di exactamente: "No encontré menciones sobre eso en los mensajes de la conversación." No supongas ni inventes detalles.
++3. CITAS Y MARCAS TEMPORALES: Cuando encuentres el dato, incluye brevemente la fecha o momento de la conversación de donde surge (ej. "[2026-04-10 14:20] Contacto dijo: ...").
++4. INTERPRETACIÓN TEMPORAL: La fecha actual de referencia es $nowStr. Si un mensaje decía "mañana", "el jueves" o "la próxima semana", calcula el día exacto tomando la marca de tiempo de dicho mensaje.
++5. CONCISIÓN: Sé directo y breve. No des rodeos ni introducciones largas.
++''';
++
++    final userPrompt = '''
++FECHA ACTUAL: $nowStr
++INTERLOCUTOR / CONTACTO: ${contactName.isNotEmpty ? contactName : 'Contacto'}
++
++HISTORIAL DE MENSAJES (orden cronológico):
++${extraction.textContext}
++
++PREGUNTA DEL USUARIO:
++$question
++''';
++
++    final uri = Uri.parse(endpoint);
++    final headers = <String, String>{
++      'Content-Type': 'application/json',
++      if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
++    };
++
++    Map<String, dynamic> body;
++    if (endpoint.contains('/chat/completions')) {
++      body = {
++        'model': model,
++        'messages': [
++          {'role': 'system', 'content': systemPrompt},
++          {'role': 'user', 'content': userPrompt},
++        ],
++        'temperature': 0.2,
++      };
++    } else {
++      // Formato nativo Ollama /api/generate
++      body = {
++        'model': model,
++        'system': systemPrompt,
++        'prompt': userPrompt,
++        'stream': false,
++      };
++    }
++
++    final response = await http
++        .post(uri, headers: headers, body: jsonEncode(body))
++        .timeout(const Duration(seconds: 40));
++
++    if (response.statusCode >= 200 && response.statusCode < 300) {
++      final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
++      String content = '';
++      if (jsonResponse is Map<String, dynamic>) {
++        if (jsonResponse.containsKey('choices') && jsonResponse['choices'] is List) {
++          final choices = jsonResponse['choices'] as List;
++          if (choices.isNotEmpty && choices[0] is Map) {
++            content = choices[0]['message']?['content'] ?? '';
++          }
++        } else if (jsonResponse.containsKey('response')) {
++          content = jsonResponse['response']?.toString() ?? '';
++        }
++      }
++
++      final trimmed = content.trim();
++      if (trimmed.isNotEmpty) {
++        return trimmed;
++      }
++      throw 'El modelo devolvió una respuesta vacía.';
++    } else {
++      FileLogger.log('[ChatAiQueryService] HTTP ${response.statusCode}: ${response.body}');
++      throw 'Error en el servidor de IA (${response.statusCode}): ${response.reasonPhrase ?? response.body}';
++    }
 +  }
 +}
 diff --git a/lib/utils/chat_history_downloader.dart b/lib/utils/chat_history_downloader.dart
@@ -368993,10 +369710,18 @@ index f19ea49d3c3d719fc7e813eb1e687af7fa43d786..708037e9939581427b4d0ea99aea1716
 +  );
 +}
 diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
-index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..5a32c3101dc908623496c52084a4a6260d3b8c93 100644
+index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..e6360915721245008c730a01dd45292f515cf42b 100644
 --- a/lib/widgets/avatar.dart
 +++ b/lib/widgets/avatar.dart
-@@ -40,19 +40,19 @@ class Avatar extends StatelessWidget {
+@@ -3,6 +3,7 @@
+ //
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ 
++import 'package:fluffychat/config/setting_keys.dart';
+ import 'package:fluffychat/utils/string_color.dart';
+ import 'package:fluffychat/widgets/mxc_image.dart';
+ import 'package:fluffychat/widgets/presence_builder.dart';
+@@ -40,25 +41,27 @@ class Avatar extends StatelessWidget {
      super.key,
    });
  
@@ -369025,7 +369750,16 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..5a32c3101dc908623496c52084a4a626
  
      final noPic =
          mxContent == null ||
-@@ -79,40 +79,32 @@ class Avatar extends StatelessWidget {
+         mxContent.toString().isEmpty ||
+         mxContent.toString() == 'null';
+-    final borderRadius = this.borderRadius ?? BorderRadius.circular(size / 2);
++    final isSquircle = AppSettings.useSquircleAvatars.value;
++    final borderRadius = this.borderRadius ??
++        BorderRadius.circular(isSquircle ? size * 0.28 : size / 2);
+     final presenceUserId = this.presenceUserId;
+     final container = Stack(
+       children: [
+@@ -79,40 +82,32 @@ class Avatar extends StatelessWidget {
              child: MxcImage(
                client: client,
                borderRadius: borderRadius,
@@ -369087,6 +369821,17 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..5a32c3101dc908623496c52084a4a626
              ),
            ),
          ),
+@@ -132,8 +127,8 @@ class Avatar extends StatelessWidget {
+                   ? Colors.orange
+                   : Colors.grey;
+               return Positioned(
+-                bottom: -3,
+-                right: -3,
++                bottom: isSquircle ? -2 : -3,
++                right: isSquircle ? -2 : -3,
+                 child: Container(
+                   width: 16,
+                   height: 16,
 diff --git a/lib/widgets/blur_hash.dart b/lib/widgets/blur_hash.dart
 index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc656802441 100644
 --- a/lib/widgets/blur_hash.dart
@@ -369315,10 +370060,10 @@ index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9
 +  }
 +}
 diff --git a/lib/widgets/chat_settings_popup_menu.dart b/lib/widgets/chat_settings_popup_menu.dart
-index 9352255979eace274d2797cb59c3bd917396cc1a..359ea8517e89e6ad2517d35aff7eebcb4e060bfc 100644
+index 9352255979eace274d2797cb59c3bd917396cc1a..5698af9b68bfefb7d9235c248b7213bcfd8a2573 100644
 --- a/lib/widgets/chat_settings_popup_menu.dart
 +++ b/lib/widgets/chat_settings_popup_menu.dart
-@@ -1,145 +1,331 @@
+@@ -1,145 +1,351 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -369479,12 +370224,14 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..359ea8517e89e6ad2517d35aff7eebcb
 +import 'package:matrix/matrix.dart';
 +
 +import 'package:fluffychat/pages/chat_details/contact_profile_sheet.dart';
++import 'package:fluffychat/pages/chat_search/chat_ai_query_sheet.dart';
 +import 'package:fluffychat/utils/chat_history_downloader.dart';
 +import 'package:fluffychat/utils/beeper_merge_utils.dart';
 +import 'matrix.dart';
 +
 +enum ChatPopupMenuActions {
 +  details,
++  askAi,
 +  profileNotes,
 +  downloadHistory,
 +  mute,
@@ -369580,6 +370327,14 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..359ea8517e89e6ad2517d35aff7eebcb
 +              case ChatPopupMenuActions.details:
 +                _showChatDetails();
 +                break;
++              case ChatPopupMenuActions.askAi:
++                showModalBottomSheet(
++                  context: context,
++                  isScrollControlled: true,
++                  backgroundColor: Colors.transparent,
++                  builder: (context) => ChatAiQuerySheet(room: widget.room),
++                );
++                break;
 +              case ChatPopupMenuActions.profileNotes:
 +                showModalBottomSheet(
 +                  context: context,
@@ -369662,6 +370417,16 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..359ea8517e89e6ad2517d35aff7eebcb
 +                  const Icon(Icons.search_outlined),
 +                  const SizedBox(width: 12),
 +                  Text(L10n.of(context).search),
++                ],
++              ),
++            ),
++            PopupMenuItem<ChatPopupMenuActions>(
++              value: ChatPopupMenuActions.askAi,
++              child: const Row(
++                children: [
++                  Icon(Icons.psychology_outlined, color: Colors.blueAccent),
++                  SizedBox(width: 12),
++                  Text('Preguntar con IA'),
 +                ],
 +              ),
 +            ),
