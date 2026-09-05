@@ -300743,6 +300743,192 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..cb0bb4cf291bc15d3716812715a588af
 +    guiStarted = true;
 +  }
 +}
+diff --git a/lib/models/contact_profile.dart b/lib/models/contact_profile.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..1722654b24888305ab299b84272761ffba1f389e
+--- /dev/null
++++ b/lib/models/contact_profile.dart
+@@ -0,0 +1,180 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++class ContactProfile {
++  final String? nombre;
++  final String? cumpleanos;
++  final String? direccion;
++  final String? profesion;
++  final String? estudiosFormales;
++  final List<String> ultimasActividades;
++  final List<String> proximosEventos;
++  final List<String> eventosPasados;
++  final String? notasLibres;
++  final int? updatedAt;
++
++  const ContactProfile({
++    this.nombre,
++    this.cumpleanos,
++    this.direccion,
++    this.profesion,
++    this.estudiosFormales,
++    this.ultimasActividades = const [],
++    this.proximosEventos = const [],
++    this.eventosPasados = const [],
++    this.notasLibres,
++    this.updatedAt,
++  });
++
++  bool get isEmpty =>
++      (nombre == null || nombre!.trim().isEmpty) &&
++      (cumpleanos == null || cumpleanos!.trim().isEmpty) &&
++      (direccion == null || direccion!.trim().isEmpty) &&
++      (profesion == null || profesion!.trim().isEmpty) &&
++      (estudiosFormales == null || estudiosFormales!.trim().isEmpty) &&
++      ultimasActividades.isEmpty &&
++      proximosEventos.isEmpty &&
++      eventosPasados.isEmpty &&
++      (notasLibres == null || notasLibres!.trim().isEmpty);
++
++  factory ContactProfile.fromJson(Map<String, dynamic>? json) {
++    if (json == null) return const ContactProfile();
++
++    List<String> parseList(dynamic raw) {
++      if (raw is List) {
++        return raw
++            .map((e) => e?.toString().trim() ?? '')
++            .where((e) => e.isNotEmpty)
++            .toList();
++      }
++      return const [];
++    }
++
++    String? parseString(dynamic raw) {
++      if (raw == null) return null;
++      final str = raw.toString().trim();
++      return str.isNotEmpty ? str : null;
++    }
++
++    return ContactProfile(
++      nombre: parseString(json['nombre']),
++      cumpleanos: parseString(json['cumpleanos']),
++      direccion: parseString(json['direccion']),
++      profesion: parseString(json['profesion']),
++      estudiosFormales: parseString(json['estudios_formales']),
++      ultimasActividades: parseList(json['ultimas_actividades_relevantes']),
++      proximosEventos: parseList(json['proximos_eventos']),
++      eventosPasados: parseList(json['eventos_pasados']),
++      notasLibres: parseString(json['notas_libres']),
++      updatedAt: json['updated_at'] is int
++          ? json['updated_at'] as int
++          : (json['updated_at'] is num
++              ? (json['updated_at'] as num).toInt()
++              : null),
++    );
++  }
++
++  Map<String, dynamic> toJson() {
++    return {
++      if (nombre != null) 'nombre': nombre,
++      if (cumpleanos != null) 'cumpleanos': cumpleanos,
++      if (direccion != null) 'direccion': direccion,
++      if (profesion != null) 'profesion': profesion,
++      if (estudiosFormales != null) 'estudios_formales': estudiosFormales,
++      'ultimas_actividades_relevantes': ultimasActividades,
++      'proximos_eventos': proximosEventos,
++      'eventos_pasados': eventosPasados,
++      if (notasLibres != null) 'notas_libres': notasLibres,
++      'updated_at': updatedAt ?? DateTime.now().millisecondsSinceEpoch,
++    };
++  }
++
++  /// Fusión incremental segura ("Diff & Merge"):
++  /// Preserva estrictamente los datos actuales si la sugerencia de la IA o actualización
++  /// no contiene datos nuevos o tiene valores vacíos/nulos.
++  ContactProfile mergeWith(ContactProfile suggested) {
++    final mergedNombre = (suggested.nombre != null && suggested.nombre!.trim().isNotEmpty)
++        ? suggested.nombre
++        : nombre;
++    final mergedCumpleanos = (suggested.cumpleanos != null && suggested.cumpleanos!.trim().isNotEmpty)
++        ? suggested.cumpleanos
++        : cumpleanos;
++    final mergedDireccion = (suggested.direccion != null && suggested.direccion!.trim().isNotEmpty)
++        ? suggested.direccion
++        : direccion;
++    final mergedProfesion = (suggested.profesion != null && suggested.profesion!.trim().isNotEmpty)
++        ? suggested.profesion
++        : profesion;
++    final mergedEstudios = (suggested.estudiosFormales != null && suggested.estudiosFormales!.trim().isNotEmpty)
++        ? suggested.estudiosFormales
++        : estudiosFormales;
++    final mergedNotas = (suggested.notasLibres != null && suggested.notasLibres!.trim().isNotEmpty)
++        ? suggested.notasLibres
++        : notasLibres;
++
++    List<String> mergeList(List<String> base, List<String> incoming) {
++      final set = <String>{};
++      final result = <String>[];
++      for (final item in base) {
++        final trimmed = item.trim();
++        if (trimmed.isNotEmpty && set.add(trimmed.toLowerCase())) {
++          result.add(trimmed);
++        }
++      }
++      for (final item in incoming) {
++        final trimmed = item.trim();
++        if (trimmed.isNotEmpty && set.add(trimmed.toLowerCase())) {
++          result.add(trimmed);
++        }
++      }
++      return result;
++    }
++
++    final mergedActividades = mergeList(ultimasActividades, suggested.ultimasActividades);
++    final mergedProximos = mergeList(proximosEventos, suggested.proximosEventos);
++
++    // Eventos pasados: combinar entrantes con base y limitar a los 10 más recientes
++    final allEventosPasados = mergeList(suggested.eventosPasados, eventosPasados);
++    final cappedEventosPasados = allEventosPasados.take(10).toList();
++
++    return ContactProfile(
++      nombre: mergedNombre,
++      cumpleanos: mergedCumpleanos,
++      direccion: mergedDireccion,
++      profesion: mergedProfesion,
++      estudiosFormales: mergedEstudios,
++      ultimasActividades: mergedActividades,
++      proximosEventos: mergedProximos,
++      eventosPasados: cappedEventosPasados,
++      notasLibres: mergedNotas,
++      updatedAt: DateTime.now().millisecondsSinceEpoch,
++    );
++  }
++
++  ContactProfile copyWith({
++    String? nombre,
++    String? cumpleanos,
++    String? direccion,
++    String? profesion,
++    String? estudiosFormales,
++    List<String>? ultimasActividades,
++    List<String>? proximosEventos,
++    List<String>? eventosPasados,
++    String? notasLibres,
++    int? updatedAt,
++  }) {
++    return ContactProfile(
++      nombre: nombre ?? this.nombre,
++      cumpleanos: cumpleanos ?? this.cumpleanos,
++      direccion: direccion ?? this.direccion,
++      profesion: profesion ?? this.profesion,
++      estudiosFormales: estudiosFormales ?? this.estudiosFormales,
++      ultimasActividades: ultimasActividades ?? this.ultimasActividades,
++      proximosEventos: proximosEventos ?? this.proximosEventos,
++      eventosPasados: eventosPasados ?? this.eventosPasados,
++      notasLibres: notasLibres ?? this.notasLibres,
++      updatedAt: updatedAt ?? this.updatedAt,
++    );
++  }
++}
 diff --git a/lib/pages/archive/archive.dart b/lib/pages/archive/archive.dart
 index 5425577e8090f6eed584413f6d98ad74df8b62b9..148d06ca77206c515ef43aabc545b187f2e94149 100644
 --- a/lib/pages/archive/archive.dart
@@ -318369,10 +318555,10 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d426a83a7 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..3f3040c503aca438517ec781aba3b5cf072110da 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
-@@ -3,36 +3,64 @@
+@@ -3,36 +3,65 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -318386,6 +318572,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/beeper_merge_utils.dart';
 +import 'package:fluffychat/utils/beeper_app_launcher.dart';
++import 'contact_profile_sheet.dart';
 +import '../merge_contact_picker/merge_contact_picker.dart';
  import 'package:fluffychat/widgets/avatar.dart';
  import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
@@ -318443,7 +318630,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
      if (room == null) {
        return Scaffold(
          appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
-@@ -42,25 +70,30 @@ class ChatDetailsView extends StatelessWidget {
+@@ -42,25 +71,30 @@ class ChatDetailsView extends StatelessWidget {
        );
      }
  
@@ -318484,7 +318671,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
          return Scaffold(
            appBar: AppBar(
              leading:
-@@ -79,8 +112,10 @@ class ChatDetailsView extends StatelessWidget {
+@@ -79,8 +113,10 @@ class ChatDetailsView extends StatelessWidget {
                  IconButton(
                    tooltip: L10n.of(context).share,
                    icon: const Icon(Icons.qr_code_rounded),
@@ -318497,7 +318684,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -92,327 +127,520 @@ class ChatDetailsView extends StatelessWidget {
+@@ -92,327 +128,537 @@ class ChatDetailsView extends StatelessWidget {
              child: ListView.builder(
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
@@ -318950,15 +319137,32 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        leading: CircleAvatar(
++                          backgroundColor: Colors.indigoAccent.withValues(alpha: 0.15),
++                          foregroundColor: Colors.indigoAccent,
++                          child: const Icon(Icons.badge_outlined),
++                        ),
++                        title: const Text('Ficha y notas del contacto'),
++                        subtitle: const Text('Perfil privado, próximos eventos e IA'),
++                        trailing: const Icon(Icons.chevron_right_outlined),
++                        onTap: () => showModalBottomSheet(
++                          context: context,
++                          isScrollControlled: true,
++                          backgroundColor: Colors.transparent,
++                          builder: (context) => ContactProfileSheet(room: room),
++                        ),
++                      ),
++                      Divider(color: theme.dividerColor),
++                      ListTile(
++                        leading: CircleAvatar(
 +                          backgroundColor: theme.colorScheme.surfaceContainer,
 +                          foregroundColor: iconColor,
 +                          child: const Icon(Icons.merge_type_outlined),
-+                        ),
+                         ),
 +                        title: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Contacto fusionado (${BeeperMergeUtils.getSiblingRooms(room.id).length} chats)'
 +                              : 'Fusionar con otras cuentas...',
-                         ),
++                        ),
 +                        subtitle: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Gestionar chats vinculados de este contacto'
@@ -318966,7 +319170,9 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
 +                        ),
 +                        trailing: const Icon(Icons.chevron_right_outlined),
 +                        onTap: () => showMergeContactPicker(context, room),
-+                      ),
+                       ),
+-                      onTap: () => context.push(
+-                        '/rooms/${controller.roomId!}/details/members',
 +                      ValueListenableBuilder<int>(
 +                        valueListenable: BeeperMergeUtils.mergeChangeNotifier,
 +                        builder: (context, _, __) {
@@ -319073,9 +319279,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
 +                            children: widgets,
 +                          );
 +                        },
-                       ),
--                      onTap: () => context.push(
--                        '/rooms/${controller.roomId!}/details/members',
++                      ),
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -319298,6 +319502,436 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..16f7e5f2a52a8946c47c4beae2a5599d
 +    }
    }
  }
+diff --git a/lib/pages/chat_details/contact_profile_sheet.dart b/lib/pages/chat_details/contact_profile_sheet.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..e930ff43c215ca3566c7df0f5bf418c3ca353c73
+--- /dev/null
++++ b/lib/pages/chat_details/contact_profile_sheet.dart
+@@ -0,0 +1,424 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:matrix/matrix.dart';
++import 'package:fluffychat/models/contact_profile.dart';
++import 'package:fluffychat/utils/ai_profile_service.dart';
++import 'package:fluffychat/utils/contact_notes_manager.dart';
++
++class ContactProfileSheet extends StatefulWidget {
++  final Room room;
++
++  const ContactProfileSheet({super.key, required this.room});
++
++  @override
++  State<ContactProfileSheet> createState() => _ContactProfileSheetState();
++}
++
++class _ContactProfileSheetState extends State<ContactProfileSheet> {
++  ContactProfile _profile = const ContactProfile();
++  bool _isLoading = true;
++  bool _isAnalyzing = false;
++  bool _isEditing = false;
++
++  // Controllers para edición manual
++  final _nombreCtrl = TextEditingController();
++  final _cumpleCtrl = TextEditingController();
++  final _direccionCtrl = TextEditingController();
++  final _profesionCtrl = TextEditingController();
++  final _estudiosCtrl = TextEditingController();
++  final _notasCtrl = TextEditingController();
++
++  @override
++  void initState() {
++    super.initState();
++    _loadProfile();
++  }
++
++  @override
++  void dispose() {
++    _nombreCtrl.dispose();
++    _cumpleCtrl.dispose();
++    _direccionCtrl.dispose();
++    _profesionCtrl.dispose();
++    _estudiosCtrl.dispose();
++    _notasCtrl.dispose();
++    super.dispose();
++  }
++
++  Future<void> _loadProfile() async {
++    setState(() => _isLoading = true);
++    final loaded = await ContactNotesManager.loadProfile(
++      widget.room.client,
++      widget.room.id,
++    );
++    if (!mounted) return;
++    setState(() {
++      _profile = loaded;
++      _initControllers(loaded);
++      _isLoading = false;
++    });
++  }
++
++  void _initControllers(ContactProfile p) {
++    _nombreCtrl.text = p.nombre ?? '';
++    _cumpleCtrl.text = p.cumpleanos ?? '';
++    _direccionCtrl.text = p.direccion ?? '';
++    _profesionCtrl.text = p.profesion ?? '';
++    _estudiosCtrl.text = p.estudiosFormales ?? '';
++    _notasCtrl.text = p.notasLibres ?? '';
++  }
++
++  Future<void> _saveCurrentProfile() async {
++    final updated = _profile.copyWith(
++      nombre: _nombreCtrl.text.trim().isNotEmpty ? _nombreCtrl.text.trim() : null,
++      cumpleanos: _cumpleCtrl.text.trim().isNotEmpty ? _cumpleCtrl.text.trim() : null,
++      direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
++      profesion: _profesionCtrl.text.trim().isNotEmpty ? _profesionCtrl.text.trim() : null,
++      estudiosFormales: _estudiosCtrl.text.trim().isNotEmpty ? _estudiosCtrl.text.trim() : null,
++      notasLibres: _notasCtrl.text.trim().isNotEmpty ? _notasCtrl.text.trim() : null,
++      updatedAt: DateTime.now().millisecondsSinceEpoch,
++    );
++
++    setState(() {
++      _profile = updated;
++      _isEditing = false;
++    });
++
++    await ContactNotesManager.saveProfile(
++      widget.room.client,
++      widget.room.id,
++      updated,
++    );
++
++    if (mounted) {
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Ficha y notas guardadas en Matrix')),
++      );
++    }
++  }
++
++  Future<void> _runAiAnalysis() async {
++    setState(() => _isAnalyzing = true);
++    try {
++      final updated = await AiProfileService.analyzeAndMergeProfile(
++        room: widget.room,
++        currentProfile: _profile,
++      );
++
++      if (!mounted) return;
++      setState(() {
++        _profile = updated;
++        _initControllers(updated);
++        _isAnalyzing = false;
++      });
++
++      await ContactNotesManager.saveProfile(
++        widget.room.client,
++        widget.room.id,
++        updated,
++      );
++
++      if (mounted) {
++        ScaffoldMessenger.of(context).showSnackBar(
++          const SnackBar(
++            content: Text('✨ Perfil y eventos actualizados con IA'),
++          ),
++        );
++      }
++    } catch (e) {
++      if (!mounted) return;
++      setState(() => _isAnalyzing = false);
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text('Error al analizar con IA: $e')),
++      );
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++
++    return DraggableScrollableSheet(
++      initialChildSize: 0.85,
++      minChildSize: 0.5,
++      maxChildSize: 0.95,
++      expand: false,
++      builder: (context, scrollController) {
++        return Container(
++          decoration: BoxDecoration(
++            color: theme.scaffoldBackgroundColor,
++            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
++          ),
++          child: Column(
++            children: [
++              // Barra superior / Tirador
++              Center(
++                child: Container(
++                  margin: const EdgeInsets.only(top: 12, bottom: 8),
++                  width: 40,
++                  height: 4,
++                  decoration: BoxDecoration(
++                    color: theme.dividerColor,
++                    borderRadius: BorderRadius.circular(2),
++                  ),
++                ),
++              ),
++              Padding(
++                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
++                child: Row(
++                  children: [
++                    const Icon(Icons.badge_outlined, color: Colors.indigoAccent),
++                    const SizedBox(width: 8),
++                    Expanded(
++                      child: Text(
++                        'Perfil Privado & Notas',
++                        style: theme.textTheme.titleMedium?.copyWith(
++                          fontWeight: FontWeight.bold,
++                        ),
++                      ),
++                    ),
++                    if (!_isLoading) ...[
++                      IconButton(
++                        tooltip: _isEditing ? 'Guardar' : 'Editar',
++                        icon: Icon(_isEditing ? Icons.check : Icons.edit_outlined),
++                        onPressed: _isEditing ? _saveCurrentProfile : () => setState(() => _isEditing = true),
++                      ),
++                      IconButton(
++                        tooltip: 'Analizar chat con IA',
++                        icon: _isAnalyzing
++                            ? const SizedBox(
++                                width: 20,
++                                height: 20,
++                                child: CircularProgressIndicator(strokeWidth: 2),
++                              )
++                            : const Icon(Icons.auto_awesome, color: Colors.amber),
++                        onPressed: _isAnalyzing ? null : _runAiAnalysis,
++                      ),
++                    ],
++                  ],
++                ),
++              ),
++              const Divider(height: 1),
++              // Contenido principal
++              Expanded(
++                child: _isLoading
++                    ? const Center(child: CircularProgressIndicator())
++                    : ListView(
++                        controller: scrollController,
++                        padding: const EdgeInsets.all(16),
++                        children: [
++                          _buildProfileCards(theme),
++                        ],
++                      ),
++              ),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
++  Widget _buildProfileCards(ThemeData theme) {
++    if (_isEditing) {
++      return Column(
++        crossAxisAlignment: CrossAxisAlignment.stretch,
++        children: [
++          TextField(
++            controller: _nombreCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Nombre Completo',
++              prefixIcon: Icon(Icons.person_outline),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _cumpleCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Cumpleaños / Fecha',
++              prefixIcon: Icon(Icons.cake_outlined),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _direccionCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Dirección o Ciudad',
++              prefixIcon: Icon(Icons.location_on_outlined),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _profesionCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Profesión / Ocupación',
++              prefixIcon: Icon(Icons.work_outline),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _estudiosCtrl,
++            decoration: const InputDecoration(
++              labelText: 'Estudios Formales',
++              prefixIcon: Icon(Icons.school_outlined),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _notasCtrl,
++            maxLines: 4,
++            decoration: const InputDecoration(
++              labelText: 'Notas Privadas Libres',
++              alignLabelWithHint: true,
++              prefixIcon: Icon(Icons.notes_outlined),
++            ),
++          ),
++          const SizedBox(height: 16),
++          ElevatedButton.icon(
++            onPressed: _saveCurrentProfile,
++            icon: const Icon(Icons.save_outlined),
++            label: const Text('Guardar Cambios'),
++          ),
++        ],
++      );
++    }
++
++    return Column(
++      crossAxisAlignment: CrossAxisAlignment.stretch,
++      children: [
++        // Tarjeta Datos Personales
++        Card(
++          elevation: 0,
++          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
++          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
++          child: Padding(
++            padding: const EdgeInsets.all(12),
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                _buildInfoRow(Icons.person_outline, 'Nombre', _profile.nombre ?? 'Sin especificar'),
++                const Divider(height: 16),
++                _buildInfoRow(Icons.cake_outlined, 'Cumpleaños', _profile.cumpleanos ?? 'Sin especificar'),
++                const Divider(height: 16),
++                _buildInfoRow(Icons.location_on_outlined, 'Dirección', _profile.direccion ?? 'Sin especificar'),
++                const Divider(height: 16),
++                _buildInfoRow(Icons.work_outline, 'Profesión', _profile.profesion ?? 'Sin especificar'),
++                const Divider(height: 16),
++                _buildInfoRow(Icons.school_outlined, 'Estudios', _profile.estudiosFormales ?? 'Sin especificar'),
++              ],
++            ),
++          ),
++        ),
++        const SizedBox(height: 16),
++
++        // Próximos Eventos
++        _buildSectionTitle(theme, Icons.event_outlined, 'Próximos Eventos'),
++        if (_profile.proximosEventos.isEmpty)
++          const Padding(
++            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
++            child: Text('No hay eventos futuros registrados.', style: TextStyle(fontStyle: FontStyle.italic)),
++          )
++        else
++          ..._profile.proximosEventos.map((e) => Card(
++                elevation: 0,
++                margin: const EdgeInsets.symmetric(vertical: 4),
++                color: Colors.blue.withValues(alpha: 0.1),
++                child: ListTile(
++                  dense: true,
++                  leading: const Icon(Icons.arrow_right, color: Colors.blueAccent),
++                  title: Text(e),
++                ),
++              )),
++        const SizedBox(height: 16),
++
++        // Eventos Pasados (Historial de 10)
++        _buildSectionTitle(theme, Icons.history_outlined, 'Historial de Eventos Pasados (${_profile.eventosPasados.length}/10)'),
++        if (_profile.eventosPasados.isEmpty)
++          const Padding(
++            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
++            child: Text('No hay eventos pasados registrados.', style: TextStyle(fontStyle: FontStyle.italic)),
++          )
++        else
++          ..._profile.eventosPasados.map((e) => Card(
++                elevation: 0,
++                margin: const EdgeInsets.symmetric(vertical: 4),
++                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
++                child: ListTile(
++                  dense: true,
++                  leading: const Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
++                  title: Text(e),
++                ),
++              )),
++        const SizedBox(height: 16),
++
++        // Notas Libres
++        if (_profile.notasLibres != null && _profile.notasLibres!.isNotEmpty) ...[
++          _buildSectionTitle(theme, Icons.notes_outlined, 'Notas Libres'),
++          Card(
++            elevation: 0,
++            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
++            child: Padding(
++              padding: const EdgeInsets.all(12),
++              child: Text(_profile.notasLibres!),
++            ),
++          ),
++          const SizedBox(height: 16),
++        ],
++
++        // Botón rápido de análisis con IA
++        OutlinedButton.icon(
++          onPressed: _isAnalyzing ? null : _runAiAnalysis,
++          icon: const Icon(Icons.auto_awesome, color: Colors.amber),
++          label: const Text('✨ Actualizar perfil leyendo el chat con IA'),
++        ),
++      ],
++    );
++  }
++
++  Widget _buildSectionTitle(ThemeData theme, IconData icon, String title) {
++    return Padding(
++      padding: const EdgeInsets.symmetric(vertical: 4.0),
++      child: Row(
++        children: [
++          Icon(icon, size: 18, color: theme.colorScheme.secondary),
++          const SizedBox(width: 8),
++          Text(
++            title,
++            style: theme.textTheme.titleSmall?.copyWith(
++              fontWeight: FontWeight.bold,
++              color: theme.colorScheme.secondary,
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++
++  Widget _buildInfoRow(IconData icon, String label, String value) {
++    return Row(
++      crossAxisAlignment: CrossAxisAlignment.start,
++      children: [
++        Icon(icon, size: 18, color: Colors.grey),
++        const SizedBox(width: 10),
++        SizedBox(
++          width: 90,
++          child: Text(
++            label,
++            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
++          ),
++        ),
++        Expanded(
++          child: Text(
++            value,
++            style: TextStyle(
++              color: value == 'Sin especificar' ? Colors.grey : null,
++              fontSize: 13,
++            ),
++          ),
++        ),
++      ],
++    );
++  }
++}
 diff --git a/lib/pages/chat_details/participant_list_item.dart b/lib/pages/chat_details/participant_list_item.dart
 index 79a561c512a85bfaea9c7570bfd4d9b49598a41f..da2aaf8d60b50b344f0ac8d910b285f540404cf2 100644
 --- a/lib/pages/chat_details/participant_list_item.dart
@@ -349828,6 +350462,238 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +    clipBehavior: Clip.hardEdge,
 +  );
 +}
+diff --git a/lib/utils/ai_profile_service.dart b/lib/utils/ai_profile_service.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..088c34df4335e9d354392931a341ab3ab4e3ad93
+--- /dev/null
++++ b/lib/utils/ai_profile_service.dart
+@@ -0,0 +1,226 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:convert';
++import 'package:http/http.dart' as http;
++import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:fluffychat/models/contact_profile.dart';
++import 'file_logger.dart';
++
++/// Servicio de IA para la extracción y síntesis de perfiles de contactos.
++/// Diseñado para ser ultraligero y compatible con:
++/// 1. Endpoint local en Android (p.ej. llama.cpp / Ollama / Termux en localhost).
++/// 2. APIs compatibles con OpenAI/Gemini/Groq configurables.
++/// 3. Heurísticas offline inteligentes de extracción si la IA externa/local no está activa.
++class AiProfileService {
++  static const String prefAiEndpointKey = 'ai_profile_endpoint';
++  static const String prefAiApiKey = 'ai_profile_api_key';
++  static const String prefAiModelKey = 'ai_profile_model';
++
++  /// Extrae el texto limpio de los últimos eventos del chat para usarlos de contexto.
++  static String extractChatContext(Room room, {int maxMessages = 50}) {
++    final buffer = StringBuffer();
++    final timelineEvents = room.timeline.events.toList();
++    final client = room.client;
++    final myUserId = client.userID;
++
++    int count = 0;
++    for (final event in timelineEvents.reversed) {
++      if (count >= maxMessages) break;
++      if (event.type == EventTypes.Message &&
++          event.content['msgtype'] == MessageTypes.Text) {
++        final body = event.content['body']?.toString().trim() ?? '';
++        if (body.isEmpty) continue;
++        
++        final sender = (event.senderId == myUserId) ? 'Yo' : 'Contacto';
++        buffer.writeln('$sender: $body');
++        count++;
++      }
++    }
++
++    return buffer.toString();
++  }
++
++  /// Ejecuta la actualización asistida por IA comparando el perfil actual con los nuevos mensajes.
++  static Future<ContactProfile> analyzeAndMergeProfile({
++    required Room room,
++    required ContactProfile currentProfile,
++  }) async {
++    final chatText = extractChatContext(room);
++    if (chatText.trim().isEmpty) {
++      FileLogger.log('[AiProfileService] Chat context is empty. Nothing to analyze.');
++      return currentProfile;
++    }
++
++    final prefs = await SharedPreferences.getInstance();
++    final endpoint = prefs.getString(prefAiEndpointKey)?.trim();
++    final apiKey = prefs.getString(prefAiApiKey)?.trim();
++    final model = prefs.getString(prefAiModelKey)?.trim() ?? 'llama3.2';
++
++    // Si hay endpoint configurado (Ollama local, OpenAI, Groq, etc.), usamos el LLM:
++    if (endpoint != null && endpoint.isNotEmpty) {
++      try {
++        final suggested = await _queryLlm(
++          endpoint: endpoint,
++          apiKey: apiKey,
++          model: model,
++          currentProfile: currentProfile,
++          chatText: chatText,
++        );
++        if (suggested != null) {
++          return currentProfile.mergeWith(suggested);
++        }
++      } catch (e) {
++        FileLogger.log('[AiProfileService] LLM query failed: $e. Falling back to heuristic.');
++      }
++    }
++
++    // Fallback inteligente: extractor heurístico por expresiones regulares
++    final heuristicProfile = _heuristicExtraction(chatText, currentProfile);
++    return currentProfile.mergeWith(heuristicProfile);
++  }
++
++  static Future<ContactProfile?> _queryLlm({
++    required String endpoint,
++    String? apiKey,
++    required String model,
++    required ContactProfile currentProfile,
++    required String chatText,
++  }) async {
++    final systemPrompt = '''
++Eres un asistente de gestión de contactos personales.
++Tu objetivo es analizar los nuevos mensajes de una conversación y extraer información verídica para el perfil del contacto.
++
++REGLAS ESTRICTAS:
++1. PRESERVACIÓN: Si en los nuevos mensajes NO se menciona nueva información sobre un campo, NO inventes nada.
++2. FORMATO OBLIGATORIO: Responde ÚNICAMENTE con un objeto JSON válido con exactamente esta estructura:
++{
++  "nombre": string o null,
++  "cumpleanos": string o null,
++  "direccion": string o null,
++  "profesion": string o null,
++  "estudios_formales": string o null,
++  "ultimas_actividades_relevantes": [lista de strings],
++  "proximos_eventos": [lista de strings],
++  "eventos_pasados": [lista de strings (máximo 10)],
++  "notas_libres": string o null
++}
++''';
++
++    final userPrompt = '''
++PERFIL ACTUAL DEL CONTACTO:
++${jsonEncode(currentProfile.toJson())}
++
++MENSAJES RECIENTES:
++$chatText
++
++Actualiza los campos relevantes basándote estrictamente en los mensajes.
++''';
++
++    // Determinar si es endpoint estilo OpenAI /chat/completions o Ollama /api/generate
++    final uri = Uri.parse(endpoint);
++    final headers = <String, String>{
++      'Content-Type': 'application/json',
++      if (apiKey != null && apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
++    };
++
++    Map<String, dynamic> body;
++    if (endpoint.contains('/chat/completions')) {
++      body = {
++        'model': model,
++        'messages': [
++          {'role': 'system', 'content': systemPrompt},
++          {'role': 'user', 'content': userPrompt},
++        ],
++        'temperature': 0.2,
++      };
++    } else {
++      // Ollama /api/generate default
++      body = {
++        'model': model,
++        'system': systemPrompt,
++        'prompt': userPrompt,
++        'stream': false,
++        'format': 'json',
++      };
++    }
++
++    final response = await http
++        .post(uri, headers: headers, body: jsonEncode(body))
++        .timeout(const Duration(seconds: 30));
++
++    if (response.statusCode >= 200 && response.statusCode < 300) {
++      final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
++      String content = '';
++      if (jsonResponse is Map<String, dynamic>) {
++        if (jsonResponse.containsKey('choices')) {
++          content = jsonResponse['choices'][0]['message']['content'] ?? '';
++        } else if (jsonResponse.containsKey('response')) {
++          content = jsonResponse['response'] ?? '';
++        }
++      }
++
++      // Buscar el bloque JSON dentro de la respuesta si vino con markdown ```json
++      final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
++      if (jsonMatch != null) {
++        final parsed = jsonDecode(jsonMatch.group(0)!);
++        if (parsed is Map<String, dynamic>) {
++          return ContactProfile.fromJson(parsed);
++        }
++      }
++    } else {
++      FileLogger.log('[AiProfileService] HTTP error: ${response.statusCode} - ${response.body}');
++    }
++
++    return null;
++  }
++
++  /// Extractor heurístico rápido offline para detectar menciones comunes cuando no hay LLM
++  static ContactProfile _heuristicExtraction(String text, ContactProfile current) {
++    String? foundCumple;
++    String? foundDireccion;
++    final actividades = <String>[];
++    final proximos = <String>[];
++
++    final lines = text.split('\n');
++    for (final line in lines) {
++      final l = line.toLowerCase();
++
++      // Detección de cumpleaños
++      if (foundCumple == null && (l.contains('cumple') || l.contains('cumpleaños') || l.contains('nací el'))) {
++        foundCumple = line.replaceFirst(RegExp(r'^(Yo|Contacto):\s*', caseSensitive: false), '').trim();
++      }
++
++      // Detección de dirección / zona
++      if (foundDireccion == null && (l.contains('vivo en') || l.contains('mi dirección') || l.contains('me mudé a'))) {
++        foundDireccion = line.replaceFirst(RegExp(r'^(Yo|Contacto):\s*', caseSensitive: false), '').trim();
++      }
++
++      // Detección de próximos eventos / citas
++      if (l.contains('el lunes') ||
++          l.contains('el martes') ||
++          l.contains('el miércoles') ||
++          l.contains('el jueves') ||
++          l.contains('el viernes') ||
++          l.contains('el sábado') ||
++          l.contains('el domingo') ||
++          l.contains('mañana') ||
++          l.contains('la semana que viene') ||
++          l.contains('nos vemos')) {
++        final cleaned = line.replaceFirst(RegExp(r'^(Yo|Contacto):\s*', caseSensitive: false), '').trim();
++        if (cleaned.length > 8 && !proximos.contains(cleaned)) {
++          proximos.add(cleaned);
++        }
++      }
++    }
++
++    return ContactProfile(
++      cumpleanos: foundCumple,
++      direccion: foundDireccion,
++      ultimasActividades: actividades,
++      proximosEventos: proximos.take(5).toList(),
++    );
++  }
++}
 diff --git a/lib/utils/background_push.dart b/lib/utils/background_push.dart
 index 8c1d1cbc98e133643a25411a6abab69c5954c76d..0bef6ae88a8776e1d14f72818110c1ca3753f3b7 100644
 --- a/lib/utils/background_push.dart
@@ -354565,6 +355431,134 @@ index e706044dd886db3f2bf8ed554bd694fb845ebdcc..29e776ac692dfbc003634e091b3e5c6c
 +
 +  static int _floatToInt8(double x) {
 +    return (x * 255.0).round() & 0xff;
++  }
++}
+diff --git a/lib/utils/contact_notes_manager.dart b/lib/utils/contact_notes_manager.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c7a5b35c37c4bf26485b5582b6c73a93f77f97a
+--- /dev/null
++++ b/lib/utils/contact_notes_manager.dart
+@@ -0,0 +1,122 @@
++// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:convert';
++import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++import 'package:fluffychat/models/contact_profile.dart';
++import 'file_logger.dart';
++
++/// Gestor de persistencia y sincronización de perfiles y notas privadas en Matrix.
++/// Utiliza `m.room.account_data` bajo el tipo 'im.nheko.contact_notes' / 'com.fluffybeep.contact_profile'
++/// con soporte de fallback y caché local en SharedPreferences para carga instantánea y 0 consumo en background.
++class ContactNotesManager {
++  static const String accountDataType = 'im.nheko.contact_notes';
++  static const String localPrefPrefix = 'contact_profile_';
++
++  static SharedPreferences? _prefs;
++
++  static Future<void> _ensurePrefs() async {
++    _prefs ??= await SharedPreferences.getInstance();
++  }
++
++  /// Lee el perfil desde la caché local en memoria/disco (0 latencia, 0 tráfico de red).
++  static ContactProfile? getCachedProfile(String roomId) {
++    if (_prefs == null) return null;
++    final raw = _prefs!.getString('$localPrefPrefix$roomId');
++    if (raw == null || raw.isEmpty) return null;
++    try {
++      final map = jsonDecode(raw);
++      if (map is Map<String, dynamic>) {
++        return ContactProfile.fromJson(map);
++      }
++    } catch (e) {
++      FileLogger.log('[ContactNotesManager] Error parsing local cache: $e');
++    }
++    return null;
++  }
++
++  /// Carga el perfil: primero retorna caché si existe, y luego sincroniza bajo demanda
++  /// con el Homeserver Matrix de Beeper usando account_data.
++  static Future<ContactProfile> loadProfile(Client client, String roomId) async {
++    await _ensurePrefs();
++    final cached = getCachedProfile(roomId);
++
++    // Intentar leer de accountData en memoria del cliente Matrix si estuviera presente
++    try {
++      final room = client.getRoomById(roomId);
++      final rawAccountData = room?.accountData[accountDataType]?.content;
++      if (rawAccountData != null && rawAccountData.isNotEmpty) {
++        final profile = ContactProfile.fromJson(rawAccountData);
++        _saveToLocalCache(roomId, profile);
++        return profile;
++      }
++    } catch (_) {}
++
++    // Si tenemos datos en caché, devolverlos de inmediato
++    if (cached != null) {
++      return cached;
++    }
++
++    // Petición HTTP on-demand directa al endpoint Matrix si no estaba en caché:
++    // GET /_matrix/client/v3/user/{userId}/rooms/{roomId}/account_data/{type}
++    try {
++      final userId = client.userID;
++      if (userId != null) {
++        final encodedUserId = Uri.encodeComponent(userId);
++        final encodedRoomId = Uri.encodeComponent(roomId);
++        final encodedType = Uri.encodeComponent(accountDataType);
++
++        final response = await client.request(
++          RequestType.GET,
++          '/client/v3/user/$encodedUserId/rooms/$encodedRoomId/account_data/$encodedType',
++        );
++
++        if (response != null && response is Map<String, dynamic>) {
++          final profile = ContactProfile.fromJson(response);
++          _saveToLocalCache(roomId, profile);
++          return profile;
++        }
++      }
++    } catch (e) {
++      FileLogger.log('[ContactNotesManager] On-demand GET failed (no notes yet or offline): $e');
++    }
++
++    return const ContactProfile();
++  }
++
++  /// Guarda el perfil en SharedPreferences y lo sincroniza con Matrix Homeserver.
++  static Future<void> saveProfile(Client client, String roomId, ContactProfile profile) async {
++    await _ensurePrefs();
++
++    // 1. Guardar en almacenamiento local para acceso offline instantáneo
++    _saveToLocalCache(roomId, profile);
++
++    // 2. Guardar en Matrix Homeserver (m.room.account_data)
++    try {
++      final userId = client.userID;
++      if (userId == null) return;
++
++      final encodedUserId = Uri.encodeComponent(userId);
++      final encodedRoomId = Uri.encodeComponent(roomId);
++      final encodedType = Uri.encodeComponent(accountDataType);
++
++      await client.request(
++        RequestType.PUT,
++        '/client/v3/user/$encodedUserId/rooms/$encodedRoomId/account_data/$encodedType',
++        data: profile.toJson(),
++      );
++
++      FileLogger.log('[ContactNotesManager] Saved profile to account_data for room $roomId');
++    } catch (e) {
++      FileLogger.log('[ContactNotesManager] Failed to PUT account_data: $e');
++    }
++  }
++
++  static void _saveToLocalCache(String roomId, ContactProfile profile) {
++    if (_prefs == null) return;
++    final jsonString = jsonEncode(profile.toJson());
++    _prefs!.setString('$localPrefPrefix$roomId', jsonString);
 +  }
 +}
 diff --git a/lib/utils/custom_http_client.dart b/lib/utils/custom_http_client.dart
@@ -366543,10 +367537,10 @@ index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9
 +  }
 +}
 diff --git a/lib/widgets/chat_settings_popup_menu.dart b/lib/widgets/chat_settings_popup_menu.dart
-index 9352255979eace274d2797cb59c3bd917396cc1a..d9802d64e2a6243d3d5935eb2ef3d369ccf90401 100644
+index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde81e21dc6 100644
 --- a/lib/widgets/chat_settings_popup_menu.dart
 +++ b/lib/widgets/chat_settings_popup_menu.dart
-@@ -1,145 +1,209 @@
+@@ -1,145 +1,229 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -366706,10 +367700,12 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..d9802d64e2a6243d3d5935eb2ef3d369
 +import 'package:go_router/go_router.dart';
 +import 'package:matrix/matrix.dart';
 +
++import 'package:fluffychat/pages/chat_details/contact_profile_sheet.dart';
 +import 'matrix.dart';
 +
 +enum ChatPopupMenuActions {
 +  details,
++  profileNotes,
 +  mute,
 +  unmute,
 +  encryption,
@@ -366803,6 +367799,14 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..d9802d64e2a6243d3d5935eb2ef3d369
 +              case ChatPopupMenuActions.details:
 +                _showChatDetails();
 +                break;
++              case ChatPopupMenuActions.profileNotes:
++                showModalBottomSheet(
++                  context: context,
++                  isScrollControlled: true,
++                  backgroundColor: Colors.transparent,
++                  builder: (context) => ContactProfileSheet(room: widget.room),
++                );
++                break;
 +              case ChatPopupMenuActions.search:
 +                context.go('/rooms/${widget.room.id}/search');
 +                break;
@@ -366825,6 +367829,16 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..d9802d64e2a6243d3d5935eb2ef3d369
 +                  ],
 +                ),
 +              ),
++            PopupMenuItem<ChatPopupMenuActions>(
++              value: ChatPopupMenuActions.profileNotes,
++              child: const Row(
++                children: [
++                  Icon(Icons.badge_outlined, color: Colors.indigoAccent),
++                  SizedBox(width: 12),
++                  Text('Ficha y notas del contacto'),
++                ],
++              ),
++            ),
 +            if (widget.room.pushRuleState == PushRuleState.notify)
 +              PopupMenuItem<ChatPopupMenuActions>(
 +                value: ChatPopupMenuActions.mute,
