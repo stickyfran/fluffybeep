@@ -307558,7 +307558,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..a268734301bb20498a082b319259edba2e506ed2 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..fdc82d9d2e68dce03580953f5cd7bb890061f58b 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -307759,7 +307759,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..a268734301bb20498a082b319259edba
 +  Future<void> _playNextAudioInRoom() async {
 +    try {
 +      final room = widget.event.room;
-+      final timeline = room.getTimeline();
++      final timeline = await room.getTimeline();
 +      final allEvents = timeline.events;
 +      final currentTs = widget.event.originServerTs;
 +
