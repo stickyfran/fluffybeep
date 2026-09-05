@@ -323142,7 +323142,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4d6f89df4 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..8165bd10001ade11ddbfc03dc450209127d47be8 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -323182,7 +323182,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,268 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,273 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -323232,7 +323232,8 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
 +    final hasUnread = widget.room.isUnreadOrInvited ||
 +        widget.room.notificationCount > 0 ||
 +        widget.room.hasNewMessages ||
-+        widget.room.isUnread;
++        widget.room.isUnread ||
++        widget.room.markedUnread;
 +    if (hasUnread) {
 +      HapticFeedback.lightImpact();
 +      if (widget.isUnreadFilter) {
@@ -323245,6 +323246,10 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
 +        widget.room,
 +        publicReceipt: AppSettings.sendPublicReadReceipts.value,
 +      );
++      // Force flush the roomReadChangeNotifier in case the cache invalidation
++      // was suppressed (e.g. chatCoveringList = true in single-column mode).
++      BeeperBridgeUtils.roomReadChangeNotifier.value = null;
++      BeeperBridgeUtils.roomReadChangeNotifier.value = widget.room.id;
 +      if (mounted) {
 +        setState(() => _isMarkingRead = false);
 +      }
@@ -323575,7 +323580,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +319,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +324,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -323584,7 +323589,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +330,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +335,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -323593,7 +323598,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +341,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +346,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -323632,7 +323637,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +358,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +363,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -323655,7 +323660,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +386,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +391,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -323664,7 +323669,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +404,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +409,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -323678,7 +323683,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +417,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +422,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -323704,7 +323709,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..07d6aa86bf420cc034fefaf28cf8a0b4
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,70 +431,179 @@ class ChatListItem extends StatelessWidget {
+@@ -336,70 +436,179 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -350486,10 +350491,10 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +}
 diff --git a/lib/utils/ai_profile_service.dart b/lib/utils/ai_profile_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..088c34df4335e9d354392931a341ab3ab4e3ad93
+index 0000000000000000000000000000000000000000..0c0320c04ab59fdcadd73ab6cabb9b8dbd047bfd
 --- /dev/null
 +++ b/lib/utils/ai_profile_service.dart
-@@ -0,0 +1,226 @@
+@@ -0,0 +1,234 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -350512,12 +350517,20 @@ index 0000000000000000000000000000000000000000..088c34df4335e9d354392931a341ab3a
 +  static const String prefAiModelKey = 'ai_profile_model';
 +
 +  /// Extrae el texto limpio de los últimos eventos del chat para usarlos de contexto.
-+  static String extractChatContext(Room room, {int maxMessages = 50}) {
++  static Future<String> extractChatContext(Room room,
++      {int maxMessages = 50}) async {
 +    final buffer = StringBuffer();
-+    final timelineEvents = room.timeline.events.toList();
 +    final client = room.client;
 +    final myUserId = client.userID;
 +
++    Timeline? timeline;
++    try {
++      timeline = await room.getTimeline();
++    } catch (_) {
++      return '';
++    }
++
++    final timelineEvents = timeline.events.toList();
 +    int count = 0;
 +    for (final event in timelineEvents.reversed) {
 +      if (count >= maxMessages) break;
@@ -350525,7 +350538,7 @@ index 0000000000000000000000000000000000000000..088c34df4335e9d354392931a341ab3a
 +          event.content['msgtype'] == MessageTypes.Text) {
 +        final body = event.content['body']?.toString().trim() ?? '';
 +        if (body.isEmpty) continue;
-+        
++
 +        final sender = (event.senderId == myUserId) ? 'Yo' : 'Contacto';
 +        buffer.writeln('$sender: $body');
 +        count++;
@@ -350540,7 +350553,7 @@ index 0000000000000000000000000000000000000000..088c34df4335e9d354392931a341ab3a
 +    required Room room,
 +    required ContactProfile currentProfile,
 +  }) async {
-+    final chatText = extractChatContext(room);
++    final chatText = await extractChatContext(room);
 +    if (chatText.trim().isEmpty) {
 +      FileLogger.log('[AiProfileService] Chat context is empty. Nothing to analyze.');
 +      return currentProfile;
@@ -355457,7 +355470,7 @@ index e706044dd886db3f2bf8ed554bd694fb845ebdcc..29e776ac692dfbc003634e091b3e5c6c
 +}
 diff --git a/lib/utils/contact_notes_manager.dart b/lib/utils/contact_notes_manager.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..1c7a5b35c37c4bf26485b5582b6c73a93f77f97a
+index 0000000000000000000000000000000000000000..9192e1e3367a521f53fd0e6e35c9a17c3d1b2398
 --- /dev/null
 +++ b/lib/utils/contact_notes_manager.dart
 @@ -0,0 +1,122 @@
@@ -355509,7 +355522,7 @@ index 0000000000000000000000000000000000000000..1c7a5b35c37c4bf26485b5582b6c73a9
 +    // Intentar leer de accountData en memoria del cliente Matrix si estuviera presente
 +    try {
 +      final room = client.getRoomById(roomId);
-+      final rawAccountData = room?.accountData[accountDataType]?.content;
++      final rawAccountData = room?.roomAccountData[accountDataType]?.content;
 +      if (rawAccountData != null && rawAccountData.isNotEmpty) {
 +        final profile = ContactProfile.fromJson(rawAccountData);
 +        _saveToLocalCache(roomId, profile);
