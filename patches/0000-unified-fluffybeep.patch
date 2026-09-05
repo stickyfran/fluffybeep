@@ -307355,7 +307355,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e079f3c760 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..5bde9feec000cebf9ef231ef25bd0c6e0d6cb1f3 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,14 +7,18 @@ import 'dart:async';
@@ -307385,7 +307385,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -53,9 +58,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -53,12 +58,21 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
    double? _downloadProgress;
  
@@ -307399,10 +307399,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
 +  
 +  AudioPlayer? _cachedAudioPlayer;
 +  Stream<Object>? _mergedStream;
++  StreamSubscription<PlayerState>? _playerCompleteSub;
  
    @override
    void dispose() {
-@@ -70,7 +82,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
++    _playerCompleteSub?.cancel();
+     super.dispose();
+     final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
+         ? null
+@@ -70,7 +84,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              MaterialBanner(
                padding: EdgeInsets.zero,
                leading: StreamBuilder(
@@ -307411,7 +307416,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
                  builder: (context, _) => IconButton(
                    onPressed: () {
                      if (audioPlayer.isAtEndPosition) {
-@@ -87,7 +99,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -87,7 +101,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                  ),
                ),
                content: StreamBuilder(
@@ -307420,7 +307425,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
                  builder: (context, _) => GestureDetector(
                    onTap: () => FluffyChatApp.router.go(
                      '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -179,7 +191,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -179,7 +193,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
          await file.writeAsBytes(matrixFile.bytes);
  
          if (Platform.isIOS &&
@@ -307431,7 +307436,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -204,6 +218,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -204,6 +220,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
  
      final audioPlayer = matrix.audioPlayer = AudioPlayer();
@@ -307451,7 +307456,85 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
  
      if (file != null) {
        audioPlayer.setFilePath(file.path);
-@@ -246,12 +273,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -216,11 +245,77 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+     }
+     if (!mounted) return;
+ 
++    _listenForCompletion(audioPlayer);
+     audioPlayer.play().onError(
+       ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
+     );
+   }
+ 
++  Future<void> _toggleOutput() async {
++    final current = AppSettings.audioPlaybackOutput.value;
++    final next = current == 'earpiece' ? 'speaker' : 'earpiece';
++    await AppSettings.audioPlaybackOutput.setItem(next);
++    if (PlatformInfos.isMobile) {
++      try {
++        final session = await AudioSession.instance;
++        await session.configure(
++          next == 'earpiece'
++              ? const AudioSessionConfiguration.speech()
++              : const AudioSessionConfiguration.music(),
++        );
++      } catch (e) {
++        Logs().w('Failed to switch audio session output', e);
++      }
++    }
++    if (mounted) setState(() {});
++  }
++
++  void _listenForCompletion(AudioPlayer player) {
++    _playerCompleteSub?.cancel();
++    _playerCompleteSub = player.playerStateStream.listen((state) {
++      if (state.processingState == ProcessingState.completed) {
++        if (matrix.continuousAudioPlaybackNotifier.value) {
++          _playNextAudioInRoom();
++        }
++      }
++    });
++  }
++
++  Future<void> _playNextAudioInRoom() async {
++    try {
++      final room = widget.event.room;
++      final timeline = room.getTimeline();
++      final allEvents = timeline.events;
++      final currentTs = widget.event.originServerTs;
++
++      // Find all audio events in room timeline sorted chronologically
++      final audioEvents = allEvents.where((e) {
++        if (e.messageType == MessageTypes.Audio) return true;
++        if (e.messageType == MessageTypes.File) {
++          final body = e.body.toLowerCase();
++          return body.endsWith('.ogg') || body.endsWith('.opus') || body.endsWith('.mp3') || body.endsWith('.m4a') || body.endsWith('.wav');
++        }
++        return false;
++      }).toList()
++        ..sort((a, b) => a.originServerTs.compareTo(b.originServerTs));
++
++      // Find the first audio event strictly after currentTs
++      Event? nextAudio;
++      for (final e in audioEvents) {
++        if (e.originServerTs.isAfter(currentTs) && e.eventId != widget.event.eventId) {
++          nextAudio = e;
++          break;
++        }
++      }
++
++      if (nextAudio != null && mounted) {
++        matrix.voiceMessageEventId.value = nextAudio.eventId;
++      }
++    } catch (e, s) {
++      Logs().e('Failed to auto-play next audio', e, s);
++    }
++  }
++
+   Future<void> _toggleSpeed() async {
+     final audioPlayer = matrix.audioPlayer;
+     if (audioPlayer == null) return;
+@@ -246,12 +341,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -307467,7 +307550,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +294,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +362,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -307542,7 +307625,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +391,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +459,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -307566,7 +307649,121 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -511,6 +604,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +610,94 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+                               color: widget.color,
+                             ),
+                           ),
+-                          secondChild: Material(
+-                            color: widget.color.withAlpha(64),
+-                            borderRadius: BorderRadius.circular(
+-                              AppConfig.borderRadius,
+-                            ),
+-                            child: InkWell(
+-                              borderRadius: BorderRadius.circular(
+-                                AppConfig.borderRadius,
++                          secondChild: Row(
++                            mainAxisSize: MainAxisSize.min,
++                            children: [
++                              Material(
++                                color: widget.color.withAlpha(64),
++                                borderRadius: BorderRadius.circular(
++                                  AppConfig.borderRadius,
++                                ),
++                                child: InkWell(
++                                  borderRadius: BorderRadius.circular(
++                                    AppConfig.borderRadius,
++                                  ),
++                                  onTap: _toggleSpeed,
++                                  child: SizedBox(
++                                    width: 32,
++                                    height: 20,
++                                    child: Center(
++                                      child: Text(
++                                        '${audioPlayer?.speed}x',
++                                        style: TextStyle(
++                                          color: widget.color,
++                                          fontSize: 9,
++                                        ),
++                                      ),
++                                    ),
++                                  ),
++                                ),
+                               ),
+-                              onTap: _toggleSpeed,
+-                              child: SizedBox(
+-                                width: 32,
+-                                height: 20,
+-                                child: Center(
+-                                  child: Text(
+-                                    '${audioPlayer?.speed}x',
+-                                    style: TextStyle(
+-                                      color: widget.color,
+-                                      fontSize: 9,
++                              const SizedBox(width: 4),
++                              Material(
++                                color: widget.color.withAlpha(64),
++                                borderRadius: BorderRadius.circular(
++                                  AppConfig.borderRadius,
++                                ),
++                                child: InkWell(
++                                  borderRadius: BorderRadius.circular(
++                                    AppConfig.borderRadius,
++                                  ),
++                                  onTap: _toggleOutput,
++                                  child: SizedBox(
++                                    width: 24,
++                                    height: 20,
++                                    child: Center(
++                                      child: Icon(
++                                        AppSettings.audioPlaybackOutput.value == 'earpiece'
++                                            ? Icons.phone_in_talk_outlined
++                                            : Icons.volume_up_outlined,
++                                        size: 14,
++                                        color: widget.color,
++                                      ),
+                                     ),
+                                   ),
+                                 ),
+                               ),
+-                            ),
++                              const SizedBox(width: 4),
++                              ValueListenableBuilder<bool>(
++                                valueListenable: matrix.continuousAudioPlaybackNotifier,
++                                builder: (context, continuous, _) {
++                                  return Material(
++                                    color: continuous
++                                        ? widget.color.withAlpha(128)
++                                        : widget.color.withAlpha(64),
++                                    borderRadius: BorderRadius.circular(
++                                      AppConfig.borderRadius,
++                                    ),
++                                    child: InkWell(
++                                      borderRadius: BorderRadius.circular(
++                                        AppConfig.borderRadius,
++                                      ),
++                                      onTap: () {
++                                        matrix.continuousAudioPlaybackNotifier.value = !continuous;
++                                      },
++                                      child: SizedBox(
++                                        width: 24,
++                                        height: 20,
++                                        child: Center(
++                                          child: Icon(
++                                            Icons.playlist_play_rounded,
++                                            size: 16,
++                                            color: continuous ? Colors.white : widget.color,
++                                          ),
++                                        ),
++                                      ),
++                                    ),
++                                  );
++                                },
++                              ),
++                            ],
+                           ),
+                           alignment: Alignment.center,
+                           crossFadeState: audioPlayer == null
+@@ -511,6 +736,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -307574,7 +307771,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..4b8dea4b665e98dad4ce88b7debf54e0
                  ],
                ),
              );
-@@ -519,6 +613,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +745,157 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -318291,10 +318488,10 @@ index f4142a63d007ebeea05cd3becdfe694af8efc1a1..195386cc06f642c4c26fe3c480211a22
 +}
 diff --git a/lib/pages/chat_details/chat_details_media_tabs.dart b/lib/pages/chat_details/chat_details_media_tabs.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722efd35b48
+index 0000000000000000000000000000000000000000..659d2009c4d0bbd0c0dee473565fc34e0c18f7a9
 --- /dev/null
 +++ b/lib/pages/chat_details/chat_details_media_tabs.dart
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,345 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_files_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_images_tab.dart';
@@ -318315,11 +318512,17 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +class _ChatDetailsMediaTabsState extends State<ChatDetailsMediaTabs> with SingleTickerProviderStateMixin {
 +  late TabController _tabController;
 +
-+  final List<Event> _mediaEvents = [];
-+  String? _mediaNextBatch;
-+  bool _mediaLoading = false;
-+  bool _mediaEndReached = false;
-+  DateTime? _mediaSearchedUntil;
++  final List<Event> _imagesEvents = [];
++  String? _imagesNextBatch;
++  bool _imagesLoading = false;
++  bool _imagesEndReached = false;
++  DateTime? _imagesSearchedUntil;
++
++  final List<Event> _videosEvents = [];
++  String? _videosNextBatch;
++  bool _videosLoading = false;
++  bool _videosEndReached = false;
++  DateTime? _videosSearchedUntil;
 +
 +  final List<Event> _filesEvents = [];
 +  String? _filesNextBatch;
@@ -318342,9 +318545,9 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  @override
 +  void initState() {
 +    super.initState();
-+    _tabController = TabController(length: 4, vsync: this);
++    _tabController = TabController(length: 5, vsync: this);
 +    _tabController.addListener(_onTabChanged);
-+    _loadMedia();
++    _loadImages();
 +  }
 +
 +  @override
@@ -318354,35 +318557,58 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +
 +  void _onTabChanged() {
-+    if (_tabController.index == 0 && _mediaEvents.isEmpty && !_mediaLoading && !_mediaEndReached) {
-+      _loadMedia();
-+    } else if (_tabController.index == 1 && _filesEvents.isEmpty && !_filesLoading && !_filesEndReached) {
++    if (_tabController.index == 0 && _imagesEvents.isEmpty && !_imagesLoading && !_imagesEndReached) {
++      _loadImages();
++    } else if (_tabController.index == 1 && _videosEvents.isEmpty && !_videosLoading && !_videosEndReached) {
++      _loadVideos();
++    } else if (_tabController.index == 2 && _filesEvents.isEmpty && !_filesLoading && !_filesEndReached) {
 +      _loadFiles();
-+    } else if (_tabController.index == 2 && _audiosEvents.isEmpty && !_audiosLoading && !_audiosEndReached) {
++    } else if (_tabController.index == 3 && _audiosEvents.isEmpty && !_audiosLoading && !_audiosEndReached) {
 +      _loadAudios();
-+    } else if (_tabController.index == 3 && _linksEvents.isEmpty && !_linksLoading && !_linksEndReached) {
++    } else if (_tabController.index == 4 && _linksEvents.isEmpty && !_linksLoading && !_linksEndReached) {
 +      _loadLinks();
 +    }
 +  }
 +
-+  Future<void> _loadMedia() async {
-+    if (_mediaLoading || _mediaEndReached) return;
-+    setState(() => _mediaLoading = true);
++  Future<void> _loadImages() async {
++    if (_imagesLoading || _imagesEndReached) return;
++    setState(() => _imagesLoading = true);
 +    try {
 +      final res = await widget.room.searchEvents(
-+        searchFunc: (e) => {MessageTypes.Image, MessageTypes.Video}.contains(e.messageType),
-+        nextBatch: _mediaNextBatch,
++        searchFunc: (e) => e.messageType == MessageTypes.Image,
++        nextBatch: _imagesNextBatch,
 +      );
 +      if (mounted) {
 +        setState(() {
-+          _mediaEvents.addAll(res.events);
-+          _mediaNextBatch = res.nextBatch;
-+          _mediaEndReached = res.nextBatch == null || res.events.isEmpty;
-+          _mediaSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
++          _imagesEvents.addAll(res.events);
++          _imagesNextBatch = res.nextBatch;
++          _imagesEndReached = res.nextBatch == null || res.events.isEmpty;
++          _imagesSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
 +        });
 +      }
 +    } finally {
-+      if (mounted) setState(() => _mediaLoading = false);
++      if (mounted) setState(() => _imagesLoading = false);
++    }
++  }
++
++  Future<void> _loadVideos() async {
++    if (_videosLoading || _videosEndReached) return;
++    setState(() => _videosLoading = true);
++    try {
++      final res = await widget.room.searchEvents(
++        searchFunc: (e) => e.messageType == MessageTypes.Video,
++        nextBatch: _videosNextBatch,
++      );
++      if (mounted) {
++        setState(() {
++          _videosEvents.addAll(res.events);
++          _videosNextBatch = res.nextBatch;
++          _videosEndReached = res.nextBatch == null || res.events.isEmpty;
++          _videosSearchedUntil = res.searchedUntil ?? (res.events.isNotEmpty ? res.events.last.originServerTs : null);
++        });
++      }
++    } finally {
++      if (mounted) setState(() => _videosLoading = false);
 +    }
 +  }
 +
@@ -318484,24 +318710,35 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +          isScrollable: true,
 +          tabAlignment: TabAlignment.start,
 +          tabs: [
-+            Tab(text: L10n.of(context).gallery),
++            const Tab(text: 'Imágenes'),
++            const Tab(text: 'Videos'),
 +            Tab(text: L10n.of(context).files),
 +            const Tab(text: 'Audios'),
 +            const Tab(text: 'Links'),
 +          ],
 +        ),
 +        SizedBox(
-+          height: 400, // Fixed height for nested tabs since we can't easily expand inside ListView.builder
++          height: 620, // Expanded height to comfortably display at least 5 rows of gallery items
 +          child: TabBarView(
 +            controller: _tabController,
 +            children: [
 +              ChatSearchImagesTab(
 +                room: widget.room,
-+                events: _mediaEvents,
-+                onStartSearch: _loadMedia,
-+                endReached: _mediaEndReached,
-+                isLoading: _mediaLoading,
-+                searchedUntil: _mediaSearchedUntil,
++                events: _imagesEvents,
++                onStartSearch: _loadImages,
++                endReached: _imagesEndReached,
++                isLoading: _imagesLoading,
++                searchedUntil: _imagesSearchedUntil,
++                filterMessageType: MessageTypes.Image,
++              ),
++              ChatSearchImagesTab(
++                room: widget.room,
++                events: _videosEvents,
++                onStartSearch: _loadVideos,
++                endReached: _videosEndReached,
++                isLoading: _videosLoading,
++                searchedUntil: _videosSearchedUntil,
++                filterMessageType: MessageTypes.Video,
 +              ),
 +              ChatSearchFilesTab(
 +                room: widget.room,
@@ -318601,7 +318838,7 @@ index 0000000000000000000000000000000000000000..f0ec32cf6825627b3da9d0245b194722
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..a7e2b09456cd1676289ededc23add4b692c5ed0f 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..b9592b7eab4edf4b47679414a520a15aa7e83781 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -3,36 +3,66 @@
@@ -319120,14 +319357,14 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..a7e2b09456cd1676289ededc23add4b6
 +                        ),
 +                        const SizedBox(height: 16),
 +                      ],
-+                      // 1. Ficha y notas del contacto (INLINE, no dentro de un botón)
-+                      ContactProfileInlineCard(room: room),
-+                      const SizedBox(height: 8),
-+                      // 2. Galería, Archivos, Audios y Links
++                      // 1. Galería, Archivos, Audios y Links (debajo de la descripción)
 +                      Padding(
 +                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
 +                        child: ChatDetailsMediaTabs(room: room),
 +                      ),
++                      const SizedBox(height: 8),
++                      // 2. Ficha y notas del contacto (INLINE, no dentro de un botón)
++                      ContactProfileInlineCard(room: room),
 +                      const SizedBox(height: 8),
 +                      if (!room.isDirectChat) ...[
                          Divider(color: theme.dividerColor),
@@ -329102,10 +329339,10 @@ index e0bc810205205d770e34c1eb9ddc3fcf93ac35ff..a8837011131554881655ee9df338d106
 +  }
 +}
 diff --git a/lib/pages/chat_search/chat_search_images_tab.dart b/lib/pages/chat_search/chat_search_images_tab.dart
-index ff8ed41ea406dd9d17c184c7bf09ea933afe3e58..8a53bfd96a0ffce733aab51d87d988b057c94d91 100644
+index ff8ed41ea406dd9d17c184c7bf09ea933afe3e58..206d539365a2f5bbd9d04413cb02f698ef351021 100644
 --- a/lib/pages/chat_search/chat_search_images_tab.dart
 +++ b/lib/pages/chat_search/chat_search_images_tab.dart
-@@ -1,129 +1,133 @@
+@@ -1,129 +1,139 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -329255,6 +329492,7 @@ index ff8ed41ea406dd9d17c184c7bf09ea933afe3e58..8a53bfd96a0ffce733aab51d87d988b0
 +  final void Function() onStartSearch;
 +  final bool endReached, isLoading;
 +  final DateTime? searchedUntil;
++  final String? filterMessageType;
 +
 +  const ChatSearchImagesTab({
 +    required this.room,
@@ -329264,6 +329502,7 @@ index ff8ed41ea406dd9d17c184c7bf09ea933afe3e58..8a53bfd96a0ffce733aab51d87d988b0
 +    required this.isLoading,
 +    super.key,
 +    required this.searchedUntil,
++    this.filterMessageType,
 +  });
 +
 +  @override
@@ -329271,8 +329510,12 @@ index ff8ed41ea406dd9d17c184c7bf09ea933afe3e58..8a53bfd96a0ffce733aab51d87d988b0
 +    final borderRadius = BorderRadius.circular(AppConfig.borderRadius / 2);
 +    final theme = Theme.of(context);
 +
++    final filteredEvents = filterMessageType == null
++        ? events
++        : events.where((e) => e.messageType == filterMessageType).toList();
++
 +    final eventsByMonth = <DateTime, List<Event>>{};
-+    for (final event in events) {
++    for (final event in filteredEvents) {
 +      final month = DateTime(
 +        event.originServerTs.year,
 +        event.originServerTs.month,
@@ -371196,10 +371439,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..374e13fc0be9c9a00e64dde6f1a38f6d47fc0d7d 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..2d4f5fdbdb03920ca610b294033ef4ee060ae1d8 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,486 @@
+@@ -1,443 +1,488 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -371807,6 +372050,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..374e13fc0be9c9a00e64dde6f1a38f6d
 +
 +  AudioPlayer? audioPlayer;
 +  final ValueNotifier<String?> voiceMessageEventId = ValueNotifier(null);
++  final ValueNotifier<bool> continuousAudioPlaybackNotifier = ValueNotifier(true);
 +
 +  Future<Client> getLoginClient() async {
 +    if (widget.clients.isNotEmpty && !client.isLogged()) {
@@ -372089,6 +372333,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..374e13fc0be9c9a00e64dde6f1a38f6d
 +    onUiaRequest.clear();
 +
 +    voiceMessageEventId.dispose();
++    continuousAudioPlaybackNotifier.dispose();
 +
 +    super.dispose();
 +  }
