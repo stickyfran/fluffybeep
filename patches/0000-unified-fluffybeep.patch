@@ -351789,7 +351789,7 @@ index 398e13b5cc95c6d1b51c475137fd72c5f3becff2..6f30258b7e5bcd6adfd94d5279816cba
 +}
 diff --git a/lib/utils/ai_profile_service.dart b/lib/utils/ai_profile_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4799c8ce89d14ca7faa46981db853bb09d8baff9
+index 0000000000000000000000000000000000000000..1aaaee3532b22ac5ac7434e9a40d8defba81c6fb
 --- /dev/null
 +++ b/lib/utils/ai_profile_service.dart
 @@ -0,0 +1,461 @@
@@ -351967,15 +351967,15 @@ index 0000000000000000000000000000000000000000..4799c8ce89d14ca7faa46981db853bb0
 +    if (cached != null && cached.trim().isNotEmpty && !cached.startsWith('@')) {
 +      return cached.trim();
 +    }
-+    final calc = room.calcDisplayname().trim();
-+    if (calc.isNotEmpty && !calc.startsWith('@') && !calc.startsWith('!')) {
-+      return calc;
++    final beeperData = BeeperBridgeUtils.getRoomData(room);
++    if (beeperData.displayName != null &&
++        beeperData.displayName!.trim().isNotEmpty &&
++        !beeperData.displayName!.startsWith('@')) {
++      return beeperData.displayName!.trim();
 +    }
-+    if (room.isDirectChat && room.directChatMatrixID != null) {
-+      final user = room.getUser(room.directChatMatrixID!);
-+      if (user != null && user.calcDisplayname().isNotEmpty) {
-+        return user.calcDisplayname();
-+      }
++    final localized = room.getLocalizedDisplayname().trim();
++    if (localized.isNotEmpty && !localized.startsWith('@') && !localized.startsWith('!')) {
++      return localized;
 +    }
 +    return '';
 +  }
