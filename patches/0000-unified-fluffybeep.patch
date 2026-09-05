@@ -315656,7 +315656,7 @@ index bcdfdb72eeacc822636ec54067a82b447adb0934..e4747e0068964d728ac3259387ce63fc
 +  }
 +}
 diff --git a/lib/pages/chat/sticker_picker_dialog.dart b/lib/pages/chat/sticker_picker_dialog.dart
-index 9943dac0602792336e1a8e1e25af2215d51c5c23..f70637a11dd0a462c909e62e1d8bc2c03e503c4d 100644
+index 9943dac0602792336e1a8e1e25af2215d51c5c23..27dd2142bf13fec93012c338efb310e51494c0e2 100644
 --- a/lib/pages/chat/sticker_picker_dialog.dart
 +++ b/lib/pages/chat/sticker_picker_dialog.dart
 @@ -27,8 +27,6 @@ class StickerPickerDialog extends StatefulWidget {
@@ -315668,8 +315668,12 @@ index 9943dac0602792336e1a8e1e25af2215d51c5c23..f70637a11dd0a462c909e62e1d8bc2c0
    @override
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
-@@ -40,98 +38,66 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
-       color: theme.colorScheme.onInverseSurface,
+@@ -37,101 +35,73 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+     final packSlugs = stickerPacks.keys.toList();
+ 
+     return Material(
+-      color: theme.colorScheme.onInverseSurface,
++      color: Colors.transparent,
        child: SafeArea(
          top: false,
 -        child: CustomScrollView(
@@ -315740,11 +315744,9 @@ index 9943dac0602792336e1a8e1e25af2215d51c5c23..f70637a11dd0a462c909e62e1d8bc2c0
                )
 -            else
 -              SliverList.builder(
-+            : ListView.builder(
-+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                 itemCount: packSlugs.length,
-                 itemBuilder: (BuildContext context, int packIndex) {
-                   final pack = stickerPacks[packSlugs[packIndex]]!;
+-                itemCount: packSlugs.length,
+-                itemBuilder: (BuildContext context, int packIndex) {
+-                  final pack = stickerPacks[packSlugs[packIndex]]!;
 -                  final filteredImagePackImageEntried = pack.images.entries
 -                      .toList();
 -                  if (searchFilter?.isNotEmpty ?? false) {
@@ -315762,56 +315764,75 @@ index 9943dac0602792336e1a8e1e25af2215d51c5c23..f70637a11dd0a462c909e62e1d8bc2c0
 -                  final imageKeys = filteredImagePackImageEntried
 -                      .map((e) => e.key)
 -                      .toList();
-+                  final imageKeys = pack.images.keys.toList();
-                   if (imageKeys.isEmpty) {
-                     return const SizedBox.shrink();
-                   }
-                   final packName =
-                       pack.pack.displayName ?? packSlugs[packIndex];
-                   return Column(
-+                    crossAxisAlignment: CrossAxisAlignment.start,
-                     children: <Widget>[
+-                  if (imageKeys.isEmpty) {
+-                    return const SizedBox.shrink();
+-                  }
+-                  final packName =
+-                      pack.pack.displayName ?? packSlugs[packIndex];
+-                  return Column(
+-                    children: <Widget>[
 -                      if (packIndex != 0) const SizedBox(height: 20),
-+                      if (packIndex != 0) const SizedBox(height: 16),
-                       if (packName != 'user')
+-                      if (packName != 'user')
 -                        ListTile(
 -                          leading: Avatar(
 -                            mxContent: pack.pack.avatarUrl,
 -                            name: packName,
 -                            client: widget.room.client,
-+                        Padding(
-+                          padding: const EdgeInsets.symmetric(vertical: 4),
-+                          child: Row(
-+                            children: [
-+                              Avatar(
-+                                mxContent: pack.pack.avatarUrl,
-+                                name: packName,
-+                                client: widget.room.client,
-+                                size: 24,
-+                              ),
-+                              const SizedBox(width: 8),
-+                              Expanded(
-+                                child: Text(
-+                                  packName,
-+                                  style: theme.textTheme.titleSmall?.copyWith(
-+                                    fontWeight: FontWeight.bold,
-+                                  ),
-+                                  maxLines: 1,
-+                                  overflow: TextOverflow.ellipsis,
++            : MediaQuery.removePadding(
++                context: context,
++                removeTop: true,
++                child: ListView.builder(
++                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
++                  itemCount: packSlugs.length,
++                  itemBuilder: (BuildContext context, int packIndex) {
++                    final pack = stickerPacks[packSlugs[packIndex]]!;
++                    final imageKeys = pack.images.keys.toList();
++                    if (imageKeys.isEmpty) {
++                      return const SizedBox.shrink();
++                    }
++                    final packName =
++                        pack.pack.displayName ?? packSlugs[packIndex];
++                    final showHeader = packName != 'user';
++                    return Column(
++                      crossAxisAlignment: CrossAxisAlignment.start,
++                      children: <Widget>[
++                        if (packIndex != 0) const SizedBox(height: 12),
++                        if (showHeader)
++                          Padding(
++                            padding: const EdgeInsets.symmetric(vertical: 4),
++                            child: Row(
++                              children: [
++                                Avatar(
++                                  mxContent: pack.pack.avatarUrl,
++                                  name: packName,
++                                  client: widget.room.client,
++                                  size: 24,
 +                                ),
-+                              ),
-+                            ],
++                                const SizedBox(width: 8),
++                                Expanded(
++                                  child: Text(
++                                    packName,
++                                    style: theme.textTheme.titleSmall?.copyWith(
++                                      fontWeight: FontWeight.bold,
++                                    ),
++                                    maxLines: 1,
++                                    overflow: TextOverflow.ellipsis,
++                                  ),
++                                ),
++                              ],
++                            ),
                            ),
 -                          title: Text(packName),
-                         ),
+-                        ),
 -                      const SizedBox(height: 6),
-+                      const SizedBox(height: 4),
-                       GridView.builder(
+-                      GridView.builder(
 -                        padding: EdgeInsets.zero,
++                        if (showHeader) const SizedBox(height: 4),
++                        GridView.builder(
                          itemCount: imageKeys.length,
                          gridDelegate:
                              const SliverGridDelegateWithMaxCrossAxisExtent(
-@@ -166,7 +132,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+@@ -166,7 +136,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
                                    width: 128,
                                    height: 128,
                                    animated: true,
@@ -315820,12 +315841,13 @@ index 9943dac0602792336e1a8e1e25af2215d51c5c23..f70637a11dd0a462c909e62e1d8bc2c0
                                  ),
                                ),
                              ),
-@@ -177,8 +143,6 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
+@@ -177,8 +147,7 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
                    );
                  },
                ),
 -          ],
 -        ),
++            ),
        ),
      );
    }
