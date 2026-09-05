@@ -14281,10 +14281,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d49e83474 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..9e60ccdcd5212500143cc1ae91c5c11ccb843fb7 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,420 @@
+@@ -1,31 +1,438 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14322,6 +14322,7 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d
 +import io.flutter.embedding.engine.FlutterEngine
 +import io.flutter.plugin.common.MethodChannel
 +
++import android.app.Activity
 +import android.content.Context
 +import android.content.Intent
 +import android.net.Uri
@@ -14347,6 +14348,14 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d
 +    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
 +        setupMethodChannel(flutterEngine, this)
 +        AudioRouteManager.setup(flutterEngine, this)
++        AudioRouteManager.currentActivity = this
++    }
++
++    override fun onDestroy() {
++        if (AudioRouteManager.currentActivity == this) {
++            AudioRouteManager.currentActivity = null
++        }
++        super.onDestroy()
 +    }
 +
 +    companion object {
@@ -14553,12 +14562,16 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d
 +    private var proximitySensor: Sensor? = null
 +    private var proximityWakeLock: PowerManager.WakeLock? = null
 +
++    var currentActivity: Activity? = null
 +    private var currentMode: String = "auto" // auto, speaker, earpiece
 +    private var isSessionActive: Boolean = false
 +    private var isNearEar: Boolean = false
 +
 +    fun setup(flutterEngine: FlutterEngine, context: Context) {
 +        appContext = context.applicationContext
++        if (context is Activity) {
++            currentActivity = context
++        }
 +        audioManager = appContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 +        sensorManager = appContext?.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
 +        proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
@@ -14626,6 +14639,7 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d
 +            @Suppress("DEPRECATION")
 +            am.isSpeakerphoneOn = false
 +            am.mode = AudioManager.MODE_NORMAL
++            currentActivity?.volumeControlStream = AudioManager.USE_DEFAULT_STREAM_TYPE
 +        } catch (_: Exception) {}
 +    }
 +
@@ -14643,11 +14657,15 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..dc7fdd75e2730a938df985489cbbc28d
 +
 +            if (shouldRouteToEarpiece) {
 +                routeToEarpiece(am)
++                // En modo auricular, el volumen físico del dispositivo debe regular el canal de llamada (VOICE_CALL)
++                currentActivity?.volumeControlStream = AudioManager.STREAM_VOICE_CALL
 +                if (currentMode == "auto" || currentMode == "earpiece") {
 +                    acquireWakeLock()
 +                }
 +            } else {
 +                routeToSpeaker(am)
++                // En modo altavoz, regular el volumen de música/multimedia
++                currentActivity?.volumeControlStream = AudioManager.STREAM_MUSIC
 +                if (currentMode == "auto") {
 +                    releaseWakeLock()
 +                }
@@ -307569,7 +307587,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089c7e99483 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..678fd94794a7675c9afdd1bc940f0aee163517fc 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -307659,7 +307677,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -203,8 +221,23 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -203,8 +221,32 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      if (!context.mounted) return;
      if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
  
@@ -307680,10 +307698,19 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
 +      await AudioRouterService.instance.startSession(outputMode);
 +    }
 +
++    if (Platform.isAndroid && outputMode == 'earpiece') {
++      await audioPlayer.setAndroidAudioAttributes(
++        const AndroidAudioAttributes(
++          contentType: AndroidAudioContentType.speech,
++          usage: AndroidAudioUsage.voiceCommunication,
++        ),
++      );
++    }
++
      if (file != null) {
        audioPlayer.setFilePath(file.path);
      } else {
-@@ -216,11 +249,121 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -216,11 +258,134 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      }
      if (!mounted) return;
  
@@ -307745,6 +307772,19 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
 +        Logs().w('Failed to switch audio session output', e);
 +      }
 +      await AudioRouterService.instance.setOutputMode(next);
++      if (Platform.isAndroid && matrix.audioPlayer != null) {
++        await matrix.audioPlayer!.setAndroidAudioAttributes(
++          next == 'earpiece'
++              ? const AndroidAudioAttributes(
++                  contentType: AndroidAudioContentType.speech,
++                  usage: AndroidAudioUsage.voiceCommunication,
++                )
++              : const AndroidAudioAttributes(
++                  contentType: AndroidAudioContentType.music,
++                  usage: AndroidAudioUsage.media,
++                ),
++        );
++      }
 +    }
 +    if (mounted) setState(() {});
 +  }
@@ -307805,7 +307845,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
    Future<void> _toggleSpeed() async {
      final audioPlayer = matrix.audioPlayer;
      if (audioPlayer == null) return;
-@@ -246,12 +389,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +411,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -307821,7 +307861,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +410,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +432,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -307896,7 +307936,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +507,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +529,17 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -307920,7 +307960,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -449,30 +658,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +680,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -307976,7 +308016,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +725,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +747,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -307984,7 +308024,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..afee973f7d4347a2debe17237958e089
                  ],
                ),
              );
-@@ -519,6 +734,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +756,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -318818,10 +318858,10 @@ index f4142a63d007ebeea05cd3becdfe694af8efc1a1..195386cc06f642c4c26fe3c480211a22
 +}
 diff --git a/lib/pages/chat_details/chat_details_media_tabs.dart b/lib/pages/chat_details/chat_details_media_tabs.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..659d2009c4d0bbd0c0dee473565fc34e0c18f7a9
+index 0000000000000000000000000000000000000000..34e93c4bc766e6ec8fd45b1395029db2bea3b491
 --- /dev/null
 +++ b/lib/pages/chat_details/chat_details_media_tabs.dart
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,368 @@
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_files_tab.dart';
 +import 'package:fluffychat/pages/chat_search/chat_search_images_tab.dart';
@@ -319028,27 +319068,50 @@ index 0000000000000000000000000000000000000000..659d2009c4d0bbd0c0dee473565fc34e
 +    }
 +  }
 +
++  bool _isExpanded = false;
++
 +  @override
 +  Widget build(BuildContext context) {
 +    return Column(
 +      crossAxisAlignment: CrossAxisAlignment.stretch,
 +      children: [
-+        TabBar(
-+          controller: _tabController,
-+          labelColor: Theme.of(context).colorScheme.primary,
-+          unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-+          isScrollable: true,
-+          tabAlignment: TabAlignment.start,
-+          tabs: [
-+            const Tab(text: 'Imágenes'),
-+            const Tab(text: 'Videos'),
-+            Tab(text: L10n.of(context).files),
-+            const Tab(text: 'Audios'),
-+            const Tab(text: 'Links'),
++        Row(
++          children: [
++            Expanded(
++              child: TabBar(
++                controller: _tabController,
++                labelColor: Theme.of(context).colorScheme.primary,
++                unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
++                isScrollable: true,
++                tabAlignment: TabAlignment.start,
++                tabs: [
++                  const Tab(text: 'Imágenes'),
++                  const Tab(text: 'Videos'),
++                  Tab(text: L10n.of(context).files),
++                  const Tab(text: 'Audios'),
++                  const Tab(text: 'Links'),
++                ],
++              ),
++            ),
++            IconButton(
++              tooltip: _isExpanded ? 'Reducir altura' : 'Expandir galería',
++              icon: Icon(
++                _isExpanded ? Icons.unfold_less_outlined : Icons.unfold_more_outlined,
++                size: 20,
++              ),
++              onPressed: () => setState(() => _isExpanded = !_isExpanded),
++            ),
++            IconButton(
++              tooltip: 'Abrir multimedia en pantalla completa',
++              icon: const Icon(Icons.open_in_new_outlined, size: 18),
++              onPressed: () => context.go('/rooms/${widget.room.id}/search'),
++            ),
 +          ],
 +        ),
-+        SizedBox(
-+          height: 620, // Expanded height to comfortably display at least 5 rows of gallery items
++        AnimatedContainer(
++          duration: const Duration(milliseconds: 250),
++          curve: Curves.easeInOut,
++          height: _isExpanded ? 600.0 : 250.0, // Moderate height allows smooth page scrolling without trapping the finger
 +          child: TabBarView(
 +            controller: _tabController,
 +            children: [
@@ -369252,10 +369315,10 @@ index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9
 +  }
 +}
 diff --git a/lib/widgets/chat_settings_popup_menu.dart b/lib/widgets/chat_settings_popup_menu.dart
-index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde81e21dc6 100644
+index 9352255979eace274d2797cb59c3bd917396cc1a..359ea8517e89e6ad2517d35aff7eebcb4e060bfc 100644
 --- a/lib/widgets/chat_settings_popup_menu.dart
 +++ b/lib/widgets/chat_settings_popup_menu.dart
-@@ -1,145 +1,229 @@
+@@ -1,145 +1,331 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -369416,11 +369479,14 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde
 +import 'package:matrix/matrix.dart';
 +
 +import 'package:fluffychat/pages/chat_details/contact_profile_sheet.dart';
++import 'package:fluffychat/utils/chat_history_downloader.dart';
++import 'package:fluffychat/utils/beeper_merge_utils.dart';
 +import 'matrix.dart';
 +
 +enum ChatPopupMenuActions {
 +  details,
 +  profileNotes,
++  downloadHistory,
 +  mute,
 +  unmute,
 +  encryption,
@@ -369522,6 +369588,9 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde
 +                  builder: (context) => ContactProfileSheet(room: widget.room),
 +                );
 +                break;
++              case ChatPopupMenuActions.downloadHistory:
++                _downloadFullHistory();
++                break;
 +              case ChatPopupMenuActions.search:
 +                context.go('/rooms/${widget.room.id}/search');
 +                break;
@@ -369551,6 +369620,16 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde
 +                  Icon(Icons.badge_outlined, color: Colors.indigoAccent),
 +                  SizedBox(width: 12),
 +                  Text('Ficha y notas del contacto'),
++                ],
++              ),
++            ),
++            PopupMenuItem<ChatPopupMenuActions>(
++              value: ChatPopupMenuActions.downloadHistory,
++              child: const Row(
++                children: [
++                  Icon(Icons.download_for_offline_outlined, color: Colors.blueAccent),
++                  SizedBox(width: 12),
++                  Text('Descargar todo el historial'),
 +                ],
 +              ),
 +            ),
@@ -369620,6 +369699,92 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..763c91e5a6a157ab76222ba8994a0dde
 +        ),
 +      ],
 +    );
++  }
++
++  void _downloadFullHistory() {
++    final isMerged = BeeperMergeUtils.isRoomMerged(widget.room.id);
++    final siblings = isMerged ? BeeperMergeUtils.getSiblingRooms(widget.room.id) : <Room>[];
++    final totalChats = 1 + siblings.length;
++
++    String currentStatus = 'Iniciando descarga ($totalChats ${totalChats == 1 ? 'chat' : 'chats vinculados'})...';
++    int lastCount = 0;
++    StateSetter? dialogSetState;
++
++    showDialog(
++      context: context,
++      barrierDismissible: false,
++      builder: (dialogCtx) {
++        return StatefulBuilder(
++          builder: (context, setSt) {
++            dialogSetState = setSt;
++            return AlertDialog(
++              title: const Row(
++                children: [
++                  Icon(Icons.download_for_offline_outlined, color: Colors.blueAccent),
++                  SizedBox(width: 8),
++                  Text('Descargando Historial', style: TextStyle(fontSize: 16)),
++                ],
++              ),
++              content: Column(
++                mainAxisSize: MainAxisSize.min,
++                crossAxisAlignment: CrossAxisAlignment.start,
++                children: [
++                  const LinearProgressIndicator(),
++                  const SizedBox(height: 14),
++                  Text(
++                    currentStatus,
++                    style: const TextStyle(fontSize: 13),
++                  ),
++                ],
++              ),
++              actions: [
++                TextButton(
++                  onPressed: () {
++                    ChatHistoryDownloader.cancel();
++                    Navigator.of(dialogCtx).pop();
++                  },
++                  child: const Text('Cancelar', style: TextStyle(color: Colors.red)),
++                ),
++              ],
++            );
++          },
++        );
++      },
++    );
++
++    ChatHistoryDownloader.downloadFullHistory(
++      room: widget.room,
++      onProgress: ({
++        required int downloadedCount,
++        required String currentRoomName,
++        required bool isCompleted,
++        String? error,
++      }) {
++        lastCount = downloadedCount;
++        currentStatus = isCompleted
++            ? 'Completado: $downloadedCount mensajes guardados.'
++            : 'Descargando $currentRoomName ($downloadedCount mensajes)...';
++        dialogSetState?.call(() {});
++      },
++    ).then((count) {
++      if (mounted) {
++        // Cerrar diálogo si sigue abierto
++        Navigator.of(context, rootNavigator: true).pop();
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(
++            content: Text('✅ Historial descargado: $count mensajes guardados en el dispositivo.'),
++            duration: const Duration(seconds: 4),
++          ),
++        );
++      }
++    }).catchError((e) {
++      if (mounted) {
++        Navigator.of(context, rootNavigator: true).pop();
++        ScaffoldMessenger.of(context).showSnackBar(
++          SnackBar(content: Text('Error al descargar historial: $e')),
++        );
++      }
++    });
 +  }
 +
 +  void _showChatDetails() {
