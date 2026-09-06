@@ -313184,10 +313184,10 @@ index 0b8dc33f50384162f195fcf8251ef86b45f47a8e..7cbbc7163f8ee0ea18304372bece0e1d
 +  }
 +}
 diff --git a/lib/pages/chat/recording_input_row.dart b/lib/pages/chat/recording_input_row.dart
-index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead6839a91c 100644
+index b4a412669b8c93a72773352f931e045f1354b797..5c11edc0b7a95bd3eed30867d824c30717aefa35 100644
 --- a/lib/pages/chat/recording_input_row.dart
 +++ b/lib/pages/chat/recording_input_row.dart
-@@ -1,107 +1,116 @@
+@@ -1,107 +1,153 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -313360,30 +313360,15 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +            ),
 +          Text(time),
 +          Expanded(
-+            child: LayoutBuilder(
-+              builder: (context, constraints) {
-+                const width = 4;
-+                return Row(
-+                  mainAxisSize: .min,
-+                  mainAxisAlignment: .end,
-+                  children: state.amplitudeTimeline.reversed
-+                      .take((constraints.maxWidth / (width + 2)).floor())
-+                      .toList()
-+                      .reversed
-+                      .map(
-+                        (amplitude) => Container(
-+                          margin: const EdgeInsets.only(left: 2),
-+                          width: width.toDouble(),
-+                          decoration: BoxDecoration(
-+                            color: theme.colorScheme.primary,
-+                            borderRadius: BorderRadius.circular(2),
-+                          ),
-+                          height: maxDecibalWidth * (amplitude / 100),
-+                        ),
-+                      )
-+                      .toList(),
-+                );
-+              },
++            child: RepaintBoundary(
++              child: CustomPaint(
++                size: const Size(double.infinity, maxDecibalWidth),
++                painter: _RecordingWaveformPainter(
++                  amplitudes: state.amplitudeTimeline,
++                  barColor: theme.colorScheme.primary,
++                  maxHeight: maxDecibalWidth,
++                ),
++              ),
 +            ),
 +          ),
 +          IconButton(
@@ -313409,6 +313394,58 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +        ],
 +      ),
 +    );
++  }
++}
++
++class _RecordingWaveformPainter extends CustomPainter {
++  final List<double> amplitudes;
++  final Color barColor;
++  final double maxHeight;
++
++  _RecordingWaveformPainter({
++    required this.amplitudes,
++    required this.barColor,
++    required this.maxHeight,
++  });
++
++  @override
++  void paint(Canvas canvas, Size size) {
++    if (amplitudes.isEmpty) return;
++
++    final paint = Paint()
++      ..color = barColor
++      ..style = PaintingStyle.fill;
++
++    const barWidth = 4.0;
++    const barSpacing = 2.0;
++    const step = barWidth + barSpacing;
++
++    final maxBars = (size.width / step).floor();
++    if (maxBars <= 0) return;
++
++    final count = amplitudes.length < maxBars ? amplitudes.length : maxBars;
++    final startIndex = amplitudes.length - count;
++
++    // Draw from right to left (newest on the right)
++    for (var i = 0; i < count; i++) {
++      final amp = amplitudes[startIndex + i];
++      final barHeight = (maxHeight * (amp / 100)).clamp(2.0, maxHeight);
++      final x = size.width - ((count - i) * step);
++      final y = (size.height - barHeight) / 2;
++
++      final rrect = RRect.fromRectAndRadius(
++        Rect.fromLTWH(x, y, barWidth, barHeight),
++        const Radius.circular(2),
++      );
++      canvas.drawRRect(rrect, paint);
++    }
++  }
++
++  @override
++  bool shouldRepaint(_RecordingWaveformPainter oldDelegate) {
++    return oldDelegate.amplitudes.length != amplitudes.length ||
++        oldDelegate.barColor != barColor ||
++        oldDelegate.maxHeight != maxHeight;
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
@@ -326321,10 +326358,10 @@ index d6ebd5bee577f7e4b8c27669c303412fac2412c5..6fbae371952bda488f5342853e7590bc
 +  archive,
 +}
 diff --git a/lib/pages/chat_list/dummy_chat_list_item.dart b/lib/pages/chat_list/dummy_chat_list_item.dart
-index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..bd68e8e87063c91010bf39820e250dd59afd67ac 100644
+index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..31054d74f79759f1d077ae13cad97325a7193a5c 100644
 --- a/lib/pages/chat_list/dummy_chat_list_item.dart
 +++ b/lib/pages/chat_list/dummy_chat_list_item.dart
-@@ -1,77 +1,79 @@
+@@ -1,77 +1,78 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -326422,15 +326459,19 @@ index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..bd68e8e87063c91010bf39820e250dd5
 +  @override
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
-+    final titleColor = theme.textTheme.bodyLarge!.color!.withAlpha(100);
-+    final subtitleColor = theme.textTheme.bodyLarge!.color!.withAlpha(50);
-+    final tile = ListTile(
++    final effectiveAlpha = opacity.clamp(0.0, 1.0);
++    final titleColor = theme.textTheme.bodyLarge!.color!
++        .withAlpha((100 * effectiveAlpha).round());
++    final subtitleColor = theme.textTheme.bodyLarge!.color!
++        .withAlpha((50 * effectiveAlpha).round());
++    return ListTile(
 +      leading: CircleAvatar(
 +        backgroundColor: titleColor,
 +        child: animate
 +            ? CircularProgressIndicator(
 +                strokeWidth: 1,
-+                color: theme.textTheme.bodyLarge!.color,
++                color: theme.textTheme.bodyLarge!.color!
++                    .withAlpha((255 * effectiveAlpha).round()),
 +              )
 +            : const SizedBox.shrink(),
 +      ),
@@ -326473,11 +326514,6 @@ index 72ee8e757cf2fdb3a8684328d9f9d9c9282864be..bd68e8e87063c91010bf39820e250dd5
 +        height: 12,
 +        margin: const EdgeInsets.only(right: 22),
 +      ),
-+    );
-+    if (opacity == 1.0) return tile;
-+    return Opacity(
-+      opacity: opacity,
-+      child: tile,
 +    );
 +  }
 +}
