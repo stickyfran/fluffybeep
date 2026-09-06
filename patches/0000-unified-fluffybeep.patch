@@ -322564,7 +322564,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc178d2c2c9c 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..97af2d7844419e17f9d6a235776603365dcf13d3 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -323441,7 +323441,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +956,164 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +956,165 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -323578,6 +323578,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
 +            if (syncUpdate.rooms?.join != null) {
 +              for (final entry in syncUpdate.rooms!.join!.entries) {
 +                final roomId = entry.key;
++                final roomUpdate = entry.value;
 +                final hasEphemeralReceipt =
 +                    roomUpdate.ephemeral?.any((e) => e.type == 'm.receipt') ??
 +                        false;
@@ -323640,7 +323641,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1207,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1208,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -323656,7 +323657,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1320,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1321,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323688,7 +323689,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1355,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1356,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323728,7 +323729,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
          ],
        );
      }
-@@ -700,7 +1408,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1409,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -323752,7 +323753,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1524,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1525,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -323878,7 +323879,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
      }
    }
  
-@@ -864,6 +1698,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1699,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -323886,7 +323887,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1749,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1750,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -323900,7 +323901,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc17
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1873,7 @@ enum ChatContextAction {
+@@ -1039,4 +1874,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -338679,14 +338680,15 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5330bb94550abbb373065a27bb0366cfcb11a82d
+index 0000000000000000000000000000000000000000..6f141c5604481911de1c80d63d9e2e33c2bbe350
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,662 @@
+@@ -0,0 +1,663 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:async';
 +import 'dart:collection';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
@@ -363308,7 +363310,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..a31c264cf95799e4b00ac78e72ab0c5c42fd65ed 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..e853b3c689ff0e2e654614dec7ab100388756e60 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,500 +1,661 @@
@@ -364066,7 +364068,7 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..a31c264cf95799e4b00ac78e72ab0c5c
 +      _callSyncWatchdogs[client]?.cancel();
 +      _callSyncWatchdogs[client] = Timer(const Duration(seconds: 90), () {
 +        if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
-+          client.backgroundSync = false;
++          client?.backgroundSync = false;
 +          Logs().d('Push helper: VoIP call watchdog expired, disabled backgroundSync');
 +        }
 +      });
@@ -373840,7 +373842,7 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..c973528792a668fb7eda1cbf2141a50dfb52b935 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..daa355af7653b030b4487fa373cfa415ec647ecd 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
 @@ -1,443 +1,526 @@
@@ -374723,8 +374725,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..c973528792a668fb7eda1cbf2141a50d
 +      }
 +    } else if (state == AppLifecycleState.resumed) {
 +      // Restart encryption health monitor if client is logged in
-+      if (client.isLogged()) {
-+        EncryptionHealthMonitor().start(client);
++      if (client.isLogged() && mounted) {
++        EncryptionHealthMonitor().start(client, context);
 +      }
 +      // Restore full cache size on return to foreground.
 +      if (PlatformInfos.isMobile) {
