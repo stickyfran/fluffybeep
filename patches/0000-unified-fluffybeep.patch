@@ -303207,7 +303207,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb786e77f06 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..4217c5d39b124ee8a4993088bd9f64be5dd84b84 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -304015,7 +304015,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      });
    }
  
-@@ -883,60 +1141,191 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1141,192 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304171,8 +304171,9 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
 -          'org.matrix.msc1767.audio': {
 -            'duration': duration,
 -            'waveform': waveform,
-+        final fileName = sticker.body.isNotEmpty
-+            ? '${sticker.body.replaceAll(RegExp(r'[^\w\.-]'), '_')}.$ext'
++        final body = sticker.body;
++        final fileName = (body != null && body.isNotEmpty)
++            ? '${body.replaceAll(RegExp(r'[^\w\.-]'), '_')}.$ext'
 +            : 'sticker.$ext';
 +
 +        final file = MatrixFile(
@@ -304245,7 +304246,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1334,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1335,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304260,7 +304261,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      }
    }
  
-@@ -964,21 +1353,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1354,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304293,7 +304294,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1397,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1398,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304306,7 +304307,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1414,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1415,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304315,7 +304316,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1471,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1472,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304328,7 +304329,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1144,7 +1534,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1144,7 +1535,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304337,7 +304338,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1548,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1549,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304355,7 +304356,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1650,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1651,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304369,7 +304370,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1682,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1683,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304378,7 +304379,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1748,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1749,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304393,7 +304394,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1785,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1786,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304403,7 +304404,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1854,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +1855,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304466,7 +304467,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +1903,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +1904,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304477,7 +304478,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
            return;
          }
        }
-@@ -1527,8 +1930,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +1931,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304486,7 +304487,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +1984,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +1985,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304503,7 +304504,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..8a91b90d9dee284603116b526dc90eb7
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2071,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2072,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
