@@ -305242,7 +305242,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..c7c5306e61bd6d7dc401f286ac7bd4fa
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf2eb5ff9e 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..e148a2ea3698b4a0b1f73af0476fc022d2e181fd 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305255,7 +305255,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:flutter/cupertino.dart';
  import 'package:flutter/material.dart';
-@@ -21,62 +23,66 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
+@@ -21,62 +23,68 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
  import 'package:scroll_to_index/scroll_to_index.dart';
  
  import '../../config/app_config.dart';
@@ -305271,7 +305271,9 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
  
    @override
    Widget build(BuildContext context) {
-+    FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (roomId=${controller.room.id})');
++    if (FileLogger.isEnabled()) {
++      FileLogger.log('[FRONTEND_BUILD] ChatEventList.build (roomId=${controller.room.id})');
++    }
      final timeline = controller.timeline;
 -
      if (timeline == null) {
@@ -305283,17 +305285,17 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
      final theme = Theme.of(context);
  
 -    final colors = [theme.secondaryBubbleColor, theme.bubbleColor];
--
--    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
 +    final colors = AppSettings.useMessageBubbleGradient.value
 +        ? [theme.secondaryBubbleColor, theme.bubbleColor]
 +        : [theme.bubbleColor];
  
+-    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
++    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
+ 
 -    final events = timeline.events.filterByVisibleInGui(
 -      threadId: controller.activeThreadId,
 -    );
-+    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
- 
+-
 -    // create a map of eventId --> index to greatly improve performance of
 -    // ListView's findChildIndexCallback
 -    final thisEventsKeyMap = <String, int>{};
@@ -305358,7 +305360,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
                // Footer to display typing indicator and read receipts:
                if (i == 0) {
                  if (timeline.canRequestFuture) {
-@@ -92,13 +98,36 @@ class ChatEventList extends StatelessWidget {
+@@ -92,13 +100,36 @@ class ChatEventList extends StatelessWidget {
                      ),
                    );
                  }
@@ -305402,7 +305404,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
                  );
                }
  
-@@ -110,23 +139,21 @@ class ChatEventList extends StatelessWidget {
+@@ -110,23 +141,21 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -305437,7 +305439,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -159,86 +186,94 @@ class ChatEventList extends StatelessWidget {
+@@ -159,86 +188,94 @@ class ChatEventList extends StatelessWidget {
                    nextEvent == null ||
                    !event.originServerTs.sameDay(nextEvent.originServerTs);
  
@@ -305604,7 +305606,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..75bb4979abce976ef0513a1b75d646bf
                  ),
                );
              },
-@@ -248,6 +283,8 @@ class ChatEventList extends StatelessWidget {
+@@ -248,6 +285,8 @@ class ChatEventList extends StatelessWidget {
            ),
          ),
        ),
@@ -306191,7 +306193,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387090e9ed7 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a31d6ea063 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
 @@ -16,17 +16,25 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
@@ -306220,15 +306222,17 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387
  
  enum _EventContextAction { info, report }
  
-@@ -37,6 +45,7 @@ class ChatView extends StatelessWidget {
+@@ -37,6 +45,9 @@ class ChatView extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
-+    FileLogger.log('[FRONTEND_BUILD] ChatView.build (roomId=${controller.room.id}, route=${PerformanceLoggerObserver.currentRoute})');
++    if (FileLogger.isEnabled()) {
++      FileLogger.log('[FRONTEND_BUILD] ChatView.build (roomId=${controller.room.id}, route=${PerformanceLoggerObserver.currentRoute})');
++    }
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +55,559 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +57,559 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -306266,6 +306270,9 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387
 -            if (controller.room.pinnedEventIds.isNotEmpty &&
 -                activeThreadId == null) {
 -              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
+-            }
+-            if (scrollUpBannerEventId != null && activeThreadId == null) {
+-              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
 +    return ValueListenableBuilder<List<Event>>(
 +      valueListenable: controller.selectedEventsNotifier,
 +      builder: (context, selectedEvents, scaffoldChild) => ValueListenableBuilder<bool>(
@@ -306284,9 +306291,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387
 +            } else if (controller.activeThreadId != null) {
 +              controller.closeThread();
              }
--            if (scrollUpBannerEventId != null && activeThreadId == null) {
--              appbarBottomHeight += ChatAppBarListTile.fixedHeight;
--            }
 -            return Scaffold(
 -              key: Key('chat_page'),
 -              extendBodyBehindAppBar: true,
@@ -306929,15 +306933,6 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387
 -                              imageFilter: ui.ImageFilter.blur(
 -                                sigmaX: accountConfig.wallpaperBlur ?? 0.0,
 -                                sigmaY: accountConfig.wallpaperBlur ?? 0.0,
--                              ),
--                              child: MxcImage(
--                                cacheKey: accountConfig.wallpaperUrl.toString(),
--                                uri: accountConfig.wallpaperUrl,
--                                fit: BoxFit.cover,
--                                height: MediaQuery.sizeOf(context).height,
--                                width: MediaQuery.sizeOf(context).width,
--                                isThumbnail: false,
--                                placeholder: (_) => Container(),
 +                      if (selectedEvents.single.status.isSent)
 +                        PopupMenuItem(
 +                          value: _EventContextAction.report,
@@ -306948,6 +306943,15 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..ddc64cb298c5e0050dbb6f7f5e636387
 +                                Icons.shield_outlined,
 +                                color: Colors.red,
                                ),
+-                              child: MxcImage(
+-                                cacheKey: accountConfig.wallpaperUrl.toString(),
+-                                uri: accountConfig.wallpaperUrl,
+-                                fit: BoxFit.cover,
+-                                height: MediaQuery.sizeOf(context).height,
+-                                width: MediaQuery.sizeOf(context).width,
+-                                isThumbnail: false,
+-                                placeholder: (_) => Container(),
+-                              ),
 -                            ),
 +                              const SizedBox(width: 12),
 +                              Text(L10n.of(context).reportMessage),
@@ -307725,7 +307729,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..aea78e88f7607cd2f3369084416c320bb2a0cf3c 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8d8274075 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -308112,7 +308116,139 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..aea78e88f7607cd2f3369084416c320b
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -449,30 +694,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -365,71 +610,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+                         ),
+                         const SizedBox(width: 8),
+                         Expanded(
+-                          child: Stack(
+-                            children: [
+-                              if (waveform != null)
+-                                Padding(
+-                                  padding: const EdgeInsets.symmetric(
+-                                    horizontal: 16.0,
+-                                  ),
+-                                  child: Row(
+-                                    children: [
+-                                      for (
+-                                        var i = 0;
+-                                        i < AudioPlayerWidget.wavesCount;
+-                                        i++
+-                                      )
+-                                        Expanded(
+-                                          child: Container(
+-                                            height: 32,
+-                                            alignment: Alignment.center,
++                          child: RepaintBoundary(
++                            child: Stack(
++                              children: [
++                                if (waveform != null)
++                                  Padding(
++                                    padding: const EdgeInsets.symmetric(
++                                      horizontal: 16.0,
++                                    ),
++                                    child: Row(
++                                      children: [
++                                        for (
++                                          var i = 0;
++                                          i < AudioPlayerWidget.wavesCount;
++                                          i++
++                                        )
++                                          Expanded(
+                                             child: Container(
+-                                              margin:
+-                                                  const EdgeInsets.symmetric(
+-                                                    horizontal: 1,
+-                                                  ),
+-                                              decoration: BoxDecoration(
+-                                                color: i < wavePosition
+-                                                    ? widget.color
+-                                                    : widget.color.withAlpha(
+-                                                        128,
+-                                                      ),
+-                                                borderRadius:
+-                                                    BorderRadius.circular(64),
++                                              height: 32,
++                                              alignment: Alignment.center,
++                                              child: Container(
++                                                margin:
++                                                    const EdgeInsets.symmetric(
++                                                      horizontal: 1,
++                                                    ),
++                                                decoration: BoxDecoration(
++                                                  color: i < wavePosition
++                                                      ? widget.color
++                                                      : widget.color.withAlpha(
++                                                          128,
++                                                        ),
++                                                  borderRadius:
++                                                      BorderRadius.circular(64),
++                                                ),
++                                                height: 32 * (waveform[i] / 1024),
+                                               ),
+-                                              height: 32 * (waveform[i] / 1024),
+                                             ),
+                                           ),
+-                                        ),
+-                                    ],
++                                      ],
++                                    ),
+                                   ),
+-                                ),
+-                              SizedBox(
+-                                height: 32,
+-                                child: Slider(
+-                                  thumbColor:
+-                                      widget.event.senderId ==
+-                                          widget.event.room.client.userID
+-                                      ? theme.colorScheme.onPrimary
+-                                      : theme.colorScheme.primary,
+-                                  activeColor: waveform == null
+-                                      ? widget.color
+-                                      : Colors.transparent,
+-                                  inactiveColor: waveform == null
+-                                      ? widget.color.withAlpha(128)
+-                                      : Colors.transparent,
+-                                  max: maxPosition,
+-                                  value: currentPosition,
+-                                  onChanged: (position) => audioPlayer == null
+-                                      ? _onButtonTap()
+-                                      : audioPlayer.seek(
+-                                          Duration(
+-                                            milliseconds: position.round(),
++                                SizedBox(
++                                  height: 32,
++                                  child: Slider(
++                                    thumbColor:
++                                        widget.event.senderId ==
++                                            widget.event.room.client.userID
++                                        ? theme.colorScheme.onPrimary
++                                        : theme.colorScheme.primary,
++                                    activeColor: waveform == null
++                                        ? widget.color
++                                        : Colors.transparent,
++                                    inactiveColor: waveform == null
++                                        ? widget.color.withAlpha(128)
++                                        : Colors.transparent,
++                                    max: maxPosition,
++                                    value: currentPosition,
++                                    onChanged: (position) => audioPlayer == null
++                                        ? _onButtonTap()
++                                        : audioPlayer.seek(
++                                            Duration(
++                                              milliseconds: position.round(),
++                                            ),
+                                           ),
+-                                        ),
++                                  ),
+                                 ),
+-                              ),
+-                            ],
++                              ],
++                            ),
+                           ),
+                         ),
+                         const SizedBox(width: 8),
+@@ -449,30 +696,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -308168,7 +308304,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..aea78e88f7607cd2f3369084416c320b
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +761,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +763,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -308176,7 +308312,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..aea78e88f7607cd2f3369084416c320b
                  ],
                ),
              );
-@@ -519,6 +770,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +772,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -323643,10 +323779,10 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
 +  merge,
  }
 diff --git a/lib/pages/chat_list/chat_list_body.dart b/lib/pages/chat_list/chat_list_body.dart
-index 8610b92531be84898e03439fa07f16145a6d552c..75577319075011fda9e7af85a0b0b00bcbc5e99c 100644
+index 8610b92531be84898e03439fa07f16145a6d552c..6b617f9c17d8ec6f5755fc75a0a6e15b322a91fb 100644
 --- a/lib/pages/chat_list/chat_list_body.dart
 +++ b/lib/pages/chat_list/chat_list_body.dart
-@@ -3,224 +3,461 @@
+@@ -3,224 +3,463 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
@@ -323695,7 +323831,9 @@ index 8610b92531be84898e03439fa07f16145a6d552c..75577319075011fda9e7af85a0b0b00b
    @override
    Widget build(BuildContext context) {
 +    super.build(context);
-+    FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
++    if (FileLogger.isEnabled()) {
++      FileLogger.log('[FRONTEND_BUILD] ChatListViewBody.build (route=${PerformanceLoggerObserver.currentRoute})');
++    }
      final theme = Theme.of(context);
  
      final client = Matrix.of(context).client;
@@ -324263,7 +324401,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..75577319075011fda9e7af85a0b0b00b
              ),
              if (client.prevBatch == null)
                SliverList(
-@@ -235,28 +472,54 @@ class ChatListViewBody extends StatelessWidget {
+@@ -235,28 +474,54 @@ class ChatListViewBody extends StatelessWidget {
              if (client.prevBatch != null)
                SliverSafeArea(
                  top: false,
@@ -324318,12 +324456,12 @@ index 8610b92531be84898e03439fa07f16145a6d552c..75577319075011fda9e7af85a0b0b00b
 +                    addAutomaticKeepAlives: false,
 +                    addRepaintBoundaries: true,
 +                  ),
-+              ),
+               ),
 +            ),
 +            SliverToBoxAdapter(
 +              child: SizedBox(
 +                height: AppSettings.searchStyle.value == 'bottom_fab' && !FluffyThemes.isColumnMode(context) ? 80 : 20,
-               ),
++              ),
 +            ),
            ],
 -        );
@@ -324521,7 +324659,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..7069a6b758519367bed7a1c7d82a307d2156808e 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024fef2c4d06 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -325094,7 +325232,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..7069a6b758519367bed7a1c7d82a307d
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,70 +442,179 @@ class ChatListItem extends StatelessWidget {
+@@ -336,69 +442,180 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -325177,7 +325315,6 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..7069a6b758519367bed7a1c7d82a307d
 -                      onPressed: onForget,
 -                    ),
 -            ),
--          ),
 +                      onPressed: widget.onForget,
 +                    )
 +                  : widget.room.membership == Membership.invite
@@ -325312,10 +325449,11 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..7069a6b758519367bed7a1c7d82a307d
 +          borderRadius: BorderRadius.circular(AppConfig.borderRadius),
 +          clipBehavior: Clip.hardEdge,
 +          color: backgroundColor,
-+          child: content,
++          child: RepaintBoundary(
++            child: content,
+           ),
          ),
        ),
-     );
 diff --git a/lib/pages/chat_list/chat_list_view.dart b/lib/pages/chat_list/chat_list_view.dart
 index 0db2f7422da7acfd9a5c47694a13613cfa8e40b1..e431b1670f4e2b85929dbb0fb204d72fd0039b7c 100644
 --- a/lib/pages/chat_list/chat_list_view.dart
@@ -326402,10 +326540,10 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..daa619b530de9a67244c0b65f243876129a9223e
+index 0000000000000000000000000000000000000000..b27d7b7305c8c448f2f818bbf73dde509aa01bf9
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
-@@ -0,0 +1,278 @@
+@@ -0,0 +1,280 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -326511,7 +326649,8 @@ index 0000000000000000000000000000000000000000..daa619b530de9a67244c0b65f2438761
 +        borderRadius: BorderRadius.circular(AppConfig.borderRadius),
 +        clipBehavior: Clip.hardEdge,
 +        color: backgroundColor,
-+        child: ListTile(
++        child: RepaintBoundary(
++          child: ListTile(
 +          minVerticalPadding: 16,
 +          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
 +          onLongPress: () => onLongPress?.call(context),
@@ -326632,6 +326771,7 @@ index 0000000000000000000000000000000000000000..daa619b530de9a67244c0b65f2438761
 +            ),
 +          ),
 +        ),
++        ),
 +      ),
 +    );
 +  }
@@ -326733,7 +326873,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1ca1c2920e 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6ed08c1a2 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,26 @@
@@ -327289,7 +327429,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -71,57 +550,218 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -71,57 +550,224 @@ class SpacesNavigationRail extends StatelessWidget {
                                child: Icon(Icons.forum),
                              ),
                              toolTip: L10n.of(context).chats,
@@ -327430,30 +327570,32 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
 +                          };
 +                          final emoji = emojiMap[net.key] ?? net.name.substring(0, 1);
 +
-+                          return Material(
-+                            color: Colors.transparent,
-+                            child: InkWell(
-+                              onLongPress: () => _showNetworkMenu(context, net, visibleNetworks, store),
-+                              child: NaviRailItem(
-+                                toolTip: net.name,
-+                                isSelected: isSelected,
-+                                onTap: () => widget.onGoToSpaceId('virtual_space_${net.key}'),
-+                                unreadCount: unreadRooms.where((room) => BeeperBridgeUtils.getBaseNetworkKey(BeeperBridgeUtils.getRoomData(room).networkKey ?? '') == net.key).length,
-+                                icon: Avatar(
-+                                  name: emoji,
-+                                  backgroundColor: Color(net.colorHex).withValues(alpha: 0.2),
-+                                  textColor: Colors.white,
-+                                  shapeBorder: RoundedSuperellipseBorder(
-+                                    side: BorderSide(
-+                                      width: 1,
-+                                      color: Theme.of(context).dividerColor,
++                          return RepaintBoundary(
++                            child: Material(
++                              color: Colors.transparent,
++                              child: InkWell(
++                                onLongPress: () => _showNetworkMenu(context, net, visibleNetworks, store),
++                                child: NaviRailItem(
++                                  toolTip: net.name,
++                                  isSelected: isSelected,
++                                  onTap: () => widget.onGoToSpaceId('virtual_space_${net.key}'),
++                                  unreadCount: unreadRooms.where((room) => BeeperBridgeUtils.getBaseNetworkKey(BeeperBridgeUtils.getRoomData(room).networkKey ?? '') == net.key).length,
++                                  icon: Avatar(
++                                    name: emoji,
++                                    backgroundColor: Color(net.colorHex).withValues(alpha: 0.2),
++                                    textColor: Colors.white,
++                                    shapeBorder: RoundedSuperellipseBorder(
++                                      side: BorderSide(
++                                        width: 1,
++                                        color: Theme.of(context).dividerColor,
++                                      ),
++                                      borderRadius: BorderRadius.circular(
++                                        AppConfig.spaceBorderRadius,
++                                      ),
 +                                    ),
 +                                    borderRadius: BorderRadius.circular(
 +                                      AppConfig.spaceBorderRadius,
 +                                    ),
-+                                  ),
-+                                  borderRadius: BorderRadius.circular(
-+                                    AppConfig.spaceBorderRadius,
 +                                  ),
 +                                ),
 +                              ),
@@ -327466,36 +327608,38 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
 +                          final isSelected = widget.activeSpaceId == virtualId;
 +                          final labels = BeeperBridgeUtils.getBeeperLabels(client);
 +                          final labelData = labels[uuid] as Map? ?? {};
-+                          return Material(
-+                            color: Colors.transparent,
-+                            child: InkWell(
-+                              onLongPress: () => _showLabelMenu(context, uuid, title, item.labelEmoji, labelData, client),
-+                              child: NaviRailItem(
-+                                toolTip: title,
-+                                isSelected: isSelected,
-+                                onTap: () => widget.onGoToSpaceId(virtualId),
-+                                unreadCount: unreadRooms.where((room) {
-+                                  final rooms = labelData['rooms'];
-+                                  if (rooms is! List) return false;
-+                                  return rooms.contains(room.id);
-+                                }).length,
-+                                icon: Avatar(
-+                                  name: item.labelEmoji ?? title,
-+                                  backgroundColor:
-+                                      Theme.of(context).colorScheme.tertiaryContainer,
-+                                  textColor:
-+                                      Theme.of(context).colorScheme.onTertiaryContainer,
-+                                  shapeBorder: RoundedSuperellipseBorder(
-+                                    side: BorderSide(
-+                                      width: 1,
-+                                      color: Theme.of(context).dividerColor,
++                          return RepaintBoundary(
++                            child: Material(
++                              color: Colors.transparent,
++                              child: InkWell(
++                                onLongPress: () => _showLabelMenu(context, uuid, title, item.labelEmoji, labelData, client),
++                                child: NaviRailItem(
++                                  toolTip: title,
++                                  isSelected: isSelected,
++                                  onTap: () => widget.onGoToSpaceId(virtualId),
++                                  unreadCount: unreadRooms.where((room) {
++                                    final rooms = labelData['rooms'];
++                                    if (rooms is! List) return false;
++                                    return rooms.contains(room.id);
++                                  }).length,
++                                  icon: Avatar(
++                                    name: item.labelEmoji ?? title,
++                                    backgroundColor:
++                                        Theme.of(context).colorScheme.tertiaryContainer,
++                                    textColor:
++                                        Theme.of(context).colorScheme.onTertiaryContainer,
++                                    shapeBorder: RoundedSuperellipseBorder(
++                                      side: BorderSide(
++                                        width: 1,
++                                        color: Theme.of(context).dividerColor,
++                                      ),
++                                      borderRadius: BorderRadius.circular(
++                                        AppConfig.spaceBorderRadius,
++                                      ),
 +                                    ),
 +                                    borderRadius: BorderRadius.circular(
 +                                      AppConfig.spaceBorderRadius,
 +                                    ),
-+                                  ),
-+                                  borderRadius: BorderRadius.circular(
-+                                    AppConfig.spaceBorderRadius,
 +                                  ),
 +                                ),
 +                              ),
@@ -327505,30 +327649,32 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
 +                          final tag = item.tag!;
 +                          final isSelected = widget.activeSpaceId == 'virtual_tag_$tag';
 +                          final displayName = tag.replaceFirst('u.', '');
-+                          return Material(
-+                            color: Colors.transparent,
-+                            child: InkWell(
-+                              onLongPress: () => _showTagMenu(context, tag, client),
-+                              child: NaviRailItem(
-+                                toolTip: displayName,
-+                                isSelected: isSelected,
-+                                onTap: () => widget.onGoToSpaceId('virtual_tag_$tag'),
-+                                unreadCount: unreadRooms.where((room) => room.tags.containsKey(tag)).length,
-+                                icon: Avatar(
-+                                  name: displayName,
-+                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-+                                  textColor: Theme.of(context).colorScheme.onPrimaryContainer,
-+                                  shapeBorder: RoundedSuperellipseBorder(
-+                                    side: BorderSide(
-+                                      width: 1,
-+                                      color: Theme.of(context).dividerColor,
++                          return RepaintBoundary(
++                            child: Material(
++                              color: Colors.transparent,
++                              child: InkWell(
++                                onLongPress: () => _showTagMenu(context, tag, client),
++                                child: NaviRailItem(
++                                  toolTip: displayName,
++                                  isSelected: isSelected,
++                                  onTap: () => widget.onGoToSpaceId('virtual_tag_$tag'),
++                                  unreadCount: unreadRooms.where((room) => room.tags.containsKey(tag)).length,
++                                  icon: Avatar(
++                                    name: displayName,
++                                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
++                                    textColor: Theme.of(context).colorScheme.onPrimaryContainer,
++                                    shapeBorder: RoundedSuperellipseBorder(
++                                      side: BorderSide(
++                                        width: 1,
++                                        color: Theme.of(context).dividerColor,
++                                      ),
++                                      borderRadius: BorderRadius.circular(
++                                        AppConfig.spaceBorderRadius,
++                                      ),
 +                                    ),
 +                                    borderRadius: BorderRadius.circular(
 +                                      AppConfig.spaceBorderRadius,
 +                                    ),
-+                                  ),
-+                                  borderRadius: BorderRadius.circular(
-+                                    AppConfig.spaceBorderRadius,
 +                                  ),
 +                                ),
 +                              ),
@@ -327543,7 +327689,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..e7649eef1a8a3a17cc44fc89bd7c7f1c
                      Padding(
                        padding: const EdgeInsets.all(12.0),
                        child: StartChatFab(),
-@@ -135,3 +775,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +781,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -358744,10 +358890,10 @@ index b7e14ed983608a54f846e997c31ca74d6be4d34b..af847fa5570816390d0e6d7bbd618e0e
    /// Check if time needs to be in 24h format
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5437c86bd9a36d3424362a73b7814161db63f96e
+index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf773617ee
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,110 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
@@ -358767,10 +358913,14 @@ index 0000000000000000000000000000000000000000..5437c86bd9a36d3424362a73b7814161
 +  bool _isPrompting = false;
 +  String? _cachedRecoveryKey;
 +
++  int _checkCount = 0;
++  static const int _maxRetries = 5;
++
 +  void start(Client client, BuildContext context) {
 +    _client = client;
 +    _context = context;
 +    _timer?.cancel();
++    _checkCount = 0;
 +    // Run initial check and schedule fallback check every 15 minutes only if disconnected
 +    _checkHealth();
 +  }
@@ -358781,14 +358931,24 @@ index 0000000000000000000000000000000000000000..5437c86bd9a36d3424362a73b7814161
 +    _client = null;
 +    _context = null;
 +    _cachedRecoveryKey = null;
++    _checkCount = 0;
 +  }
 +
 +  Future<void> _checkHealth() async {
 +    if (_client == null || _context == null || !_context!.mounted || _isPrompting) return;
++    _checkCount++;
 +    final state = await _client!.getCryptoIdentityState();
 +
 +    if (state.connected) {
 +      // Identity is connected and healthy; cancel timer to conserve battery
++      _timer?.cancel();
++      _timer = null;
++      _checkCount = 0;
++      return;
++    }
++
++    if (_checkCount >= _maxRetries) {
++      // Cease polling after max retries to avoid wasting battery indefinitely
 +      _timer?.cancel();
 +      _timer = null;
 +      return;
@@ -359127,10 +359287,10 @@ index 68f9067624eb3c1ca2351f4fe83266db784faac0..89cace500ff1317ba173766b45dd0c4b
 +}
 diff --git a/lib/utils/file_logger.dart b/lib/utils/file_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..c5999c6b3d1995f6e5b1cdcbc24fa1f01602fa29
+index 0000000000000000000000000000000000000000..eb417a11b8601599414acf49ba3b06aeb4139bce
 --- /dev/null
 +++ b/lib/utils/file_logger.dart
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,137 @@
 +import 'dart:io';
 +import 'dart:async';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
@@ -359213,11 +359373,13 @@ index 0000000000000000000000000000000000000000..c5999c6b3d1995f6e5b1cdcbc24fa1f0
 +        final length = await file.length();
 +        if (length > 15 * 1024 * 1024) {
 +          try {
-+            final lines = await file.readAsLines();
-+            final keepLines = lines.sublist(lines.length ~/ 2);
++            final backupFile = File('$path.1');
++            if (await backupFile.exists()) {
++              await backupFile.delete();
++            }
++            await file.rename('$path.1');
 +            await file.writeAsString(
-+              '[LOG_ROTATED] Log size exceeded 15MB. Truncated older entries.\n'
-+              '${keepLines.join('\n')}\n',
++              '[LOG_ROTATED] Log size exceeded 15MB. Rotated to $path.1\n',
 +            );
 +          } catch (_) {}
 +        }
@@ -359254,6 +359416,10 @@ index 0000000000000000000000000000000000000000..c5999c6b3d1995f6e5b1cdcbc24fa1f0
 +      final file = File(path);
 +      if (await file.exists()) {
 +        await file.delete();
++      }
++      final backup = File('$path.1');
++      if (await backup.exists()) {
++        await backup.delete();
 +      }
 +    } catch (_) {}
 +  }
@@ -362431,10 +362597,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362b48038e9
+index 0000000000000000000000000000000000000000..ff5e216b1ae9313dfd335046dafd48731c6c3e69
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,230 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -362504,6 +362670,7 @@ index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362
 +
 +    // 5. Monitor Frame Timings (Jank, Slow Frames & UI Freezes with Route Context)
 +    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
++      if (!FileLogger.isEnabled()) return;
 +      for (final timing in timings) {
 +        final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
 +        final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
@@ -362532,6 +362699,7 @@ index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362
 +
 +    // 6. Capture Hardware Keyboard events
 +    HardwareKeyboard.instance.addHandler((KeyEvent event) {
++      if (!FileLogger.isEnabled()) return false;
 +      final keyName = event.logicalKey.debugName ?? event.logicalKey.keyLabel;
 +      final charStr = event.character != null ? ' char="${event.character}"' : '';
 +      FileLogger.log(
@@ -362543,6 +362711,7 @@ index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362
 +    // 7. Capture Global Touch & Pointer Interaction events
 +    DateTime? lastMoveLog;
 +    GestureBinding.instance.pointerRouter.addGlobalRoute((PointerEvent event) {
++      if (!FileLogger.isEnabled()) return;
 +      final route = PerformanceLoggerObserver.currentRoute;
 +      if (event is PointerDownEvent) {
 +        FileLogger.log(
@@ -362565,34 +362734,33 @@ index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362
 +  }
 +
 +  static void _setupLifecycleTracking() {
-+    SystemChannels.lifecycle.setMessageHandler((String? message) async {
-+      if (message == null) return null;
-+      final timestamp = DateTime.now();
-+      
-+      final cacheBytes = PaintingBinding.instance.imageCache.currentSizeBytes;
-+      final cacheMb = (cacheBytes / (1024 * 1024)).toStringAsFixed(1);
-+      final cacheCount = PaintingBinding.instance.imageCache.currentSize;
++    WidgetsBinding.instance.addObserver(_PerformanceLifecycleObserver());
++  }
 +
-+      FileLogger.log(
-+        '[APP_LIFECYCLE] State changed to: $message '
-+        '(ImageCache: ${cacheMb}MB / $cacheCount items)',
-+      );
++  static void _handleLifecycleState(AppLifecycleState state) {
++    final timestamp = DateTime.now();
++    final cacheBytes = PaintingBinding.instance.imageCache.currentSizeBytes;
++    final cacheMb = (cacheBytes / (1024 * 1024)).toStringAsFixed(1);
++    final cacheCount = PaintingBinding.instance.imageCache.currentSize;
 +
-+      if (message.contains('paused') || message.contains('detached')) {
-+        _backgroundStartTime ??= timestamp;
-+        _startBackgroundHeartbeat();
-+      } else if (message.contains('resumed')) {
-+        _stopBackgroundHeartbeat();
-+        if (_backgroundStartTime != null) {
-+          final bgSeconds = timestamp.difference(_backgroundStartTime!).inSeconds;
-+          FileLogger.log(
-+            '[BATTERY/BACKGROUND_STATS] Returned to foreground after ${bgSeconds}s in background.',
-+          );
-+          _backgroundStartTime = null;
-+        }
++    FileLogger.log(
++      '[APP_LIFECYCLE] State changed to: ${state.name} '
++      '(ImageCache: ${cacheMb}MB / $cacheCount items)',
++    );
++
++    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
++      _backgroundStartTime ??= timestamp;
++      _startBackgroundHeartbeat();
++    } else if (state == AppLifecycleState.resumed) {
++      _stopBackgroundHeartbeat();
++      if (_backgroundStartTime != null) {
++        final bgSeconds = timestamp.difference(_backgroundStartTime!).inSeconds;
++        FileLogger.log(
++          '[BATTERY/BACKGROUND_STATS] Returned to foreground after ${bgSeconds}s in background.',
++        );
++        _backgroundStartTime = null;
 +      }
-+      return null;
-+    });
++    }
 +  }
 +
 +  static void _startBackgroundHeartbeat() {
@@ -362614,6 +362782,13 @@ index 0000000000000000000000000000000000000000..f807e236c6b74369e6f31e791277a362
 +
 +  static void logAction(String action) {
 +    FileLogger.log('[USER_ACTION] $action');
++  }
++}
++
++class _PerformanceLifecycleObserver with WidgetsBindingObserver {
++  @override
++  void didChangeAppLifecycleState(AppLifecycleState state) {
++    PerformanceLogger._handleLifecycleState(state);
 +  }
 +}
 +
@@ -369994,18 +370169,19 @@ index f19ea49d3c3d719fc7e813eb1e687af7fa43d786..708037e9939581427b4d0ea99aea1716
 +  );
 +}
 diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
-index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..e6360915721245008c730a01dd45292f515cf42b 100644
+index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..8588868c4c6d7a73d77accc4c42bb0920bd1cbec 100644
 --- a/lib/widgets/avatar.dart
 +++ b/lib/widgets/avatar.dart
-@@ -3,6 +3,7 @@
+@@ -3,6 +3,8 @@
  //
  // SPDX-License-Identifier: AGPL-3.0-or-later
  
 +import 'package:fluffychat/config/setting_keys.dart';
++import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:fluffychat/utils/string_color.dart';
  import 'package:fluffychat/widgets/mxc_image.dart';
  import 'package:fluffychat/widgets/presence_builder.dart';
-@@ -40,25 +41,27 @@ class Avatar extends StatelessWidget {
+@@ -40,25 +42,27 @@ class Avatar extends StatelessWidget {
      super.key,
    });
  
@@ -370043,19 +370219,19 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..e6360915721245008c730a01dd45292f
      final presenceUserId = this.presenceUserId;
      final container = Stack(
        children: [
-@@ -79,40 +82,32 @@ class Avatar extends StatelessWidget {
-             child: MxcImage(
-               client: client,
-               borderRadius: borderRadius,
+@@ -76,44 +80,56 @@ class Avatar extends StatelessWidget {
+                   side: BorderSide.none,
+                 ),
+             clipBehavior: Clip.antiAlias,
+-            child: MxcImage(
+-              client: client,
+-              borderRadius: borderRadius,
 -              key: ValueKey(mxContent.toString()),
 -              cacheKey: '${mxContent}_$size',
-+              key: ValueKey(mxContent?.toString() ?? name ?? 'avatar'),
-+              cacheKey: mxContent != null ? mxContent.toString() : null,
-+              cacheName: 'avatars',
-               uri: mxContent,
-               fit: BoxFit.cover,
-               width: size,
-               height: size,
+-              uri: mxContent,
+-              fit: BoxFit.cover,
+-              width: size,
+-              height: size,
 -              placeholder: (_) => noPic
 -                  ? Container(
 -                      decoration: BoxDecoration(
@@ -370064,48 +370240,71 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..e6360915721245008c730a01dd45292f
 -                            fallbackLetters.colorScheme.primaryContainer,
 -                      ),
 -                      alignment: Alignment.center,
--                      child: Text(
--                        fallbackLetters,
--                        textAlign: TextAlign.center,
--                        style: TextStyle(
--                          fontFamily: 'RobotoMono',
++            child: noPic
++                ? Container(
++                    decoration: BoxDecoration(
++                      color: backgroundColor ?? name?.lightColorAvatar,
++                    ),
++                    alignment: Alignment.center,
++                    child: FittedBox(
++                      fit: BoxFit.scaleDown,
+                       child: Text(
+                         fallbackLetters,
+                         textAlign: TextAlign.center,
+                         style: TextStyle(
+                           fontFamily: 'RobotoMono',
 -                          color:
 -                              textColor ??
 -                              fallbackLetters.colorScheme.onPrimaryContainer,
--                          fontWeight: FontWeight.bold,
++                          color: textColor ?? Colors.white,
+                           fontWeight: FontWeight.bold,
 -                          fontSize: (size / 2.5).roundToDouble(),
--                        ),
--                      ),
++                          fontSize: 24,
+                         ),
+                       ),
 -                    )
 -                  : Center(
 -                      child: Icon(
 -                        Icons.person_2,
 -                        color: theme.colorScheme.tertiary,
 -                        size: size / 1.5,
--                      ),
-+              placeholder: (_) => Container(
-+                decoration: BoxDecoration(
-+                  color: backgroundColor ?? name?.lightColorAvatar,
-+                ),
-+                alignment: Alignment.center,
-+                child: FittedBox(
-+                  fit: BoxFit.scaleDown,
-+                  child: Text(
-+                    fallbackLetters,
-+                    textAlign: TextAlign.center,
-+                    style: TextStyle(
-+                      fontFamily: 'RobotoMono',
-+                      color: textColor ?? Colors.white,
-+                      fontWeight: FontWeight.bold,
-+                      fontSize: 24,
++                    ),
++                  )
++                : MxcImage(
++                    client: client,
++                    borderRadius: borderRadius,
++                    key: ValueKey(mxContent.toString()),
++                    cacheKey: mxContent.toString(),
++                    cacheName: 'avatars',
++                    uri: mxContent,
++                    fit: BoxFit.cover,
++                    width: size,
++                    height: size,
++                    placeholder: (_) => Container(
++                      decoration: BoxDecoration(
++                        color: backgroundColor ?? name?.lightColorAvatar,
++                      ),
++                      alignment: Alignment.center,
++                      child: FittedBox(
++                        fit: BoxFit.scaleDown,
++                        child: Text(
++                          fallbackLetters,
++                          textAlign: TextAlign.center,
++                          style: TextStyle(
++                            fontFamily: 'RobotoMono',
++                            color: textColor ?? Colors.white,
++                            fontWeight: FontWeight.bold,
++                            fontSize: 24,
++                          ),
++                        ),
+                       ),
                      ),
+-            ),
 +                  ),
-+                ),
-+              ),
-             ),
            ),
          ),
-@@ -132,8 +127,8 @@ class Avatar extends StatelessWidget {
+         if (presenceUserId != null)
+@@ -132,8 +148,8 @@ class Avatar extends StatelessWidget {
                    ? Colors.orange
                    : Colors.grey;
                return Positioned(
@@ -370116,6 +370315,16 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..e6360915721245008c730a01dd45292f
                  child: Container(
                    width: 16,
                    height: 16,
+@@ -161,6 +177,9 @@ class Avatar extends StatelessWidget {
+       ],
+     );
+     if (onTap == null) return container;
++    if (PlatformInfos.isMobile) {
++      return GestureDetector(onTap: onTap, child: container);
++    }
+     return MouseRegion(
+       cursor: SystemMouseCursors.click,
+       child: GestureDetector(onTap: onTap, child: container),
 diff --git a/lib/widgets/blur_hash.dart b/lib/widgets/blur_hash.dart
 index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc656802441 100644
 --- a/lib/widgets/blur_hash.dart
@@ -373309,10 +373518,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..91a3bc53a4e49438b7c15f3528f4c70ffd977134 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd1785f67b39 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,505 @@
+@@ -1,443 +1,510 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -374192,6 +374401,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..91a3bc53a4e49438b7c15f3528f4c70f
 +
 +  @override
 +  void dispose() {
++    _cachedPasswordClearTimer?.cancel();
++    _cachedPasswordClearTimer = null;
 +    _listener?.dispose();
 +
 +    for (final sub in onRoomKeyRequestSub.values) {
@@ -374221,6 +374432,9 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..91a3bc53a4e49438b7c15f3528f4c70f
 +    // Cancel the static presence stream subscription to prevent it from
 +    // leaking across logout/re-login cycles.
 +    PresenceManager.dispose();
++
++    // Release in-memory cached image bytes across account logout
++    MxcImage.trimAllCaches();
 +
 +    super.dispose();
 +  }
@@ -375021,10 +375235,10 @@ index 460cd78d218503d4369139851257455880ab4afc..cad75f8fcb928cc3c9ba2f70c73bf4de
 +  report,
 +}
 diff --git a/lib/widgets/mxc_image.dart b/lib/widgets/mxc_image.dart
-index 087c35629cad49b677166bd37fe30f7bd5a86adf..0dcd4d6d253500584874c72dfc96bd4c2bba1378 100644
+index 087c35629cad49b677166bd37fe30f7bd5a86adf..f12fdab561463215b0df824037f96fc0c7a25a1b 100644
 --- a/lib/widgets/mxc_image.dart
 +++ b/lib/widgets/mxc_image.dart
-@@ -1,223 +1,314 @@
+@@ -1,223 +1,318 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -375448,6 +375662,10 @@ index 087c35629cad49b677166bd37fe30f7bd5a86adf..0dcd4d6d253500584874c72dfc96bd4c
 +    } on IOException catch (_) {
 +      if (!mounted) return;
 +      _retryCount++;
++      if (_retryCount > 4) {
++        // Stop retrying after 4 attempts to save network and battery
++        return;
++      }
 +      final delaySeconds = min(60, pow(2, _retryCount)).toInt();
 +      await Future.delayed(Duration(seconds: delaySeconds));
 +      // Re-check mounted after the delay: the widget may have been disposed
@@ -375833,10 +376051,10 @@ index 03529bbbd0471f435c823660364687872feaafcd..6bc2d4dfefc4f073234eb7f0fb269552
 +  );
 +}
 diff --git a/lib/widgets/presence_builder.dart b/lib/widgets/presence_builder.dart
-index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..ee45a3a572f2cd69099d583462f32f24bd630620 100644
+index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..c7a0ae4abeaec2e8fd783290fdf75815b018d187 100644
 --- a/lib/widgets/presence_builder.dart
 +++ b/lib/widgets/presence_builder.dart
-@@ -9,6 +9,59 @@ import 'package:fluffychat/widgets/matrix.dart';
+@@ -9,6 +9,64 @@ import 'package:fluffychat/widgets/matrix.dart';
  import 'package:flutter/material.dart';
  import 'package:matrix/matrix.dart';
  
@@ -375860,6 +376078,11 @@ index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..ee45a3a572f2cd69099d583462f32f24
 +      });
 +    }
 +    if (!notifiers.containsKey(userId)) {
++      if (notifiers.length >= 300) {
++        final oldestKey = notifiers.keys.first;
++        notifiers.remove(oldestKey)?.dispose();
++        _lastFetch.remove(oldestKey);
++      }
 +      notifiers[userId] = ValueNotifier(null);
 +    }
 +
@@ -375896,7 +376119,7 @@ index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..ee45a3a572f2cd69099d583462f32f24
  class PresenceBuilder extends StatefulWidget {
    final Widget Function(BuildContext context, CachedPresence? presence) builder;
    final String? userId;
-@@ -26,35 +79,32 @@ class PresenceBuilder extends StatefulWidget {
+@@ -26,35 +84,32 @@ class PresenceBuilder extends StatefulWidget {
  }
  
  class _PresenceBuilderState extends State<PresenceBuilder> {
@@ -377507,6 +377730,100 @@ index 998e8c1ea29c671c6c4d5bed4d4eec0b3fa4e42e..65049d52c8843e34ca269022117d996f
 +    );
 +  }
 +}
+diff --git a/lib/widgets/typing_animation.dart b/lib/widgets/typing_animation.dart
+index 162b05dfcbaf05120931c1f15329c4df2a50434c..3f222b0d700819a0181d2efddd32c6389110b9a7 100644
+--- a/lib/widgets/typing_animation.dart
++++ b/lib/widgets/typing_animation.dart
+@@ -16,29 +16,24 @@ class TypingAnimation extends StatefulWidget {
+   State<TypingAnimation> createState() => _TypingAnimationState();
+ }
+ 
+-class _TypingAnimationState extends State<TypingAnimation> {
+-  int _tick = 0;
++class _TypingAnimationState extends State<TypingAnimation>
++    with SingleTickerProviderStateMixin {
++  late final AnimationController _controller;
+ 
+-  late final Timer _timer;
+-
+-  static const Duration animationDuration = Duration(milliseconds: 300);
++  static const Duration animationDuration = Duration(milliseconds: 1200);
+ 
+   @override
+   void initState() {
+-    _timer = Timer.periodic(animationDuration, (_) {
+-      if (!mounted) {
+-        return;
+-      }
+-      setState(() {
+-        _tick = (_tick + 1) % 4;
+-      });
+-    });
+     super.initState();
++    _controller = AnimationController(
++      vsync: this,
++      duration: animationDuration,
++    )..repeat();
+   }
+ 
+   @override
+   void dispose() {
+-    _timer.cancel();
++    _controller.dispose();
+     super.dispose();
+   }
+ 
+@@ -47,25 +42,31 @@ class _TypingAnimationState extends State<TypingAnimation> {
+     final theme = Theme.of(context);
+     final size = widget.size;
+ 
+-    return Row(
+-      mainAxisSize: .min,
+-      children: [
+-        for (var i = 1; i <= 3; i++)
+-          AnimatedContainer(
+-            duration: animationDuration * 1.5,
+-            curve: FluffyThemes.animationCurve,
+-            width: size,
+-            height: _tick == i ? size * 2 : size,
+-            margin: EdgeInsets.symmetric(
+-              horizontal: size / 4,
+-              vertical: _tick == i ? 4 : 8,
+-            ),
+-            decoration: BoxDecoration(
+-              borderRadius: BorderRadius.circular(size * 2),
+-              color: theme.colorScheme.secondary,
+-            ),
+-          ),
+-      ],
++    return AnimatedBuilder(
++      animation: _controller,
++      builder: (context, _) {
++        final tick = (_controller.value * 4).floor() % 4;
++        return Row(
++          mainAxisSize: .min,
++          children: [
++            for (var i = 1; i <= 3; i++)
++              AnimatedContainer(
++                duration: const Duration(milliseconds: 300),
++                curve: FluffyThemes.animationCurve,
++                width: size,
++                height: tick == i ? size * 2 : size,
++                margin: EdgeInsets.symmetric(
++                  horizontal: size / 4,
++                  vertical: tick == i ? 4 : 8,
++                ),
++                decoration: BoxDecoration(
++                  borderRadius: BorderRadius.circular(size * 2),
++                  color: theme.colorScheme.secondary,
++                ),
++              ),
++          ],
++        );
++      },
+     );
+   }
+ }
 diff --git a/lib/widgets/unread_rooms_badge.dart b/lib/widgets/unread_rooms_badge.dart
 index c47ae1d68b786e6c06ed98fd17bd379713fe8ad3..fafd50c85830bd149c602159ee3d43430467a0f4 100644
 --- a/lib/widgets/unread_rooms_badge.dart
