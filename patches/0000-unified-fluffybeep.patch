@@ -300631,10 +300631,10 @@ index 922773d8f234880aac86d4268c3a8bd3534a1395..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index d346f2271f53a5d4aee99806c55a69bf25b89be3..518ca7641fed07b854c54124eb33254fc72f4a01 100644
+index d346f2271f53a5d4aee99806c55a69bf25b89be3..9331f712a1808d13b594a3982e409b4a5b80c75f 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,165 +1,179 @@
+@@ -1,165 +1,180 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300805,6 +300805,7 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..518ca7641fed07b854c54124eb33254f
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:async';
 +import 'dart:isolate';
 +import 'dart:ui';
 +
