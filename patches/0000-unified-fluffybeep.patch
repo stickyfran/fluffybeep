@@ -13987,10 +13987,10 @@ index 7a06eb1ac3a85191fa7165cace17fadfaab93249..2b285e1072c3b4fe3afaa33f060c5a7a
  gem "multi_json"
 \ No newline at end of file
 diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
-index 8ebf61d428332c89de5bc6b78b58490b19645655..1ff6d60f27a2d94d5efddf86a84e4ddbd0bfa062 100644
+index 8ebf61d428332c89de5bc6b78b58490b19645655..669c0dce9afac1b4b10b0d2f421e7466506804ab 100644
 --- a/android/app/build.gradle.kts
 +++ b/android/app/build.gradle.kts
-@@ -1,96 +1,101 @@
+@@ -1,96 +1,102 @@
 -import java.util.Properties
 -import java.io.FileInputStream
 -
@@ -14174,12 +14174,13 @@ index 8ebf61d428332c89de5bc6b78b58490b19645655..1ff6d60f27a2d94d5efddf86a84e4ddb
 +            signingConfig = signingConfigs.getByName("release")
 +            isMinifyEnabled = true
 +            isShrinkResources = true
-+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
++            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 +        }
 +    }
 +
 +    packaging {
 +        jniLibs {
++            useLegacyPackaging = false
 +            pickFirsts += listOf("**/libavcodec.so", "**/libavfilter.so", "**/libavformat.so", "**/libavutil.so", "**/libswresample.so", "**/libswscale.so", "**/libc++_shared.so")
 +        }
 +    }
@@ -300630,10 +300631,10 @@ index 922773d8f234880aac86d4268c3a8bd3534a1395..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index d346f2271f53a5d4aee99806c55a69bf25b89be3..5047e377ee253b16b8b6287c6517368c916d84a7 100644
+index d346f2271f53a5d4aee99806c55a69bf25b89be3..518ca7641fed07b854c54124eb33254fc72f4a01 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,165 +1,178 @@
+@@ -1,165 +1,179 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300857,15 +300858,16 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..5047e377ee253b16b8b6287c6517368c
 +  }
 +
 +  if (PlatformInfos.isAndroid) {
-+    try {
-+      // High refresh rate (120Hz/90Hz) improves animation smoothness but
-+      // increases panel & GPU power consumption by ~15-25%. Controlled via
-+      // AppSettings.highRefreshRate (default: enabled).
-+      if (AppSettings.highRefreshRate.value) {
-+        await FlutterDisplayMode.setHighRefreshRate();
-+      }
-+    } catch (e) {
-+      Logs().w('Failed to set high refresh rate: $e');
++    // High refresh rate (120Hz/90Hz) improves animation smoothness but
++    // increases panel & GPU power consumption by ~15-25%. Controlled via
++    // AppSettings.highRefreshRate (default: enabled). Unawaited so it does not
++    // block first frame rendering.
++    if (AppSettings.highRefreshRate.value) {
++      unawaited(
++        FlutterDisplayMode.setHighRefreshRate().catchError((e) {
++          Logs().w('Failed to set high refresh rate: $e');
++        }),
++      );
 +    }
 +  }
 +
@@ -303085,10 +303087,10 @@ index 568b799da75226d8cea9e5026a30750c236b1389..2d1451b2f47a375a3ba8bddc5c7ffb02
 +  }
 +}
 diff --git a/lib/pages/bootstrap/widgets/store_recovery_key_view.dart b/lib/pages/bootstrap/widgets/store_recovery_key_view.dart
-index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e345cdc5fb 100644
+index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de446f0f43 100644
 --- a/lib/pages/bootstrap/widgets/store_recovery_key_view.dart
 +++ b/lib/pages/bootstrap/widgets/store_recovery_key_view.dart
-@@ -1,63 +1,63 @@
+@@ -1,63 +1,91 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -303163,9 +303165,38 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
 +
-+class StoreRecoveryKeyView extends StatelessWidget {
++class StoreRecoveryKeyView extends StatefulWidget {
 +  final BootstrapViewModel viewModel;
 +  const StoreRecoveryKeyView(this.viewModel, {super.key});
++
++  @override
++  State<StoreRecoveryKeyView> createState() => _StoreRecoveryKeyViewState();
++}
++
++class _StoreRecoveryKeyViewState extends State<StoreRecoveryKeyView> {
++  late final TextEditingController _controller;
++
++  BootstrapViewModel get viewModel => widget.viewModel;
++
++  @override
++  void initState() {
++    super.initState();
++    _controller = TextEditingController(text: viewModel.value.recoveryKey);
++  }
++
++  @override
++  void didUpdateWidget(covariant StoreRecoveryKeyView oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (oldWidget.viewModel.value.recoveryKey != viewModel.value.recoveryKey) {
++      _controller.text = viewModel.value.recoveryKey ?? '';
++    }
++  }
++
++  @override
++  void dispose() {
++    _controller.dispose();
++    super.dispose();
++  }
 +
 +  @override
 +  Widget build(BuildContext context) {
@@ -303175,8 +303206,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +        Text(L10n.of(context).storeRecoveryKeyDescription),
 +        const SizedBox(height: 16),
 +        TextField(
-+          // TODO: Dispose this
-+          controller: TextEditingController(text: viewModel.value.recoveryKey),
++          controller: _controller,
 +          readOnly: true,
 +          minLines: 2,
 +          maxLines: 4,
@@ -303216,7 +303246,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..9af3f3673ba99cef0103f7d970dbd3e3
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15a64f6e8f 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3b4676c09 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303793,7 +303823,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +776,180 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +776,182 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -304023,10 +304053,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
 +    // Fix: unregister lifecycle observer to prevent retention of this state
 +    // object after the chat is closed. addObserver is called in initState.
 +    WidgetsBinding.instance.removeObserver(this);
++    // Release in-memory cached image bytes for this room to avoid unbounded RAM accumulation
++    MxcImage.clearCache(roomId);
      super.dispose();
    }
  
-@@ -679,6 +988,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +990,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304037,7 +304069,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,12 +1009,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,12 +1011,6 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304050,7 +304082,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      // ignore: unawaited_futures
      room.sendTextEvent(
        sendController.text,
-@@ -710,17 +1017,39 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,17 +1019,39 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304096,7 +304128,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      });
    }
  
-@@ -883,60 +1212,183 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1214,183 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304318,7 +304350,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1397,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1399,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304333,7 +304365,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      }
    }
  
-@@ -964,21 +1416,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1418,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304366,7 +304398,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1460,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1462,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304379,7 +304411,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1477,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1479,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304388,7 +304420,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1534,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1536,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304401,7 +304433,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1144,7 +1597,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1144,7 +1599,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304410,7 +304442,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1611,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1613,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304428,7 +304460,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1713,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1715,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304442,7 +304474,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1745,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1747,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304451,7 +304483,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1811,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1813,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304466,7 +304498,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1848,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1850,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304476,7 +304508,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1917,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +1919,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304539,7 +304571,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +1966,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +1968,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304550,7 +304582,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
            return;
          }
        }
-@@ -1527,8 +1993,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +1995,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304559,7 +304591,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2047,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2049,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304576,7 +304608,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..30561101b6e8e44d4d4a998f4cf13c15
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2134,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2136,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -304726,7 +304758,7 @@ index eb9824f89f13d4dbd4f4f32982144146758ed9b7..d18545c73944cad27254222bc4ebc2ab
 +  }
 +}
 diff --git a/lib/pages/chat/chat_app_bar_title.dart b/lib/pages/chat/chat_app_bar_title.dart
-index 6cbf900c2b8d0c54eae2ee96c3dc490a857e5539..850879ab2067b638039ff7898fe6e54570c06461 100644
+index 6cbf900c2b8d0c54eae2ee96c3dc490a857e5539..cab6b01caca20b92ca6b50058faa37615b962b40 100644
 --- a/lib/pages/chat/chat_app_bar_title.dart
 +++ b/lib/pages/chat/chat_app_bar_title.dart
 @@ -1,193 +1,188 @@
@@ -304999,7 +305031,7 @@ index 6cbf900c2b8d0c54eae2ee96c3dc490a857e5539..850879ab2067b638039ff7898fe6e545
 +                  );
 +                }(),
 +                StreamBuilder(
-+                  stream: room.client.onSyncStatus.stream,
++                  stream: room.client.onSyncStatus.stream.distinct((a, b) => a.status == b.status),
 +                  builder: (context, snapshot) {
 +                    final status =
 +                        room.client.onSyncStatus.value ??
@@ -305242,7 +305274,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..c7c5306e61bd6d7dc401f286ac7bd4fa
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..e148a2ea3698b4a0b1f73af0476fc022d2e181fd 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea421d2a491 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305439,7 +305471,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..e148a2ea3698b4a0b1f73af0476fc022
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -159,86 +188,94 @@ class ChatEventList extends StatelessWidget {
+@@ -159,95 +188,106 @@ class ChatEventList extends StatelessWidget {
                    nextEvent == null ||
                    !event.originServerTs.sameDay(nextEvent.originServerTs);
  
@@ -305606,7 +305638,10 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..e148a2ea3698b4a0b1f73af0476fc022
                  ),
                );
              },
-@@ -248,6 +285,8 @@ class ChatEventList extends StatelessWidget {
+             childCount: events.length + 2,
++            addRepaintBoundaries: false,
+             findChildIndexCallback: (key) =>
+                 controller.findChildIndexCallback(key, thisEventsKeyMap),
            ),
          ),
        ),
@@ -307729,7 +307764,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8d8274075 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34c7c1fc02 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -308003,7 +308038,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +432,74 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +432,80 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -308042,9 +308077,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
 +        widget.event,
 +        onProgress: (progress) {
 +          if (mounted) {
-+            setState(() {
-+              _transcriptionProgress = progress;
-+            });
++            // Throttle progress updates to at least 5% increments to avoid 100+ widget rebuilds
++            // during heavy CPU/GPU Whisper transcription
++            if (_transcriptionProgress == null ||
++                (progress - _transcriptionProgress!).abs() >= 0.05 ||
++                progress >= 1.0) {
++              setState(() {
++                _transcriptionProgress = progress;
++              });
++            }
 +          }
 +        },
 +      );
@@ -308078,7 +308119,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +529,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +535,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -308116,7 +308157,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -365,71 +610,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -365,71 +616,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                          ),
                          const SizedBox(width: 8),
                          Expanded(
@@ -308248,7 +308289,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
                            ),
                          ),
                          const SizedBox(width: 8),
-@@ -449,30 +696,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +702,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -308304,7 +308345,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +763,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +769,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -308312,7 +308353,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..df2373b4e727264c547998cde5d9c2e8
                  ],
                ),
              );
-@@ -519,6 +772,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +778,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -312347,7 +312388,7 @@ index 90f8f79c21dd0b6ef9ab4a21be832feba86c5246..36f42b0cffc5226042ac245d730f19c4
                                : null,
                          ),
 diff --git a/lib/pages/chat/events/video_player.dart b/lib/pages/chat/events/video_player.dart
-index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc809e6b8e 100644
+index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..0d6f7694fd5adfc80756ec0812685cb9b7599f03 100644
 --- a/lib/pages/chat/events/video_player.dart
 +++ b/lib/pages/chat/events/video_player.dart
 @@ -4,9 +4,11 @@
@@ -312413,7 +312454,7 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc
      final fileDescription = event.fileDescription;
      const maxDimension = 300.0;
      final infoMap = event.content.tryGetMap<String, Object?>('info');
-@@ -85,30 +112,59 @@ class EventVideoPlayer extends StatelessWidget {
+@@ -85,30 +112,65 @@ class EventVideoPlayer extends StatelessWidget {
                  tag: event.eventId,
                  child: Stack(
                    children: [
@@ -312447,10 +312488,13 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc
 +                          event.transactionId ?? event.eventId,
 +                        );
 +                        if (memoryBytes != null && memoryBytes.isNotEmpty) {
++                          final dpr = MediaQuery.devicePixelRatioOf(context);
 +                          return Image.memory(
 +                            memoryBytes,
 +                            width: width,
 +                            height: height,
++                            cacheWidth: (width * dpr).round(),
++                            cacheHeight: (height * dpr).round(),
 +                            fit: BoxFit.cover,
 +                          );
 +                        }
@@ -312459,10 +312503,13 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..1d41171ea7e27ab4c91be21fe78046fc
 +                          builder: (context, snapshot) {
 +                            final bytes = snapshot.data;
 +                            if (bytes != null && bytes.isNotEmpty) {
++                              final dpr = MediaQuery.devicePixelRatioOf(context);
 +                              return Image.memory(
 +                                bytes,
 +                                width: width,
 +                                height: height,
++                                cacheWidth: (width * dpr).round(),
++                                cacheHeight: (height * dpr).round(),
 +                                fit: BoxFit.cover,
 +                              );
 +                            }
@@ -313365,7 +313412,7 @@ index b4a412669b8c93a72773352f931e045f1354b797..21a68f19afffd1d4e0c4951cea8b2ead
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2d1c6d4016b46bacc6261a650e6957370b17e395 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..f9d03fae2c77562cc806c074b808f3b0a5b71e7a 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
 @@ -1,222 +1,346 @@
@@ -313638,7 +313685,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..2d1c6d4016b46bacc6261a650e695737
 +
 +  @override
 +  void didChangeAppLifecycleState(AppLifecycleState state) {
-+    if (state == AppLifecycleState.paused) {
++    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
 +      if (isRecording) {
 +        cancel();
 +      }
@@ -316730,10 +316777,10 @@ index 9943dac0602792336e1a8e1e25af2215d51c5c23..27dd2142bf13fec93012c338efb310e5
      );
    }
 diff --git a/lib/pages/chat/trust_user_key_dialog.dart b/lib/pages/chat/trust_user_key_dialog.dart
-index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b8b15656d 100644
+index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..38119a84bd73c10381ad94d29a3393dc9733aed2 100644
 --- a/lib/pages/chat/trust_user_key_dialog.dart
 +++ b/lib/pages/chat/trust_user_key_dialog.dart
-@@ -1,163 +1,163 @@
+@@ -1,163 +1,197 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -316984,26 +317031,11 @@ index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b
 +                      ),
 +                    ],
 +                  ),
-+                  Builder(
-+                    builder: (context) {
-+                      final controller = TextEditingController(
-+                        text: l10n.publicKey(
-+                          room
-+                                  .client
-+                                  .userDeviceKeys[user.id]
-+                                  ?.masterKey
-+                                  ?.publicKey
-+                                  ?.beautifiedOneLine ??
-+                              '???',
-+                        ),
-+                      );
-+                      return DialogTextField(
-+                        controller: controller,
-+                        textStyle: theme.textTheme.labelSmall,
-+                        readOnly: true,
-+                        maxLines: 3,
-+                      );
-+                    },
++                  _UserKeyTextField(
++                    room: room,
++                    user: user,
++                    theme: theme,
++                    l10n: l10n,
 +                  ),
 +                ],
 +              ],
@@ -317060,6 +317092,55 @@ index 75ecf0e1a1cde2bfa140c84e7add638d3195a876..4d828a7a5fb9159cef3e850b2385da1b
 +}
 +
 +enum _Action { allow, deny, verification }
++
++class _UserKeyTextField extends StatefulWidget {
++  final Room room;
++  final User user;
++  final ThemeData theme;
++  final L10n l10n;
++
++  const _UserKeyTextField({
++    required this.room,
++    required this.user,
++    required this.theme,
++    required this.l10n,
++  });
++
++  @override
++  State<_UserKeyTextField> createState() => _UserKeyTextFieldState();
++}
++
++class _UserKeyTextFieldState extends State<_UserKeyTextField> {
++  late final TextEditingController _controller;
++
++  @override
++  void initState() {
++    super.initState();
++    _controller = TextEditingController(
++      text: widget.l10n.publicKey(
++        widget.room.client.userDeviceKeys[widget.user.id]?.masterKey?.publicKey
++                ?.beautifiedOneLine ??
++            '???',
++      ),
++    );
++  }
++
++  @override
++  void dispose() {
++    _controller.dispose();
++    super.dispose();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return DialogTextField(
++      controller: _controller,
++      textStyle: widget.theme.textTheme.labelSmall,
++      readOnly: true,
++      maxLines: 3,
++    );
++  }
++}
 diff --git a/lib/pages/chat/typing_indicators.dart b/lib/pages/chat/typing_indicators.dart
 index 2742ed9039262722afb865185e46ce2a2aca4cdb..62639a69c46821f2d6a9e7c291a33c8e6421b6b4 100644
 --- a/lib/pages/chat/typing_indicators.dart
@@ -319145,7 +319226,7 @@ index f4142a63d007ebeea05cd3becdfe694af8efc1a1..195386cc06f642c4c26fe3c480211a22
 +}
 diff --git a/lib/pages/chat_details/chat_details_media_tabs.dart b/lib/pages/chat_details/chat_details_media_tabs.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..34e93c4bc766e6ec8fd45b1395029db2bea3b491
+index 0000000000000000000000000000000000000000..480e524f72fe45d6d02b904ba1a485ae1dbd9609
 --- /dev/null
 +++ b/lib/pages/chat_details/chat_details_media_tabs.dart
 @@ -0,0 +1,368 @@
@@ -319468,10 +319549,10 @@ index 0000000000000000000000000000000000000000..34e93c4bc766e6ec8fd45b1395029db2
 +    required this.searchedUntil,
 +  });
 +
++  static final RegExp _urlRegExp = RegExp(r'(https?:\/\/[^\s]+)');
++
 +  @override
 +  Widget build(BuildContext context) {
-+    final RegExp urlRegExp = RegExp(r'(https?:\/\/[^\s]+)');
-+
 +    return ListView.builder(
 +      itemCount: events.length + 1,
 +      itemBuilder: (context, i) {
@@ -319486,7 +319567,7 @@ index 0000000000000000000000000000000000000000..34e93c4bc766e6ec8fd45b1395029db2
 +        
 +        final event = events[i];
 +        final body = event.body;
-+        final match = urlRegExp.firstMatch(body);
++        final match = _urlRegExp.firstMatch(body);
 +        final urlStr = match?.group(0) ?? '';
 +        
 +        if (urlStr.isEmpty) return const SizedBox.shrink();
@@ -319518,7 +319599,7 @@ index 0000000000000000000000000000000000000000..34e93c4bc766e6ec8fd45b1395029db2
 +  }
 +}
 diff --git a/lib/pages/chat_details/chat_details_view.dart b/lib/pages/chat_details/chat_details_view.dart
-index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d6788aa0c 100644
+index a13e841e8aae98fd631f12d1f2772030f2ad6973..53fac2c5d02968addd99a4166e30ba29518bccb0 100644
 --- a/lib/pages/chat_details/chat_details_view.dart
 +++ b/lib/pages/chat_details/chat_details_view.dart
 @@ -3,36 +3,66 @@
@@ -319648,7 +319729,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
                  ),
                if (controller.widget.embeddedCloseButton == null)
                  ChatSettingsPopupMenu(room, false),
-@@ -93,326 +130,518 @@ class ChatDetailsView extends StatelessWidget {
+@@ -93,326 +130,528 @@ class ChatDetailsView extends StatelessWidget {
                physics: const NeverScrollableScrollPhysics(),
                shrinkWrap: true,
                itemCount: members.length + 1 + (canRequestMoreMembers ? 1 : 0),
@@ -320111,12 +320192,12 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 +                          backgroundColor: theme.colorScheme.surfaceContainer,
 +                          foregroundColor: iconColor,
 +                          child: const Icon(Icons.merge_type_outlined),
-                         ),
++                        ),
 +                        title: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Contacto fusionado (${BeeperMergeUtils.getSiblingRooms(room.id).length} chats)'
 +                              : 'Fusionar con otras cuentas...',
-+                        ),
+                         ),
 +                        subtitle: Text(
 +                          BeeperMergeUtils.isRoomMerged(room.id)
 +                              ? 'Gestionar chats vinculados de este contacto'
@@ -320124,9 +320205,7 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 +                        ),
 +                        trailing: const Icon(Icons.chevron_right_outlined),
 +                        onTap: () => showMergeContactPicker(context, room),
-                       ),
--                      onTap: () => context.push(
--                        '/rooms/${controller.roomId!}/details/members',
++                      ),
 +                      ValueListenableBuilder<int>(
 +                        valueListenable: BeeperMergeUtils.mergeChangeNotifier,
 +                        builder: (context, _, __) {
@@ -320234,7 +320313,8 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 +                          );
 +                        },
                        ),
--                      trailing: const Icon(Icons.chevron_right_outlined),
+-                      onTap: () => context.push(
+-                        '/rooms/${controller.roomId!}/details/members',
 +                      Divider(color: theme.dividerColor),
 +                      ListTile(
 +                        title: Text(
@@ -320246,7 +320326,8 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 +                            fontWeight: FontWeight.bold,
 +                          ),
 +                        ),
-+                      ),
+                       ),
+-                      trailing: const Icon(Icons.chevron_right_outlined),
 +                      if (!room.isDirectChat && room.canInvite)
 +                        ListTile(
 +                          title: Text(L10n.of(context).inviteContact),
@@ -320273,14 +320354,14 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 +                  title: Text(
 +                    L10n.of(context).loadCountMoreParticipants(
 +                      (actualMembersCount - members.length),
-+                    ),
+                     ),
 +                  ),
 +                  leading: CircleAvatar(
 +                    backgroundColor: theme.scaffoldBackgroundColor,
 +                    child: const Icon(
 +                      Icons.group_outlined,
 +                      color: Colors.grey,
-                     ),
++                    ),
 +                  ),
 +                  onTap: () => context.push(
 +                    '/rooms/${controller.roomId!}/details/members',
@@ -320302,48 +320383,53 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 -  final IconData icon;
 +  Future<void> _showEditWhatsAppDialog(BuildContext context, Room room, String? currentPhone) async {
 +    final textController = TextEditingController(text: currentPhone ?? '');
-+    final result = await showDialog<String>(
-+      context: context,
-+      builder: (ctx) => AlertDialog(
-+        title: const Text('Número de WhatsApp'),
-+        content: Column(
-+          mainAxisSize: MainAxisSize.min,
-+          crossAxisAlignment: CrossAxisAlignment.start,
-+          children: [
-+            const Text(
-+              'Ingresa el número con código de país (ej. +5491112345678):',
-+              style: TextStyle(fontSize: 13),
-+            ),
-+            const SizedBox(height: 12),
-+            TextField(
-+              controller: textController,
-+              keyboardType: TextInputType.phone,
-+              autofocus: true,
-+              decoration: const InputDecoration(
-+                prefixIcon: Icon(Icons.phone_outlined),
-+                hintText: '+5491112345678',
-+                border: OutlineInputBorder(),
++    String? result;
++    try {
++      result = await showDialog<String>(
++        context: context,
++        builder: (ctx) => AlertDialog(
++          title: const Text('Número de WhatsApp'),
++          content: Column(
++            mainAxisSize: MainAxisSize.min,
++            crossAxisAlignment: CrossAxisAlignment.start,
++            children: [
++              const Text(
++                'Ingresa el número con código de país (ej. +5491112345678):',
++                style: TextStyle(fontSize: 13),
 +              ),
++              const SizedBox(height: 12),
++              TextField(
++                controller: textController,
++                keyboardType: TextInputType.phone,
++                autofocus: true,
++                decoration: const InputDecoration(
++                  prefixIcon: Icon(Icons.phone_outlined),
++                  hintText: '+5491112345678',
++                  border: OutlineInputBorder(),
++                ),
++              ),
++            ],
++          ),
++          actions: [
++            if (currentPhone != null && currentPhone.isNotEmpty)
++              TextButton(
++                onPressed: () => Navigator.of(ctx).pop(''),
++                child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++              ),
++            TextButton(
++              onPressed: () => Navigator.of(ctx).pop(),
++              child: const Text('Cancelar'),
++            ),
++            ElevatedButton(
++              onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
++              child: const Text('Guardar'),
 +            ),
 +          ],
 +        ),
-+        actions: [
-+          if (currentPhone != null && currentPhone.isNotEmpty)
-+            TextButton(
-+              onPressed: () => Navigator.of(ctx).pop(''),
-+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-+            ),
-+          TextButton(
-+            onPressed: () => Navigator.of(ctx).pop(),
-+            child: const Text('Cancelar'),
-+          ),
-+          ElevatedButton(
-+            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
-+            child: const Text('Guardar'),
-+          ),
-+        ],
-+      ),
-+    );
++      );
++    } finally {
++      textController.dispose();
++    }
  
 -  const _MainChatDetailsButton({
 -    required this.onPressed,
@@ -320376,7 +320462,18 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 -          child: Column(
 -            crossAxisAlignment: .center,
 -            mainAxisSize: .min,
--            children: [
++  Future<void> _showEditInstagramDialog(BuildContext context, Room room, String? currentHandle) async {
++    final textController = TextEditingController(text: currentHandle ?? '');
++    String? result;
++    try {
++      result = await showDialog<String>(
++        context: context,
++        builder: (ctx) => AlertDialog(
++          title: const Text('Usuario de Instagram'),
++          content: Column(
++            mainAxisSize: MainAxisSize.min,
++            crossAxisAlignment: CrossAxisAlignment.start,
+             children: [
 -              Icon(icon, color: theme.colorScheme.secondary),
 -              SizedBox(
 -                width: 64,
@@ -320386,53 +320483,45 @@ index a13e841e8aae98fd631f12d1f2772030f2ad6973..e5b061fa80ff4e89813f6334a5912d0d
 -                  overflow: .ellipsis,
 -                  textAlign: .center,
 -                  style: TextStyle(color: theme.colorScheme.secondary),
--                ),
-+  Future<void> _showEditInstagramDialog(BuildContext context, Room room, String? currentHandle) async {
-+    final textController = TextEditingController(text: currentHandle ?? '');
-+    final result = await showDialog<String>(
-+      context: context,
-+      builder: (ctx) => AlertDialog(
-+        title: const Text('Usuario de Instagram'),
-+        content: Column(
-+          mainAxisSize: MainAxisSize.min,
-+          crossAxisAlignment: CrossAxisAlignment.start,
-+          children: [
-+            const Text(
-+              'Ingresa el nombre de usuario de Instagram sin espacios (ej. thiaguirre):',
-+              style: TextStyle(fontSize: 13),
-+            ),
-+            const SizedBox(height: 12),
-+            TextField(
-+              controller: textController,
-+              autofocus: true,
-+              decoration: const InputDecoration(
-+                prefixText: '@',
-+                prefixIcon: Icon(Icons.camera_alt_outlined),
-+                hintText: 'usuario',
-+                border: OutlineInputBorder(),
++              const Text(
++                'Ingresa el nombre de usuario de Instagram sin espacios (ej. thiaguirre):',
++                style: TextStyle(fontSize: 13),
++              ),
++              const SizedBox(height: 12),
++              TextField(
++                controller: textController,
++                autofocus: true,
++                decoration: const InputDecoration(
++                  prefixText: '@',
++                  prefixIcon: Icon(Icons.camera_alt_outlined),
++                  hintText: 'usuario',
++                  border: OutlineInputBorder(),
+                 ),
                ),
--            ],
--          ),
+             ],
+           ),
++          actions: [
++            if (currentHandle != null && currentHandle.isNotEmpty)
++              TextButton(
++                onPressed: () => Navigator.of(ctx).pop(''),
++                child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++              ),
++            TextButton(
++              onPressed: () => Navigator.of(ctx).pop(),
++              child: const Text('Cancelar'),
++            ),
++            ElevatedButton(
++              onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
++              child: const Text('Guardar'),
 +            ),
 +          ],
          ),
-+        actions: [
-+          if (currentHandle != null && currentHandle.isNotEmpty)
-+            TextButton(
-+              onPressed: () => Navigator.of(ctx).pop(''),
-+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-+            ),
-+          TextButton(
-+            onPressed: () => Navigator.of(ctx).pop(),
-+            child: const Text('Cancelar'),
-+          ),
-+          ElevatedButton(
-+            onPressed: () => Navigator.of(ctx).pop(textController.text.trim()),
-+            child: const Text('Guardar'),
-+          ),
-+        ],
-       ),
-     );
+-      ),
+-    );
++      );
++    } finally {
++      textController.dispose();
++    }
 +
 +    if (result != null) {
 +      await BeeperMergeUtils.setCustomInstagramHandle(room.client, room.id, result.isEmpty ? null : result);
@@ -322438,7 +322527,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffbe90100e2 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..cd523e4aa215991ebd8cb9b9f3ecfc178d2c2c9c 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -323315,7 +323404,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +956,160 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +956,164 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -323452,11 +323541,13 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
 +            if (syncUpdate.rooms?.join != null) {
 +              for (final entry in syncUpdate.rooms!.join!.entries) {
 +                final roomId = entry.key;
-+                final roomUpdate = entry.value;
++                final hasEphemeralReceipt =
++                    roomUpdate.ephemeral?.any((e) => e.type == 'm.receipt') ??
++                        false;
 +                if (roomUpdate.timeline?.events?.isNotEmpty == true ||
 +                    roomUpdate.state?.isNotEmpty == true ||
 +                    roomUpdate.unreadNotifications != null ||
-+                    roomUpdate.ephemeral?.isNotEmpty == true ||
++                    hasEphemeralReceipt ||
 +                    roomUpdate.accountData?.isNotEmpty == true) {
 +                  BeeperBridgeUtils.invalidateLastMessageTime(roomId);
 +                  _pendingChangedRoomIds.add(roomId);
@@ -323492,6 +323583,8 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
  
    @override
    void dispose() {
++    EncryptionHealthMonitor().stop();
++    _coolDown?.cancel();
 +    BeeperMergeUtils.mergeChangeNotifier.removeListener(_onMergeChange);
 +    BeeperBridgeUtils.roomReadChangeNotifier.removeListener(_onRoomReadChange);
 +    _batchTimestampTimer?.cancel();
@@ -323510,7 +323603,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1203,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1207,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -323526,7 +323619,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1316,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1320,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323558,7 +323651,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1351,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1355,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323598,7 +323691,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
          ],
        );
      }
-@@ -700,7 +1404,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1408,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -323622,7 +323715,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1520,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1524,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -323748,7 +323841,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
      }
    }
  
-@@ -864,6 +1694,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1698,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -323756,7 +323849,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1745,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1749,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -323770,7 +323863,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..5dd10fa5417d3e8f1a84e3aa649caffb
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1869,7 @@ enum ChatContextAction {
+@@ -1039,4 +1873,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -324659,7 +324752,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024fef2c4d06 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..3f7296b99c5c191173fd7ec3ea62ea82d5e33c5e 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -324699,7 +324792,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,279 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,285 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -324716,6 +324809,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
 +  Future<void>? _loadHeroUsersFuture;
 +  Future<String>? _calcLocalizedBodyFuture;
 +  late AnimationController _sizeController;
++  late Animation<double> _sizeAnimation;
 +
 +  @override
 +  bool get wantKeepAlive => false;
@@ -324728,11 +324822,16 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
 +      duration: const Duration(milliseconds: 250),
 +      value: 1.0,
 +    );
++    _sizeAnimation = CurvedAnimation(
++      parent: _sizeController,
++      curve: Curves.easeOut,
++    );
 +    _initHeroFuture();
 +  }
 +
 +  @override
 +  void dispose() {
++    _sizeAnimation.removeListener(() {});
 +    _sizeController.dispose();
 +    super.dispose();
 +  }
@@ -325103,7 +325202,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +330,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +336,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -325112,7 +325211,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +341,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +347,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -325121,7 +325220,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +352,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +358,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -325160,7 +325259,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +369,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +375,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -325183,7 +325282,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +397,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +403,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -325192,7 +325291,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +415,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +421,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -325206,7 +325305,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +428,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +434,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -325232,7 +325331,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,69 +442,180 @@ class ChatListItem extends StatelessWidget {
+@@ -336,69 +448,177 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -325439,10 +325538,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..3a5316d47b4b41acac957d693b52024f
 +    }
 +
 +    return SizeTransition(
-+      sizeFactor: CurvedAnimation(
-+        parent: _sizeController,
-+        curve: Curves.easeOut,
-+      ),
++      sizeFactor: _sizeAnimation,
 +      child: Padding(
 +        padding: const EdgeInsets.symmetric(horizontal: 8),
 +        child: Material(
@@ -325721,10 +325817,10 @@ index 0db2f7422da7acfd9a5c47694a13613cfa8e40b1..e431b1670f4e2b85929dbb0fb204d72f
 +  }
 +}
 diff --git a/lib/pages/chat_list/client_chooser_button.dart b/lib/pages/chat_list/client_chooser_button.dart
-index d6ebd5bee577f7e4b8c27669c303412fac2412c5..233b8ca72c60970067000a84a9d1d436ab2140f5 100644
+index d6ebd5bee577f7e4b8c27669c303412fac2412c5..6fbae371952bda488f5342853e7590bc62bb0ebd 100644
 --- a/lib/pages/chat_list/client_chooser_button.dart
 +++ b/lib/pages/chat_list/client_chooser_button.dart
-@@ -1,241 +1,243 @@
+@@ -1,241 +1,258 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -325983,10 +326079,20 @@ index d6ebd5bee577f7e4b8c27669c303412fac2412c5..233b8ca72c60970067000a84a9d1d436
 +import '../../utils/fluffy_share.dart';
 +import 'chat_list.dart';
 +
-+class ClientChooserButton extends StatelessWidget {
++class ClientChooserButton extends StatefulWidget {
 +  final ChatListController controller;
 +
 +  const ClientChooserButton(this.controller, {super.key});
++
++  @override
++  State<ClientChooserButton> createState() => _ClientChooserButtonState();
++}
++
++class _ClientChooserButtonState extends State<ClientChooserButton> {
++  Future<Profile>? _profileFuture;
++  Client? _lastClient;
++
++  ChatListController get controller => widget.controller;
 +
 +  List<PopupMenuEntry<Object>> _bundleMenuItems(BuildContext context) {
 +    final matrix = Matrix.of(context);
@@ -326139,10 +326245,15 @@ index d6ebd5bee577f7e4b8c27669c303412fac2412c5..233b8ca72c60970067000a84a9d1d436
 +    final matrix = Matrix.of(context);
 +    final client = Result(() => matrix.client).asValue?.value;
 +
++    if (client != _lastClient) {
++      _lastClient = client;
++      _profileFuture = client?.isLogged() == true ? client?.fetchOwnProfile() : null;
++    }
++
 +    var clientCount = 0;
 +    matrix.accountBundles.forEach((key, value) => clientCount += value.length);
 +    return FutureBuilder<Profile>(
-+      future: client?.isLogged() == true ? client?.fetchOwnProfile() : null,
++      future: _profileFuture,
 +      builder: (context, snapshot) => Material(
 +        clipBehavior: Clip.hardEdge,
 +        borderRadius: BorderRadius.circular(99),
@@ -326540,10 +326651,10 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..b27d7b7305c8c448f2f818bbf73dde509aa01bf9
+index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7d00de6fd
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
-@@ -0,0 +1,280 @@
+@@ -0,0 +1,282 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -326621,6 +326732,8 @@ index 0000000000000000000000000000000000000000..b27d7b7305c8c448f2f818bbf73dde50
 +                phoneContact!.thumbnail!,
 +                width: Avatar.defaultSize,
 +                height: Avatar.defaultSize,
++                cacheWidth: (Avatar.defaultSize * MediaQuery.devicePixelRatioOf(context)).round(),
++                cacheHeight: (Avatar.defaultSize * MediaQuery.devicePixelRatioOf(context)).round(),
 +                fit: BoxFit.cover,
 +              ),
 +            )
@@ -326873,7 +326986,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6ed08c1a2 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5f6c8098a1a57bc009ae0577751e565aea79ceaa 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,26 @@
@@ -326907,7 +327020,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6
    final String? activeSpaceId;
    final void Function() onGoToChats;
    final void Function(String) onGoToSpaceId;
-@@ -28,23 +34,496 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -28,23 +34,501 @@ class SpacesNavigationRail extends StatelessWidget {
      super.key,
    });
  
@@ -327130,27 +327243,32 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6
 +              onTap: () async {
 +                Navigator.of(context).pop();
 +                final textController = TextEditingController(text: displayName);
-+                final newName = await showDialog<String>(
-+                  context: context,
-+                  builder: (context) => AlertDialog(
-+                    title: const Text('Editar etiqueta'),
-+                    content: TextField(
-+                      controller: textController,
-+                      autofocus: true,
-+                      decoration: const InputDecoration(labelText: 'Nombre de la etiqueta'),
++                String? newName;
++                try {
++                  newName = await showDialog<String>(
++                    context: context,
++                    builder: (context) => AlertDialog(
++                      title: const Text('Editar etiqueta'),
++                      content: TextField(
++                        controller: textController,
++                        autofocus: true,
++                        decoration: const InputDecoration(labelText: 'Nombre de la etiqueta'),
++                      ),
++                      actions: [
++                        TextButton(
++                          onPressed: () => Navigator.of(context).pop(),
++                          child: const Text('Cancelar'),
++                        ),
++                        ElevatedButton(
++                          onPressed: () => Navigator.of(context).pop(textController.text.trim()),
++                          child: const Text('Guardar'),
++                        ),
++                      ],
 +                    ),
-+                    actions: [
-+                      TextButton(
-+                        onPressed: () => Navigator.of(context).pop(),
-+                        child: const Text('Cancelar'),
-+                      ),
-+                      ElevatedButton(
-+                        onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-+                        child: const Text('Guardar'),
-+                      ),
-+                    ],
-+                  ),
-+                );
++                  );
++                } finally {
++                  textController.dispose();
++                }
 +                if (newName != null && newName.isNotEmpty && newName != displayName) {
 +                  final newTag = 'u.$newName';
 +                  for (final room in client.rooms) {
@@ -327410,7 +327528,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6
  
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
-@@ -54,14 +533,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -54,14 +538,14 @@ class SpacesNavigationRail extends StatelessWidget {
                  children: [
                    Expanded(
                      child: ListView.builder(
@@ -327429,7 +327547,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -71,57 +550,224 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -71,57 +555,224 @@ class SpacesNavigationRail extends StatelessWidget {
                                child: Icon(Icons.forum),
                              ),
                              toolTip: L10n.of(context).chats,
@@ -327689,7 +327807,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..39acdbf4884ca02aca47b507d0a6adc6
                      Padding(
                        padding: const EdgeInsets.all(12.0),
                        child: StartChatFab(),
-@@ -135,3 +781,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +786,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -327976,7 +328094,7 @@ index 13d6fe73c0bd33a8ca518f476ecbe5d0397dcf7d..d88172fd98a80acd1ec461a4746644b9
 +  }
 +}
 diff --git a/lib/pages/chat_list/space_view.dart b/lib/pages/chat_list/space_view.dart
-index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a46562a67d41 100644
+index 558056ea899b772be608de1907f4d60c45a5956c..2d9f2682be7346ce5e59905beeff4bdfeb7680de 100644
 --- a/lib/pages/chat_list/space_view.dart
 +++ b/lib/pages/chat_list/space_view.dart
 @@ -8,9 +8,12 @@ import 'dart:convert';
@@ -328010,7 +328128,23 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
    final List<SpaceRoomsChunk$2> _discoveredChildren = [];
    final TextEditingController _filterController = TextEditingController();
    String? _nextBatch;
-@@ -178,8 +183,15 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -60,6 +65,7 @@ class _SpaceViewState extends State<SpaceView> {
+   bool _isLoading = false;
+ 
+   StreamSubscription? _childStateSub;
++  Timer? _filterDebounceTimer;
+ 
+   @override
+   void initState() {
+@@ -78,6 +84,7 @@ class _SpaceViewState extends State<SpaceView> {
+ 
+   @override
+   void dispose() {
++    _filterDebounceTimer?.cancel();
+     _childStateSub?.cancel();
+     _filterController.dispose();
+     super.dispose();
+@@ -178,8 +185,15 @@ class _SpaceViewState extends State<SpaceView> {
          if (!mounted) return;
          context.push('/rooms/${widget.spaceId}/details');
          break;
@@ -328028,7 +328162,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
          break;
        case SpaceActions.leave:
          final confirmed = await showOkCancelAlertDialog(
-@@ -254,20 +266,20 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -254,20 +268,20 @@ class _SpaceViewState extends State<SpaceView> {
              ),
            ),
            PopupMenuItem(
@@ -328052,7 +328186,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -353,7 +365,10 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -353,7 +367,10 @@ class _SpaceViewState extends State<SpaceView> {
        case SpaceChildAction.markAsRead:
          await showFutureLoadingDialog(
            context: context,
@@ -328064,7 +328198,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
          );
        case SpaceChildAction.leave:
          await showFutureLoadingDialog(
-@@ -372,19 +387,122 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -372,26 +389,134 @@ class _SpaceViewState extends State<SpaceView> {
          room?.getLocalizedDisplayname() ?? L10n.of(context).nothingFound;
      const avatarSize = Avatar.defaultSize / 1.5;
      final isAdmin = room?.canChangeStateEvent(EventTypes.SpaceChild) == true;
@@ -328191,7 +328325,20 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                        floating: true,
                        scrolledUnderElevation: 0,
                        backgroundColor: Colors.transparent,
-@@ -414,60 +532,13 @@ class _SpaceViewState extends State<SpaceView> {
+                       automaticallyImplyLeading: false,
+                       title: TextField(
+                         controller: _filterController,
+-                        onChanged: (_) => setState(() {}),
++                        onChanged: (_) {
++                          _filterDebounceTimer?.cancel();
++                          _filterDebounceTimer = Timer(const Duration(milliseconds: 250), () {
++                            if (mounted) setState(() {});
++                          });
++                        },
+                         textInputAction: TextInputAction.search,
+                         decoration: InputDecoration(
+                           filled: true,
+@@ -414,60 +539,13 @@ class _SpaceViewState extends State<SpaceView> {
                                color: theme.colorScheme.onPrimaryContainer,
                              ),
                            ),
@@ -328255,7 +328402,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                            if (_noMoreRooms) {
                              return const SizedBox.shrink();
                            }
-@@ -484,7 +555,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -484,7 +562,7 @@ class _SpaceViewState extends State<SpaceView> {
                              ),
                            );
                          }
@@ -328264,7 +328411,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                          var joinedRoom = room.client.getRoomById(item.roomId);
                          final displayname =
                              item.name ??
-@@ -492,9 +563,6 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -492,9 +570,6 @@ class _SpaceViewState extends State<SpaceView> {
                              joinedRoom?.getLocalizedDisplayname() ??
                              L10n.of(context).emptyChat;
                          final avatarUrl = item.avatarUrl ?? joinedRoom?.avatar;
@@ -328274,7 +328421,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                          if (joinedRoom?.membership == Membership.leave) {
                            joinedRoom = null;
                          }
-@@ -532,8 +600,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -532,8 +607,7 @@ class _SpaceViewState extends State<SpaceView> {
                                          item.roomId,
                                        )
                                      : null,
@@ -328284,7 +328431,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                                      ? SizedBox.square(
                                          dimension: avatarSize,
                                          child: IconButton(
-@@ -547,11 +614,13 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -547,11 +621,13 @@ class _SpaceViewState extends State<SpaceView> {
                                                  .colorScheme
                                                  .tertiaryContainer,
                                            ),
@@ -328303,7 +328450,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                                            icon: const Icon(Icons.edit_outlined),
                                          ),
                                        )
-@@ -562,7 +631,7 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -562,7 +638,7 @@ class _SpaceViewState extends State<SpaceView> {
                                          backgroundColor:
                                              theme.colorScheme.surfaceContainer,
                                          textColor:
@@ -328312,7 +328459,7 @@ index 558056ea899b772be608de1907f4d60c45a5956c..ad06589d94f38281c927ca97abe9a465
                                              theme.colorScheme.onSurface,
                                          shapeBorder: item.roomType == 'm.space'
                                              ? RoundedSuperellipseBorder(
-@@ -587,14 +656,20 @@ class _SpaceViewState extends State<SpaceView> {
+@@ -587,14 +663,20 @@ class _SpaceViewState extends State<SpaceView> {
                                  title: Row(
                                    children: [
                                      Expanded(
@@ -328541,10 +328688,10 @@ index 74aeef4b8379830a53306a5955e2679aa7aed689..69f26d937fcdddbdb3370ba78bcfcf71
 +  }
 +}
 diff --git a/lib/pages/chat_members/chat_members.dart b/lib/pages/chat_members/chat_members.dart
-index 5248574bd315287cec3c88fc06b90791628f8a15..0c726a35e75b165d8a092cdd841b11066e188cd3 100644
+index 5248574bd315287cec3c88fc06b90791628f8a15..9c151188f5fd74eada7c8f63a7014e06d0d96458 100644
 --- a/lib/pages/chat_members/chat_members.dart
 +++ b/lib/pages/chat_members/chat_members.dart
-@@ -1,120 +1,120 @@
+@@ -1,120 +1,129 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328694,13 +328841,21 @@ index 5248574bd315287cec3c88fc06b90791628f8a15..0c726a35e75b165d8a092cdd841b1106
 +  Membership membershipFilter = Membership.join;
 +
 +  final TextEditingController filterController = TextEditingController();
++  Timer? _filterDebounceTimer;
 +
 +  void setMembershipFilter(Membership membership) {
 +    membershipFilter = membership;
-+    setFilter();
++    _runFilter();
 +  }
 +
-+  Future<void> setFilter([_]) async {
++  void setFilter([_]) {
++    _filterDebounceTimer?.cancel();
++    _filterDebounceTimer = Timer(const Duration(milliseconds: 250), () {
++      if (mounted) _runFilter();
++    });
++  }
++
++  Future<void> _runFilter() async {
 +    final filter = filterController.text.toLowerCase().trim();
 +
 +    final members = this.members
@@ -328777,6 +328932,7 @@ index 5248574bd315287cec3c88fc06b90791628f8a15..0c726a35e75b165d8a092cdd841b1106
 +
 +  @override
 +  void dispose() {
++    _filterDebounceTimer?.cancel();
 +    _updateSub?.cancel();
 +    filterController.dispose();
 +    super.dispose();
@@ -332834,10 +332990,10 @@ index 2c578b51a60d69e80cfb1f967f5556834af9a63c..07fa502ef08330890097070e9aeb7531
 +  }
 +}
 diff --git a/lib/pages/dialer/dialer.dart b/lib/pages/dialer/dialer.dart
-index 0050898f28d14ac2ebd2bb9d634a09b66ed44cba..f790cdcd41f641fe40068afbe098a6f771318220 100644
+index 0050898f28d14ac2ebd2bb9d634a09b66ed44cba..4cc03edb0bcda70328e04dc12d160334cedbccf3 100644
 --- a/lib/pages/dialer/dialer.dart
 +++ b/lib/pages/dialer/dialer.dart
-@@ -1,574 +1,590 @@
+@@ -1,574 +1,600 @@
 -// Copyright (C) 2019-2021 Famedly GmbH
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
@@ -333590,10 +333746,13 @@ index 0050898f28d14ac2ebd2bb9d634a09b66ed44cba..f790cdcd41f641fe40068afbe098a6f7
 +    _playCallSound();
 +  }
 +
++  StreamSubscription? _callStateSub;
++  StreamSubscription? _callEventSub;
++
 +  void initialize() {
 +    final call = this.call;
-+    call.onCallStateChanged.stream.listen(_handleCallState);
-+    call.onCallEventChanged.stream.listen((event) {
++    _callStateSub = call.onCallStateChanged.stream.listen(_handleCallState);
++    _callEventSub = call.onCallEventChanged.stream.listen((event) {
 +      if (event == CallStateChange.kFeedsChanged) {
 +        setState(call.tryRemoveStopedStreams);
 +      } else if (event == CallStateChange.kLocalHoldUnhold ||
@@ -333625,6 +333784,13 @@ index 0050898f28d14ac2ebd2bb9d634a09b66ed44cba..f790cdcd41f641fe40068afbe098a6f7
 +
 +  @override
 +  void dispose() {
++    _callStateSub?.cancel();
++    _callEventSub?.cancel();
++    if (call.type == CallType.kVideo) {
++      try {
++        unawaited(WakelockPlus.disable());
++      } catch (_) {}
++    }
 +    super.dispose();
 +    call.cleanUp.call();
 +  }
@@ -334003,10 +334169,10 @@ index 0050898f28d14ac2ebd2bb9d634a09b66ed44cba..f790cdcd41f641fe40068afbe098a6f7
 +  }
 +}
 diff --git a/lib/pages/dialer/pip/dismiss_keyboard.dart b/lib/pages/dialer/pip/dismiss_keyboard.dart
-index b2a69769fbace8a34d4928a868ec0e85ee4ce21f..db072befb87d4f6a1d70da2b47fe97799d804b9d 100644
+index b2a69769fbace8a34d4928a868ec0e85ee4ce21f..c1bf8281a236456d51b0fee48d70d41e76ff2743 100644
 --- a/lib/pages/dialer/pip/dismiss_keyboard.dart
 +++ b/lib/pages/dialer/pip/dismiss_keyboard.dart
-@@ -1,11 +1,11 @@
+@@ -1,11 +1,10 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -334026,8 +334192,7 @@ index b2a69769fbace8a34d4928a868ec0e85ee4ce21f..db072befb87d4f6a1d70da2b47fe9779
 +import 'package:flutter/material.dart';
 +
 +void dismissKeyboard(BuildContext context) {
-+  // TODO: Dispose this
-+  FocusScope.of(context).requestFocus(FocusNode());
++  FocusScope.of(context).unfocus();
 +}
 diff --git a/lib/pages/dialer/pip/pip_view.dart b/lib/pages/dialer/pip/pip_view.dart
 index 9b83db8106ceda6f263b7f4e4a5ea6f49faf7560..8673ab11f7c5771d0fc8ce52d03d205031107438 100644
@@ -336137,10 +336302,10 @@ index ea41f1df81ba4cb3bdf49f17c619807d48975f05..a98b16f7d2a492b6558b769b4744cc49
 +  }
 +}
 diff --git a/lib/pages/invitation_selection/invitation_selection.dart b/lib/pages/invitation_selection/invitation_selection.dart
-index c20d748c908187325325d74bfeaad28858684b0a..9b8f13f58747fd43cf0bab372d7c1178a6bdae0c 100644
+index c20d748c908187325325d74bfeaad28858684b0a..8f55df371a12144bd8fa8817a0d498181a1bace4 100644
 --- a/lib/pages/invitation_selection/invitation_selection.dart
 +++ b/lib/pages/invitation_selection/invitation_selection.dart
-@@ -1,129 +1,129 @@
+@@ -1,129 +1,130 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -336392,6 +336557,7 @@ index c20d748c908187325325d74bfeaad28858684b0a..9b8f13f58747fd43cf0bab372d7c1178
 +
 +  @override
 +  void dispose() {
++    coolDown?.cancel();
 +    controller.dispose();
 +    super.dispose();
 +  }
@@ -338477,10 +338643,10 @@ index 5b822afacf890fd8959ae4e7f814e2a6489bdc70..5d73047f6bc5c6a4bffecd2c26bd20a1
 +}
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..55e8c9ba9daf7b996f53f16a88f01e1420cd9f28
+index 0000000000000000000000000000000000000000..5330bb94550abbb373065a27bb0366cfcb11a82d
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,656 @@
+@@ -0,0 +1,662 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -338545,6 +338711,7 @@ index 0000000000000000000000000000000000000000..55e8c9ba9daf7b996f53f16a88f01e14
 +  final TextEditingController _searchController = TextEditingController();
 +  final TextEditingController _nameController = TextEditingController();
 +  final ValueNotifier<String> _searchFilterNotifier = ValueNotifier<String>('');
++  Timer? _searchDebounceTimer;
 +
 +  String? _matchedPhoneContactId;
 +  bool _isLoadingContacts = false;
@@ -338581,10 +338748,14 @@ index 0000000000000000000000000000000000000000..55e8c9ba9daf7b996f53f16a88f01e14
 +    _computeSuggestions();
 +
 +    _searchController.addListener(() {
-+      final text = _searchController.text.trim().toLowerCase();
-+      if (_searchFilterNotifier.value != text) {
-+        _searchFilterNotifier.value = text;
-+      }
++      _searchDebounceTimer?.cancel();
++      _searchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
++        if (!mounted) return;
++        final text = _searchController.text.trim().toLowerCase();
++        if (_searchFilterNotifier.value != text) {
++          _searchFilterNotifier.value = text;
++        }
++      });
 +    });
 +
 +    _initPhoneContacts();
@@ -338725,6 +338896,7 @@ index 0000000000000000000000000000000000000000..55e8c9ba9daf7b996f53f16a88f01e14
 +
 +  @override
 +  void dispose() {
++    _searchDebounceTimer?.cancel();
 +    _searchController.dispose();
 +    _nameController.dispose();
 +    _searchFilterNotifier.dispose();
@@ -339928,10 +340100,10 @@ index 10d57b3710b274d420ac1e3c58b444e18af9cbf4..b4706d182cd7dc16f0f0d6f41e450398
 +  }
 +}
 diff --git a/lib/pages/new_private_chat/new_private_chat.dart b/lib/pages/new_private_chat/new_private_chat.dart
-index e9f7145ac913f4ff398bdf36fafd9f7326eb349a..e4ea90cba5b4111579da4a45c559d9f511164792 100644
+index e9f7145ac913f4ff398bdf36fafd9f7326eb349a..09791032eb96d960b6180eb432edd21e6c481262 100644
 --- a/lib/pages/new_private_chat/new_private_chat.dart
 +++ b/lib/pages/new_private_chat/new_private_chat.dart
-@@ -1,134 +1,134 @@
+@@ -1,134 +1,135 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -340192,6 +340364,7 @@ index e9f7145ac913f4ff398bdf36fafd9f7326eb349a..e4ea90cba5b4111579da4a45c559d9f5
 +
 +  @override
 +  void dispose() {
++    _searchCoolDown?.cancel();
 +    controller.dispose();
 +    textFieldFocus.dispose();
 +    super.dispose();
@@ -340806,10 +340979,10 @@ index ac1270cece0ecf0bd66b5c43fe053de7fde39049..321bd952c34790c87bec8eed53ec199e
 +  }
 +}
 diff --git a/lib/pages/new_private_chat/qr_scanner_modal.dart b/lib/pages/new_private_chat/qr_scanner_modal.dart
-index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39a9450b60 100644
+index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..d2bc0a1d65977bf001c8c065de9a296a8dfd4b67 100644
 --- a/lib/pages/new_private_chat/qr_scanner_modal.dart
 +++ b/lib/pages/new_private_chat/qr_scanner_modal.dart
-@@ -1,80 +1,80 @@
+@@ -1,80 +1,89 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -340952,6 +341125,15 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +    );
 +  }
 +
++  StreamSubscription? _scanSub;
++
++  @override
++  void dispose() {
++    _scanSub?.cancel();
++    controller?.dispose();
++    super.dispose();
++  }
++
 +  void _onQRViewCreated(QRViewController controller) {
 +    this.controller = controller;
 +    // Workaround for QR Scanner is started in Pause mode
@@ -340960,9 +341142,9 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..e68ed26326df08791e300ecebb4b9d39
 +      controller.pauseCamera();
 +    }
 +    controller.resumeCamera();
-+    late StreamSubscription sub;
-+    sub = controller.scannedDataStream.listen((scanData) {
-+      sub.cancel();
++    _scanSub = controller.scannedDataStream.listen((scanData) {
++      _scanSub?.cancel();
++      _scanSub = null;
 +      if (!mounted) return;
 +      Navigator.of(context).pop();
 +      final data = scanData.code;
@@ -351969,10 +352151,10 @@ index 9abd8ce13969f15d8f0f26186213531ff9d6f286..29a8b6155f20182818c04fa319900dc5
 +  AsyncSnapshot<bool> loginLoading = const AsyncSnapshot.nothing();
 +}
 diff --git a/lib/pages/sign_in/view_model/sign_in_view_model.dart b/lib/pages/sign_in/view_model/sign_in_view_model.dart
-index 31c89bb610ce83cc4ea66d77b050e72e683e030e..03449980d73012ce373126f0b0f8e60090e3eeef 100644
+index 31c89bb610ce83cc4ea66d77b050e72e683e030e..2de0516fe0c1de7d9331410476093cb4990ac38d 100644
 --- a/lib/pages/sign_in/view_model/sign_in_view_model.dart
 +++ b/lib/pages/sign_in/view_model/sign_in_view_model.dart
-@@ -1,114 +1,114 @@
+@@ -1,114 +1,124 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -352092,6 +352274,7 @@ index 31c89bb610ce83cc4ea66d77b050e72e683e030e..03449980d73012ce373126f0b0f8e600
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:async';
 +import 'dart:convert';
 +
 +import 'package:collection/collection.dart';
@@ -352107,18 +352290,27 @@ index 31c89bb610ce83cc4ea66d77b050e72e683e030e..03449980d73012ce373126f0b0f8e600
 +  final MatrixState matrixService;
 +  final bool signUp;
 +  final TextEditingController filterTextController = TextEditingController();
++  Timer? _filterDebounceTimer;
 +
 +  SignInViewModel(this.matrixService, {required this.signUp})
 +    : super(SignInState()) {
 +    refreshPublicHomeservers();
-+    filterTextController.addListener(_filterHomeservers);
++    filterTextController.addListener(_onFilterChanged);
 +  }
 +
 +  @override
 +  void dispose() {
-+    filterTextController.removeListener(_filterHomeservers);
++    _filterDebounceTimer?.cancel();
++    filterTextController.removeListener(_onFilterChanged);
 +    filterTextController.dispose();
 +    super.dispose();
++  }
++
++  void _onFilterChanged() {
++    _filterDebounceTimer?.cancel();
++    _filterDebounceTimer = Timer(const Duration(milliseconds: 250), () {
++      _filterHomeservers();
++    });
 +  }
 +
 +  void _filterHomeservers() {
@@ -354552,10 +354744,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..b61891ddafdcfc158d21898ee857b6dfeb199f7f
+index 0000000000000000000000000000000000000000..ac775044a078e3b188af012120ffcfc4da32ea82
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1355 @@
+@@ -0,0 +1,1364 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -354767,6 +354959,12 @@ index 0000000000000000000000000000000000000000..b61891ddafdcfc158d21898ee857b6df
 +    if (cachedSig == sig) {
 +      final cached = _roomDataCache[room.id];
 +      if (cached != null) return cached;
++    } else if (cachedSig == -1) {
++      final cached = _roomDataCache[room.id];
++      if (cached != null) {
++        _roomDataSignatures[room.id] = sig;
++        return cached;
++      }
 +    }
 +
 +    final data = _computeRoomData(room);
@@ -355817,14 +356015,17 @@ index 0000000000000000000000000000000000000000..b61891ddafdcfc158d21898ee857b6df
 +    return null;
 +  }
 +
++  static final RegExp _leadingPrefixHtmlRegExp = RegExp(r'^<p>\s*\[[^\]]+\]\s*');
++  static final RegExp _leadingPrefixPlainRegExp = RegExp(r'^\s*\[[^\]]+\]\s*');
++
 +  /// Strips leading bridge prefixes like [WhatsApp], [Telegram], [Signal], etc.
 +  /// when AppSettings.hideNetworkPrefixInNotification is enabled.
 +  static String stripNetworkPrefix(String text) {
 +    if (!AppSettings.hideNetworkPrefixInNotification.value) return text;
 +    if (text.startsWith('<p>[')) {
-+      return text.replaceFirst(RegExp(r'^<p>\s*\[[^\]]+\]\s*'), '<p>');
++      return text.replaceFirst(_leadingPrefixHtmlRegExp, '<p>');
 +    }
-+    return text.replaceFirst(RegExp(r'^\s*\[[^\]]+\]\s*'), '');
++    return text.replaceFirst(_leadingPrefixPlainRegExp, '');
 +  }
 +
 +  /// Global notifier that broadcasts when a room has been marked as read locally
@@ -355913,10 +356114,10 @@ index 0000000000000000000000000000000000000000..b61891ddafdcfc158d21898ee857b6df
 +}
 diff --git a/lib/utils/beeper_fuzzy_matcher.dart b/lib/utils/beeper_fuzzy_matcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e7cb2bbd5
+index 0000000000000000000000000000000000000000..28f2a25da64464d9ffc3b174109f03592711c639
 --- /dev/null
 +++ b/lib/utils/beeper_fuzzy_matcher.dart
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,339 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -355987,17 +356188,19 @@ index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e
 +    'victoria': ['vicky'],
 +  };
 +
++  static final RegExp _bridgeTagsRegExp = RegExp(
++    r'\[(?:whatsapp|instagram|telegram|signal|discord|slack|facebook|googlechat)\]',
++    caseSensitive: false,
++  );
++  static final RegExp _nonAlphaNumRegExp = RegExp(r'[^a-z0-9]');
++  static final RegExp _whitespaceRegExp = RegExp(r'\s+');
++  static final RegExp _digitsRegExp = RegExp(r'\d+');
++
 +  /// Remove accents, emojis, punctuation, bridge tags and normalize
 +  static String clean(String input) {
 +    var s = input.toLowerCase();
 +    // Remove bridge tags like [WhatsApp], [Instagram]
-+    s = s.replaceAll(
-+      RegExp(
-+        r'\[(?:whatsapp|instagram|telegram|signal|discord|slack|facebook|googlechat)\]',
-+        caseSensitive: false,
-+      ),
-+      '',
-+    );
++    s = s.replaceAll(_bridgeTagsRegExp, '');
 +    // Remove accents (diacritics)
 +    const withDia = 'áàäâãéèëêíìïîóòöôõúùüûñç';
 +    const withoutDia = 'aaaaaeeeeiiiiooooouuuunc';
@@ -356012,13 +356215,13 @@ index 0000000000000000000000000000000000000000..dd7ba7f6b5861f02538d20beab38f43e
 +    final cleaned = clean(input);
 +    if (cleaned.isEmpty) return const [];
 +    // Replace non-alphanumeric with spaces
-+    final separated = cleaned.replaceAll(RegExp(r'[^a-z0-9]'), ' ');
++    final separated = cleaned.replaceAll(_nonAlphaNumRegExp, ' ');
 +    // Split into tokens, separating digit blocks
 +    final tokens = <String>[];
-+    for (final part in separated.split(RegExp(r'\s+'))) {
++    for (final part in separated.split(_whitespaceRegExp)) {
 +      if (part.isEmpty) continue;
 +      // Split sub-parts if contains digits, e.g. "ramiro25caraballo" -> "ramiro", "caraballo"
-+      final alphaParts = part.split(RegExp(r'\d+'));
++      final alphaParts = part.split(_digitsRegExp);
 +      for (final ap in alphaParts) {
 +        final t = ap.trim();
 +        if (t.length >= 2) {
@@ -357143,10 +357346,10 @@ index 0000000000000000000000000000000000000000..b7abf2fd5bfedd13725ddb6b534d4a3e
 +}
 diff --git a/lib/utils/beeper_video_thumbnail_cache.dart b/lib/utils/beeper_video_thumbnail_cache.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f78f825b7
+index 0000000000000000000000000000000000000000..1e8d472364ff7e40f62c9699c964fd4384b6ae74
 --- /dev/null
 +++ b/lib/utils/beeper_video_thumbnail_cache.dart
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,134 @@
 +// SPDX-FileCopyrightText: 2026 Beeper / Fluffybeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -357162,9 +357365,17 @@ index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f
 +/// Provides instant in-memory (RAM) retrieval and persistent disk caching
 +/// to prevent UI jank and eliminate blurry BlurHash placeholders for videos.
 +class BeeperVideoThumbnailCache {
++  static const int _maxMemoryCacheItems = 50;
 +  static final Map<String, Uint8List> _memoryCache = {};
 +  static final Map<String, Future<Uint8List?>> _pendingTasks = {};
 +  static String? _cacheDirPath;
++
++  static void _putMemoryCache(String key, Uint8List bytes) {
++    if (_memoryCache.length >= _maxMemoryCacheItems) {
++      _memoryCache.remove(_memoryCache.keys.first);
++    }
++    _memoryCache[key] = bytes;
++  }
 +
 +  /// Retrieves thumbnail bytes from memory or disk cache if available.
 +  static Uint8List? getMemoryThumbnail(String key) {
@@ -357204,7 +357415,7 @@ index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f
 +    try {
 +      final result = await task;
 +      if (result != null) {
-+        _memoryCache[key] = result;
++        _putMemoryCache(key, result);
 +      }
 +      return result;
 +    } finally {
@@ -357250,18 +357461,21 @@ index 0000000000000000000000000000000000000000..04461c208f344374714986da6a900d0f
 +      await tempVideoFile.writeAsBytes(attachmentData.bytes);
 +
 +      Uint8List? thumbBytes;
-+      if (PlatformInfos.isMobile) {
-+        thumbBytes = await VideoCompress.getByteThumbnail(tempVideoFile.path);
-+      }
-+
-+      // Cleanup temp video file
-+      if (await tempVideoFile.exists()) {
-+        await tempVideoFile.delete();
++      try {
++        if (PlatformInfos.isMobile) {
++          thumbBytes = await VideoCompress.getByteThumbnail(tempVideoFile.path);
++        }
++      } finally {
++        if (await tempVideoFile.exists()) {
++          try {
++            await tempVideoFile.delete();
++          } catch (_) {}
++        }
 +      }
 +
 +      if (thumbBytes != null && thumbBytes.isNotEmpty) {
 +        await diskFile.writeAsBytes(thumbBytes);
-+        _memoryCache[key] = thumbBytes;
++        _putMemoryCache(key, thumbBytes);
 +        return thumbBytes;
 +      }
 +    } catch (e) {
@@ -362597,10 +362811,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ff5e216b1ae9313dfd335046dafd48731c6c3e69
+index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874ae884fec2
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,235 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -362748,7 +362962,9 @@ index 0000000000000000000000000000000000000000..ff5e216b1ae9313dfd335046dafd4873
 +      '(ImageCache: ${cacheMb}MB / $cacheCount items)',
 +    );
 +
-+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
++    if (state == AppLifecycleState.paused ||
++        state == AppLifecycleState.detached ||
++        state == AppLifecycleState.hidden) {
 +      _backgroundStartTime ??= timestamp;
 +      _startBackgroundHeartbeat();
 +    } else if (state == AppLifecycleState.resumed) {
@@ -362764,6 +362980,9 @@ index 0000000000000000000000000000000000000000..ff5e216b1ae9313dfd335046dafd4873
 +  }
 +
 +  static void _startBackgroundHeartbeat() {
++    // Only run the recurring heartbeat in debug mode to prevent waking the CPU
++    // and flash storage from Android Doze in production release builds.
++    if (!kDebugMode) return;
 +    _backgroundHeartbeatTimer?.cancel();
 +    _backgroundHeartbeatTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
 +      if (_backgroundStartTime != null) {
@@ -363053,10 +363272,10 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..ae4ff7326ca8222508b9790ce0c259a9c6094e19 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..a31c264cf95799e4b00ac78e72ab0c5c42fd65ed 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
-@@ -1,500 +1,649 @@
+@@ -1,500 +1,661 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -363590,6 +363809,7 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..ae4ff7326ca8222508b9790ce0c259a9
 +const notificationAvatarDimension = 128;
 +final Map<String, DateTime> lastReceivedPushNotification = {};
 +final Set<String> _createdChannelIds = {};
++final Map<Client, Timer> _callSyncWatchdogs = {};
 +
 +Future<void> pushHelper(
 +  PushNotification notification, {
@@ -363807,10 +364027,21 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..ae4ff7326ca8222508b9790ce0c259a9
 +      // make sure bg sync is on (needed to update hold, unhold events)
 +      // prevent over write from app life cycle change
 +      client.backgroundSync = true;
++      _callSyncWatchdogs[client]?.cancel();
++      _callSyncWatchdogs[client] = Timer(const Duration(seconds: 90), () {
++        if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
++          client.backgroundSync = false;
++          Logs().d('Push helper: VoIP call watchdog expired, disabled backgroundSync');
++        }
++      });
 +    }
 +
 +    if (event.type == EventTypes.CallHangup) {
-+      client.backgroundSync = false;
++      _callSyncWatchdogs[client]?.cancel();
++      _callSyncWatchdogs.remove(client);
++      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
++        client.backgroundSync = false;
++      }
 +    }
 +
 +    if (event.type.startsWith('m.call') && event.type != EventTypes.CallInvite) {
@@ -365644,10 +365875,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..6c6bcc7972388ba874c24ab097a28addce0632d7
+index 0000000000000000000000000000000000000000..d0de6aa356a69882174f1008e7a59c17324a0405
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,437 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -365674,8 +365905,16 @@ index 0000000000000000000000000000000000000000..6c6bcc7972388ba874c24ab097a28add
 +  final WhisperController _whisperController = WhisperController();
 +  final Map<String, String> _memoryCache = {};
 +  SharedPreferences? _prefs;
++  Timer? _idleTimer;
 +
 +  static const String _prefPrefix = 'audio_transcription_';
++
++  void _scheduleModelRelease() {
++    _idleTimer?.cancel();
++    _idleTimer = Timer(const Duration(seconds: 90), () {
++      releaseModel();
++    });
++  }
 +
 +  Future<void> _initPrefs() async {
 +    _prefs ??= await SharedPreferences.getInstance();
@@ -366053,13 +366292,27 @@ index 0000000000000000000000000000000000000000..6c6bcc7972388ba874c24ab097a28add
 +    // 6. Persistir resultado
 +    await saveTranscription(event.eventId, finalText);
 +
++    // Limpiar archivo temporal WAV para no inflar el disco
++    try {
++      final wFile = File(wavPath);
++      if (await wFile.exists()) {
++        await wFile.delete();
++      }
++    } catch (_) {}
++
++    // Programar liberación de modelo de RAM tras 90s de inactividad
++    _scheduleModelRelease();
++
 +    return finalText;
 +  }
 +
 +  /// Libera el modelo de la memoria RAM si es necesario
 +  Future<void> releaseModel() async {
++    _idleTimer?.cancel();
++    _idleTimer = null;
 +    try {
 +      await _whisperController.releaseModel();
++      Logs().d('Whisper GGML model liberado de memoria.');
 +    } catch (_) {}
 +  }
 +}
@@ -367065,10 +367318,10 @@ index ceab2dc2629e2c12206cbd07e1c3792f9913bf18..b88eb20966f6c131ce7bc13746dd2ffc
 +        );
 +}
 diff --git a/lib/utils/voip_plugin.dart b/lib/utils/voip_plugin.dart
-index 903cc7fea791578cd261dc184b6d741e330dca91..a8faab40e697ca3e66d994d0ab74348911af01cb 100644
+index 903cc7fea791578cd261dc184b6d741e330dca91..9e489933b79bb64893a15492cb8f988fb2899dc2 100644
 --- a/lib/utils/voip_plugin.dart
 +++ b/lib/utils/voip_plugin.dart
-@@ -1,173 +1,188 @@
+@@ -1,173 +1,192 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -367282,9 +367535,7 @@ index 903cc7fea791578cd261dc184b6d741e330dca91..a8faab40e697ca3e66d994d0ab743489
 +
 +  @override
 +  void didChangeAppLifecycleState(AppLifecycleState? state) {
-+    background =
-+        (state == AppLifecycleState.detached ||
-+        state == AppLifecycleState.paused);
++    background = state != AppLifecycleState.resumed;
 +  }
 +
 +  void addCallingOverlay(String callId, CallSession call) {
@@ -367428,6 +367679,12 @@ index 903cc7fea791578cd261dc184b6d741e330dca91..a8faab40e697ca3e66d994d0ab743489
 +  Future<void> registerListeners(CallSession session) async {
 +    // TODO: Implement me
 +    return;
++  }
++
++  void dispose() {
++    if (!kIsWeb) {
++      WidgetsBinding.instance.removeObserver(this);
++    }
 +  }
 +}
 diff --git a/lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart b/lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart
@@ -370326,18 +370583,37 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..8588868c4c6d7a73d77accc4c42bb092
        cursor: SystemMouseCursors.click,
        child: GestureDetector(onTap: onTap, child: container),
 diff --git a/lib/widgets/blur_hash.dart b/lib/widgets/blur_hash.dart
-index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc656802441 100644
+index ada498221b72bbbe08212fa5d836dcd654f65313..0af4402da40e3d351b9b7e744acbc4949a04a11a 100644
 --- a/lib/widgets/blur_hash.dart
 +++ b/lib/widgets/blur_hash.dart
-@@ -27,6 +27,7 @@ class BlurHash extends StatefulWidget {
+@@ -27,7 +27,26 @@ class BlurHash extends StatefulWidget {
  }
  
  class _BlurHashState extends State<BlurHash> {
 +  static final Map<String, Uint8List> _cache = {};
    Uint8List? _data;
++  Future<Uint8List?>? _blurhashFuture;
++
++  @override
++  void initState() {
++    super.initState();
++    _blurhashFuture = _computeBlurhashData();
++  }
++
++  @override
++  void didUpdateWidget(covariant BlurHash oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (oldWidget.blurhash != widget.blurhash ||
++        oldWidget.width != widget.width ||
++        oldWidget.height != widget.height) {
++      _data = null;
++      _blurhashFuture = _computeBlurhashData();
++    }
++  }
  
    static Future<Uint8List> getBlurhashData(BlurhashData blurhashData) async {
-@@ -37,6 +38,7 @@ class _BlurHashState extends State<BlurHash> {
+     final blurhash = b.BlurHash.decode(blurhashData.hsh);
+@@ -37,6 +56,7 @@ class _BlurHashState extends State<BlurHash> {
  
    Future<Uint8List?> _computeBlurhashData() async {
      if (_data != null) return _data!;
@@ -370345,7 +370621,7 @@ index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc6
      final ratio = widget.width / widget.height;
      var width = 32;
      var height = 32;
-@@ -46,10 +48,23 @@ class _BlurHashState extends State<BlurHash> {
+@@ -46,16 +66,29 @@ class _BlurHashState extends State<BlurHash> {
        width = (height * ratio).round();
      }
  
@@ -370370,12 +370646,19 @@ index ada498221b72bbbe08212fa5d836dcd654f65313..130c0342c16f20f211bf64914a357dc6
    }
  
    @override
+   Widget build(BuildContext context) {
+     return FutureBuilder<Uint8List?>(
+-      future: _computeBlurhashData(),
++      future: _blurhashFuture,
+       initialData: _data,
+       builder: (context, snapshot) {
+         final data = snapshot.data;
 diff --git a/lib/widgets/cache_refresh_overlay.dart b/lib/widgets/cache_refresh_overlay.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9f845b39e
+index 0000000000000000000000000000000000000000..1acfb800e44d0eb276f42b54ad601eaf58a04945
 --- /dev/null
 +++ b/lib/widgets/cache_refresh_overlay.dart
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,177 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -370428,11 +370711,12 @@ index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9
 +  Widget build(BuildContext context) {
 +    return ValueListenableBuilder<BeeperSyncProgress>(
 +      valueListenable: BeeperSyncManager.progressNotifier,
-+      builder: (context, syncState, _) {
++      child: widget.child,
++      builder: (context, syncState, child) {
 +        return Stack(
 +          children: [
 +            // Always display the actual app so user can use it completely freely
-+            widget.child,
++            child!,
 +
 +            // Floating top banner when syncing in background
 +            if (syncState.isSyncing && !_bannerDismissed)
@@ -370553,10 +370837,10 @@ index 0000000000000000000000000000000000000000..afff307fcb1037112ad5f8b80e7638e9
 +  }
 +}
 diff --git a/lib/widgets/chat_settings_popup_menu.dart b/lib/widgets/chat_settings_popup_menu.dart
-index 9352255979eace274d2797cb59c3bd917396cc1a..5698af9b68bfefb7d9235c248b7213bcfd8a2573 100644
+index 9352255979eace274d2797cb59c3bd917396cc1a..315788a4b6e24038f57dcbf1f7d3ea9aec5fa087 100644
 --- a/lib/widgets/chat_settings_popup_menu.dart
 +++ b/lib/widgets/chat_settings_popup_menu.dart
-@@ -1,145 +1,351 @@
+@@ -1,145 +1,353 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -370759,7 +371043,9 @@ index 9352255979eace274d2797cb59c3bd917396cc1a..5698af9b68bfefb7d9235c248b7213bc
 +              ) ??
 +              false,
 +        )
-+        .listen((u) => setState(() {}));
++        .listen((u) {
++          if (mounted) setState(() {});
++        });
 +  }
 +
 +  @override
@@ -373518,10 +373804,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd1785f67b39 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..c973528792a668fb7eda1cbf2141a50dfb52b935 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,510 @@
+@@ -1,443 +1,526 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -374007,6 +374293,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +import '../utils/beeper_bridge_utils.dart';
 +import 'mxc_image.dart';
 +import 'presence_builder.dart';
++import '../utils/transcription_service.dart';
++import '../utils/encryption_health_monitor.dart';
 +
 +class Matrix extends StatefulWidget {
 +  final Widget? child;
@@ -374284,6 +374572,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +            ).showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
 +            return;
 +          }
++          PresenceManager.dispose();
++          MxcImage.trimAllCaches();
 +          FluffyChatApp.router.go('/');
 +        });
 +    onUiaRequest[name] ??= c.onUiaRequest.stream.listen(uiaRequestHandler);
@@ -374319,6 +374609,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +    onLogoutSub.remove(name);
 +    onNotification[name]?.cancel();
 +    onNotification.remove(name);
++    onUiaRequest[name]?.cancel();
++    onUiaRequest.remove(name);
 +  }
 +
 +  void initMatrix() {
@@ -374360,6 +374652,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +  }
 +
 +  Future<void> createVoipPlugin() async {
++    voipPlugin?.dispose();
 +    if (!AppSettings.experimentalVoip.value) {
 +      voipPlugin = null;
 +      return;
@@ -374368,11 +374661,9 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +  }
 +
 +  void didChangeAppLifecycleState(AppLifecycleState state) {
-+    final foreground =
-+        state != AppLifecycleState.inactive &&
-+        state != AppLifecycleState.paused;
++    final foreground = state == AppLifecycleState.resumed;
 +    for (final client in widget.clients) {
-+      client.syncPresence = state == AppLifecycleState.resumed
++      client.syncPresence = foreground
 +          ? null
 +          : PresenceType.unavailable;
 +      if (PlatformInfos.isMobile) {
@@ -374381,7 +374672,11 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +        Logs().v('Set background sync to', foreground);
 +      }
 +    }
-+    if (state == AppLifecycleState.paused) {
++    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
++      // Pause encryption health polling while app is in background
++      EncryptionHealthMonitor().stop();
++      // Release Whisper GGML model from native RAM when leaving foreground
++      TranscriptionService().releaseModel();
 +      // Partial cache trim: shrink Flutter ImageCache to 50 MB in background
 +      // to reduce RAM footprint and lower the risk of an OS low-memory kill,
 +      // while keeping enough cached to avoid heavy reload jank on resume.
@@ -374391,6 +374686,10 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +            50 * 1024 * 1024; // 50 MB while backgrounded
 +      }
 +    } else if (state == AppLifecycleState.resumed) {
++      // Restart encryption health monitor if client is logged in
++      if (client.isLogged()) {
++        EncryptionHealthMonitor().start(client);
++      }
 +      // Restore full cache size on return to foreground.
 +      if (PlatformInfos.isMobile) {
 +        PaintingBinding.instance.imageCache.maximumSizeBytes =
@@ -374435,6 +374734,9 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..14abdf13bc030e46fd98f5a55abfcd17
 +
 +    // Release in-memory cached image bytes across account logout
 +    MxcImage.trimAllCaches();
++
++    voipPlugin?.dispose();
++    voipPlugin = null;
 +
 +    super.dispose();
 +  }
@@ -376051,10 +376353,10 @@ index 03529bbbd0471f435c823660364687872feaafcd..6bc2d4dfefc4f073234eb7f0fb269552
 +  );
 +}
 diff --git a/lib/widgets/presence_builder.dart b/lib/widgets/presence_builder.dart
-index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..c7a0ae4abeaec2e8fd783290fdf75815b018d187 100644
+index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..12a7dea574d984c45de3047dbfcac79a2a3b133a 100644
 --- a/lib/widgets/presence_builder.dart
 +++ b/lib/widgets/presence_builder.dart
-@@ -9,6 +9,64 @@ import 'package:fluffychat/widgets/matrix.dart';
+@@ -9,6 +9,67 @@ import 'package:fluffychat/widgets/matrix.dart';
  import 'package:flutter/material.dart';
  import 'package:matrix/matrix.dart';
  
@@ -376110,6 +376412,9 @@ index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..c7a0ae4abeaec2e8fd783290fdf75815
 +  static void dispose() {
 +    _globalSub?.cancel();
 +    _globalSub = null;
++    for (final notifier in notifiers.values) {
++      notifier.dispose();
++    }
 +    notifiers.clear();
 +    _lastFetch.clear();
 +    _inflight = 0;
@@ -376119,7 +376424,7 @@ index bfafea2e5d6cf05ec952bad5ff6cb4235b5ac91d..c7a0ae4abeaec2e8fd783290fdf75815
  class PresenceBuilder extends StatefulWidget {
    final Widget Function(BuildContext context, CachedPresence? presence) builder;
    final String? userId;
-@@ -26,35 +84,32 @@ class PresenceBuilder extends StatefulWidget {
+@@ -26,35 +87,32 @@ class PresenceBuilder extends StatefulWidget {
  }
  
  class _PresenceBuilderState extends State<PresenceBuilder> {
@@ -377731,7 +378036,7 @@ index 998e8c1ea29c671c6c4d5bed4d4eec0b3fa4e42e..65049d52c8843e34ca269022117d996f
 +  }
 +}
 diff --git a/lib/widgets/typing_animation.dart b/lib/widgets/typing_animation.dart
-index 162b05dfcbaf05120931c1f15329c4df2a50434c..3f222b0d700819a0181d2efddd32c6389110b9a7 100644
+index 162b05dfcbaf05120931c1f15329c4df2a50434c..93da069426bd5496c50b0307690d752897b5c7e0 100644
 --- a/lib/widgets/typing_animation.dart
 +++ b/lib/widgets/typing_animation.dart
 @@ -16,29 +16,24 @@ class TypingAnimation extends StatefulWidget {
@@ -377773,7 +378078,7 @@ index 162b05dfcbaf05120931c1f15329c4df2a50434c..3f222b0d700819a0181d2efddd32c638
      super.dispose();
    }
  
-@@ -47,25 +42,31 @@ class _TypingAnimationState extends State<TypingAnimation> {
+@@ -47,25 +42,33 @@ class _TypingAnimationState extends State<TypingAnimation> {
      final theme = Theme.of(context);
      final size = widget.size;
  
@@ -377796,31 +378101,33 @@ index 162b05dfcbaf05120931c1f15329c4df2a50434c..3f222b0d700819a0181d2efddd32c638
 -            ),
 -          ),
 -      ],
-+    return AnimatedBuilder(
-+      animation: _controller,
-+      builder: (context, _) {
-+        final tick = (_controller.value * 4).floor() % 4;
-+        return Row(
-+          mainAxisSize: .min,
-+          children: [
-+            for (var i = 1; i <= 3; i++)
-+              AnimatedContainer(
-+                duration: const Duration(milliseconds: 300),
-+                curve: FluffyThemes.animationCurve,
-+                width: size,
-+                height: tick == i ? size * 2 : size,
-+                margin: EdgeInsets.symmetric(
-+                  horizontal: size / 4,
-+                  vertical: tick == i ? 4 : 8,
++    return RepaintBoundary(
++      child: AnimatedBuilder(
++        animation: _controller,
++        builder: (context, _) {
++          final tick = (_controller.value * 4).floor() % 4;
++          return Row(
++            mainAxisSize: .min,
++            children: [
++              for (var i = 1; i <= 3; i++)
++                AnimatedContainer(
++                  duration: const Duration(milliseconds: 300),
++                  curve: FluffyThemes.animationCurve,
++                  width: size,
++                  height: tick == i ? size * 2 : size,
++                  margin: EdgeInsets.symmetric(
++                    horizontal: size / 4,
++                    vertical: tick == i ? 4 : 8,
++                  ),
++                  decoration: BoxDecoration(
++                    borderRadius: BorderRadius.circular(size * 2),
++                    color: theme.colorScheme.secondary,
++                  ),
 +                ),
-+                decoration: BoxDecoration(
-+                  borderRadius: BorderRadius.circular(size * 2),
-+                  color: theme.colorScheme.secondary,
-+                ),
-+              ),
-+          ],
-+        );
-+      },
++            ],
++          );
++        },
++      ),
      );
    }
  }
