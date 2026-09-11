@@ -307796,7 +307796,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34c7c1fc02 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b853707456b 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -307827,14 +307827,24 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -53,12 +59,21 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -49,16 +55,31 @@ enum AudioPlayerStatus { notDownloaded, downloading, downloaded }
+ 
+ class AudioPlayerState extends State<AudioPlayerWidget> {
+   static const double buttonSize = 36;
++  static const int _maxAutoPreloadSizeBytes = 10 * 1024 * 1024; // 10MB limit
++  static final Set<String> _prefetchedEventIds = <String>{};
++  static final Set<String> _activeDownloadEventIds = <String>{};
+ 
    AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
    double? _downloadProgress;
- 
++  File? _cachedFile;
++  MatrixFile? _cachedMatrixFile;
++  bool _isUserTappedPlay = false;
++
 +  String? _transcription;
 +  bool _isTranscribing = false;
 +  double? _transcriptionProgress;
-+
+ 
    late final MatrixState matrix;
    List<int>? _waveform;
    String? _durationString;
@@ -307849,7 +307859,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
      super.dispose();
      final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
          ? null
-@@ -70,7 +85,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -70,7 +91,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              MaterialBanner(
                padding: EdgeInsets.zero,
                leading: StreamBuilder(
@@ -307858,7 +307868,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
                  builder: (context, _) => IconButton(
                    onPressed: () {
                      if (audioPlayer.isAtEndPosition) {
-@@ -87,7 +102,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -87,7 +108,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                  ),
                ),
                content: StreamBuilder(
@@ -307867,7 +307877,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
                  builder: (context, _) => GestureDetector(
                    onTap: () => FluffyChatApp.router.go(
                      '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -124,6 +139,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -124,41 +145,99 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        audioPlayer.pause();
        audioPlayer.dispose();
        matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
@@ -307875,7 +307885,131 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
      }
    }
  
-@@ -179,7 +195,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+-  Future<void> _onButtonTap() async {
+-    WidgetsBinding.instance.addPostFrameCallback((_) {
+-      ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
++  Future<File?> _getLocalAudioFile() async {
++    final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
++    if (kIsWeb || attachmentUrl == null) return null;
++    final tempDir = await getTemporaryDirectory();
++    final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
++    final rawFile = File('${tempDir.path}/${fileName}_${widget.event.body}');
++    if (Platform.isIOS) {
++      final convertedFile = File('${rawFile.path}.caf');
++      if (await convertedFile.exists() && await convertedFile.length() > 0) {
++        return convertedFile;
++      }
++    }
++    if (await rawFile.exists() && await rawFile.length() > 0) {
++      return rawFile;
++    }
++    return null;
++  }
++
++  void _checkOrPreloadAudio() {
++    final eventId = widget.event.eventId;
++    if (_prefetchedEventIds.contains(eventId) ||
++        _activeDownloadEventIds.contains(eventId)) {
++      return;
++    }
++    final fileSize = widget.event.content
++        .tryGetMap<String, Object?>('info')
++        ?.tryGet<int>('size');
++    if (fileSize != null && fileSize > _maxAutoPreloadSizeBytes) {
++      return;
++    }
++    _prefetchedEventIds.add(eventId);
++
++    _getLocalAudioFile().then((cached) {
++      if (cached != null) {
++        if (mounted) {
++          setState(() {
++            _cachedFile = cached;
++            status = AudioPlayerStatus.downloaded;
++          });
++        }
++        return;
++      }
++      // Pre-download in background quietly
++      _ensureAudioDownloaded(isBackgroundPreload: true).catchError((e) {
++        Logs().v('Background audio preload failed silently for $eventId: $e');
++      });
++    }).catchError((e) {
++      Logs().v('Check local audio file failed: $e');
+     });
+-    final currentPlayer =
+-        matrix.voiceMessageEventId.value != widget.event.eventId
+-        ? null
+-        : matrix.audioPlayer;
+-    if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
+-      if (currentPlayer.playing) {
+-        currentPlayer.pause();
+-      } else {
+-        currentPlayer.play();
++  }
++
++  Future<void> _ensureAudioDownloaded({bool isBackgroundPreload = false}) async {
++    final eventId = widget.event.eventId;
++    if (_cachedFile != null && await _cachedFile!.exists() && await _cachedFile!.length() > 0) {
++      if (mounted) setState(() => status = AudioPlayerStatus.downloaded);
++      return;
++    }
++
++    final existingFile = await _getLocalAudioFile();
++    if (existingFile != null) {
++      if (mounted) {
++        setState(() {
++          _cachedFile = existingFile;
++          status = AudioPlayerStatus.downloaded;
++        });
+       }
+       return;
+     }
+ 
+-    matrix.voiceMessageEventId.value = widget.event.eventId;
+-    matrix.audioPlayer
+-      ?..stop()
+-      ..dispose();
+-    File? file;
+-    MatrixFile? matrixFile;
++    if (_activeDownloadEventIds.contains(eventId)) {
++      while (_activeDownloadEventIds.contains(eventId)) {
++        await Future.delayed(const Duration(milliseconds: 50));
++      }
++      return;
++    }
++
++    _activeDownloadEventIds.add(eventId);
++    if (!isBackgroundPreload && mounted) {
++      setState(() => status = AudioPlayerStatus.downloading);
++    }
+ 
+-    setState(() => status = AudioPlayerStatus.downloading);
+     try {
+       final fileSize = widget.event.content
+           .tryGetMap<String, Object?>('info')
+           ?.tryGet<int>('size');
+-      matrixFile = await widget.event.downloadAndDecryptAttachment(
+-        onDownloadProgress: fileSize != null && fileSize > 0
++      final matrixFile = await widget.event.downloadAndDecryptAttachment(
++        onDownloadProgress: (!isBackgroundPreload && fileSize != null && fileSize > 0)
+             ? (progress) {
++                if (!mounted) return;
+                 final progressPercentage = progress / fileSize;
+                 setState(() {
+                   _downloadProgress = progressPercentage < 1
+@@ -169,17 +248,18 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+             : null,
+       );
+ 
++      File? file;
+       final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
+-
+       if (!kIsWeb && attachmentUrl != null) {
+         final tempDir = await getTemporaryDirectory();
+         final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
+         file = File('${tempDir.path}/${fileName}_${matrixFile.name}');
+-
          await file.writeAsBytes(matrixFile.bytes);
  
          if (Platform.isIOS &&
@@ -307886,13 +308020,74 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
            Logs().v('Convert ogg audio file for iOS...');
            final convertedFile = File('${file.path}.caf');
            if (await convertedFile.exists() == false) {
-@@ -203,8 +221,32 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -189,9 +269,43 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+         }
+       }
+ 
+-      setState(() {
+-        status = AudioPlayerStatus.downloaded;
+-      });
++      _cachedFile = file;
++      _cachedMatrixFile = matrixFile;
++      if (mounted) {
++        setState(() {
++          status = AudioPlayerStatus.downloaded;
++        });
++      }
++    } finally {
++      _activeDownloadEventIds.remove(eventId);
++    }
++  }
++
++  Future<void> _onButtonTap() async {
++    WidgetsBinding.instance.addPostFrameCallback((_) {
++      ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
++    });
++    final currentPlayer =
++        matrix.voiceMessageEventId.value != widget.event.eventId
++        ? null
++        : matrix.audioPlayer;
++    if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
++      if (currentPlayer.playing) {
++        currentPlayer.pause();
++      } else {
++        currentPlayer.play();
++      }
++      return;
++    }
++
++    matrix.voiceMessageEventId.value = widget.event.eventId;
++    matrix.audioPlayer
++      ?..stop()
++      ..dispose();
++
++    _isUserTappedPlay = true;
++    try {
++      await _ensureAudioDownloaded(isBackgroundPreload: false);
+     } catch (e, s) {
+       Logs().v('Could not download audio file', e, s);
+       if (!mounted) rethrow;
+@@ -199,28 +313,182 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+         context,
+       ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+       rethrow;
++    } finally {
++      if (mounted) {
++        setState(() {
++          _isUserTappedPlay = false;
++        });
++      }
+     }
++
      if (!context.mounted) return;
      if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
  
 +    final outputMode = AppSettings.audioPlaybackOutput.value; // 'auto', 'speaker', 'earpiece'
      final audioPlayer = matrix.audioPlayer = AudioPlayer();
  
+-    if (file != null) {
+-      audioPlayer.setFilePath(file.path);
+-    } else {
 +    if (PlatformInfos.isMobile) {
 +      try {
 +        final session = await AudioSession.instance;
@@ -307916,10 +308111,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
 +      );
 +    }
 +
-     if (file != null) {
-       audioPlayer.setFilePath(file.path);
-     } else {
-@@ -216,11 +258,134 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
++    if (_cachedFile != null) {
++      audioPlayer.setFilePath(_cachedFile!.path);
++    } else if (_cachedMatrixFile != null) {
+       await audioPlayer.setAudioSource(
+         AudioSource.uri(
+-          Uri.dataFromBytes(matrixFile.bytes, mimeType: matrixFile.mimeType),
++          Uri.dataFromBytes(_cachedMatrixFile!.bytes, mimeType: _cachedMatrixFile!.mimeType),
+         ),
+       );
      }
      if (!mounted) return;
  
@@ -308054,7 +308254,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
    Future<void> _toggleSpeed() async {
      final audioPlayer = matrix.audioPlayer;
      if (audioPlayer == null) return;
-@@ -246,12 +411,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +514,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -308070,7 +308270,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +432,80 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +535,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -308095,6 +308295,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
 +    super.didUpdateWidget(oldWidget);
 +    if (oldWidget.event.eventId != widget.event.eventId) {
 +      _loadTranscription();
++      _checkOrPreloadAudio();
 +    }
 +  }
 +
@@ -308148,10 +308349,11 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
      matrix = Matrix.of(context);
      _waveform = _getWaveform();
 +    _loadTranscription();
++    _checkOrPreloadAudio();
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +535,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +640,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -308189,7 +308391,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -365,71 +616,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -338,7 +694,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+                         SizedBox(
+                           width: buttonSize,
+                           height: buttonSize,
+-                          child: status == AudioPlayerStatus.downloading
++                          child: (status == AudioPlayerStatus.downloading && _isUserTappedPlay)
+                               ? CircularProgressIndicator(
+                                   strokeWidth: 2,
+                                   color: widget.color,
+@@ -365,71 +721,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                          ),
                          const SizedBox(width: 8),
                          Expanded(
@@ -308321,7 +308532,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
                            ),
                          ),
                          const SizedBox(width: 8),
-@@ -449,30 +702,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +807,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -308377,7 +308588,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +769,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +874,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -308385,7 +308596,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..af539ea4b32df4c934128435e08d9a34
                  ],
                ),
              );
-@@ -519,6 +778,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +883,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
