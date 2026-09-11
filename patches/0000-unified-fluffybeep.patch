@@ -303247,7 +303247,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3b4676c09 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e843aaff41 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303646,7 +303646,13 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
          _showScrollUpMaterialBanner(readMarkerEventId);
        }
  
-@@ -491,15 +591,20 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -486,20 +586,26 @@ class ChatController extends State<ChatPageWithRoom>
+ 
+       if (!mounted) return;
+     } catch (e, s) {
++      if (!mounted) rethrow;
+       ErrorReporter(context, 'Unable to load timeline').onErrorCallback(e, s);
+       rethrow;
      }
    }
  
@@ -303672,7 +303678,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
  
    String? animateInEventId;
  
-@@ -512,10 +617,122 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -512,10 +618,122 @@ class ChatController extends State<ChatPageWithRoom>
      if (animateInEventId == eventId) animateInEventId = null;
    }
  
@@ -303797,7 +303803,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +741,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +742,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -303805,7 +303811,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +749,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +750,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -303824,7 +303830,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +776,182 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +777,189 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -304021,6 +304027,13 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
 +    inputBarHeightNotifier.dispose();
 +    scrollUpBannerEventIdNotifier.dispose();
 +    _displayChatDetailsColumn.dispose();
++    // These were previously missing and caused memory leaks on repeated chat navigation.
++    draggingNotifier.dispose();
++    selectedEventsNotifier.dispose();
++    replyEventNotifier.dispose();
++    editEventNotifier.dispose();
++    showEmojiPickerNotifier.dispose();
++    scrolledUpNotifier.dispose();
 +
 +    // Immediately persist any pending draft text on dispose before tearing down
 +    try {
@@ -304059,7 +304072,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      super.dispose();
    }
  
-@@ -679,6 +990,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +998,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304070,7 +304083,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,12 +1011,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,12 +1019,6 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304083,7 +304096,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      // ignore: unawaited_futures
      room.sendTextEvent(
        sendController.text,
-@@ -710,17 +1019,39 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,17 +1027,39 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304129,7 +304142,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      });
    }
  
-@@ -883,60 +1214,183 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1222,183 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304351,7 +304364,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1399,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1407,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304366,7 +304379,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      }
    }
  
-@@ -964,21 +1418,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1426,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304399,7 +304412,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1462,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1470,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304412,7 +304425,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1479,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1487,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304421,7 +304434,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1536,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1544,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304434,7 +304447,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1144,7 +1599,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1144,7 +1607,7 @@ class ChatController extends State<ChatPageWithRoom>
        ),
      );
      if (!mounted) return;
@@ -304443,7 +304456,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1613,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1621,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304461,7 +304474,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1715,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1723,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304475,7 +304488,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1747,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1755,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304484,7 +304497,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1813,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1821,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304499,7 +304512,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1850,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1858,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304509,7 +304522,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1919,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +1927,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304572,7 +304585,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +1968,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +1976,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304583,7 +304596,22 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
            return;
          }
        }
-@@ -1527,8 +1995,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +1991,13 @@ class ChatController extends State<ChatPageWithRoom>
+       });
+       typingTimeout ??= Timer(const Duration(seconds: 30), () {
+         typingTimeout = null;
+-        currentlyTyping = false;
++        if (!mounted) return;
++        if (currentlyTyping) {
++          currentlyTyping = false;
++          // Also notify the server so the typing indicator clears even if
++          // typingCoolDown was cancelled before it could send setTyping(false).
++          room.setTyping(false);
++        }
+       });
+       if (!currentlyTyping) {
+         currentlyTyping = true;
+@@ -1527,8 +2009,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304592,7 +304620,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2049,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2063,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304609,7 +304637,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c6f8352efdf634953a461c5de694f1a3
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2136,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2150,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -313450,10 +313478,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..5c11edc0b7a95bd3eed30867d824c307
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..f9d03fae2c77562cc806c074b808f3b0a5b71e7a 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8f89b7eae 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,346 @@
+@@ -1,222 +1,358 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -313830,7 +313858,13 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..f9d03fae2c77562cc806c074b808f3b0
 +    _recorderSubscription = Timer.periodic(const Duration(milliseconds: 100), (
 +      _,
 +    ) async {
-+      final amplitude = await _audioRecorder!.getAmplitude();
++      // Capture before the async gap so that a concurrent _reset() / dispose()
++      // nulling _audioRecorder does not cause an NPE on the force-unwrap.
++      final recorder = _audioRecorder;
++      if (recorder == null) return;
++      final amplitude = await recorder.getAmplitude();
++      // Guard setState: the widget may have been disposed while getAmplitude awaited.
++      if (!mounted || _audioRecorder == null) return;
 +      var value = 100 + amplitude.current * 2;
 +      value = value < 1 ? 1 : value;
 +      amplitudeTimeline.add(value);
@@ -313995,7 +314029,13 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..f9d03fae2c77562cc806c074b808f3b0
 +        effectiveFileName,
 +      );
 +    } finally {
-+      cancel();
++      // cancel() calls setState(_reset). Guard mounted to avoid setState on a
++      // disposed widget after the long FFmpegKit operation completes.
++      if (mounted) {
++        cancel();
++      } else {
++        _reset();
++      }
 +    }
 +  }
 +
@@ -322565,7 +322605,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7fcb0e71a8 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5f41df45c 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -323456,7 +323496,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +970,174 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +970,184 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -323557,18 +323597,11 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
 +                ) ??
 +                false,
 +          )
-+          .listen(_updateRoomTags);
-+
-+      if (roomTags.containsKey(AppSettings.chatFilter.value)) {
-+        activeFilter = ActiveFilter.tag;
-+        activeTag = AppSettings.chatFilter.value;
-+      } else {
-+        activeFilter =
-+            ActiveFilter.values.singleWhereOrNull(
-+              (filter) => AppSettings.chatFilter.value == filter.name,
-+            ) ??
-+            ActiveFilter.allChats;
-+      }
++          .listen(
++            _updateRoomTags,
++            onError: (e, s) => Logs().w('ChatList: _onRoomTagUpdate stream error', e, s),
++            cancelOnError: false,
++          );
  
 -    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
 -      activeFilter = ActiveFilter.tag;
@@ -323579,6 +323612,17 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
 -            (filter) => AppSettings.chatFilter.value == filter.name,
 -          ) ??
 -          ActiveFilter.allChats;
++      if (roomTags.containsKey(AppSettings.chatFilter.value)) {
++        activeFilter = ActiveFilter.tag;
++        activeTag = AppSettings.chatFilter.value;
++      } else {
++        activeFilter =
++            ActiveFilter.values.singleWhereOrNull(
++              (filter) => AppSettings.chatFilter.value == filter.name,
++            ) ??
++            ActiveFilter.allChats;
++      }
++
 +      // Build initial room cache and hook into sync stream for future updates.
 +      // Rate-limit to 1s so rapid syncs don't thrash the sort. Safe to use Matrix.of(context) here.
 +      _invalidateRoomCache();
@@ -323624,7 +323668,10 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
 +                }
 +              });
 +            }
-+          });
++          },
++          onError: (e, s) => Logs().w('ChatList: _onSyncForRoomCache stream error', e, s),
++          cancelOnError: false,
++          );
 +
 +      _processPushHelperCrashReport();
      }
@@ -323650,6 +323697,9 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
 +    BeeperMergeUtils.mergeChangeNotifier.removeListener(_onMergeChange);
 +    BeeperBridgeUtils.roomReadChangeNotifier.removeListener(_onRoomReadChange);
 +    _batchTimestampTimer?.cancel();
++    // Clear the static pending-fetch set so stale room IDs from the previous
++    // session don't persist into a new session after logout/re-login.
++    _pendingTimestampFetches.clear();
 +    _roomCacheDebounceTimer?.cancel();
      _intentDataStreamSubscription?.cancel();
      _intentFileStreamSubscription?.cancel();
@@ -323665,7 +323715,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1231,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1241,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -323681,7 +323731,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1344,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1354,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323713,7 +323763,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1379,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1389,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323753,7 +323803,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
          ],
        );
      }
-@@ -700,7 +1432,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1442,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -323777,7 +323827,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1548,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1558,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -323903,7 +323953,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
      }
    }
  
-@@ -864,6 +1722,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1732,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -323911,7 +323961,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1773,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1783,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -323925,7 +323975,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7f
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1897,7 @@ enum ChatContextAction {
+@@ -1039,4 +1907,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -359193,10 +359243,10 @@ index b7e14ed983608a54f846e997c31ca74d6be4d34b..af847fa5570816390d0e6d7bbd618e0e
    /// Check if time needs to be in 24h format
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf773617ee
+index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77fc39f2df
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,132 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
@@ -359211,6 +359261,11 @@ index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf
 +  EncryptionHealthMonitor._internal();
 +
 +  Timer? _timer;
++  // Tracks the 10-minute cooldown before we can show another prompt.
++  // Stored as a cancellable Timer so stop() can cancel it on logout,
++  // preventing the delayed closure from resetting _isPrompting on a
++  // new session after a fast logout/re-login.
++  Timer? _promptCooldownTimer;
 +  Client? _client;
 +  BuildContext? _context;
 +  bool _isPrompting = false;
@@ -359231,16 +359286,26 @@ index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf
 +  void stop() {
 +    _timer?.cancel();
 +    _timer = null;
++    _promptCooldownTimer?.cancel();
++    _promptCooldownTimer = null;
 +    _client = null;
 +    _context = null;
 +    _cachedRecoveryKey = null;
++    _isPrompting = false;
 +    _checkCount = 0;
 +  }
 +
 +  Future<void> _checkHealth() async {
-+    if (_client == null || _context == null || !_context!.mounted || _isPrompting) return;
++    // Capture local refs before the first await so that a concurrent stop()
++    // (which nulls _client/_context) does not cause NPE force-unwraps later.
++    final client = _client;
++    final context = _context;
++    if (client == null || context == null || !context.mounted || _isPrompting) return;
 +    _checkCount++;
-+    final state = await _client!.getCryptoIdentityState();
++    final state = await client.getCryptoIdentityState();
++
++    // After the async gap: bail out if stop() was called or client replaced.
++    if (_client == null || _client != client) return;
 +
 +    if (state.connected) {
 +      // Identity is connected and healthy; cancel timer to conserve battery
@@ -359266,11 +359331,15 @@ index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf
 +      if (supportsSecureStorage) {
 +        try {
 +          _cachedRecoveryKey ??= await const FlutterSecureStorage().read(
-+            key: 'ssss_recovery_key_${_client!.userID}',
++            key: 'ssss_recovery_key_${client.userID}',
 +          );
++          // Re-check: stop() may have been called during the await above.
++          if (_client == null || _client != client) return;
 +          if (_cachedRecoveryKey != null) {
-+            await _client!.restoreCryptoIdentity(_cachedRecoveryKey!);
-+            final newState = await _client!.getCryptoIdentityState();
++            await client.restoreCryptoIdentity(_cachedRecoveryKey!);
++            if (_client == null || _client != client) return;
++            final newState = await client.getCryptoIdentityState();
++            if (_client == null || _client != client) return;
 +            if (newState.connected) {
 +              Logs().i('EncryptionHealthMonitor: Successfully auto-restored crypto identity from secure storage.');
 +              _timer?.cancel();
@@ -359285,14 +359354,14 @@ index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf
 +
 +      // If auto-restore failed, prompt user
 +      _isPrompting = true;
-+      if (_context!.mounted) {
-+        ScaffoldMessenger.of(_context!).showSnackBar(
++      if (context.mounted) {
++        ScaffoldMessenger.of(context).showSnackBar(
 +          SnackBar(
 +            content: const Text('Problema con el cifrado de extremo a extremo. Por favor verifica tu sesión.'),
 +            action: SnackBarAction(
 +              label: 'Verificar',
 +              onPressed: () {
-+                _context!.go('/bootstrap');
++                context.go('/bootstrap');
 +              },
 +            ),
 +            duration: const Duration(seconds: 10),
@@ -359300,8 +359369,11 @@ index 0000000000000000000000000000000000000000..35283afdf1c0a85934b724c892179caf
 +        );
 +      }
 +      
-+      // Cooldown before prompting again
-+      Future.delayed(const Duration(minutes: 10), () {
++      // Cooldown before prompting again. Use a tracked Timer so stop() can
++      // cancel it and prevent it from firing on a new session after re-login.
++      _promptCooldownTimer?.cancel();
++      _promptCooldownTimer = Timer(const Duration(minutes: 10), () {
++        _promptCooldownTimer = null;
 +        _isPrompting = false;
 +      });
 +    }
