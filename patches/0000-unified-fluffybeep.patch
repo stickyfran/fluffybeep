@@ -358894,10 +358894,10 @@ index 0000000000000000000000000000000000000000..9192e1e3367a521f53fd0e6e35c9a17c
 +}
 diff --git a/lib/utils/crash_logger.dart b/lib/utils/crash_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..be004b3407a81f3b6ff7b0d41bee2409688a88d8
+index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e0f9d4a9d
 --- /dev/null
 +++ b/lib/utils/crash_logger.dart
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,190 @@
 +import 'dart:async';
 +import 'dart:io';
 +import 'dart:isolate';
@@ -359032,13 +359032,11 @@ index 0000000000000000000000000000000000000000..be004b3407a81f3b6ff7b0d41bee2409
 +  }
 +
 +  static void logEvent(String message) {
-+    _write('[EVENT] [' + DateTime.now().toIso8601String() + '] ' + message + '
-+');
++    _write('[EVENT] [' + DateTime.now().toIso8601String() + '] ' + message + '\n');
 +  }
 +
 +  static void logFreeze(String type, String details) {
-+    _write('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + '
-+');
++    _write('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + '\n');
 +  }
 +
 +  static void logCrash(String type, String error, StackTrace? stack) {
@@ -359048,8 +359046,7 @@ index 0000000000000000000000000000000000000000..be004b3407a81f3b6ff7b0d41bee2409
 +    buffer.writeln('Type: ' + type);
 +    buffer.writeln('Error: ' + error);
 +    if (stack != null) {
-+      buffer.writeln('StackTrace:
-+' + stack.toString());
++      buffer.writeln('StackTrace:\n' + stack.toString());
 +    }
 +    buffer.writeln('===========================================================');
 +    _write(buffer.toString());
