@@ -322609,7 +322609,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5f41df45c 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4588f2695 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -322682,7 +322682,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
      context.go('/rooms/${room.id}');
    }
  
-@@ -140,22 +160,638 @@ class ChatListController extends State<ChatList>
+@@ -140,22 +160,640 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -322894,7 +322894,9 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
 +
 +        for (final r in contactRooms) {
 +          final ts = _cachedTimestamps[r.id] ?? _getMessageTimestamp(r);
-+          totalUnread += r.notificationCount;
++          if (BeeperBridgeUtils.isRoomUnread(r)) {
++            totalUnread += r.notificationCount;
++          }
 +          if (ts.isAfter(maxTs) || latestRoom == null) {
 +            maxTs = ts;
 +            latestRoom = r;
@@ -323328,7 +323330,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +800,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +802,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -323435,7 +323437,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +830,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +832,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -323462,7 +323464,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
    }
  
    void openNavrail() {
-@@ -285,13 +864,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +866,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -323486,7 +323488,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +882,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +884,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -323500,7 +323502,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +970,184 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +972,184 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -323719,7 +323721,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1241,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1243,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -323735,7 +323737,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1354,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1356,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323767,7 +323769,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1389,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1391,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323807,7 +323809,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
          ],
        );
      }
-@@ -700,7 +1442,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1444,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -323831,7 +323833,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1558,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1560,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -323957,7 +323959,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
      }
    }
  
-@@ -864,6 +1732,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1734,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -323965,7 +323967,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1783,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1785,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -323979,7 +323981,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3508c267695abf6a36f687edb85bfbd5
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1907,7 @@ enum ChatContextAction {
+@@ -1039,4 +1909,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -328706,10 +328708,10 @@ index 3803d1516c84675d0744236a00e1e0ea67d77bb8..9f4df84ec9fab4f993dc5bb1dd83949c
 +  }
 +}
 diff --git a/lib/pages/chat_list/unread_bubble.dart b/lib/pages/chat_list/unread_bubble.dart
-index 74aeef4b8379830a53306a5955e2679aa7aed689..69f26d937fcdddbdb3370ba78bcfcf71e392c40e 100644
+index 74aeef4b8379830a53306a5955e2679aa7aed689..96acb208be019616dc93fc601ee8a4bbb07b5dbd 100644
 --- a/lib/pages/chat_list/unread_bubble.dart
 +++ b/lib/pages/chat_list/unread_bubble.dart
-@@ -1,59 +1,60 @@
+@@ -1,59 +1,58 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -328787,11 +328789,9 @@ index 74aeef4b8379830a53306a5955e2679aa7aed689..69f26d937fcdddbdb3370ba78bcfcf71
 +  Widget build(BuildContext context) {
 +    final theme = Theme.of(context);
 +    final unread = BeeperBridgeUtils.isRoomUnread(room);
-+    final hasNotifications = room.notificationCount > 0;
++    final hasNotifications = unread && room.notificationCount > 0;
 +    final unreadBubbleSize = unread
-+        ? room.notificationCount > 0
-+              ? 20.0
-+              : 14.0
++        ? (hasNotifications ? 20.0 : 14.0)
 +        : 0.0;
 +    return AnimatedContainer(
 +      duration: FluffyThemes.animationDuration,
@@ -328811,7 +328811,7 @@ index 74aeef4b8379830a53306a5955e2679aa7aed689..69f26d937fcdddbdb3370ba78bcfcf71
 +            : theme.colorScheme.primaryContainer,
 +        borderRadius: BorderRadius.circular(unreadBubbleSize),
 +      ),
-+      child: hasNotifications || room.markedUnread
++      child: (hasNotifications || (unread && room.markedUnread))
 +          ? Text(
 +              room.notificationCount.toString(),
 +              style: TextStyle(
@@ -354962,10 +354962,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..d7448a9de76ccc675f86485e52058648c9ad906d
+index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011fca410a0
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1375 @@
+@@ -0,0 +1,1379 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -356183,16 +356183,20 @@ index 0000000000000000000000000000000000000000..d7448a9de76ccc675f86485e52058648
 +      }
 +    }
 +    // If the last real message in this room was sent by the current user
-+    // and there are no unread mentions/notifications, consider it read:
-+    // the user already responded (either here or on another device/app).
-+    if (!room.markedUnread && room.notificationCount == 0) {
++    // (the user already responded either here or from another client/web/phone),
++    // or if the last real message is from me, suppress unread status.
++    if (!room.markedUnread) {
 +      final myUserId = room.client.userID;
-+      final lastReal = getLastRealMessage(room) ?? lastRealMessageCache[room.id];
++      final lastReal = getLastRealMessage(room) ??
++          lastRealMessageCache[room.id] ??
++          (room.lastEvent?.type.startsWith('com.beeper') == true ? null : room.lastEvent);
 +      if (lastReal != null && lastReal.senderId == myUserId) {
 +        return false;
 +      }
 +    }
 +
++    // A room is unread if marked unread explicitly, or has real unread notifications,
++    // or SDK reports unread/new messages.
 +    return room.isUnreadOrInvited ||
 +        room.hasNewMessages ||
 +        room.isUnread ||
