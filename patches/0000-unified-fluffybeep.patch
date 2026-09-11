@@ -322565,7 +322565,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb274186fc09 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..3e4f8aedd0928f73caf880b3830f6a7fcb0e71a8 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -322638,7 +322638,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
      context.go('/rooms/${room.id}');
    }
  
-@@ -140,22 +160,639 @@ class ChatListController extends State<ChatList>
+@@ -140,22 +160,638 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -323000,16 +323000,15 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
 +    // Also refresh the space-delegate map at the same time (cheap).
 +    _cachedSpaceDelegates = _computeSpaceDelegates();
 +
-+    // In single-column mode (mobile), if a chat is active or another screen (e.g. Settings or ChatPage)
-+    // is covering the ChatListViewBody, suppress the rebuild to avoid wasting build budget
-+    // on an invisible widget. Mark a pending flush so that when the user returns to /rooms
-+    // we notify immediately.
++    // In single-column mode (mobile), if a chat is active, the ChatListViewBody is offscreen.
++    // Suppress the rebuild to avoid wasting build budget on an invisible widget.
++    // When the user returns (activeChat → null), didUpdateWidget flushes the pending notify.
++    // NOTE: We deliberately do NOT use PerformanceLoggerObserver.currentRoute here because
++    // GoRouter's ShellRoute does not fire NavigatorObserver.didPop with the /rooms route name
++    // when returning from a sub-route, causing isHiddenRoute to get stuck "true" and
++    // permanently suppressing filter-tab updates on the rooms list.
 +    final isSingleColumn = !FluffyThemes.isColumnMode(context);
-+    final currentRoute = PerformanceLoggerObserver.currentRoute;
-+    final isHiddenRoute = currentRoute != 'unknown' &&
-+        currentRoute != '/rooms' &&
-+        !currentRoute.startsWith('/rooms?');
-+    final chatCoveringList = isSingleColumn && (widget.activeChat != null || isHiddenRoute);
++    final chatCoveringList = isSingleColumn && widget.activeChat != null;
 +    if (chatCoveringList) {
 +      _pendingRoomCacheNotify = true;
 +    } else {
@@ -323285,7 +323284,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +801,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +800,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -323392,7 +323391,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +831,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +830,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -323419,7 +323418,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
    }
  
    void openNavrail() {
-@@ -285,13 +865,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +864,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -323443,7 +323442,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +883,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +882,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -323457,7 +323456,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +971,174 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +970,174 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -323666,7 +323665,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1232,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1231,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -323682,7 +323681,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1345,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1344,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323714,7 +323713,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1380,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1379,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -323754,7 +323753,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
          ],
        );
      }
-@@ -700,7 +1433,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1432,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -323778,7 +323777,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1549,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1548,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -323904,7 +323903,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
      }
    }
  
-@@ -864,6 +1723,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1722,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -323912,7 +323911,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1774,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1773,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -323926,7 +323925,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..24c86e7a0f4f9241268bb326b3f3cb27
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1898,7 @@ enum ChatContextAction {
+@@ -1039,4 +1897,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
