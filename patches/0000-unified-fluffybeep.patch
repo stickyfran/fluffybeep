@@ -312575,10 +312575,10 @@ index 5743e0f80d860a3741b38f7b9f27afa4e7e9f72d..0d6f7694fd5adfc80756ec0812685cb9
                          child: supportsVideoPlayer
 diff --git a/lib/pages/chat/floating_manual_read_button.dart b/lib/pages/chat/floating_manual_read_button.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..8081fcbc5d926c578bdcbe36918174e644971138
+index 0000000000000000000000000000000000000000..b3a3b24728cdc5030bc449b191c085fd86fecd29
 --- /dev/null
 +++ b/lib/pages/chat/floating_manual_read_button.dart
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,154 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -312669,6 +312669,7 @@ index 0000000000000000000000000000000000000000..8081fcbc5d926c578bdcbe36918174e6
 +        final theme = Theme.of(context);
 +        final room = widget.controller.room;
 +        final hasUnread = !_isMarkedReadLocally && BeeperBridgeUtils.isRoomUnread(room);
++        if (!hasUnread && !_isMarkingRead) return const SizedBox.shrink();
 +
 +        return AnimatedContainer(
 +          duration: FluffyThemes.animationDuration,
@@ -354883,10 +354884,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ac775044a078e3b188af012120ffcfc4da32ea82
+index 0000000000000000000000000000000000000000..d7448a9de76ccc675f86485e52058648c9ad906d
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1364 @@
+@@ -0,0 +1,1375 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -356103,6 +356104,17 @@ index 0000000000000000000000000000000000000000..ac775044a078e3b188af012120ffcfc4
 +        locallyReadRooms.remove(room.id);
 +      }
 +    }
++    // If the last real message in this room was sent by the current user
++    // and there are no unread mentions/notifications, consider it read:
++    // the user already responded (either here or on another device/app).
++    if (!room.markedUnread && room.notificationCount == 0) {
++      final myUserId = room.client.userID;
++      final lastReal = getLastRealMessage(room) ?? lastRealMessageCache[room.id];
++      if (lastReal != null && lastReal.senderId == myUserId) {
++        return false;
++      }
++    }
++
 +    return room.isUnreadOrInvited ||
 +        room.hasNewMessages ||
 +        room.isUnread ||
