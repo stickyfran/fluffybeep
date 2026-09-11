@@ -300631,10 +300631,10 @@ index 922773d8f234880aac86d4268c3a8bd3534a1395..85138ca89a47351eb356e077e7f8c934
  }
 \ No newline at end of file
 diff --git a/lib/main.dart b/lib/main.dart
-index d346f2271f53a5d4aee99806c55a69bf25b89be3..9331f712a1808d13b594a3982e409b4a5b80c75f 100644
+index d346f2271f53a5d4aee99806c55a69bf25b89be3..f8d976ba14fdb3c11ab7168aba1c787a111193ee 100644
 --- a/lib/main.dart
 +++ b/lib/main.dart
-@@ -1,165 +1,180 @@
+@@ -1,165 +1,183 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -300825,6 +300825,7 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..9331f712a1808d13b594a3982e409b4a
 +
 +import 'config/setting_keys.dart';
 +import 'utils/background_push.dart';
++import 'utils/crash_logger.dart';
 +import 'utils/file_logger.dart';
 +import 'utils/performance_logger.dart';
 +import 'widgets/fluffy_chat_app.dart';
@@ -300838,6 +300839,8 @@ index d346f2271f53a5d4aee99806c55a69bf25b89be3..9331f712a1808d13b594a3982e409b4a
 +void main(List<String> args) async {
 +  WidgetsFlutterBinding.ensureInitialized();
 +  await FileLogger.checkEnabledAsync();
++  await CrashLogger.checkEnabledAsync();
++  CrashLogger.init();
 +  PerformanceLogger.init();
 +  isIntegrationTest = args.singleOrNull == 'integration_test';
 +  if (PlatformInfos.isAndroid) {
@@ -341294,10 +341297,10 @@ index 4f740d331cdbf7e4b65a4e7b5848881d53725cc6..d2bc0a1d65977bf001c8c065de9a296a
 +}
 diff --git a/lib/pages/settings/patches_settings.dart b/lib/pages/settings/patches_settings.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406bd057b0f
+index 0000000000000000000000000000000000000000..c253a936b83b6ff5c6ae4f7b10546f4b789fa418
 --- /dev/null
 +++ b/lib/pages/settings/patches_settings.dart
-@@ -0,0 +1,779 @@
+@@ -0,0 +1,854 @@
 +// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 +// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 +//
@@ -341315,6 +341318,7 @@ index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406
 +import 'package:shared_preferences/shared_preferences.dart';
 +import 'package:fluffychat/pages/chat_list/label_editor_dialog.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
++import 'package:fluffychat/utils/crash_logger.dart';
 +import 'package:fluffychat/utils/file_logger.dart';
 +
 +class SettingsPatches extends StatefulWidget {
@@ -341326,7 +341330,9 @@ index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406
 +
 +class _SettingsPatchesState extends State<SettingsPatches> {
 +  int _logSize = 0;
++  int _crashLogSize = 0;
 +  bool _debugLoggingEnabled = false;
++  bool _crashLoggingEnabled = false;
 +  bool _logRoomOrderEnabled = false;
 +  bool _forcePublicPushGateway = false;
 +  bool _manualReadReceipts = false;
@@ -341347,10 +341353,13 @@ index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406
 +  Future<void> _loadAllSettings() async {
 +    final prefs = await SharedPreferences.getInstance();
 +    final logSize = await FileLogger.getLogSize();
++    final crashLogSize = await CrashLogger.getLogSize();
 +    if (!mounted) return;
 +    setState(() {
 +      _logSize = logSize;
++      _crashLogSize = crashLogSize;
 +      _debugLoggingEnabled = prefs.getBool('beeper_debug_logging_enabled') ?? false;
++      _crashLoggingEnabled = prefs.getBool('beeper_crash_logging_enabled') ?? false;
 +      _logRoomOrderEnabled = prefs.getBool('beeper_log_room_order_enabled') ?? false;
 +      _forcePublicPushGateway = prefs.getBool('beeper_force_public_push_gateway') ?? false;
 +      _manualReadReceipts = prefs.getBool('beeper_manual_read_receipts') ?? false;
@@ -341363,9 +341372,20 @@ index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406
 +
 +  Future<void> _loadLogSize() async {
 +    final size = await FileLogger.getLogSize();
++    final crashSize = await CrashLogger.getLogSize();
 +    if (mounted) {
 +      setState(() {
 +        _logSize = size;
++        _crashLogSize = crashSize;
++      });
++    }
++  }
++
++  Future<void> _setCrashLoggingEnabled(bool value) async {
++    await CrashLogger.setEnabled(value);
++    if (mounted) {
++      setState(() {
++        _crashLoggingEnabled = value;
 +      });
 +    }
 +  }
@@ -341723,6 +341743,64 @@ index 0000000000000000000000000000000000000000..ac3c68d1db5d0543c35a075a1ff44406
 +                    ],
 +                  )
 +                : null,
++          ),
++          SwitchListTile.adaptive(
++            secondary: const Icon(Icons.warning_amber_rounded),
++            title: const Text('Activar log de Crashes y Freezes'),
++            subtitle: const Text(
++              'Registra excepciones no controladas, caídas de frames (>150ms) y bloqueos severos del hilo principal (>3.5s).',
++            ),
++            value: _crashLoggingEnabled,
++            onChanged: _setCrashLoggingEnabled,
++          ),
++          ListTile(
++            leading: const Icon(Icons.bug_report),
++            title: const Text('Logs de Crashes y Freezes'),
++            subtitle: Text(
++              _crashLoggingEnabled
++                  ? 'Tamaño actual: ${(_crashLogSize / 1024).toStringAsFixed(2)} KB'
++                  : 'Desactivado — activa el interruptor superior para registrar congelamientos y caídas.',
++            ),
++            trailing: Row(
++              mainAxisSize: MainAxisSize.min,
++              children: [
++                IconButton(
++                  icon: const Icon(Icons.share_outlined),
++                  onPressed: _crashLogSize == 0 ? null : () async {
++                    final path = await CrashLogger.getLogPath();
++                    if (path != null) {
++                      final file = File(path);
++                      if (await file.exists()) {
++                        final bytes = await file.readAsBytes();
++                        final box = context.findRenderObject() as RenderBox?;
++                        await SharePlus.instance.share(
++                          ShareParams(
++                            files: [XFile.fromData(bytes, name: 'fluffybeep_crash_freeze.txt', mimeType: 'text/plain')],
++                            sharePositionOrigin: box == null
++                                ? null
++                                : box.localToGlobal(Offset.zero) & box.size,
++                          ),
++                        );
++                      }
++                    }
++                  },
++                  tooltip: 'Exportar logs de crasheos/freezes',
++                ),
++                IconButton(
++                  icon: const Icon(Icons.delete_outline, color: Colors.red),
++                  onPressed: _crashLogSize == 0 ? null : () async {
++                    await CrashLogger.clearLog();
++                    await _loadLogSize();
++                    if (mounted) {
++                      ScaffoldMessenger.of(context).showSnackBar(
++                        const SnackBar(content: Text('Logs de crasheos eliminados')),
++                      );
++                    }
++                  },
++                  tooltip: 'Borrar logs de crasheos/freezes',
++                ),
++              ],
++            ),
 +          ),
 +          if (_debugLoggingEnabled)
 +            SwitchListTile.adaptive(
@@ -358808,6 +358886,205 @@ index 0000000000000000000000000000000000000000..9192e1e3367a521f53fd0e6e35c9a17c
 +    if (_prefs == null) return;
 +    final jsonString = jsonEncode(profile.toJson());
 +    _prefs!.setString('$localPrefPrefix$roomId', jsonString);
++  }
++}
+diff --git a/lib/utils/crash_logger.dart b/lib/utils/crash_logger.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..be004b3407a81f3b6ff7b0d41bee2409688a88d8
+--- /dev/null
++++ b/lib/utils/crash_logger.dart
+@@ -0,0 +1,193 @@
++import 'dart:async';
++import 'dart:io';
++import 'dart:isolate';
++import 'dart:ui';
++import 'package:flutter/foundation.dart';
++import 'package:flutter/widgets.dart';
++import 'package:path_provider/path_provider.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++
++/// Logger especializado exclusivamente en capturar crasheos no controlados y freezes/tildes (ANRs) de la UI.
++class CrashLogger {
++  static const String prefKey = 'beeper_crash_logging_enabled';
++  static bool _enabled = false;
++  static bool get isEnabled => _enabled;
++
++  static File? _logFile;
++  static Timer? _watchdogTimer;
++  static DateTime _lastHeartbeat = DateTime.now();
++  static bool _watchdogActive = false;
++
++  // Umbral de bloqueo del hilo principal para considerarlo congelamiento severo (freeze)
++  static const int freezeThresholdMs = 3500;
++
++  static Future<void> checkEnabledAsync() async {
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      _enabled = prefs.getBool(prefKey) ?? false;
++      if (_enabled) {
++        await _initFile();
++      }
++    } catch (_) {}
++  }
++
++  static Future<void> setEnabled(bool val) async {
++    _enabled = val;
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      await prefs.setBool(prefKey, val);
++      if (val) {
++        await _initFile();
++        startWatchdog();
++        logEvent('CrashLogger activado manualmente por el usuario.');
++      } else {
++        stopWatchdog();
++        logEvent('CrashLogger desactivado por el usuario.');
++      }
++    } catch (_) {}
++  }
++
++  static Future<void> _initFile() async {
++    if (_logFile != null) return;
++    try {
++      final dir = await getApplicationDocumentsDirectory();
++      _logFile = File('${dir.path}/fluffybeep_crash_freeze.txt');
++    } catch (_) {
++      final fallback = File('/sdcard/Download/fluffybeep_crash_freeze.txt');
++      _logFile = fallback;
++    }
++  }
++
++  static void init() {
++    if (!_enabled) return;
++
++    // 1. Flutter framework error handler
++    final originalOnError = FlutterError.onError;
++    FlutterError.onError = (FlutterErrorDetails details) {
++      logCrash('FLUTTER_ERROR', details.exceptionAsString(), details.stack);
++      if (originalOnError != null) {
++        originalOnError(details);
++      }
++    };
++
++    // 2. Async error handler (PlatformDispatcher)
++    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
++      logCrash('PLATFORM_ASYNC_ERROR', error.toString(), stack);
++      return false;
++    };
++
++    // 3. Isolate errors
++    final errorPort = ReceivePort();
++    errorPort.listen((message) {
++      if (message is List && message.length >= 2) {
++        logCrash('ISOLATE_ERROR', message[0].toString(), StackTrace.fromString(message[1].toString()));
++      } else {
++        logCrash('ISOLATE_ERROR', message.toString(), null);
++      }
++    });
++    Isolate.current.addErrorListener(errorPort.sendPort);
++
++    // 4. Detección de frames bloqueados (> 150ms)
++    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
++      if (!_enabled) return;
++      for (final timing in timings) {
++        final totalDuration = timing.totalSpan.inMilliseconds;
++        final buildDuration = timing.buildDuration.inMilliseconds;
++        final rasterDuration = timing.rasterDuration.inMilliseconds;
++        if (totalDuration > 150) {
++          logFreeze(
++            'UI_FRAME_DROP',
++            'Frame demoro ' + totalDuration.toString() + 'ms (Build: ' + buildDuration.toString() + 'ms, Raster: ' + rasterDuration.toString() + 'ms)',
++          );
++        }
++      }
++    });
++
++    startWatchdog();
++  }
++
++  /// Watchdog para detectar ANRs o freezes donde el event loop se queda colgado
++  static void startWatchdog() {
++    if (_watchdogActive) return;
++    _watchdogActive = true;
++    _lastHeartbeat = DateTime.now();
++
++    _watchdogTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
++      final now = DateTime.now();
++      final diff = now.difference(_lastHeartbeat).inMilliseconds;
++      if (diff > freezeThresholdMs) {
++        logFreeze(
++          'MAIN_THREAD_FROZEN',
++          'El hilo principal estuvo bloqueado por ' + diff.toString() + 'ms (posible ANR o tarea pesada sincrona)',
++        );
++      }
++      _lastHeartbeat = now;
++    });
++  }
++
++  static void stopWatchdog() {
++    _watchdogActive = false;
++    _watchdogTimer?.cancel();
++    _watchdogTimer = null;
++  }
++
++  static void logEvent(String message) {
++    _write('[EVENT] [' + DateTime.now().toIso8601String() + '] ' + message + '
++');
++  }
++
++  static void logFreeze(String type, String details) {
++    _write('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + '
++');
++  }
++
++  static void logCrash(String type, String error, StackTrace? stack) {
++    final buffer = StringBuffer();
++    buffer.writeln('==================== CRASH / EXCEPTION ====================');
++    buffer.writeln('Timestamp: ' + DateTime.now().toIso8601String());
++    buffer.writeln('Type: ' + type);
++    buffer.writeln('Error: ' + error);
++    if (stack != null) {
++      buffer.writeln('StackTrace:
++' + stack.toString());
++    }
++    buffer.writeln('===========================================================');
++    _write(buffer.toString());
++  }
++
++  static void _write(String text) {
++    if (!_enabled) return;
++    try {
++      if (_logFile != null) {
++        _logFile!.writeAsStringSync(text, mode: FileMode.append, flush: true);
++      }
++    } catch (_) {}
++  }
++
++  static Future<String?> getLogPath() async {
++    await _initFile();
++    if (_logFile != null && await _logFile!.exists()) {
++      return _logFile!.path;
++    }
++    return null;
++  }
++
++  static Future<int> getLogSize() async {
++    try {
++      await _initFile();
++      if (_logFile != null && await _logFile!.exists()) {
++        return await _logFile!.length();
++      }
++    } catch (_) {}
++    return 0;
++  }
++
++  static Future<void> clearLog() async {
++    try {
++      await _initFile();
++      if (_logFile != null && await _logFile!.exists()) {
++        await _logFile!.delete();
++      }
++    } catch (_) {}
 +  }
 +}
 diff --git a/lib/utils/custom_http_client.dart b/lib/utils/custom_http_client.dart
