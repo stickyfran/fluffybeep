@@ -14282,10 +14282,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..9e60ccdcd5212500143cc1ae91c5c11ccb843fb7 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..5df6aa8e146797e3ddcae1b297a381dbff09fd8c 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,438 @@
+@@ -1,31 +1,442 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14740,8 +14740,12 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..9e60ccdcd5212500143cc1ae91c5c11c
 +        val maxRange = event.sensor.maximumRange
 +
 +        val wasNear = isNearEar
-+        // Near threshold logic: distance < maxRange and typically <= 5 cm
-+        isNearEar = distance < maxRange && distance < 5.0f
++        // Near threshold logic: standard proximity sensors report 0.0 or distance < maxRange / 5cm
++        isNearEar = if (maxRange <= 1.0f) {
++            distance < maxRange // binary sensor (0 = near, 1 = far)
++        } else {
++            distance < 5.0f && distance < maxRange
++        }
 +
 +        if (wasNear != isNearEar) {
 +            methodChannel?.invokeMethod("onProximityChanged", isNearEar)
@@ -303250,7 +303254,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e843aaff41 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd4546dbf3ff 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303442,15 +303446,15 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
 +  final ValueNotifier<Event?> replyEventNotifier = ValueNotifier(null);
 +  Event? get replyEvent => replyEventNotifier.value;
 +  set replyEvent(Event? val) => replyEventNotifier.value = val;
-+
+ 
+-  Event? editEvent;
 +  final ValueNotifier<Event?> editEventNotifier = ValueNotifier(null);
 +  Event? get editEvent => editEventNotifier.value;
 +  set editEvent(Event? val) => editEventNotifier.value = val;
  
--  Event? editEvent;
-+  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
- 
 -  bool _scrolledUp = false;
++  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
++
 +  final ValueNotifier<bool> scrolledUpNotifier = ValueNotifier<bool>(false);
 +  bool get _scrolledUp => scrolledUpNotifier.value;
 +  set _scrolledUp(bool value) => scrolledUpNotifier.value = value;
@@ -303662,12 +303666,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -304450,7 +304454,52 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1144,7 +1607,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1598,49 @@ class ChatController extends State<ChatPageWithRoom>
+       selectedEvents,
+     ).map((event) => event.getDisplayEvent(timeline)).toList();
+ 
++    // Download/convert media events into FileShareItem if they contain files/images
++    final shareItems = <ShareItem>[];
++    for (final event in forwardEvents) {
++      if ({
++        MessageTypes.Image,
++        MessageTypes.Video,
++        MessageTypes.Audio,
++        MessageTypes.File,
++        MessageTypes.Sticker,
++      }.contains(event.messageType)) {
++        try {
++          final matrixFile = await showFutureLoadingDialog(
++            context: context,
++            future: event.downloadAndDecryptAttachment,
++          );
++          if (matrixFile.result != null) {
++            shareItems.add(
++              FileShareItem(
++                XFile.fromData(
++                  matrixFile.result!.bytes,
++                  name: matrixFile.result!.name,
++                  mimeType: matrixFile.result!.mimeType,
++                ),
++              ),
++            );
++            continue;
++          }
++        } catch (e) {
++          Logs().w('Failed to download attachment for forward, fallback to content', e);
++        }
++      }
++      shareItems.add(ContentShareItem(event.content.copy()));
++    }
++
++    if (!mounted) return;
+     await showScaffoldDialog(
+       context: context,
+       builder: (context) => ShareScaffoldDialog(
+-        items: forwardEvents
+-            .map((event) => ContentShareItem(event.content.copy()))
+-            .toList(),
++        items: shareItems,
        ),
      );
      if (!mounted) return;
@@ -304459,7 +304508,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1621,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1654,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304477,7 +304526,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1723,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1756,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304491,7 +304540,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1755,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1788,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304500,7 +304549,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1821,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1854,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304515,7 +304564,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1858,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1891,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304525,7 +304574,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1927,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +1960,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304588,7 +304637,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +1976,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2009,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304599,7 +304648,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
            return;
          }
        }
-@@ -1515,7 +1991,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2024,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304614,7 +304663,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2009,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2042,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304623,7 +304672,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2063,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2096,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304640,7 +304689,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..0c8376d6ba016b21c5421343d38b87e8
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2150,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2183,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -305306,7 +305355,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..c7c5306e61bd6d7dc401f286ac7bd4fa
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea421d2a491 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296b828f571 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305349,17 +305398,17 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea4
      final theme = Theme.of(context);
  
 -    final colors = [theme.secondaryBubbleColor, theme.bubbleColor];
+-
+-    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
 +    final colors = AppSettings.useMessageBubbleGradient.value
 +        ? [theme.secondaryBubbleColor, theme.bubbleColor]
 +        : [theme.bubbleColor];
  
--    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 8.0 : 0.0;
-+    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
- 
 -    final events = timeline.events.filterByVisibleInGui(
 -      threadId: controller.activeThreadId,
 -    );
--
++    final horizontalPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
+ 
 -    // create a map of eventId --> index to greatly improve performance of
 -    // ListView's findChildIndexCallback
 -    final thisEventsKeyMap = <String, int>{};
@@ -305503,7 +305552,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea4
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -159,95 +188,106 @@ class ChatEventList extends StatelessWidget {
+@@ -159,95 +188,113 @@ class ChatEventList extends StatelessWidget {
                    nextEvent == null ||
                    !event.originServerTs.sameDay(nextEvent.originServerTs);
  
@@ -305574,54 +305623,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea4
                                ),
                              ),
                            ),
-+                        Message(
-+                          event,
-+                          bigEmojis: controller.bigEmojis,
-+                          animateIn: animateIn,
-+                          onSwipe: () => controller.replyAction(replyTo: event),
-+                          onInfoTab: controller.showEventInfo,
-+                          onMention: () => controller.sendController.text +=
-+                              '${event.senderFromMemoryOrFallback.mention} ',
-+                          highlightMarker:
-+                              controller.scrollToEventIdMarker == event.eventId,
-+                          onSelect: controller.onSelectMessage,
-+                          scrollToEventId: controller.scrollToEventId,
-+                          longPressSelect: controller.selectedEvents.isNotEmpty,
-+                          selected: controller.selectedEvents.any(
-+                            (e) => e.eventId == event.eventId,
-+                          ),
-+                          singleSelected:
-+                              controller.selectedEvents.singleOrNull?.eventId ==
-+                              event.eventId,
-+                          onEdit: controller.editSelectedEventAction,
-+                          timeline: timeline,
-+                          displayReadMarker:
-+                              i > 0 &&
-+                              controller.readMarkerEventId == event.eventId,
-+                          onMarkRead: () => controller.setReadMarker(
-+                            force: true,
-+                          ),
-+                          nextEvent: nextEvent,
-+                          previousEvent: previousEvent,
-+                          wallpaperMode: hasWallpaper,
-+                          scrollController: controller.scrollController,
-+                          colors: colors,
-+                          isCollapsed: isCollapsed,
-+                          enterThread: controller.activeThreadId == null
-+                              ? controller.enterThread
-+                              : null,
-+                          cachedReactions: controller.reactionsMap[event.eventId],
-+                          cachedThreadChildren: controller.threadsMap[event.eventId],
-+                          cachedIsEdited: controller.editsSet.contains(event.eventId),
-+                          onExpand: canExpand
-+                              ? () => controller.expandEventsFrom(
-+                                  event,
-+                                  !controller.expandedEventIds.contains(
-+                                    event.eventId,
-+                                  ),
-+                                )
-+                              : null,
-                         ),
+-                        ),
 -                      ),
 -                    Message(
 -                      event,
@@ -305658,12 +305660,65 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..a09d03760505ffb5ab96391337ef2ea4
 -                          : null,
 -                      onExpand: canExpand
 -                          ? () => controller.expandEventsFrom(
--                              event,
++                        ValueListenableBuilder<List<Event>>(
++                          valueListenable: controller.selectedEventsNotifier,
++                          builder: (context, selectedEvents, _) {
++                            final isSelected = selectedEvents.any(
++                              (e) => e.eventId == event.eventId,
++                            );
++                            final isSingleSelected =
++                                selectedEvents.length == 1 &&
++                                selectedEvents.first.eventId == event.eventId;
++                            return Message(
+                               event,
 -                              !controller.expandedEventIds.contains(
 -                                event.eventId,
--                              ),
++                              bigEmojis: controller.bigEmojis,
++                              animateIn: animateIn,
++                              onSwipe: () => controller.replyAction(replyTo: event),
++                              onInfoTab: controller.showEventInfo,
++                              onMention: () => controller.sendController.text +=
++                                  '${event.senderFromMemoryOrFallback.mention} ',
++                              highlightMarker:
++                                  controller.scrollToEventIdMarker == event.eventId,
++                              onSelect: controller.onSelectMessage,
++                              scrollToEventId: controller.scrollToEventId,
++                              longPressSelect: selectedEvents.isNotEmpty,
++                              selected: isSelected,
++                              singleSelected: isSingleSelected,
++                              onEdit: controller.editSelectedEventAction,
++                              timeline: timeline,
++                              displayReadMarker:
++                                  i > 0 &&
++                                  controller.readMarkerEventId == event.eventId,
++                              onMarkRead: () => controller.setReadMarker(
++                                force: true,
+                               ),
 -                            )
 -                          : null,
++                              nextEvent: nextEvent,
++                              previousEvent: previousEvent,
++                              wallpaperMode: hasWallpaper,
++                              scrollController: controller.scrollController,
++                              colors: colors,
++                              isCollapsed: isCollapsed,
++                              enterThread: controller.activeThreadId == null
++                                  ? controller.enterThread
++                                  : null,
++                              cachedReactions: controller.reactionsMap[event.eventId],
++                              cachedThreadChildren: controller.threadsMap[event.eventId],
++                              cachedIsEdited: controller.editsSet.contains(event.eventId),
++                              onExpand: canExpand
++                                  ? () => controller.expandEventsFrom(
++                                      event,
++                                      !controller.expandedEventIds.contains(
++                                        event.eventId,
++                                      ),
++                                    )
++                                  : null,
++                            );
++                          },
++                        ),
 +                      ],
                      ),
 -                  ],
@@ -307796,7 +307851,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b853707456b 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..b2310b320b69bdaeda72366b90d48362088f9573 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -308067,7 +308122,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
      } catch (e, s) {
        Logs().v('Could not download audio file', e, s);
        if (!mounted) rethrow;
-@@ -199,28 +313,182 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -199,26 +313,184 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
          context,
        ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
        rethrow;
@@ -308123,6 +308178,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
      }
      if (!mounted) return;
  
+-    audioPlayer.play().onError(
+-      ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
+-    );
 +    // Smart delay if earpiece forced and delay > 0
 +    final delaySeconds = AppSettings.audioEarpieceDelaySeconds.value;
 +    if (outputMode == 'earpiece' && delaySeconds > 0) {
@@ -308154,11 +308212,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
 +    if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
 +
 +    _listenForCompletion(audioPlayer);
-     audioPlayer.play().onError(
-       ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
-     );
-   }
- 
++    audioPlayer.play().catchError((e, s) {
++      if (e.toString().contains('interrupted') || e.toString().contains('abort')) {
++        Logs().d('Audio playback interrupted: $e');
++        return;
++      }
++      ErrorReporter(context, 'Unable to play audio message').onErrorCallback(e, s);
++    });
++  }
++
 +  Future<void> _toggleOutput() async {
 +    final current = AppSettings.audioPlaybackOutput.value;
 +    // Cycle: auto -> speaker -> earpiece -> auto
@@ -308249,12 +308311,10 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
 +    } catch (e, s) {
 +      Logs().e('Failed to auto-play next audio', e, s);
 +    }
-+  }
-+
+   }
+ 
    Future<void> _toggleSpeed() async {
-     final audioPlayer = matrix.audioPlayer;
-     if (audioPlayer == null) return;
-@@ -246,12 +514,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +518,13 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -308270,7 +308330,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +535,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +539,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -308353,7 +308413,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -300,15 +640,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -300,15 +644,31 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
              ? null
              : matrix.audioPlayer;
  
@@ -308391,7 +308451,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
            builder: (context, _) {
              final maxPosition =
                  audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-@@ -338,7 +694,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -338,7 +698,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                          SizedBox(
                            width: buttonSize,
                            height: buttonSize,
@@ -308400,7 +308460,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
                                ? CircularProgressIndicator(
                                    strokeWidth: 2,
                                    color: widget.color,
-@@ -365,71 +721,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -365,71 +725,73 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                          ),
                          const SizedBox(width: 8),
                          Expanded(
@@ -308532,7 +308592,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
                            ),
                          ),
                          const SizedBox(width: 8),
-@@ -449,30 +807,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -449,30 +811,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                color: widget.color,
                              ),
                            ),
@@ -308588,7 +308648,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
                            ),
                            alignment: Alignment.center,
                            crossFadeState: audioPlayer == null
-@@ -511,6 +874,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -511,6 +878,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                        ),
                      ),
                    ],
@@ -308596,7 +308656,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..c9a0cc029ccb9825bd98163dc1fb3b85
                  ],
                ),
              );
-@@ -519,6 +883,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -519,6 +887,274 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
        },
      );
    }
@@ -310059,7 +310119,7 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116ca4a98f0 100644
+index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcbb769106e 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -5,7 +5,6 @@
@@ -310285,7 +310345,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
      final sender = event.senderFromMemoryOrFallback;
  
      final wallpaperTextShadow = !wallpaperMode
-@@ -260,15 +348,26 @@ class Message extends StatelessWidget {
+@@ -260,15 +348,24 @@ class Message extends StatelessWidget {
                        borderRadius: BorderRadius.circular(
                          AppConfig.borderRadius / 2,
                        ),
@@ -310299,16 +310359,14 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
 +                            AppConfig.borderRadius / 2,
 +                          ),
 +                          color: selected
-+                              ? theme.colorScheme.primary.withOpacity(0.12)
++                              ? theme.colorScheme.primary.withOpacity(0.24)
 +                              : highlightMarker
 +                                  ? theme.colorScheme.secondaryContainer.withAlpha(128)
 +                                  : Colors.transparent,
 +                          border: selected
-+                              ? Border(
-+                                  left: BorderSide(
-+                                    color: theme.colorScheme.primary,
-+                                    width: 3,
-+                                  ),
++                              ? Border.all(
++                                  color: theme.colorScheme.primary,
++                                  width: 2,
 +                                )
 +                              : null,
                          ),
@@ -310320,7 +310378,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                        ),
                      ),
                    ),
-@@ -283,36 +382,38 @@ class Message extends StatelessWidget {
+@@ -283,36 +380,38 @@ class Message extends StatelessWidget {
                            child: IconButton(
                              padding: EdgeInsets.zero,
                              tooltip: L10n.of(context).select,
@@ -310383,7 +310441,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                          ),
                        Expanded(
                          child: Column(
-@@ -345,12 +446,9 @@ class Message extends StatelessWidget {
+@@ -345,12 +444,9 @@ class Message extends StatelessWidget {
                                        ),
                                      ),
                                    if ((!nextEventSameSender) && !ownMessage)
@@ -310399,7 +310457,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                          return ConstrainedBox(
                                            constraints: BoxConstraints(
                                              maxWidth: 200,
-@@ -363,12 +461,9 @@ class Message extends StatelessWidget {
+@@ -363,12 +459,9 @@ class Message extends StatelessWidget {
                                                    ? Colors.transparent
                                                    : (theme.brightness ==
                                                              Brightness.light
@@ -310414,7 +310472,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                                fontSize: 11,
                                                shadows: wallpaperTextShadow,
                                              ),
-@@ -386,45 +481,6 @@ class Message extends StatelessWidget {
+@@ -386,45 +479,6 @@ class Message extends StatelessWidget {
                                alignment: alignment,
                                padding: const EdgeInsets.only(left: 8),
                                child: GestureDetector(
@@ -310460,7 +310518,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                  onLongPress: longPressSelect
                                      ? null
                                      : () {
-@@ -449,6 +505,8 @@ class Message extends StatelessWidget {
+@@ -449,6 +503,8 @@ class Message extends StatelessWidget {
                                        ignore:
                                            noBubble ||
                                            !ownMessage ||
@@ -310469,7 +310527,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                            MediaQuery.highContrastOf(context),
                                        scrollController: scrollController,
                                        child: Container(
-@@ -471,9 +529,8 @@ class Message extends StatelessWidget {
+@@ -471,9 +527,8 @@ class Message extends StatelessWidget {
                                                  ) !=
                                                  null)
                                                FutureBuilder<Event?>(
@@ -310481,7 +310539,47 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                                  builder: (BuildContext context, snapshot) {
                                                    final replyEvent =
                                                        snapshot.hasData
-@@ -550,7 +607,8 @@ class Message extends StatelessWidget {
+@@ -530,15 +585,30 @@ class Message extends StatelessWidget {
+                                                   );
+                                                 },
+                                               ),
+-                                            MessageContent(
+-                                              displayEvent,
+-                                              textColor: textColor,
+-                                              linkColor: linkColor,
+-                                              onInfoTab: onInfoTab,
+-                                              borderRadius: borderRadius,
+-                                              timeline: timeline,
+-                                              selected: selected,
+-                                              bigEmojis: bigEmojis,
++                                            Stack(
++                                              children: [
++                                                MessageContent(
++                                                  displayEvent,
++                                                  textColor: textColor,
++                                                  linkColor: linkColor,
++                                                  onInfoTab: onInfoTab,
++                                                  borderRadius: borderRadius,
++                                                  timeline: timeline,
++                                                  selected: selected,
++                                                  bigEmojis: bigEmojis,
++                                                ),
++                                                if (selected)
++                                                  Positioned.fill(
++                                                    child: IgnorePointer(
++                                                      child: Container(
++                                                        decoration: BoxDecoration(
++                                                          color: theme.colorScheme.primary.withOpacity(0.18),
++                                                          borderRadius: borderRadius,
++                                                        ),
++                                                      ),
++                                                    ),
++                                                  ),
++                                              ],
+                                             ),
+                                           ],
+                                         ),
+@@ -550,7 +620,8 @@ class Message extends StatelessWidget {
                              ),
  
                              AnimatedSize(
@@ -310491,7 +310589,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                curve: FluffyThemes.animationCurve,
                                alignment: Alignment.bottomCenter,
                                child: !hasReactions
-@@ -564,7 +622,11 @@ class Message extends StatelessWidget {
+@@ -564,7 +635,11 @@ class Message extends StatelessWidget {
                                          left: 8.0,
                                          right: ownMessage ? 0 : 12.0,
                                        ),
@@ -310504,7 +310602,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                      ),
                              ),
                              Row(
-@@ -646,7 +708,8 @@ class Message extends StatelessWidget {
+@@ -646,7 +721,8 @@ class Message extends StatelessWidget {
                                    ? Alignment.bottomRight
                                    : Alignment.bottomLeft,
                                child: AnimatedSize(
@@ -310514,7 +310612,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                  curve: FluffyThemes.animationCurve,
                                  child: showReactionPicker
                                      ? Padding(
-@@ -667,22 +730,20 @@ class Message extends StatelessWidget {
+@@ -667,22 +743,20 @@ class Message extends StatelessWidget {
                                                    (emoji) => IconButton(
                                                      padding: EdgeInsets.zero,
                                                      icon: Center(
@@ -310550,7 +310648,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                                                      ),
                                                      onPressed:
                                                          sentReactions.contains(
-@@ -829,7 +890,8 @@ class Message extends StatelessWidget {
+@@ -829,7 +903,8 @@ class Message extends StatelessWidget {
                ),
                if (enterThread != null)
                  AnimatedSize(
@@ -310560,7 +310658,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                    curve: FluffyThemes.animationCurve,
                    alignment: Alignment.bottomCenter,
                    child: threadChildren.isEmpty
-@@ -890,9 +952,52 @@ class Message extends StatelessWidget {
+@@ -890,9 +965,52 @@ class Message extends StatelessWidget {
                        ),
                        child: Text(
                          L10n.of(context).readUpToHere,
@@ -310614,7 +310712,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
                      Expanded(
                        child: Divider(
                          color: theme.colorScheme.surfaceContainerHighest,
-@@ -924,61 +1029,26 @@ class BubbleBackground extends StatelessWidget {
+@@ -924,61 +1042,26 @@ class BubbleBackground extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -310690,7 +310788,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..e9c7d6e6be5b0440888d758658bb1116
  class _AnimateIn extends StatefulWidget {
    final bool animateIn;
    final Widget child;
-@@ -1003,7 +1073,8 @@ class __AnimateInState extends State<_AnimateIn> {
+@@ -1003,7 +1086,8 @@ class __AnimateInState extends State<_AnimateIn> {
      }
  
      return AnimatedSize(
@@ -335217,10 +335315,10 @@ index 9b83db8106ceda6f263b7f4e4a5ea6f49faf7560..8673ab11f7c5771d0fc8ce52d03d2050
 +  return offsets;
 +}
 diff --git a/lib/pages/image_viewer/image_viewer.dart b/lib/pages/image_viewer/image_viewer.dart
-index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..df2e77be83b56087a032705e7832391773e67bf4 100644
+index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..b469f1c5286a4edd71149fea97a939db7bae54e7 100644
 --- a/lib/pages/image_viewer/image_viewer.dart
 +++ b/lib/pages/image_viewer/image_viewer.dart
-@@ -1,134 +1,134 @@
+@@ -1,134 +1,155 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -335455,11 +335553,32 @@ index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..df2e77be83b56087a032705e78323917
 +  bool get canGoBack => _index > 0;
 +
 +  /// Forward this image to another room.
-+  void forwardAction() => showScaffoldDialog(
-+    context: context,
-+    builder: (context) =>
-+        ShareScaffoldDialog(items: [ContentShareItem(currentEvent.content)]),
-+  );
++  Future<void> forwardAction() async {
++    final event = currentEvent;
++    ShareItem item = ContentShareItem(event.content);
++    try {
++      final matrixFile = await showFutureLoadingDialog(
++        context: context,
++        future: event.downloadAndDecryptAttachment,
++      );
++      if (matrixFile.result != null) {
++        item = FileShareItem(
++          XFile.fromData(
++            matrixFile.result!.bytes,
++            name: matrixFile.result!.name,
++            mimeType: matrixFile.result!.mimeType,
++          ),
++        );
++      }
++    } catch (e) {
++      Logs().w('Failed to download image for forward', e);
++    }
++    if (!mounted) return;
++    await showScaffoldDialog(
++      context: context,
++      builder: (context) => ShareScaffoldDialog(items: [item]),
++    );
++  }
 +
 +  /// Save this file with a system call.
 +  void saveFileAction(BuildContext context) => currentEvent.saveFile(context);
