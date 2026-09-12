@@ -303254,7 +303254,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd4546dbf3ff 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7cef4ab9d 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303289,7 +303289,16 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  import 'package:go_router/go_router.dart';
  import 'package:image_picker/image_picker.dart';
  import 'package:matrix/matrix.dart';
-@@ -56,20 +64,17 @@ class ChatPage extends StatelessWidget {
+@@ -49,6 +57,8 @@ import 'package:universal_html/universal_html.dart' as web;
+ 
+ import '../../utils/account_bundles.dart';
+ import '../../utils/localized_exception_extension.dart';
++import '../../utils/scheduled_message_service.dart';
++import '../../widgets/scheduled_time_picker_dialog.dart';
+ import 'send_file_dialog.dart';
+ import 'send_location_dialog.dart';
+ 
+@@ -56,20 +66,17 @@ class ChatPage extends StatelessWidget {
    final String roomId;
    final List<ShareItem>? shareItems;
    final String? eventId;
@@ -303311,7 +303320,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      if (room == null) {
        return Scaffold(
          appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
-@@ -87,23 +92,74 @@ class ChatPage extends StatelessWidget {
+@@ -87,23 +94,74 @@ class ChatPage extends StatelessWidget {
        room: room,
        shareItems: shareItems,
        eventId: eventId,
@@ -303389,7 +303398,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    });
  
    @override
-@@ -120,9 +176,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -120,9 +178,13 @@ class ChatController extends State<ChatPageWithRoom>
  
    String? activeThreadId;
  
@@ -303405,7 +303414,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    String get roomId => widget.room.id;
  
-@@ -133,16 +193,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -133,16 +195,21 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? typingCoolDown;
    Timer? typingTimeout;
    bool currentlyTyping = false;
@@ -303431,7 +303440,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      if (details.files.isEmpty) return;
  
      await showAdaptiveDialog(
-@@ -170,15 +235,25 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -170,15 +237,25 @@ class ChatController extends State<ChatPageWithRoom>
    void saveSelectedEvent(BuildContext context) =>
        selectedEvents.single.saveFile(context);
  
@@ -303446,22 +303455,22 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
 +  final ValueNotifier<Event?> replyEventNotifier = ValueNotifier(null);
 +  Event? get replyEvent => replyEventNotifier.value;
 +  set replyEvent(Event? val) => replyEventNotifier.value = val;
- 
--  Event? editEvent;
++
 +  final ValueNotifier<Event?> editEventNotifier = ValueNotifier(null);
 +  Event? get editEvent => editEventNotifier.value;
 +  set editEvent(Event? val) => editEventNotifier.value = val;
  
--  bool _scrolledUp = false;
+-  Event? editEvent;
 +  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
-+
+ 
+-  bool _scrolledUp = false;
 +  final ValueNotifier<bool> scrolledUpNotifier = ValueNotifier<bool>(false);
 +  bool get _scrolledUp => scrolledUpNotifier.value;
 +  set _scrolledUp(bool value) => scrolledUpNotifier.value = value;
  
    bool get showScrollDownButton =>
        _scrolledUp || timeline?.allowNewEvent == false;
-@@ -189,7 +264,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -189,7 +266,9 @@ class ChatController extends State<ChatPageWithRoom>
  
    String pendingText = '';
  
@@ -303472,7 +303481,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    String? get threadLastEventId {
      final threadId = activeThreadId;
-@@ -200,15 +277,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -200,15 +279,21 @@ class ChatController extends State<ChatPageWithRoom>
          ?.eventId;
    }
  
@@ -303502,7 +303511,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    Future<void> recreateChat() async {
      final room = this.room;
-@@ -234,9 +317,29 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -234,9 +319,29 @@ class ChatController extends State<ChatPageWithRoom>
      context.go('/rooms');
    }
  
@@ -303532,7 +303541,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    Future<void> requestFuture() async {
-@@ -271,16 +374,22 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -271,16 +376,22 @@ class ChatController extends State<ChatPageWithRoom>
      if (!scrollController.hasClients) return;
      if (timeline?.allowNewEvent == false ||
          scrollController.position.pixels > 0 && _scrolledUp == false) {
@@ -303558,7 +303567,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      if (draft != null && draft.isNotEmpty) {
        sendController.text = draft;
      }
-@@ -401,13 +510,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -401,13 +512,7 @@ class ChatController extends State<ChatPageWithRoom>
        AppSettings.displayChatDetailsColumn.value,
      );
  
@@ -303573,7 +303582,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
      sendingClient = Matrix.of(context).client;
      final lastEventThreadId =
-@@ -428,17 +531,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -428,17 +533,17 @@ class ChatController extends State<ChatPageWithRoom>
        threadId: activeThreadId,
      );
      final start = events.indexOf(event);
@@ -303601,7 +303610,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,6 +549,16 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,6 +551,16 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
@@ -303618,7 +303627,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
        // We launched the chat with a given initial event ID:
        if (initialEventId != null) {
          scrollToEventId(initialEventId);
-@@ -454,30 +567,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -454,30 +569,17 @@ class ChatController extends State<ChatPageWithRoom>
  
        var readMarkerEventIndex = readMarkerEventId.isEmpty
            ? -1
@@ -303653,7 +303662,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
          _showScrollUpMaterialBanner(readMarkerEventId);
        }
  
-@@ -486,20 +586,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -486,20 +588,26 @@ class ChatController extends State<ChatPageWithRoom>
  
        if (!mounted) return;
      } catch (e, s) {
@@ -303685,7 +303694,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    String? animateInEventId;
  
-@@ -512,10 +618,122 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -512,10 +620,122 @@ class ChatController extends State<ChatPageWithRoom>
      if (animateInEventId == eventId) animateInEventId = null;
    }
  
@@ -303810,7 +303819,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +742,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +744,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -303818,7 +303827,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +750,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +752,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -303837,7 +303846,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +777,189 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +779,189 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -304079,7 +304088,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      super.dispose();
    }
  
-@@ -679,6 +998,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1000,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304090,7 +304099,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,12 +1019,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,12 +1021,6 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304103,7 +304112,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      // ignore: unawaited_futures
      room.sendTextEvent(
        sendController.text,
-@@ -710,17 +1027,39 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,20 +1029,68 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304149,7 +304158,36 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      });
    }
  
-@@ -883,60 +1222,183 @@ class ChatController extends State<ChatPageWithRoom>
++  Future<void> scheduleMessageAction(BuildContext context) async {
++    final text = sendController.text.trim();
++    if (text.isEmpty) return;
++
++    final scheduledAt = await showDialog<DateTime>(
++      context: context,
++      builder: (c) => const ScheduledTimePickerDialog(),
++    );
++    if (scheduledAt == null) return;
++
++    await ScheduledMessageService().scheduleMessage(
++      roomId: roomId,
++      body: sendController.text,
++      scheduledAt: scheduledAt,
++      inReplyToId: replyEvent?.eventId,
++      editEventId: editEvent?.eventId,
++      threadRootEventId: activeThreadId,
++    );
++
++    sendController.clear();
++    replyEvent = null;
++    editEvent = null;
++    pendingText = '';
++    isInputEmptyNotifier.value = true;
++  }
++
+   Future<void> sendFileAction({FileType type = FileType.any}) async {
+     final files = await selectFiles(context, allowMultiple: true, type: type);
+     if (files.isEmpty) return;
+@@ -883,60 +1250,183 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304371,7 +304409,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1407,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1435,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304386,7 +304424,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      }
    }
  
-@@ -964,21 +1426,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1454,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304419,7 +304457,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1470,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1498,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304432,7 +304470,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1487,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1515,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304441,7 +304479,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1544,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1572,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304454,7 +304492,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1598,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1626,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -304508,7 +304546,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1654,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1682,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304526,7 +304564,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1756,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1784,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304540,7 +304578,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1788,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1816,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304549,7 +304587,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1854,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1882,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304564,7 +304602,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1891,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1919,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304574,7 +304612,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1960,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +1988,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304637,7 +304675,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2009,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2037,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304648,7 +304686,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
            return;
          }
        }
-@@ -1515,7 +2024,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2052,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304663,7 +304701,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2042,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2070,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304672,7 +304710,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2096,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2124,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304689,7 +304727,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..2974bb761a18f5dcb5cd9d12d9d5fd45
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2183,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2211,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -305739,7 +305777,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296
    }
  }
 diff --git a/lib/pages/chat/chat_input_row.dart b/lib/pages/chat/chat_input_row.dart
-index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3dbb6fa7b2 100644
+index 879717fa9889be421184b768e20bad7417f95114..b240fedd604d1417c0485da7f845de2aee660fc2 100644
 --- a/lib/pages/chat/chat_input_row.dart
 +++ b/lib/pages/chat/chat_input_row.dart
 @@ -4,22 +4,45 @@
@@ -306112,7 +306150,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
                                style: IconButton.styleFrom(
                                  backgroundColor: theme.bubbleColor,
                                  foregroundColor: theme.onBubbleColor,
-@@ -372,17 +484,20 @@ class ChatInputRow extends StatelessWidget {
+@@ -372,17 +484,21 @@ class ChatInputRow extends StatelessWidget {
                                  hovered ? Icons.mic : Icons.mic_none_outlined,
                                ),
                              ),
@@ -306132,6 +306170,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
 +                          key: const Key('send_button'),
 +                          tooltip: L10n.of(context).send,
 +                          onPressed: controller.send,
++                          onLongPress: () => controller.scheduleMessageAction(context),
 +                          style: IconButton.styleFrom(
 +                            backgroundColor: theme.bubbleColor,
 +                            foregroundColor: theme.onBubbleColor,
@@ -306143,7 +306182,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
                    ),
                  ],
          );
-@@ -391,11 +506,32 @@ class ChatInputRow extends StatelessWidget {
+@@ -391,11 +507,32 @@ class ChatInputRow extends StatelessWidget {
    }
  }
  
@@ -306177,7 +306216,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
    void _popupMenuButtonSelected(String mxid, BuildContext context) {
      final client = Matrix.of(
        context,
-@@ -404,16 +540,16 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -404,16 +541,16 @@ class _ChatAccountPicker extends StatelessWidget {
        Logs().w('Attempted to switch to a non-existing client $mxid');
        return;
      }
@@ -306197,7 +306236,7 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
          builder: (context, snapshot) => PopupMenuButton<String>(
            useRootNavigator: true,
            onSelected: (mxid) => _popupMenuButtonSelected(mxid, context),
-@@ -450,3 +586,116 @@ class _ChatAccountPicker extends StatelessWidget {
+@@ -450,3 +587,116 @@ class _ChatAccountPicker extends StatelessWidget {
      );
    }
  }
@@ -306315,12 +306354,14 @@ index 879717fa9889be421184b768e20bad7417f95114..e4553fed19600be61cdb705cfda2cf3d
 +  }
 +}
 diff --git a/lib/pages/chat/chat_view.dart b/lib/pages/chat/chat_view.dart
-index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a31d6ea063 100644
+index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..d0a200611039dbee10d999a1a808c57347ef261a 100644
 --- a/lib/pages/chat/chat_view.dart
 +++ b/lib/pages/chat/chat_view.dart
-@@ -16,17 +16,25 @@ import 'package:fluffychat/pages/chat/chat_event_list.dart';
+@@ -15,18 +15,28 @@ import 'package:fluffychat/pages/chat/chat_app_bar_title.dart';
+ import 'package:fluffychat/pages/chat/chat_event_list.dart';
  import 'package:fluffychat/pages/chat/pinned_events.dart';
  import 'package:fluffychat/pages/chat/reply_display.dart';
++import 'package:fluffychat/pages/chat/scheduled_message_banner.dart';
  import 'package:fluffychat/utils/account_config.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
  import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -306337,6 +306378,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a3
  import '../../utils/stream_extension.dart';
 +import '../../utils/beeper_app_launcher.dart';
 +import '../../utils/beeper_merge_utils.dart';
++import '../../utils/scheduled_message_service.dart';
  import 'chat_emoji_picker.dart';
  import 'chat_input_row.dart';
 +import 'floating_manual_read_button.dart';
@@ -306344,7 +306386,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a3
  
  enum _EventContextAction { info, report }
  
-@@ -37,6 +45,9 @@ class ChatView extends StatelessWidget {
+@@ -37,6 +47,9 @@ class ChatView extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -306354,7 +306396,7 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a3
      final theme = Theme.of(context);
      if (controller.room.membership == Membership.invite) {
        showFutureLoadingDialog(
-@@ -46,418 +57,559 @@ class ChatView extends StatelessWidget {
+@@ -46,418 +59,563 @@ class ChatView extends StatelessWidget {
        );
      }
      final bottomSheetPadding = FluffyThemes.isColumnMode(context) ? 16.0 : 8.0;
@@ -306733,6 +306775,10 @@ index ae1b35fd2a99200fc6b7d498dfd2f58d396cf8a7..26a72783cdc31069126ddc62aa27b5a3
 +                                      : Column(
 +                                          mainAxisSize: .min,
 +                                          children: [
++                                            ListenableBuilder(
++                                              listenable: ScheduledMessageService(),
++                                              builder: (context, _) => ScheduledMessageBanner(controller),
++                                            ),
 +                                            ListenableBuilder(listenable: Listenable.merge([controller.editEventNotifier, controller.replyEventNotifier]), builder: (context, _) => ReplyDisplay(controller)),
 +                                            ListenableBuilder(listenable: Listenable.merge([controller.editEventNotifier, controller.replyEventNotifier, controller.showEmojiPickerNotifier]), builder: (context, _) => ChatInputRow(controller)),
 +                                            ValueListenableBuilder<bool>(valueListenable: controller.showEmojiPickerNotifier, builder: (context, _, __) => ChatEmojiPicker(controller)),
@@ -314561,6 +314607,238 @@ index 087047dc04d4283dd230b7ee7cec95939e904ddc..3746e6045ded05356e387eaaf8109593
 +          style: TextStyle(color: theme.textTheme.bodyMedium!.color),
 +        ),
 +      ],
++    );
++  }
++}
+diff --git a/lib/pages/chat/scheduled_message_banner.dart b/lib/pages/chat/scheduled_message_banner.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ad16cfa73727fdc188d72352ad69bd1e04a349c
+--- /dev/null
++++ b/lib/pages/chat/scheduled_message_banner.dart
+@@ -0,0 +1,226 @@
++// SPDX-FileCopyrightText: 2024-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:intl/intl.dart';
++
++import '../../config/themes.dart';
++import '../../utils/scheduled_message_service.dart';
++import 'chat.dart';
++
++class ScheduledMessageBanner extends StatelessWidget {
++  final ChatController controller;
++
++  const ScheduledMessageBanner(this.controller, {super.key});
++
++  String _formatDateTime(DateTime dt) {
++    final now = DateTime.now();
++    final today = DateTime(now.year, now.month, now.day);
++    final msgDate = DateTime(dt.year, dt.month, dt.day);
++
++    final timeStr = DateFormat.jm().format(dt);
++    if (msgDate == today) {
++      return 'Hoy a las $timeStr';
++    } else if (msgDate == today.add(const Duration(days: 1))) {
++      return 'Mañana a las $timeStr';
++    } else {
++      return '${DateFormat.MMMd().format(dt)}, $timeStr';
++    }
++  }
++
++  void _showAllScheduledMessages(
++    BuildContext context,
++    List<ScheduledMessage> messages,
++  ) {
++    showModalBottomSheet(
++      context: context,
++      builder: (ctx) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            Padding(
++              padding: const EdgeInsets.all(16.0),
++              child: Row(
++                children: [
++                  const Icon(Icons.schedule),
++                  const SizedBox(width: 8),
++                  Text(
++                    'Mensajes programados (${messages.length})',
++                    style: Theme.of(context).textTheme.titleMedium,
++                  ),
++                ],
++              ),
++            ),
++            const Divider(height: 1),
++            Flexible(
++              child: ListView.separated(
++                shrinkWrap: true,
++                itemCount: messages.length,
++                separatorBuilder: (_, __) => const Divider(height: 1),
++                itemBuilder: (ctx, i) {
++                  final msg = messages[i];
++                  return ListTile(
++                    leading: const Icon(Icons.access_time_outlined),
++                    title: Text(
++                      msg.body,
++                      maxLines: 2,
++                      overflow: TextOverflow.ellipsis,
++                    ),
++                    subtitle: Text(
++                      _formatDateTime(msg.scheduledAt),
++                      style: TextStyle(
++                        color: Theme.of(context).colorScheme.primary,
++                        fontWeight: FontWeight.bold,
++                      ),
++                    ),
++                    trailing: Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        IconButton(
++                          icon: const Icon(Icons.edit_outlined),
++                          tooltip: 'Editar',
++                          onPressed: () {
++                            Navigator.of(ctx).pop();
++                            controller.sendController.text = msg.body;
++                            controller.isInputEmptyNotifier.value = false;
++                            ScheduledMessageService().cancelMessage(msg.id);
++                          },
++                        ),
++                        IconButton(
++                          icon: const Icon(Icons.send_outlined),
++                          tooltip: 'Enviar ahora',
++                          onPressed: () {
++                            Navigator.of(ctx).pop();
++                            ScheduledMessageService().sendNow(msg.id);
++                          },
++                        ),
++                        IconButton(
++                          icon: const Icon(Icons.close),
++                          tooltip: 'Cancelar',
++                          onPressed: () {
++                            ScheduledMessageService().cancelMessage(msg.id);
++                          },
++                        ),
++                      ],
++                    ),
++                  );
++                },
++              ),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final messages = ScheduledMessageService().getMessagesForRoom(controller.roomId);
++
++    if (messages.isEmpty) {
++      return const SizedBox.shrink();
++    }
++
++    final isSingle = messages.length == 1;
++    final singleMsg = messages.first;
++
++    return AnimatedContainer(
++      duration: FluffyThemes.animationDuration,
++      curve: FluffyThemes.animationCurve,
++      height: 52,
++      clipBehavior: Clip.hardEdge,
++      decoration: BoxDecoration(
++        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
++        border: Border(
++          bottom: BorderSide(
++            color: theme.dividerColor.withValues(alpha: 0.5),
++            width: 0.5,
++          ),
++        ),
++      ),
++      child: Material(
++        color: Colors.transparent,
++        child: InkWell(
++          onTap: isSingle ? null : () => _showAllScheduledMessages(context, messages),
++          child: Padding(
++            padding: const EdgeInsets.symmetric(horizontal: 12.0),
++            child: Row(
++              children: [
++                Icon(
++                  Icons.schedule,
++                  size: 20,
++                  color: theme.colorScheme.primary,
++                ),
++                const SizedBox(width: 8),
++                Expanded(
++                  child: isSingle
++                      ? Column(
++                          mainAxisAlignment: MainAxisAlignment.center,
++                          crossAxisAlignment: CrossAxisAlignment.start,
++                          children: [
++                            Text(
++                              'Programado: ${_formatDateTime(singleMsg.scheduledAt)}',
++                              style: TextStyle(
++                                fontSize: 12,
++                                fontWeight: FontWeight.bold,
++                                color: theme.colorScheme.primary,
++                              ),
++                            ),
++                            Text(
++                              singleMsg.body,
++                              maxLines: 1,
++                              overflow: TextOverflow.ellipsis,
++                              style: TextStyle(
++                                fontSize: 13,
++                                color: theme.colorScheme.onSurface,
++                              ),
++                            ),
++                          ],
++                        )
++                      : Text(
++                          '${messages.length} mensajes programados (toca para ver)',
++                          style: TextStyle(
++                            fontSize: 13,
++                            fontWeight: FontWeight.w600,
++                            color: theme.colorScheme.primary,
++                          ),
++                        ),
++                ),
++                if (isSingle) ...[
++                  IconButton(
++                    icon: const Icon(Icons.edit_outlined, size: 18),
++                    tooltip: 'Editar mensaje',
++                    onPressed: () {
++                      controller.sendController.text = singleMsg.body;
++                      controller.isInputEmptyNotifier.value = false;
++                      ScheduledMessageService().cancelMessage(singleMsg.id);
++                    },
++                  ),
++                  IconButton(
++                    icon: const Icon(Icons.send_outlined, size: 18),
++                    tooltip: 'Enviar ahora',
++                    onPressed: () {
++                      ScheduledMessageService().sendNow(singleMsg.id);
++                    },
++                  ),
++                  IconButton(
++                    icon: const Icon(Icons.close, size: 18),
++                    tooltip: 'Cancelar programación',
++                    onPressed: () {
++                      ScheduledMessageService().cancelMessage(singleMsg.id);
++                    },
++                  ),
++                ] else ...[
++                  const Icon(Icons.chevron_right, size: 20),
++                ],
++              ],
++            ),
++          ),
++        ),
++      ),
 +    );
 +  }
 +}
@@ -325023,7 +325301,7 @@ index 8610b92531be84898e03439fa07f16145a6d552c..2e5e985880acfdb7223f991c45e0980c
  }
  
 diff --git a/lib/pages/chat_list/chat_list_header.dart b/lib/pages/chat_list/chat_list_header.dart
-index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb361a010d 100644
+index e518661dbc1025bc9c70f570a758dbec67e7aa8c..2013afc725f2081c8a1c4c5a9c083e5cfbdc3c84 100644
 --- a/lib/pages/chat_list/chat_list_header.dart
 +++ b/lib/pages/chat_list/chat_list_header.dart
 @@ -14,7 +14,7 @@ import 'package:matrix/matrix.dart';
@@ -325123,7 +325401,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
                border: OutlineInputBorder(
                  borderSide: BorderSide.none,
                  borderRadius: BorderRadius.circular(99),
-@@ -63,24 +111,24 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -63,24 +111,23 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                    ? L10n.of(context).searchChatsRooms
                    : status.calcLocalizedString(context),
                hintStyle: TextStyle(
@@ -325145,8 +325423,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
                          : FluffyThemes.isColumnMode(context) ||
 -                              (controller.spaces.isEmpty &&
 -                                  !AppSettings.displayNavigationRail.value)
-+                              widget.controller.spaces.isEmpty ||
-+                              AppSettings.displayNavigationRail.value
++                              widget.controller.spaces.isEmpty
                          ? IconButton(
                              tooltip: L10n.of(context).search,
 -                            onPressed: controller.startSearch,
@@ -325154,16 +325431,21 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
                              icon: Icon(
                                Icons.search_outlined,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -88,7 +136,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -88,9 +135,11 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                            )
                          : IconButton(
                              tooltip: L10n.of(context).displayNavigationRail,
 -                            onPressed: controller.openNavrail,
 +                            onPressed: widget.controller.openNavrail,
                              icon: Icon(
-                               Icons.menu,
+-                              Icons.menu,
++                              AppSettings.displayNavigationRail.value
++                                  ? Icons.menu_open
++                                  : Icons.menu,
                                color: theme.colorScheme.onPrimaryContainer,
-@@ -104,8 +152,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+                             ),
+                           )
+@@ -104,8 +153,8 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                          ),
                        ),
                      ),
@@ -325174,7 +325456,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
                          ? const Padding(
                              padding: EdgeInsets.symmetric(
                                vertical: 10.0,
-@@ -119,7 +167,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -119,7 +168,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                            )
                          : TextButton.icon(
@@ -325183,7 +325465,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
                              style: TextButton.styleFrom(
                                shape: RoundedRectangleBorder(
                                  borderRadius: BorderRadius.circular(99),
-@@ -128,12 +176,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -128,12 +177,12 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                              ),
                              icon: const Icon(Icons.edit_outlined, size: 16),
                              label: Text(
@@ -325198,7 +325480,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..4b87f033c50d52cc01b48e2fa928a2cb
              ),
            );
          },
-@@ -141,6 +189,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
+@@ -141,6 +190,4 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
      );
    }
  
@@ -327439,7 +327721,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5f6c8098a1a57bc009ae0577751e565aea79ceaa 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..9659529395dab1c500d95d6af52e2c0b5df28b81 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,26 @@
@@ -327981,8 +328263,19 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5f6c8098a1a57bc009ae0577751e565a
  
              return SizedBox(
                width: FluffyThemes.isColumnMode(context)
-@@ -54,14 +538,14 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -52,16 +536,25 @@ class SpacesNavigationRail extends StatelessWidget {
+                   : FluffyThemes.navRailWidth - 8,
+               child: Column(
                  children: [
++                  if (!FluffyThemes.isColumnMode(context))
++                    Padding(
++                      padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
++                      child: IconButton(
++                        icon: const Icon(Icons.menu_open),
++                        tooltip: L10n.of(context).close,
++                        onPressed: () => AppSettings.displayNavigationRail.setItem(false),
++                      ),
++                    ),
                    Expanded(
                      child: ListView.builder(
 -                      padding: EdgeInsets.symmetric(vertical: 4),
@@ -328000,7 +328293,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5f6c8098a1a57bc009ae0577751e565a
                              icon: const Padding(
                                padding: EdgeInsets.all(12.0),
                                child: Icon(Icons.forum_outlined),
-@@ -71,57 +555,224 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -71,57 +564,224 @@ class SpacesNavigationRail extends StatelessWidget {
                                child: Icon(Icons.forum),
                              ),
                              toolTip: L10n.of(context).chats,
@@ -328260,7 +328553,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5f6c8098a1a57bc009ae0577751e565a
                      Padding(
                        padding: const EdgeInsets.all(12.0),
                        child: StartChatFab(),
-@@ -135,3 +786,54 @@ class SpacesNavigationRail extends StatelessWidget {
+@@ -135,3 +795,54 @@ class SpacesNavigationRail extends StatelessWidget {
      );
    }
  }
@@ -350795,10 +351088,10 @@ index 3485e73e93a486f7dc1918b462f8c14a96afe8df..18a6bfef0b7ff609f41552e53cab7bd1
 +  }
 +}
 diff --git a/lib/pages/settings_style/settings_style.dart b/lib/pages/settings_style/settings_style.dart
-index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..1def15a47370836add47900bfcac53373b628294 100644
+index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..0b4060b7d269bad1d138166ff18a39073fe85c7d 100644
 --- a/lib/pages/settings_style/settings_style.dart
 +++ b/lib/pages/settings_style/settings_style.dart
-@@ -1,141 +1,156 @@
+@@ -1,141 +1,161 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -351093,14 +351386,19 @@ index 8eb6b18c164a6adf042d38bcf5d6aeb72409d0b2..1def15a47370836add47900bfcac5337
 +    setState(() {});
 +  }
 +
++  Future<void> toggleDisplayNavigationRail(bool value) async {
++    await AppSettings.displayNavigationRail.setItem(value);
++    setState(() {});
++  }
++
 +  @override
 +  Widget build(BuildContext context) => SettingsStyleView(this);
 +}
 diff --git a/lib/pages/settings_style/settings_style_view.dart b/lib/pages/settings_style/settings_style_view.dart
-index 916eff68379a38f84d30dfc7ca90701e1e329544..2b99beddb60bdf44d28592fe2e72d73d8796677e 100644
+index 916eff68379a38f84d30dfc7ca90701e1e329544..c530d47749648b8d0793cd3e8bff1052ba4d8104 100644
 --- a/lib/pages/settings_style/settings_style_view.dart
 +++ b/lib/pages/settings_style/settings_style_view.dart
-@@ -1,349 +1,394 @@
+@@ -1,349 +1,402 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -351837,6 +352135,14 @@ index 916eff68379a38f84d30dfc7ca90701e1e329544..2b99beddb60bdf44d28592fe2e72d73d
 +                'Muestra los avatares en formato squircle en lugar de círculos',
 +              ),
 +              onChanged: controller.toggleUseSquircleAvatars,
++            ),
++            SwitchListTile.adaptive(
++              value: AppSettings.displayNavigationRail.value,
++              title: Text(L10n.of(context).displayNavigationRail),
++              subtitle: const Text(
++                'Muestra la barra lateral de espacios y redes en pantallas móviles',
++              ),
++              onChanged: controller.toggleDisplayNavigationRail,
 +            ),
 +          ],
 +        ),
@@ -365490,6 +365796,272 @@ index d7eeb116da7877c0fc52a842459d376e279f00ce..3b4db901cd769b4b71d6e08fb8309220
 +    return lastReceipts.toList();
 +  }
 +}
+diff --git a/lib/utils/scheduled_message_service.dart b/lib/utils/scheduled_message_service.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..d942ce9c0aecb01d1b6eab8d8d366df334c0ad88
+--- /dev/null
++++ b/lib/utils/scheduled_message_service.dart
+@@ -0,0 +1,260 @@
++// SPDX-FileCopyrightText: 2024-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:async';
++import 'dart:convert';
++
++import 'package:collection/collection.dart';
++import 'package:flutter/widgets.dart';
++import 'package:matrix/matrix.dart';
++import 'package:shared_preferences/shared_preferences.dart';
++
++import '../config/setting_keys.dart';
++import 'beeper_bridge_utils.dart';
++
++class ScheduledMessage {
++  final String id;
++  final String roomId;
++  final String body;
++  final DateTime scheduledAt;
++  final String? inReplyToId;
++  final String? editEventId;
++  final String? threadRootEventId;
++
++  const ScheduledMessage({
++    required this.id,
++    required this.roomId,
++    required this.body,
++    required this.scheduledAt,
++    this.inReplyToId,
++    this.editEventId,
++    this.threadRootEventId,
++  });
++
++  Map<String, dynamic> toJson() => {
++    'id': id,
++    'roomId': roomId,
++    'body': body,
++    'scheduledAt': scheduledAt.millisecondsSinceEpoch,
++    if (inReplyToId != null) 'inReplyToId': inReplyToId,
++    if (editEventId != null) 'editEventId': editEventId,
++    if (threadRootEventId != null) 'threadRootEventId': threadRootEventId,
++  };
++
++  factory ScheduledMessage.fromJson(Map<String, dynamic> json) =>
++      ScheduledMessage(
++        id: json['id'] as String,
++        roomId: json['roomId'] as String,
++        body: json['body'] as String,
++        scheduledAt: DateTime.fromMillisecondsSinceEpoch(
++          json['scheduledAt'] as int,
++        ),
++        inReplyToId: json['inReplyToId'] as String?,
++        editEventId: json['editEventId'] as String?,
++        threadRootEventId: json['threadRootEventId'] as String?,
++      );
++}
++
++class ScheduledMessageService extends ChangeNotifier with WidgetsBindingObserver {
++  static final ScheduledMessageService _instance =
++      ScheduledMessageService._internal();
++  factory ScheduledMessageService() => _instance;
++
++  ScheduledMessageService._internal();
++
++  static const String _storageKey = 'fluffybeep_scheduled_messages';
++
++  final List<ScheduledMessage> _messages = [];
++  Timer? _activeTimer;
++  List<Client> _clients = [];
++  bool _initialized = false;
++
++  List<ScheduledMessage> get allMessages => List.unmodifiable(_messages);
++
++  Future<void> init({List<Client>? clients}) async {
++    if (clients != null) {
++      _clients = clients;
++    }
++    if (_initialized) {
++      _scheduleNextTimer();
++      return;
++    }
++    _initialized = true;
++    WidgetsBinding.instance.addObserver(this);
++
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      final rawList = prefs.getStringList(_storageKey) ?? [];
++      _messages.clear();
++      for (final raw in rawList) {
++        try {
++          final map = jsonDecode(raw) as Map<String, dynamic>;
++          _messages.add(ScheduledMessage.fromJson(map));
++        } catch (e) {
++          Logs().w('[ScheduledMessageService] Error parsing item: $e');
++        }
++      }
++    } catch (e) {
++      Logs().w('[ScheduledMessageService] Error reading store: $e');
++    }
++
++    await checkOverdueMessages();
++    _scheduleNextTimer();
++    notifyListeners();
++  }
++
++  void setClients(List<Client> clients) {
++    _clients = clients;
++  }
++
++  void addClient(Client client) {
++    if (!_clients.contains(client)) {
++      _clients.add(client);
++    }
++  }
++
++  List<ScheduledMessage> getMessagesForRoom(String roomId) {
++    return _messages
++        .where((m) => m.roomId == roomId)
++        .toList()
++      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
++  }
++
++  Future<void> scheduleMessage({
++    required String roomId,
++    required String body,
++    required DateTime scheduledAt,
++    String? inReplyToId,
++    String? editEventId,
++    String? threadRootEventId,
++  }) async {
++    final msg = ScheduledMessage(
++      id: '${DateTime.now().millisecondsSinceEpoch}_${roomId.hashCode}',
++      roomId: roomId,
++      body: body,
++      scheduledAt: scheduledAt,
++      inReplyToId: inReplyToId,
++      editEventId: editEventId,
++      threadRootEventId: threadRootEventId,
++    );
++
++    _messages.add(msg);
++    await _save();
++    _scheduleNextTimer();
++    notifyListeners();
++  }
++
++  Future<void> cancelMessage(String id) async {
++    _messages.removeWhere((m) => m.id == id);
++    await _save();
++    _scheduleNextTimer();
++    notifyListeners();
++  }
++
++  Future<void> sendNow(String id) async {
++    final msg = _messages.firstWhereOrNull((m) => m.id == id);
++    if (msg == null) return;
++    await _dispatchMessage(msg);
++  }
++
++  Future<void> _save() async {
++    try {
++      final prefs = await SharedPreferences.getInstance();
++      final list = _messages.map((m) => jsonEncode(m.toJson())).toList();
++      await prefs.setStringList(_storageKey, list);
++    } catch (e) {
++      Logs().w('[ScheduledMessageService] Error saving messages: $e');
++    }
++  }
++
++  void _scheduleNextTimer() {
++    _activeTimer?.cancel();
++    _activeTimer = null;
++
++    if (_messages.isEmpty) return;
++
++    _messages.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
++    final next = _messages.first;
++    final diff = next.scheduledAt.difference(DateTime.now());
++
++    if (diff <= Duration.zero) {
++      // Overdue or immediate
++      unawaited(_dispatchMessage(next));
++    } else {
++      // Zero-polling: a single kernel timer scheduled for the exact duration
++      _activeTimer = Timer(diff, () {
++        unawaited(_dispatchMessage(next));
++      });
++    }
++  }
++
++  Future<void> _dispatchMessage(ScheduledMessage msg) async {
++    _messages.removeWhere((m) => m.id == msg.id);
++    await _save();
++    _scheduleNextTimer();
++    notifyListeners();
++
++    Room? targetRoom;
++    for (final client in _clients) {
++      targetRoom = client.getRoomById(msg.roomId);
++      if (targetRoom != null) break;
++    }
++
++    if (targetRoom == null) {
++      Logs().w(
++        '[ScheduledMessageService] Target room ${msg.roomId} not found across clients.',
++      );
++      return;
++    }
++
++    Event? inReplyToEvent;
++    if (msg.inReplyToId != null) {
++      inReplyToEvent = targetRoom.timeline?.events.firstWhereOrNull(
++        (e) => e.eventId == msg.inReplyToId,
++      );
++    }
++
++    try {
++      await targetRoom.sendTextEvent(
++        msg.body,
++        inReplyTo: inReplyToEvent,
++        editEventId: msg.editEventId,
++        threadRootEventId: msg.threadRootEventId,
++        parseCommands: true,
++      );
++      BeeperBridgeUtils.markRoomAsRead(
++        targetRoom,
++        publicReceipt: AppSettings.sendPublicReadReceipts.value,
++      );
++    } catch (e, s) {
++      Logs().e('[ScheduledMessageService] Failed to send scheduled message', e, s);
++    }
++  }
++
++  Future<void> checkOverdueMessages() async {
++    final now = DateTime.now();
++    final overdue = _messages
++        .where((m) => m.scheduledAt.isBefore(now))
++        .toList();
++
++    for (final msg in overdue) {
++      await _dispatchMessage(msg);
++    }
++  }
++
++  @override
++  void didChangeAppLifecycleState(AppLifecycleState state) {
++    if (state == AppLifecycleState.resumed) {
++      unawaited(checkOverdueMessages());
++      _scheduleNextTimer();
++    }
++  }
++
++  @override
++  void dispose() {
++    WidgetsBinding.instance.removeObserver(this);
++    _activeTimer?.cancel();
++    super.dispose();
++  }
++}
 diff --git a/lib/utils/show_scaffold_dialog.dart b/lib/utils/show_scaffold_dialog.dart
 index e66f4ad802adb15f1be03be475882eca8cc5ec43..885a2f819a0f030c7025c8cf6069316f1733ae0a 100644
 --- a/lib/utils/show_scaffold_dialog.dart
@@ -374585,10 +375157,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..daa355af7653b030b4487fa373cfa415ec647ecd 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..bfb3fc681406dd8d5b386659c9218121e82c4000 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,526 @@
+@@ -1,443 +1,529 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -375072,6 +375644,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..daa355af7653b030b4487fa373cfa415
 +import 'local_notifications_extension.dart';
 +import 'cache_refresh_overlay.dart';
 +import '../utils/beeper_bridge_utils.dart';
++import '../utils/scheduled_message_service.dart';
 +import 'mxc_image.dart';
 +import 'presence_builder.dart';
 +import '../utils/transcription_service.dart';
@@ -375268,6 +375841,8 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..daa355af7653b030b4487fa373cfa415
 +    // Initialize and preload Beeper bridge cache
 +    BeeperBridgeUtils.initCacheWithPrefs(widget.store);
 +    _preloadBridgeCache();
++
++    ScheduledMessageService().init(clients: widget.clients);
 +
 +    initMatrix();
 +  }
@@ -377544,6 +378119,121 @@ index 9d0b61245ff5766ad04b918697bb1c218ee4d7c3..a9042006803813885880ff70135274c0
 +          ),
 +        ),
 +      ),
++    );
++  }
++}
+diff --git a/lib/widgets/scheduled_time_picker_dialog.dart b/lib/widgets/scheduled_time_picker_dialog.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..edf35b59530cdba4d9fc799d8b9fe99eda32cd35
+--- /dev/null
++++ b/lib/widgets/scheduled_time_picker_dialog.dart
+@@ -0,0 +1,109 @@
++// SPDX-FileCopyrightText: 2024-Present FluffyBeep Contributors
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'package:flutter/material.dart';
++import 'package:intl/intl.dart';
++
++class ScheduledTimePickerDialog extends StatelessWidget {
++  const ScheduledTimePickerDialog({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    final theme = Theme.of(context);
++    final now = DateTime.now();
++
++    final in30Minutes = now.add(const Duration(minutes: 30));
++    final in1Hour = now.add(const Duration(hours: 1));
++    final tomorrow9am = DateTime(now.year, now.month, now.day + 1, 9, 0);
++
++    return AlertDialog(
++      title: Row(
++        children: [
++          Icon(Icons.schedule, color: theme.colorScheme.primary),
++          const SizedBox(width: 10),
++          const Text('Programar mensaje'),
++        ],
++      ),
++      content: SingleChildScrollView(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            ListTile(
++              dense: true,
++              leading: const Icon(Icons.timer_outlined),
++              title: const Text('En 30 minutos'),
++              subtitle: Text(DateFormat.jm().format(in30Minutes)),
++              onTap: () => Navigator.of(context).pop(in30Minutes),
++            ),
++            ListTile(
++              dense: true,
++              leading: const Icon(Icons.hourglass_bottom_outlined),
++              title: const Text('En 1 hora'),
++              subtitle: Text(DateFormat.jm().format(in1Hour)),
++              onTap: () => Navigator.of(context).pop(in1Hour),
++            ),
++            ListTile(
++              dense: true,
++              leading: const Icon(Icons.wb_sunny_outlined),
++              title: const Text('Mañana por la mañana'),
++              subtitle: Text(
++                'Mañana, ${DateFormat.jm().format(tomorrow9am)}',
++              ),
++              onTap: () => Navigator.of(context).pop(tomorrow9am),
++            ),
++            const Divider(),
++            ListTile(
++              dense: true,
++              leading: const Icon(Icons.calendar_month_outlined),
++              title: const Text('Elegir fecha y hora...'),
++              onTap: () async {
++                final pickedDate = await showDatePicker(
++                  context: context,
++                  initialDate: now,
++                  firstDate: now,
++                  lastDate: now.add(const Duration(days: 365)),
++                );
++                if (pickedDate == null || !context.mounted) return;
++
++                final pickedTime = await showTimePicker(
++                  context: context,
++                  initialTime: TimeOfDay.fromDateTime(
++                    now.add(const Duration(minutes: 15)),
++                  ),
++                );
++                if (pickedTime == null || !context.mounted) return;
++
++                final finalDateTime = DateTime(
++                  pickedDate.year,
++                  pickedDate.month,
++                  pickedDate.day,
++                  pickedTime.hour,
++                  pickedTime.minute,
++                );
++
++                if (finalDateTime.isBefore(DateTime.now())) {
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(
++                      content: Text('La fecha seleccionada debe ser en el futuro.'),
++                    ),
++                  );
++                  return;
++                }
++
++                Navigator.of(context).pop(finalDateTime);
++              },
++            ),
++          ],
++        ),
++      ),
++      actions: [
++        TextButton(
++          onPressed: () => Navigator.of(context).pop(),
++          child: const Text('Cancelar'),
++        ),
++      ],
 +    );
 +  }
 +}
