@@ -327423,10 +327423,10 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7d00de6fd
+index 0000000000000000000000000000000000000000..44a0d7eef6b4aac11f610fec4083198d04ff69ad
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,281 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -327519,7 +327519,13 @@ index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7
 +          Positioned(
 +            bottom: -2,
 +            right: -2,
-+            child: _NetworkBadgeRow(rooms: entry.rooms),
++            child: _NetworkBadgeRow(
++              rooms: entry.rooms,
++              activeNetworkKey: entry.latestNetwork?.key ??
++                  (entry.latestRoom != null
++                      ? BeeperBridgeUtils.getRoomNetwork(entry.latestRoom!)?.key
++                      : null),
++            ),
 +          ),
 +        ],
 +      ),
@@ -327561,30 +327567,13 @@ index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7
 +              ),
 +            ],
 +          ),
-+          subtitle: Row(
-+            children: [
-+              if (entry.latestNetwork != null) ...[
-+                Container(
-+                  width: 5,
-+                  height: 5,
-+                  margin: const EdgeInsets.only(right: 5),
-+                  decoration: BoxDecoration(
-+                    shape: BoxShape.circle,
-+                    color: Color(entry.latestNetwork!.colorHex),
-+                  ),
-+                ),
-+              ],
-+              Expanded(
-+                child: Text(
-+                  snippet,
-+                  maxLines: 1,
-+                  overflow: TextOverflow.ellipsis,
-+                  style: TextStyle(
-+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
-+                  ),
-+                ),
-+              ),
-+            ],
++          subtitle: Text(
++            snippet,
++            maxLines: 1,
++            overflow: TextOverflow.ellipsis,
++            style: TextStyle(
++              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
++            ),
 +          ),
 +          trailing: Material(
 +            color: Colors.transparent,
@@ -327664,8 +327653,12 @@ index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7
 +
 +class _NetworkBadgeRow extends StatelessWidget {
 +  final List<Room> rooms;
++  final String? activeNetworkKey;
 +
-+  const _NetworkBadgeRow({required this.rooms});
++  const _NetworkBadgeRow({
++    required this.rooms,
++    this.activeNetworkKey,
++  });
 +
 +  @override
 +  Widget build(BuildContext context) {
@@ -327694,15 +327687,21 @@ index 0000000000000000000000000000000000000000..d7d486e092e964ace08f5bd1b443e2f7
 +
 +    return Row(
 +      mainAxisSize: MainAxisSize.min,
++      crossAxisAlignment: CrossAxisAlignment.center,
 +      children: networks.take(3).map((net) {
++        final isActive = net.key == activeNetworkKey;
++        final size = isActive ? 10.0 : 6.5;
 +        return Container(
-+          margin: const EdgeInsets.only(left: 1),
-+          width: 7,
-+          height: 7,
++          margin: const EdgeInsets.symmetric(horizontal: 1.0),
++          width: size,
++          height: size,
 +          decoration: BoxDecoration(
 +            shape: BoxShape.circle,
 +            color: Color(net.colorHex),
-+            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.0),
++            border: Border.all(
++              color: Theme.of(context).colorScheme.surface,
++              width: isActive ? 1.5 : 1.0,
++            ),
 +          ),
 +        );
 +      }).toList(),
