@@ -305393,10 +305393,10 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..c7c5306e61bd6d7dc401f286ac7bd4fa
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296b828f571 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38ee51a7ebd 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
-@@ -13,7 +13,9 @@ import 'package:fluffychat/pages/chat/events/message.dart';
+@@ -13,70 +13,79 @@ import 'package:fluffychat/pages/chat/events/message.dart';
  import 'package:fluffychat/pages/chat/seen_by_row.dart';
  import 'package:fluffychat/pages/chat/typing_indicators.dart';
  import 'package:fluffychat/utils/account_config.dart';
@@ -305406,7 +305406,8 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296
  import 'package:fluffychat/utils/platform_infos.dart';
  import 'package:flutter/cupertino.dart';
  import 'package:flutter/material.dart';
-@@ -21,62 +23,68 @@ import 'package:matrix/matrix_api_lite/model/event_types.dart';
++import 'package:matrix/matrix.dart';
+ import 'package:matrix/matrix_api_lite/model/event_types.dart';
  import 'package:scroll_to_index/scroll_to_index.dart';
  
  import '../../config/app_config.dart';
@@ -305511,7 +305512,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296
                // Footer to display typing indicator and read receipts:
                if (i == 0) {
                  if (timeline.canRequestFuture) {
-@@ -92,13 +100,36 @@ class ChatEventList extends StatelessWidget {
+@@ -92,13 +101,36 @@ class ChatEventList extends StatelessWidget {
                      ),
                    );
                  }
@@ -305555,7 +305556,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296
                  );
                }
  
-@@ -110,23 +141,21 @@ class ChatEventList extends StatelessWidget {
+@@ -110,23 +142,21 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -305590,7 +305591,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..d52dd361e1d70e7100033265cf896296
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -159,95 +188,113 @@ class ChatEventList extends StatelessWidget {
+@@ -159,95 +189,113 @@ class ChatEventList extends StatelessWidget {
                    nextEvent == null ||
                    !event.originServerTs.sameDay(nextEvent.originServerTs);
  
@@ -335644,10 +335645,10 @@ index 9b83db8106ceda6f263b7f4e4a5ea6f49faf7560..8673ab11f7c5771d0fc8ce52d03d2050
 +  return offsets;
 +}
 diff --git a/lib/pages/image_viewer/image_viewer.dart b/lib/pages/image_viewer/image_viewer.dart
-index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..b469f1c5286a4edd71149fea97a939db7bae54e7 100644
+index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..b5ca153b9c4bc78103b0d4193b6ccedd6565f92c 100644
 --- a/lib/pages/image_viewer/image_viewer.dart
 +++ b/lib/pages/image_viewer/image_viewer.dart
-@@ -1,134 +1,155 @@
+@@ -1,134 +1,157 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -335787,10 +335788,12 @@ index 5ac09c7efe4c5d42dae5dccb774b1cc8b0e96742..b469f1c5286a4edd71149fea97a939db
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'package:cross_file/cross_file.dart';
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/pages/image_viewer/image_viewer_view.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:fluffychat/utils/show_scaffold_dialog.dart';
++import 'package:fluffychat/widgets/future_loading_dialog.dart';
 +import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
 +import 'package:flutter/material.dart';
 +import 'package:flutter/services.dart';
@@ -365851,10 +365854,10 @@ index d7eeb116da7877c0fc52a842459d376e279f00ce..3b4db901cd769b4b71d6e08fb8309220
 +}
 diff --git a/lib/utils/scheduled_message_service.dart b/lib/utils/scheduled_message_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..d942ce9c0aecb01d1b6eab8d8d366df334c0ad88
+index 0000000000000000000000000000000000000000..2d81a70a3ea954adc9fc15e2d91131d833f6071e
 --- /dev/null
 +++ b/lib/utils/scheduled_message_service.dart
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,263 @@
 +// SPDX-FileCopyrightText: 2024-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -366067,9 +366070,12 @@ index 0000000000000000000000000000000000000000..d942ce9c0aecb01d1b6eab8d8d366df3
 +
 +    Event? inReplyToEvent;
 +    if (msg.inReplyToId != null) {
-+      inReplyToEvent = targetRoom.timeline?.events.firstWhereOrNull(
-+        (e) => e.eventId == msg.inReplyToId,
-+      );
++      try {
++        final timeline = await targetRoom.getTimeline();
++        inReplyToEvent = timeline.events.firstWhereOrNull(
++          (e) => e.eventId == msg.inReplyToId,
++        );
++      } catch (_) {}
 +    }
 +
 +    try {
