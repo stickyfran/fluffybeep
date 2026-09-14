@@ -303256,7 +303256,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7cef4ab9d 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0119d13d5 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303457,15 +303457,15 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 +  final ValueNotifier<Event?> replyEventNotifier = ValueNotifier(null);
 +  Event? get replyEvent => replyEventNotifier.value;
 +  set replyEvent(Event? val) => replyEventNotifier.value = val;
-+
+ 
+-  Event? editEvent;
 +  final ValueNotifier<Event?> editEventNotifier = ValueNotifier(null);
 +  Event? get editEvent => editEventNotifier.value;
 +  set editEvent(Event? val) => editEventNotifier.value = val;
  
--  Event? editEvent;
-+  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
- 
 -  bool _scrolledUp = false;
++  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
++
 +  final ValueNotifier<bool> scrolledUpNotifier = ValueNotifier<bool>(false);
 +  bool get _scrolledUp => scrolledUpNotifier.value;
 +  set _scrolledUp(bool value) => scrolledUpNotifier.value = value;
@@ -303677,12 +303677,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -303848,7 +303848,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +779,189 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +779,204 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -303904,14 +303904,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -
 -    // We do not set read marker if we offer user the scroll up banner
 -    if (scrollUpBannerEventId != null) return;
-+    if (!force &&
-+        eventId == null &&
-+        !room.hasNewMessages &&
-+        room.notificationCount == 0 &&
-+        !room.markedUnread) {
-+      return;
-+    }
- 
+-
 -    // We do not set read marker if timeline is empty
 -    final timeline = this.timeline;
 -    if (timeline == null || timeline.events.isEmpty) return;
@@ -303929,18 +303922,41 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -                    event.eventId.isValidMatrixIdStrict(),
 -        )
 -        ?.eventId;
-+    // Do not send read markers when app is not in foreground
-+    if (!force && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
++    if (!force &&
++        eventId == null &&
++        !room.hasNewMessages &&
++        room.notificationCount == 0 &&
++        !room.markedUnread) {
 +      return;
 +    }
  
 -    // There is no event we could place a read marker
 -    if (eventId == null) return;
-+    final currentTimeline = timeline;
-+    final targetId = eventId ?? currentTimeline?.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
++    // Do not send read markers when app is not in foreground
++    if (!force && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
++      return;
++    }
  
 -    // This is a sending event, we do not set a readmarker yet
 -    if (eventId.isValidMatrixIdStrict() == false) return;
++    final currentTimeline = timeline;
++    final fullyReadId = eventId ?? currentTimeline?.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
++
++    // For mRead (public receipt sent to peer and WhatsApp/Telegram bridges):
++    // Find the latest incoming real message from the peer so the bridge marks it upstream as read.
++    Event? incomingEvent;
++    if (currentTimeline != null) {
++      for (final e in currentTimeline.events) {
++        if (e.senderId != room.client.userID && BeeperBridgeUtils.isRealMessageType(e.type)) {
++          incomingEvent = e;
++          break;
++        }
++      }
++    }
++    final mReadId = (eventId != null && eventId != fullyReadId)
++        ? eventId
++        : (incomingEvent?.eventId ?? fullyReadId);
++
 +    if (force || eventId != null) {
 +      scrollUpBannerEventId = null;
 +      if (room.markedUnread) {
@@ -303966,7 +303982,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -    if (setOnLatestEvent &&
 -        !room.hasNewMessages &&
 -        room.notificationCount == 0) {
-+    if (targetId == null) {
++    if (fullyReadId == null) {
 +      if (force && mounted) 
        return;
      }
@@ -303976,7 +303992,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -    _setReadMarkerFuture = timeline
 -        .setReadMarker(
 -          eventId: eventId,
-+    Logs().d('Set read marker...', targetId);
++    Logs().d('Set read marker...', fullyReadId);
 +
 +    _setReadMarkerFuture = () async {
 +      try {
@@ -303984,18 +304000,18 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 +          await room.markUnread(false);
 +        }
 +        await room.setReadMarker(
-+          targetId,
-+          mRead: targetId,
++          fullyReadId,
++          mRead: mReadId ?? fullyReadId,
            public: AppSettings.sendPublicReadReceipts.value,
 -        )
 -        .then((_) {
 -          _setReadMarkerFuture = null;
 -        });
 +        );
-+        if (currentTimeline != null) {
++        if (currentTimeline != null && mReadId != null) {
 +          try {
 +            await currentTimeline.setReadMarker(
-+              eventId: targetId,
++              eventId: mReadId,
 +              public: AppSettings.sendPublicReadReceipts.value,
 +            );
 +          } catch (_) {
@@ -304090,7 +304106,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      super.dispose();
    }
  
-@@ -679,6 +1000,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1015,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304101,7 +304117,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,12 +1021,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,11 +1036,12 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304110,11 +304126,16 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -      currentlyTyping = false;
 -      room.setTyping(false);
 -    }
--
++    final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
++        ? replyEvent!.eventId
++        : timeline?.events.firstWhereOrNull(
++            (e) => e.senderId != room.client.userID && 
++                   BeeperBridgeUtils.isRealMessageType(e.type),
++          )?.eventId;
+ 
      // ignore: unawaited_futures
      room.sendTextEvent(
-       sendController.text,
-@@ -710,20 +1029,68 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,20 +1051,70 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304125,6 +304146,8 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 +    }
 +    BeeperBridgeUtils.markRoomAsRead(
 +      room,
++      targetEventId: incomingTargetId,
++      timeline: timeline,
 +      publicReceipt: AppSettings.sendPublicReadReceipts.value,
 +    );
 +    setReadMarker(force: true);
@@ -304189,7 +304212,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    Future<void> sendFileAction({FileType type = FileType.any}) async {
      final files = await selectFiles(context, allowMultiple: true, type: type);
      if (files.isEmpty) return;
-@@ -883,60 +1250,183 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1274,201 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304271,12 +304294,21 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 +        _lastVoiceMessageSentPath = path;
 +        _lastVoiceMessageSentAt = DateTime.now();
 +
++        final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
++            ? replyEvent!.eventId
++            : timeline?.events.firstWhereOrNull(
++                (e) => e.senderId != room.client.userID && 
++                       BeeperBridgeUtils.isRealMessageType(e.type),
++              )?.eventId;
++
 +        if (PlatformInfos.isMobile) {
 +          final notifId = '${room.client.clientName}_${room.id}'.hashCode;
 +          FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +        }
 +        BeeperBridgeUtils.markRoomAsRead(
 +          room,
++          targetEventId: incomingTargetId,
++          timeline: timeline,
 +          publicReceipt: AppSettings.sendPublicReadReceipts.value,
 +        );
 +        setReadMarker(force: true);
@@ -304388,12 +304420,21 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
 -      return;
      }
 +
++    final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
++        ? replyEvent!.eventId
++        : timeline?.events.firstWhereOrNull(
++            (e) => e.senderId != room.client.userID && 
++                   BeeperBridgeUtils.isRealMessageType(e.type),
++          )?.eventId;
++
 +    if (PlatformInfos.isMobile) {
 +      final notifId = '${room.client.clientName}_${room.id}'.hashCode;
 +      FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +    }
 +    BeeperBridgeUtils.markRoomAsRead(
 +      room,
++      targetEventId: incomingTargetId,
++      timeline: timeline,
 +      publicReceipt: AppSettings.sendPublicReadReceipts.value,
 +    );
 +    setReadMarker(force: true);
@@ -304411,7 +304452,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1435,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1477,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304426,7 +304467,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      }
    }
  
-@@ -964,21 +1454,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1496,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304459,7 +304500,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1498,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1540,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304472,7 +304513,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1515,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1557,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304481,7 +304522,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1572,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1614,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304494,7 +304535,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1626,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1668,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -304548,7 +304589,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1682,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1724,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304566,7 +304607,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1784,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1826,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304580,7 +304621,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1816,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1858,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304589,7 +304630,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1882,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1924,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304604,7 +304645,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1919,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1961,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304614,7 +304655,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +1988,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2030,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304677,7 +304718,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2037,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2079,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304688,7 +304729,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
            return;
          }
        }
-@@ -1515,7 +2052,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2094,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304703,7 +304744,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2070,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2112,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304712,7 +304753,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2124,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2166,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304729,7 +304770,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..328850c4e07d490217e32ae5ced132b7
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2211,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2253,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -315751,10 +315792,10 @@ index 975ee1b0f79f1689118b34da2ef7485fd9b2411f..338925683cac53bbe52c22e5a4a59241
                  : Alignment.topLeft,
              padding: const EdgeInsets.only(
 diff --git a/lib/pages/chat/send_file_dialog.dart b/lib/pages/chat/send_file_dialog.dart
-index 299b726b20907334c70785f5a061280d7c35105a..31e8c8914f3b5375d1b23bda9f670023919e4f0a 100644
+index 299b726b20907334c70785f5a061280d7c35105a..67be486ddc67a0d52aecc029010880e24fdfe045 100644
 --- a/lib/pages/chat/send_file_dialog.dart
 +++ b/lib/pages/chat/send_file_dialog.dart
-@@ -1,1205 +1,430 @@
+@@ -1,1205 +1,436 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -316968,8 +317009,10 @@ index 299b726b20907334c70785f5a061280d7c35105a..31e8c8914f3b5375d1b23bda9f670023
 +import 'package:async/async.dart' show Result;
 +import 'package:cross_file/cross_file.dart';
 +import 'package:fluffychat/config/app_config.dart';
++import 'package:fluffychat/config/setting_keys.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
++import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 +import 'package:fluffychat/utils/other_party_can_receive.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
@@ -317111,6 +317154,10 @@ index 299b726b20907334c70785f5a061280d7c35105a..31e8c8914f3b5375d1b23bda9f670023
 +        }
 +        sentFiles++;
 +      }
++      await BeeperBridgeUtils.markRoomAsRead(
++        widget.room,
++        publicReceipt: AppSettings.sendPublicReadReceipts.value,
++      );
 +    }
 +
 +    if (widget.files.length == 1 && !(uniqueFileType == 'video' && compress)) {
@@ -324027,7 +324074,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4588f2695 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe9c545ae0 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -324920,7 +324967,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +972,184 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +972,200 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -325078,6 +325125,22 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
 +                  BeeperBridgeUtils.invalidateLastMessageTime(roomId);
 +                  _pendingChangedRoomIds.add(roomId);
 +                }
++
++                // If a real message sent by the current user arrived via sync (e.g. from PC / web / desktop),
++                // the user responded from another device: clear local notification and mark room as read!
++                final client = Matrix.of(context).client;
++                final hasOwnMessage = roomUpdate.timeline?.events?.any(
++                  (e) => e.senderId == client.userID && _isChatActivityEvent(e),
++                ) ?? false;
++                if (hasOwnMessage) {
++                  final room = client.getRoomById(roomId);
++                  if (room != null) {
++                    BeeperBridgeUtils.markRoomAsRead(
++                      room,
++                      publicReceipt: AppSettings.sendPublicReadReceipts.value,
++                    );
++                  }
++                }
 +              }
 +            }
 +            
@@ -325139,7 +325202,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1243,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1259,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -325155,7 +325218,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1356,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1372,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -325187,7 +325250,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1391,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1407,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -325227,7 +325290,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
          ],
        );
      }
-@@ -700,7 +1444,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1460,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -325251,7 +325314,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1560,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1576,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -325377,7 +325440,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
      }
    }
  
-@@ -864,6 +1734,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1750,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -325385,7 +325448,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1785,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1801,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -325399,7 +325462,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..08bc86fd4fc6f53bfea05f88159ed2f4
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1909,7 @@ enum ChatContextAction {
+@@ -1039,4 +1925,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -356447,10 +356510,10 @@ index 0000000000000000000000000000000000000000..b0c1471b9cda981df3d8e052345266d4
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011fca410a0
+index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b5234c15b944
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1379 @@
+@@ -0,0 +1,1409 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -357690,17 +357753,18 @@ index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011
 +  }
 +
 +  /// Returns the last real message event in a room, skipping state events
++  static bool isRealMessageType(String type) {
++    return type == EventTypes.Message ||
++        type == EventTypes.Encrypted ||
++        type == EventTypes.Sticker;
++  }
++
++  /// Returns the last real message event in a room, skipping state events
 +  /// and other technical events (e.g. m.room.member, m.room.topic, etc.).
 +  /// Only returns events of type m.room.message, m.room.encrypted, or m.sticker.
 +  static Event? getLastRealMessage(Room room) {
-+    const realMessageTypes = {
-+      EventTypes.Message,    // m.room.message
-+      EventTypes.Encrypted,  // m.room.encrypted
-+      EventTypes.Sticker,    // m.sticker
-+    };
-+
 +    final lastEvent = room.lastEvent;
-+    if (lastEvent != null && realMessageTypes.contains(lastEvent.type)) {
++    if (lastEvent != null && isRealMessageType(lastEvent.type)) {
 +      return lastEvent;
 +    }
 +
@@ -357710,25 +357774,47 @@ index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011
 +  /// Returns the last incoming real message event in a room (senderId != client.userID).
 +  /// Essential for Beeper bridges (e.g. WhatsApp, Telegram) which ignore read receipts
 +  /// pointing to outbound user events (e.g. when the user already replied from desktop/web).
-+  static Event? getLastIncomingRealMessage(Room room) {
-+    const realMessageTypes = {
-+      EventTypes.Message,
-+      EventTypes.Encrypted,
-+      EventTypes.Sticker,
-+    };
++  static Event? getLastIncomingRealMessage(Room room, {Timeline? timeline}) {
 +    final myUserId = room.client.userID;
++
++    if (timeline != null) {
++      for (final ev in timeline.events) {
++        if (ev.senderId != myUserId && isRealMessageType(ev.type)) {
++          return ev;
++        }
++      }
++    }
 +
 +    // Check cached real message first if not from me
 +    final cached = lastRealMessageCache[room.id];
-+    if (cached != null && cached.senderId != myUserId && realMessageTypes.contains(cached.type)) {
++    if (cached != null && cached.senderId != myUserId && isRealMessageType(cached.type)) {
 +      return cached;
 +    }
 +
 +    // Check lastEvent
 +    final lastEvent = room.lastEvent;
-+    if (lastEvent != null && lastEvent.senderId != myUserId && realMessageTypes.contains(lastEvent.type)) {
++    if (lastEvent != null && lastEvent.senderId != myUserId && isRealMessageType(lastEvent.type)) {
 +      return lastEvent;
 +    }
++
++    return null;
++  }
++
++  /// Asynchronously finds the last incoming real message event in a room (senderId != client.userID),
++  /// searching the provided timeline, caches, and falling back to database history.
++  static Future<Event?> findLastIncomingRealMessage(Room room, {Timeline? timeline}) async {
++    final syncResult = getLastIncomingRealMessage(room, timeline: timeline);
++    if (syncResult != null) return syncResult;
++
++    final myUserId = room.client.userID;
++    try {
++      final events = await room.client.database.getEventList(room, limit: 20);
++      for (final ev in events) {
++        if (ev.senderId != myUserId && isRealMessageType(ev.type)) {
++          return ev;
++        }
++      }
++    } catch (_) {}
 +
 +    return null;
 +  }
@@ -357751,7 +357837,12 @@ index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011
 +
 +  /// Unified, robust method to mark a room as read with immediate local feedback,
 +  /// notification clearing, and retry loop on connection hiccups.
-+  static Future<void> markRoomAsRead(Room room, {String? targetEventId, bool publicReceipt = true}) async {
++  static Future<void> markRoomAsRead(
++    Room room, {
++    String? targetEventId,
++    Timeline? timeline,
++    bool publicReceipt = true,
++  }) async {
 +    // 1. Optimistically mark as read locally
 +    locallyReadRooms[room.id] = DateTime.now().millisecondsSinceEpoch;
 +    room.notificationCount = 0;
@@ -357760,15 +357851,17 @@ index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011
 +      await room.markUnread(false).catchError((_) {});
 +    }
 +
-+    // 2. Resolve target event ID:
-+    // Prioritize incoming real message so bridge (WhatsApp/Telegram) can mark upstream read
-+    // even if the user already sent a response from another device.
-+    final incomingMsg = getLastIncomingRealMessage(room);
++    // 2. Resolve target incoming event for mRead (crucial for WhatsApp/Telegram bridges):
++    final incomingMsg = targetEventId != null
++        ? null
++        : await findLastIncomingRealMessage(room, timeline: timeline);
++    final mReadId = targetEventId ?? incomingMsg?.eventId;
++
++    // Resolve fullyRead ID (advances to latest event in room so no unread banners remain):
 +    final anyRealMsg = getLastRealMessage(room) ?? lastRealMessageCache[room.id];
-+    final targetId = targetEventId ??
-+        incomingMsg?.eventId ??
++    final fullyReadId = room.lastEvent?.eventId ??
 +        anyRealMsg?.eventId ??
-+        room.lastEvent?.eventId ??
++        mReadId ??
 +        room.fullyRead;
 +
 +    // 3. Clear system notifications & update app badge
@@ -357785,12 +357878,12 @@ index 0000000000000000000000000000000000000000..f3200beb3eb09dc63db6cf0328f04011
 +    roomReadChangeNotifier.value = room.id;
 +
 +    // 5. Send read marker with up to 3 retries
-+    if (targetId != null && targetId.isNotEmpty) {
++    if (fullyReadId != null && fullyReadId.isNotEmpty) {
 +      for (int attempt = 0; attempt < 3; attempt++) {
 +        try {
 +          await room.setReadMarker(
-+            targetId,
-+            mRead: targetId,
++            fullyReadId,
++            mRead: mReadId ?? fullyReadId,
 +            public: publicReceipt,
 +          );
 +          break;
