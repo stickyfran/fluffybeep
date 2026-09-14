@@ -324074,7 +324074,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe9c545ae0 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..603633b50e96732756200ac7b46f8c99d142ffb8 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -324147,7 +324147,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
      context.go('/rooms/${room.id}');
    }
  
-@@ -140,22 +160,640 @@ class ChatListController extends State<ChatList>
+@@ -140,22 +160,641 @@ class ChatListController extends State<ChatList>
        case ActiveFilter.allChats:
          return (room) => true;
        case ActiveFilter.messages:
@@ -324167,8 +324167,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
 -  List<Room> get filteredRooms => Matrix.of(
 -    context,
 -  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
-+  static bool _isChatActivityEvent(Event event) {
-+    final type = event.type;
++  static bool _isChatActivityType(String type) {
 +    if (type == EventTypes.Message ||
 +        type == EventTypes.Encrypted ||
 +        type == EventTypes.Sticker ||
@@ -324179,6 +324178,8 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
 +    }
 +    return false;
 +  }
++
++  static bool _isChatActivityEvent(Event event) => _isChatActivityType(event.type);
 +
 +  DateTime _getMessageTimestamp(Room room) {
 +    // 1. SDK: check if room.lastEvent is a real chat activity event (message, photo, sticker, call, etc.)
@@ -324795,7 +324796,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
    String? searchServer;
    Timer? _coolDown;
    SearchUserDirectoryResponse? userSearchResult;
-@@ -164,92 +802,28 @@ class ChatListController extends State<ChatList>
+@@ -164,92 +803,28 @@ class ChatListController extends State<ChatList>
    bool isSearching = false;
    static const String _serverStoreNamespace = 'im.fluffychat.search.server';
  
@@ -324902,7 +324903,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
    }
  
    void onSearchEnter(String text, {bool globalSearch = true}) {
-@@ -258,13 +832,20 @@ class ChatListController extends State<ChatList>
+@@ -258,13 +833,20 @@ class ChatListController extends State<ChatList>
        return;
      }
  
@@ -324929,7 +324930,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
    }
  
    void openNavrail() {
-@@ -285,13 +866,17 @@ class ChatListController extends State<ChatList>
+@@ -285,13 +867,17 @@ class ChatListController extends State<ChatList>
    }
  
    void cancelSearch({bool unfocus = true}) {
@@ -324953,7 +324954,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
    }
  
    BoxConstraints? snappingSheetContainerSize;
-@@ -299,6 +884,13 @@ class ChatListController extends State<ChatList>
+@@ -299,6 +885,13 @@ class ChatListController extends State<ChatList>
    final ScrollController scrollController = ScrollController();
    final ValueNotifier<bool> scrolledToTop = ValueNotifier(true);
  
@@ -324967,7 +324968,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
    final StreamController<Client> _clientStream = StreamController.broadcast();
  
    Stream<Client> get clientStream => _clientStream.stream;
-@@ -380,64 +972,200 @@ class ChatListController extends State<ChatList>
+@@ -380,64 +973,200 @@ class ChatListController extends State<ChatList>
      _activeSpaceId = widget.activeSpace;
  
      scrollController.addListener(_onScroll);
@@ -325130,7 +325131,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
 +                // the user responded from another device: clear local notification and mark room as read!
 +                final client = Matrix.of(context).client;
 +                final hasOwnMessage = roomUpdate.timeline?.events?.any(
-+                  (e) => e.senderId == client.userID && _isChatActivityEvent(e),
++                  (e) => e.senderId == client.userID && _isChatActivityType(e.type),
 +                ) ?? false;
 +                if (hasOwnMessage) {
 +                  final room = client.getRoomById(roomId);
@@ -325202,7 +325203,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
      _clientStream.close();
      super.dispose();
    }
-@@ -531,13 +1259,13 @@ class ChatListController extends State<ChatList>
+@@ -531,13 +1260,13 @@ class ChatListController extends State<ChatList>
                mainAxisSize: .min,
                children: [
                  Icon(
@@ -325218,7 +325219,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
                        ? L10n.of(context).markAsRead
                        : L10n.of(context).markAsUnread,
                  ),
-@@ -644,19 +1372,18 @@ class ChatListController extends State<ChatList>
+@@ -644,19 +1373,18 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -325250,7 +325251,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
              PopupMenuItem(
                value: ChatContextAction.removeTag,
                child: Row(
-@@ -680,6 +1407,39 @@ class ChatListController extends State<ChatList>
+@@ -680,6 +1408,39 @@ class ChatListController extends State<ChatList>
                  ],
                ),
              ),
@@ -325290,7 +325291,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
          ],
        );
      }
-@@ -700,7 +1460,22 @@ class ChatListController extends State<ChatList>
+@@ -700,7 +1461,22 @@ class ChatListController extends State<ChatList>
        case ChatContextAction.markUnread:
          await showFutureLoadingDialog(
            context: context,
@@ -325314,7 +325315,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
          );
          return;
        case ChatContextAction.mute:
-@@ -801,13 +1576,124 @@ class ChatListController extends State<ChatList>
+@@ -801,13 +1577,124 @@ class ChatListController extends State<ChatList>
          );
          return;
        case ChatContextAction.removeTag:
@@ -325440,7 +325441,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
      }
    }
  
-@@ -864,6 +1750,7 @@ class ChatListController extends State<ChatList>
+@@ -864,6 +1751,7 @@ class ChatListController extends State<ChatList>
      final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
@@ -325448,7 +325449,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1801,9 @@ class ChatListController extends State<ChatList>
+@@ -914,10 +1802,9 @@ class ChatListController extends State<ChatList>
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -325462,7 +325463,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..439f456b0648339a69c8b7da714bf5fe
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1925,7 @@ enum ChatContextAction {
+@@ -1039,4 +1926,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
