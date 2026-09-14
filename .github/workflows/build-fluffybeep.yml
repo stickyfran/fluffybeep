@@ -98,6 +98,7 @@ jobs:
           body: |
             ### 🚀 Fluffybeep v1.3.0 Release (Upstream FluffyChat 2.9.4 Base)
 
+            - **WhatsApp Incoming Call Auto-Wake**: Force wake and launch WhatsApp on incoming calls received via Beeper bridge, waking WhatsApp from Android deep sleep (suspensión profunda).
             - **Beeper Unified Contacts Merge**: Merge multiple chats and accounts (WhatsApp personal, WhatsApp business, Instagram, etc.) into unified contacts with seamless sibling quick-switch bar inside the chat view.
             - **Address Book Integration**: Match Matrix contacts directly with phone contacts safely using `flutter_contacts`.
             - **Robust SQLite Concurrency & WAL**: Fix `database is locked (code 5)` and prevent session loss on restart.
