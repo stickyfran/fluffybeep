@@ -14209,7 +14209,7 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..1494f6d72d248920f1a0f5d3d37dc58f
 +-dontwarn com.antonkarpenko.ffmpegkit.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
-index a63fd498ebbe29fc828e0d980ef50460acfd83d5..d2117d3caae19f219c8f6acb3f14592089d8cf0a 100644
+index a63fd498ebbe29fc828e0d980ef50460acfd83d5..07d87854bf22a32a4aef046ec9f3a2d9c3837194 100644
 --- a/android/app/src/main/AndroidManifest.xml
 +++ b/android/app/src/main/AndroidManifest.xml
 @@ -20,11 +20,31 @@
@@ -14244,24 +14244,6 @@ index a63fd498ebbe29fc828e0d980ef50460acfd83d5..d2117d3caae19f219c8f6acb3f145920
      <uses-sdk
              tools:overrideLibrary="io.wazo.callkeep, net.touchcapture.qr.flutterqr, com.cloudwebrtc.webrtc, org.webrtc, com.it_nomads.fluttersecurestorage, com.pichillilorenzo.flutter_inappwebview, com.example.video_compress, com.otaliastudios.transcoder, com.otaliastudios.opengl, com.kineapps.flutter_file_dialog, com.llfbandit.record, com.pravera.flutter_foreground_task"/>
      <application
-@@ -128,6 +148,17 @@
-         <!-- From flutter_local_notifications package for notification actions -->
-         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
- 
-+        <receiver
-+            android:name=".UnifiedPushReceiver"
-+            android:exported="true">
-+            <intent-filter>
-+                <action android:name="org.unifiedpush.android.connector.MESSAGE"/>
-+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED"/>
-+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT"/>
-+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED"/>
-+            </intent-filter>
-+        </receiver>
-+
-         <!-- To make notifications available in Android Auto -->
-         <meta-data
-             android:name="com.google.android.gms.car.application"
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
 index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316752792b6 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
@@ -14849,40 +14831,6 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6
 +}
 +
 +
-diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt
-new file mode 100644
-index 0000000000000000000000000000000000000000..5c97e759b0f93cb9a8ce46b43ad8c4cd74837acc
---- /dev/null
-+++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt
-@@ -0,0 +1,28 @@
-+// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
-+//
-+// SPDX-License-Identifier: AGPL-3.0-or-later
-+
-+package chat.fluffy.fluffychat
-+
-+import android.content.Context
-+import io.flutter.embedding.engine.FlutterEngine
-+import io.flutter.embedding.engine.dart.DartExecutor.DartEntrypoint
-+import org.unifiedpush.flutter.connector.MessagingReceiver
-+import org.unifiedpush.flutter.connector.UnifiedPushHandler
-+
-+val receiverHandler = object : UnifiedPushHandler() {
-+    override fun getEngine(context: Context): FlutterEngine {
-+        var engine = MainActivity.engine
-+        if (engine == null) {
-+            engine = MainActivity.provideEngine(context)
-+            engine.dartExecutor.executeDartEntrypoint(
-+                DartEntrypoint.createDefault()
-+            )
-+        } else {
-+            MainActivity.setupMethodChannel(engine, context.applicationContext ?: context)
-+        }
-+        return engine
-+    }
-+}
-+
-+class UnifiedPushReceiver : MessagingReceiver(receiverHandler)
 diff --git a/android/app/src/main/res/drawable-night-v21/launch_background.xml b/android/app/src/main/res/drawable-night-v21/launch_background.xml
 index 3fe6b2e8821ee859d652350db1310b5f51698871..89832c8c4c407a922c01f5eedadd033454023bd3 100644
 --- a/android/app/src/main/res/drawable-night-v21/launch_background.xml
