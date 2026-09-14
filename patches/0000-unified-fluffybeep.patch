@@ -303256,7 +303256,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0119d13d5 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caaf47e7ce7 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303677,12 +303677,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -304212,7 +304212,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    Future<void> sendFileAction({FileType type = FileType.any}) async {
      final files = await selectFiles(context, allowMultiple: true, type: type);
      if (files.isEmpty) return;
-@@ -883,60 +1274,201 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1274,204 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304419,9 +304419,14 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
 -      );
 -      return;
      }
+-    setState(() {
+-      replyEvent = null;
+-    });
+-    return;
 +
-+    final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
-+        ? replyEvent!.eventId
++    final currentReply = replyEvent;
++    final incomingTargetId = (currentReply != null && currentReply.senderId != room.client.userID)
++        ? currentReply.eventId
 +        : timeline?.events.firstWhereOrNull(
 +            (e) => e.senderId != room.client.userID && 
 +                   BeeperBridgeUtils.isRealMessageType(e.type),
@@ -304439,11 +304444,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
 +    );
 +    setReadMarker(force: true);
 +
-     setState(() {
-       replyEvent = null;
-     });
--    return;
-+    hideEmojiPicker();
++    if (mounted) {
++      setState(() {
++        replyEvent = null;
++      });
++      hideEmojiPicker();
++    }
    }
  
    void hideEmojiPicker() {
@@ -304452,7 +304458,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1477,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1480,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304467,7 +304473,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      }
    }
  
-@@ -964,21 +1496,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1499,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304500,7 +304506,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1540,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1543,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304513,7 +304519,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1557,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1560,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304522,7 +304528,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1614,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1617,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304535,7 +304541,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1668,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1671,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -304589,7 +304595,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1724,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1727,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304607,7 +304613,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1826,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1829,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304621,7 +304627,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1858,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1861,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304630,7 +304636,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1924,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1927,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304645,7 +304651,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1961,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1964,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304655,7 +304661,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +2030,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2033,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304718,7 +304724,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2079,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2082,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304729,7 +304735,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
            return;
          }
        }
-@@ -1515,7 +2094,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2097,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304744,7 +304750,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2112,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2115,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304753,7 +304759,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2166,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2169,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304770,7 +304776,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..c1f3b6a6a152c3d06c36a5185cfcf9c0
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2253,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2256,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -363146,11 +363152,14 @@ index 337cd2ad30b9e35c18daf574524d61308bc390eb..24789e7ef1d4d8a3b5aea2d57beea4a8
 +      type.startsWith('m.key.verification.');
 +}
 diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
-index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..4ac8ac07e561065c91e9cb2cd583b85493205722 100644
+index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..6738197df3263b89d709a7e326cfb6c11143d164 100644
 --- a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
 +++ b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/builder.dart
-@@ -19,33 +19,58 @@ import 'package:universal_html/html.dart' as html;
+@@ -17,35 +17,61 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+ import 'package:universal_html/html.dart' as html;
+ 
  import 'cipher.dart';
++import 'fluffy_matrix_sdk_database.dart';
  
  Future<DatabaseApi> flutterMatrixSdkDatabaseBuilder(String clientName) async {
 -  try {
@@ -363230,7 +363239,7 @@ index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..4ac8ac07e561065c91e9cb2cd583b854
  }
  
  Future<Directory?> getFileStorageLocation() async {
-@@ -106,8 +131,26 @@ Future<MatrixSdkDatabase> _constructDatabase(String clientName) async {
+@@ -106,12 +132,30 @@ Future<MatrixSdkDatabase> _constructDatabase(String clientName) async {
      path,
      options: OpenDatabaseOptions(
        version: 1,
@@ -363259,6 +363268,11 @@ index d6e24d1d19a974dd9b9780b4c41a7fc2ffd14fc0..4ac8ac07e561065c91e9cb2cd583b854
      ),
    );
  
+-  return await MatrixSdkDatabase.init(
++  return await FluffyMatrixSdkDatabase.init(
+     clientName,
+     database: database,
+     maxFileSize: 1000 * 1000 * 10,
 diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart
 index b2e637f837c0f03fae4ecfac621f469316a90def..403d08b6bd523a539cc33b5ae4b006324e3d211f 100644
 --- a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/cipher.dart
@@ -363416,6 +363430,245 @@ index b2e637f837c0f03fae4ecfac621f469316a90def..403d08b6bd523a539cc33b5ae4b00632
 +  );
 +
 +  await AppSettings.noEncryptionWarningShown.setItem(true);
++}
+diff --git a/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/fluffy_matrix_sdk_database.dart b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/fluffy_matrix_sdk_database.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..76772a37f527b60c34b3b6b135368775cec2dda9
+--- /dev/null
++++ b/lib/utils/matrix_sdk_extensions/flutter_matrix_dart_sdk_database/fluffy_matrix_sdk_database.dart
+@@ -0,0 +1,233 @@
++// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
++// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++import 'dart:io';
++import 'dart:isolate';
++import 'dart:typed_data';
++
++import 'package:matrix/matrix.dart';
++import 'package:sqflite_common/sqflite.dart';
++
++/// FluffyBeep custom extension of [MatrixSdkDatabase] that optimizes
++/// file cache management to prevent Main Thread / Event Loop starvation.
++///
++/// Features:
++/// 1. Runs cache cleanup in a background [Isolate] so file I/O never freezes the UI.
++/// 2. Throttles `deleteOldFiles` to run at most once every 12 hours (since Matrix SDK
++///    triggers it on every single sync cycle).
++/// 3. Prevents overlapping concurrent cleanup runs via lock flag.
++/// 4. Catches and suppresses [PathNotFoundException] and [FileSystemException] safely.
++/// 5. Provides cooperative yielding (`Future.delayed(Duration.zero)`) fallback
++///    if background isolates fail or are unsupported.
++class FluffyMatrixSdkDatabase extends MatrixSdkDatabase {
++  bool _isDeletingOldFiles = false;
++  DateTime? _lastCleanupTime;
++  static const Duration _minCleanupInterval = Duration(hours: 12);
++
++  FluffyMatrixSdkDatabase.buildWithoutOpen(
++    super.name, {
++    super.database,
++    super.idbFactory,
++    super.sqfliteFactory,
++    super.maxFileSize = 0,
++    super.fileStorageLocation,
++    super.deleteFilesAfterDuration,
++  }) : super.buildWithoutOpen();
++
++  static Future<FluffyMatrixSdkDatabase> init(
++    String name, {
++    Database? database,
++    dynamic idbFactory,
++    DatabaseFactory? sqfliteFactory,
++    int maxFileSize = 0,
++    Uri? fileStorageLocation,
++    Duration? deleteFilesAfterDuration,
++  }) async {
++    final matrixSdkDatabase = FluffyMatrixSdkDatabase.buildWithoutOpen(
++      name,
++      database: database,
++      idbFactory: idbFactory,
++      sqfliteFactory: sqfliteFactory,
++      maxFileSize: maxFileSize,
++      fileStorageLocation: fileStorageLocation,
++      deleteFilesAfterDuration: deleteFilesAfterDuration,
++    );
++    await matrixSdkDatabase.open();
++    return matrixSdkDatabase;
++  }
++
++  @override
++  Future<void> deleteOldFiles(int savedAt) async {
++    final dirUri = fileStorageLocation;
++    final deleteDuration = deleteFilesAfterDuration;
++    if (!supportsFileStoring || dirUri == null || deleteDuration == null) {
++      return;
++    }
++
++    // 1. Concurrency Guard: Prevent overlapping cleanups from multiple sync cycles
++    if (_isDeletingOldFiles) return;
++
++    // 2. Throttling Guard: Matrix SDK triggers deleteOldFiles after every sync cycle.
++    // Cache pruning of files older than 30 days should only run once every 12 hours.
++    final now = DateTime.now();
++    if (_lastCleanupTime != null &&
++        now.difference(_lastCleanupTime!) < _minCleanupInterval) {
++      return;
++    }
++
++    _isDeletingOldFiles = true;
++    _lastCleanupTime = now;
++
++    try {
++      final dirPath = Directory.fromUri(dirUri).path;
++      final maxAgeMillis = deleteDuration.inMilliseconds;
++
++      // 3. Offload all heavy file system operations to a background Isolate
++      try {
++        final deleted = await Isolate.run(
++          () => _isolateDeleteOldFiles(dirPath, maxAgeMillis),
++        );
++        if (deleted > 0) {
++          Logs().i(
++            '[DatabaseFileStorage] Purged $deleted expired cache files in background isolate',
++          );
++        }
++      } catch (isolateError) {
++        Logs().w(
++          '[DatabaseFileStorage] Background isolate failed ($isolateError), falling back to cooperative cleanup',
++        );
++        await _deleteOldFilesCooperative(dirPath, maxAgeMillis);
++      }
++    } catch (e, s) {
++      Logs().w('[DatabaseFileStorage] Error during deleteOldFiles', e, s);
++    } finally {
++      _isDeletingOldFiles = false;
++    }
++  }
++
++  /// Synchronous I/O executed inside a background Isolate.
++  /// Does not touch or block the Flutter UI Isolate Event Loop.
++  static int _isolateDeleteOldFiles(String dirPath, int maxAgeMillis) {
++    final dir = Directory(dirPath);
++    if (!dir.existsSync()) return 0;
++
++    final now = DateTime.now().millisecondsSinceEpoch;
++    int deletedCount = 0;
++
++    try {
++      final entities = dir.listSync(followLinks: false);
++      for (final entity in entities) {
++        if (entity is! File) continue;
++        try {
++          final stat = entity.statSync();
++          final ageMillis = now - stat.modified.millisecondsSinceEpoch;
++          if (ageMillis > maxAgeMillis) {
++            try {
++              entity.deleteSync();
++              deletedCount++;
++            } on PathNotFoundException {
++              // File was already deleted or moved; safe to ignore
++            } on FileSystemException {
++              // File is locked, busy, or permission denied; safely ignore
++            } catch (_) {}
++          }
++        } on PathNotFoundException {
++          // File missing during stat check; safely ignore
++        } on FileSystemException {
++          // Stat failed; safely ignore
++        } catch (_) {}
++      }
++    } catch (_) {
++      // Directory listing failed; safely ignore
++    }
++    return deletedCount;
++  }
++
++  /// Cooperative async cleanup with event-loop yielding.
++  /// Yields execution every 20 files to prevent starving UI frames or MethodChannels.
++  Future<void> _deleteOldFilesCooperative(
++    String dirPath,
++    int maxAgeMillis,
++  ) async {
++    final dir = Directory(dirPath);
++    if (!await dir.exists()) return;
++
++    final now = DateTime.now().millisecondsSinceEpoch;
++    int processedCount = 0;
++    int deletedCount = 0;
++
++    try {
++      await for (final entity in dir.list(followLinks: false)) {
++        if (entity is! File) continue;
++
++        processedCount++;
++        // Yield to the Flutter Event Loop every 20 files
++        if (processedCount % 20 == 0) {
++          await Future.delayed(Duration.zero);
++        }
++
++        try {
++          final stat = await entity.stat();
++          final ageMillis = now - stat.modified.millisecondsSinceEpoch;
++          if (ageMillis > maxAgeMillis) {
++            try {
++              await entity.delete();
++              deletedCount++;
++            } on PathNotFoundException {
++              // Safe silent ignore
++            } on FileSystemException {
++              // Safe silent ignore
++            } catch (_) {}
++          }
++        } on PathNotFoundException {
++          // Safe silent ignore
++        } on FileSystemException {
++          // Safe silent ignore
++        } catch (_) {}
++      }
++      if (deletedCount > 0) {
++        Logs().i(
++          '[DatabaseFileStorage] Purged $deletedCount expired cache files cooperatively',
++        );
++      }
++    } catch (e) {
++      Logs().w('[DatabaseFileStorage] Error during cooperative cleanup: $e');
++    }
++  }
++
++  @override
++  Future<bool> deleteFile(Uri mxcUri) async {
++    try {
++      return await super.deleteFile(mxcUri);
++    } on PathNotFoundException {
++      return false;
++    } on FileSystemException {
++      return false;
++    } catch (_) {
++      return false;
++    }
++  }
++
++  @override
++  Future<Uint8List?> getFile(Uri mxcUri) async {
++    try {
++      return await super.getFile(mxcUri);
++    } on FileSystemException catch (e) {
++      Logs().w('[DatabaseFileStorage] Failed to read cache file for $mxcUri: $e');
++      return null;
++    } catch (_) {
++      return null;
++    }
++  }
++
++  @override
++  Future<void> storeFile(Uri mxcUri, Uint8List bytes, int time) async {
++    try {
++      await super.storeFile(mxcUri, bytes, time);
++    } on FileSystemException catch (e) {
++      Logs().w('[DatabaseFileStorage] Failed to store cache file for $mxcUri: $e');
++    } catch (_) {}
++  }
 +}
 diff --git a/lib/utils/matrix_sdk_extensions/matrix_locals.dart b/lib/utils/matrix_sdk_extensions/matrix_locals.dart
 index daffb557c96af4dbd20bf80b53b37f3d34a2891a..383668e0961cf86d24d5aa8099ac060a2a5ddb2b 100644
