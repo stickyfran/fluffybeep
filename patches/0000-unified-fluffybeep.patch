@@ -14209,10 +14209,10 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..1494f6d72d248920f1a0f5d3d37dc58f
 +-dontwarn com.antonkarpenko.ffmpegkit.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
-index a63fd498ebbe29fc828e0d980ef50460acfd83d5..f2db90ddd67df5484fa778106550b95c3d839ff9 100644
+index a63fd498ebbe29fc828e0d980ef50460acfd83d5..d2117d3caae19f219c8f6acb3f14592089d8cf0a 100644
 --- a/android/app/src/main/AndroidManifest.xml
 +++ b/android/app/src/main/AndroidManifest.xml
-@@ -20,6 +20,9 @@
+@@ -20,11 +20,31 @@
      <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
      <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
      <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
@@ -14222,6 +14222,46 @@ index a63fd498ebbe29fc828e0d980ef50460acfd83d5..f2db90ddd67df5484fa778106550b95c
  
      <!-- To make app compatible with tablets -->
      <uses-feature android:name="android.hardware.camera" android:required="false"/>
+     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+ 
++    <queries>
++        <package android:name="com.whatsapp" />
++        <package android:name="com.whatsapp.w4b" />
++        <package android:name="com.instagram.android" />
++        <intent>
++            <action android:name="android.intent.action.VIEW" />
++            <data android:scheme="whatsapp" />
++        </intent>
++        <intent>
++            <action android:name="android.intent.action.VIEW" />
++            <data android:scheme="https" />
++        </intent>
++        <intent>
++            <action android:name="android.intent.action.DIAL" />
++        </intent>
++    </queries>
++
+     <uses-sdk
+             tools:overrideLibrary="io.wazo.callkeep, net.touchcapture.qr.flutterqr, com.cloudwebrtc.webrtc, org.webrtc, com.it_nomads.fluttersecurestorage, com.pichillilorenzo.flutter_inappwebview, com.example.video_compress, com.otaliastudios.transcoder, com.otaliastudios.opengl, com.kineapps.flutter_file_dialog, com.llfbandit.record, com.pravera.flutter_foreground_task"/>
+     <application
+@@ -128,6 +148,17 @@
+         <!-- From flutter_local_notifications package for notification actions -->
+         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+ 
++        <receiver
++            android:name=".UnifiedPushReceiver"
++            android:exported="true">
++            <intent-filter>
++                <action android:name="org.unifiedpush.android.connector.MESSAGE"/>
++                <action android:name="org.unifiedpush.android.connector.UNREGISTERED"/>
++                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT"/>
++                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED"/>
++            </intent-filter>
++        </receiver>
++
+         <!-- To make notifications available in Android Auto -->
+         <meta-data
+             android:name="com.google.android.gms.car.application"
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
 index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316752792b6 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/FcmPushService.kt
@@ -14284,10 +14324,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddcb63cada1 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6799d28de 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,479 @@
+@@ -1,31 +1,490 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14350,7 +14390,8 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +    }
 +
 +    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-+        setupMethodChannel(flutterEngine, this)
++        engine = flutterEngine
++        setupMethodChannel(flutterEngine, applicationContext)
 +        AudioRouteManager.setup(flutterEngine, this)
 +        AudioRouteManager.currentActivity = this
 +    }
@@ -14378,7 +14419,12 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +                        try {
 +                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
 +                            if (launchIntent != null) {
-+                                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
++                                launchIntent.addFlags(
++                                    Intent.FLAG_ACTIVITY_NEW_TASK or
++                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
++                                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
++                                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
++                                )
 +                                context.startActivity(launchIntent)
 +                                result.success(true)
 +                            } else {
@@ -14461,6 +14507,7 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +                    "openWhatsApp" -> {
 +                        val packageName = call.argument<String>("packageName") ?: "com.whatsapp"
 +                        val phone = call.argument<String>("phone")
++                        val onlyLaunchApp = call.argument<Boolean>("onlyLaunchApp") ?: false
 +                        try {
 +                            try {
 +                                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -14474,9 +14521,12 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +                                }
 +                            } catch (_: Exception) {}
 +
-+                            val activityFlags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
++                            val activityFlags = Intent.FLAG_ACTIVITY_NEW_TASK or
++                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
++                                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
++                                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
 +                            var launched = false
-+                            if (!phone.isNullOrEmpty()) {
++                            if (!onlyLaunchApp && !phone.isNullOrEmpty()) {
 +                                val cleanPhone = phone.filter { it.isDigit() }
 +                                val uris = listOf(
 +                                    Uri.parse("whatsapp://send?phone=$cleanPhone"),
@@ -14581,9 +14631,10 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +        }
 +
 +        fun provideEngine(context: Context): FlutterEngine {
-+            val eng = engine ?: FlutterEngine(context, emptyArray(), true, false).also {
-+                setupMethodChannel(it, context)
-+                AudioRouteManager.setup(it, context)
++            val appContext = context.applicationContext ?: context
++            val eng = engine ?: FlutterEngine(appContext, emptyArray(), true, false).also {
++                setupMethodChannel(it, appContext)
++                AudioRouteManager.setup(it, appContext)
 +            }
 +            engine = eng
 +            return eng
@@ -14798,6 +14849,40 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..d573955987097a9724fc824261c28ddc
 +}
 +
 +
+diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..5c97e759b0f93cb9a8ce46b43ad8c4cd74837acc
+--- /dev/null
++++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/UnifiedPushReceiver.kt
+@@ -0,0 +1,28 @@
++// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
++//
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package chat.fluffy.fluffychat
++
++import android.content.Context
++import io.flutter.embedding.engine.FlutterEngine
++import io.flutter.embedding.engine.dart.DartExecutor.DartEntrypoint
++import org.unifiedpush.flutter.connector.MessagingReceiver
++import org.unifiedpush.flutter.connector.UnifiedPushHandler
++
++val receiverHandler = object : UnifiedPushHandler() {
++    override fun getEngine(context: Context): FlutterEngine {
++        var engine = MainActivity.engine
++        if (engine == null) {
++            engine = MainActivity.provideEngine(context)
++            engine.dartExecutor.executeDartEntrypoint(
++                DartEntrypoint.createDefault()
++            )
++        } else {
++            MainActivity.setupMethodChannel(engine, context.applicationContext ?: context)
++        }
++        return engine
++    }
++}
++
++class UnifiedPushReceiver : MessagingReceiver(receiverHandler)
 diff --git a/android/app/src/main/res/drawable-night-v21/launch_background.xml b/android/app/src/main/res/drawable-night-v21/launch_background.xml
 index 3fe6b2e8821ee859d652350db1310b5f51698871..89832c8c4c407a922c01f5eedadd033454023bd3 100644
 --- a/android/app/src/main/res/drawable-night-v21/launch_background.xml
@@ -311761,7 +311846,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..35c30c08369016550d935a85ac6405742151fb50 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..cf340764ace52eec19e1482c4dc14fa6172ab828 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
 @@ -1,324 +1,516 @@
@@ -312443,7 +312528,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..35c30c08369016550d935a85ac640574
 +                    Row(
 +                      children: [
 +                        ElevatedButton.icon(
-+                          onPressed: () => BeeperAppLauncher.openWhatsApp(room: event.room),
++                          onPressed: () => BeeperAppLauncher.launchWhatsAppApp(),
 +                          icon: const Icon(Icons.open_in_new, size: 16),
 +                          label: const Text('Abrir WhatsApp'),
 +                          style: ElevatedButton.styleFrom(
@@ -356403,10 +356488,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e2bc81d80575b8ef987681764eaf4e96428c3479
+index 0000000000000000000000000000000000000000..cb48bd1150c41df43dee32c4407e774a3dc565e0
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
-@@ -0,0 +1,231 @@
+@@ -0,0 +1,269 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -356416,6 +356501,7 @@ index 0000000000000000000000000000000000000000..e2bc81d80575b8ef987681764eaf4e96
 +import 'package:flutter/services.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:url_launcher/url_launcher.dart';
++import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 +import '../config/setting_keys.dart';
 +import 'beeper_bridge_utils.dart';
 +import 'beeper_merge_utils.dart';
@@ -356446,8 +356532,7 @@ index 0000000000000000000000000000000000000000..e2bc81d80575b8ef987681764eaf4e96
 +            if (body.contains('Incoming call. Use the WhatsApp app to answer.')) {
 +              final ts = e.originServerTs;
 +              if (DateTime.now().difference(ts).inSeconds.abs() < 45) {
-+                final room = client.getRoomById(roomId);
-+                openWhatsApp(room: room);
++                launchWhatsAppApp();
 +                break;
 +              }
 +            }
@@ -356584,6 +356669,44 @@ index 0000000000000000000000000000000000000000..e2bc81d80575b8ef987681764eaf4e96
 +      return await launchUrl(Uri.parse('whatsapp://'), mode: LaunchMode.externalApplication);
 +    } catch (_) {
 +      return await launchUrl(Uri.parse('https://whatsapp.com'), mode: LaunchMode.externalApplication);
++    }
++  }
++
++  /// Directly launches WhatsApp application process without any URI or redirecting to chat
++  static Future<bool> launchWhatsAppApp() async {
++    final packageName = AppSettings.whatsappPackageName.value.trim();
++    final targetPackage = packageName.isNotEmpty ? packageName : 'com.whatsapp';
++
++    if (Platform.isAndroid) {
++      try {
++        await FlutterForegroundTask.wakeUpScreen();
++      } catch (_) {}
++      try {
++        final res = await _channel.invokeMethod<bool>('openWhatsApp', {
++          'packageName': targetPackage,
++          'onlyLaunchApp': true,
++        });
++        if (res == true) return true;
++      } catch (_) {}
++      try {
++        final res = await _channel.invokeMethod<bool>('launchApp', {
++          'packageName': targetPackage,
++        });
++        if (res == true) return true;
++      } catch (_) {}
++    }
++
++    // Fallback using url_launcher
++    try {
++      final uri = Uri.parse('whatsapp://');
++      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
++    } catch (_) {}
++
++    try {
++      final webUri = Uri.parse('https://whatsapp.com');
++      return await launchUrl(webUri, mode: LaunchMode.externalApplication);
++    } catch (_) {
++      return false;
 +    }
 +  }
 +
@@ -364723,10 +364846,10 @@ index b2e91f94be614c6e076914e5cdd6fbc4d03d3812..451562cf585917eba5857ce73cacf027
    /// This loads the avatar for a room and also stores it in a temporary
    /// directory so the Notification Service Extension can access it later.
 diff --git a/lib/utils/notification_background_handler.dart b/lib/utils/notification_background_handler.dart
-index ee462f873c82516dad8729bf60ee0ab626663879..f2cf2e2193e1b15ef03a0dab4f462f7c6f589314 100644
+index ee462f873c82516dad8729bf60ee0ab626663879..221d837129f5e1648904841db74fe5639b2378e4 100644
 --- a/lib/utils/notification_background_handler.dart
 +++ b/lib/utils/notification_background_handler.dart
-@@ -1,212 +1,272 @@
+@@ -1,212 +1,269 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -365083,8 +365206,7 @@ index ee462f873c82516dad8729bf60ee0ab626663879..f2cf2e2193e1b15ef03a0dab4f462f7c
 +      final roomId = payload.roomId;
 +      if (roomId == null) return;
 +      if (payload.isWhatsAppCall) {
-+        final room = client.getRoomById(roomId);
-+        await BeeperAppLauncher.openWhatsApp(room: room);
++        await BeeperAppLauncher.launchWhatsAppApp();
 +        return;
 +      }
 +
@@ -365127,9 +365249,7 @@ index ee462f873c82516dad8729bf60ee0ab626663879..f2cf2e2193e1b15ef03a0dab4f462f7c
 +      );
 +    case NotificationResponseType.selectedNotificationAction:
 +      if (notificationResponse.actionId == 'open_whatsapp_call') {
-+        final roomId = payload.roomId;
-+        final room = roomId != null ? client.getRoomById(roomId) : null;
-+        await BeeperAppLauncher.openWhatsApp(room: room);
++        await BeeperAppLauncher.launchWhatsAppApp();
 +        return;
 +      }
 +      final actionType = FluffyChatNotificationActions.values.singleWhereOrNull(
@@ -365731,7 +365851,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..9350971ddd1769f1b2eee3e408dba79e4c02da4d 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..d7ef92a95240e6cdceefadc05569f6f73bde59bc 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,500 +1,672 @@
@@ -366536,7 +366656,7 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..9350971ddd1769f1b2eee3e408dba79e
 +
 +    final isWhatsAppCall = body.contains('Incoming call. Use the WhatsApp app to answer.');
 +    if (isWhatsAppCall && AppSettings.autoOpenWhatsAppOnCall.value) {
-+      unawaited(BeeperAppLauncher.openWhatsApp(room: event.room));
++      unawaited(BeeperAppLauncher.launchWhatsAppApp());
 +    }
 +
 +    // The person object for the android message style notification
