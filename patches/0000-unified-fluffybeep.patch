@@ -307900,7 +307900,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647f4a5eaa8 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa33bf4b513 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -7,21 +7,27 @@ import 'dart:async';
@@ -307931,18 +307931,109 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -47,15 +53,397 @@ class AudioPlayerWidget extends StatefulWidget {
+@@ -47,181 +53,608 @@ class AudioPlayerWidget extends StatefulWidget {
  
  enum AudioPlayerStatus { notDownloaded, downloading, downloaded }
  
+-class AudioPlayerState extends State<AudioPlayerWidget> {
+-  static const double buttonSize = 36;
 +class VoicePlaybackController {
 +  VoicePlaybackController._();
 +  static final VoicePlaybackController instance = VoicePlaybackController._();
-+
+ 
+-  AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
+-  double? _downloadProgress;
 +  static final Set<String> prefetchedEventIds = <String>{};
 +  static final Set<String> activeDownloadEventIds = <String>{};
++  final ValueNotifier<String?> preparingEventIdNotifier = ValueNotifier<String?>(null);
++  final ValueNotifier<double?> downloadProgressNotifier = ValueNotifier<double?>(null);
++  final ValueNotifier<bool> isWaitingForEarNotifier = ValueNotifier<bool>(false);
++  int _playbackSessionToken = 0;
++  Timer? _pauseInactivityTimer;
 +  StreamSubscription<PlayerState>? _playerSub;
-+
+ 
+-  late final MatrixState matrix;
+-  List<int>? _waveform;
+-  String? _durationString;
++  void stopPlayback(MatrixState matrix) {
++    _pauseInactivityTimer?.cancel();
++    _pauseInactivityTimer = null;
++    _playbackSessionToken++;
++    preparingEventIdNotifier.value = null;
++    downloadProgressNotifier.value = null;
++    isWaitingForEarNotifier.value = false;
++    _playerSub?.cancel();
++    _playerSub = null;
++    matrix.voiceMessageEventId.value = null;
++    matrix.audioPlayer?.stop();
++    matrix.audioPlayer?.dispose();
++    matrix.audioPlayer = null;
++    AudioRouterService.instance.stopSession();
++  }
+ 
+-  @override
+-  void dispose() {
+-    super.dispose();
+-    final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
+-        ? null
+-        : matrix.audioPlayer;
+-    if (audioPlayer != null) {
+-      if (audioPlayer.playing && !audioPlayer.isAtEndPosition) {
+-        WidgetsBinding.instance.addPostFrameCallback((_) {
+-          ScaffoldMessenger.of(matrix.context).showMaterialBanner(
+-            MaterialBanner(
+-              padding: EdgeInsets.zero,
+-              leading: StreamBuilder(
+-                stream: audioPlayer.playerStateStream.asBroadcastStream(),
+-                builder: (context, _) => IconButton(
+-                  onPressed: () {
+-                    if (audioPlayer.isAtEndPosition) {
+-                      audioPlayer.seek(Duration.zero);
+-                    } else if (audioPlayer.playing) {
+-                      audioPlayer.pause();
+-                    } else {
+-                      audioPlayer.play();
+-                    }
+-                  },
+-                  icon: audioPlayer.playing && !audioPlayer.isAtEndPosition
+-                      ? const Icon(Icons.pause_outlined)
+-                      : const Icon(Icons.play_arrow_outlined),
+-                ),
+-              ),
+-              content: StreamBuilder(
+-                stream: audioPlayer.positionStream.asBroadcastStream(),
+-                builder: (context, _) => GestureDetector(
+-                  onTap: () => FluffyChatApp.router.go(
+-                    '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
+-                  ),
+-                  child: Text(
+-                    '🎙️ ${audioPlayer.position.minuteSecondString} / ${audioPlayer.duration?.minuteSecondString} - ${widget.event.senderFromMemoryOrFallback.calcDisplayname()}',
+-                    maxLines: 1,
+-                    overflow: TextOverflow.ellipsis,
+-                  ),
+-                ),
+-              ),
+-              actions: [
+-                IconButton(
+-                  onPressed: () {
+-                    audioPlayer.pause();
+-                    audioPlayer.dispose();
+-                    matrix.voiceMessageEventId.value = matrix.audioPlayer =
+-                        null;
+-
+-                    WidgetsBinding.instance.addPostFrameCallback((_) {
+-                      ScaffoldMessenger.of(
+-                        matrix.context,
+-                      ).clearMaterialBanners();
+-                    });
+-                  },
+-                  icon: const Icon(Icons.close_outlined),
+-                ),
+-              ],
+-            ),
+-          );
+-        });
+-        return;
 +  static String _getAudioCacheKey(Event event) {
 +    final attachmentUrl = event.attachmentOrThumbnailMxcUrl();
 +    final mxcPart = attachmentUrl != null && attachmentUrl.pathSegments.isNotEmpty
@@ -307959,11 +308050,27 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +      final ext = name.substring(dotIndex).toLowerCase();
 +      if (['.ogg', '.opus', '.mp3', '.m4a', '.wav', '.aac', '.flac'].contains(ext)) {
 +        return ext;
-+      }
-+    }
+       }
+-      audioPlayer.pause();
+-      audioPlayer.dispose();
+-      matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
+     }
 +    return '.ogg';
-+  }
-+
+   }
+ 
+-  Future<void> _onButtonTap() async {
+-    WidgetsBinding.instance.addPostFrameCallback((_) {
+-      ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
+-    });
+-    final currentPlayer =
+-        matrix.voiceMessageEventId.value != widget.event.eventId
+-        ? null
+-        : matrix.audioPlayer;
+-    if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
+-      if (currentPlayer.playing) {
+-        currentPlayer.pause();
+-      } else {
+-        currentPlayer.play();
 +  static Future<File?> getLocalAudioFile(Event event) async {
 +    final attachmentUrl = event.attachmentOrThumbnailMxcUrl();
 +    if (kIsWeb || attachmentUrl == null) return null;
@@ -307975,9 +308082,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +      final convertedFile = File('${tempDir.path}/audio_$cacheKey.caf');
 +      if (await convertedFile.exists() && await convertedFile.length() > 100) {
 +        return convertedFile;
-+      }
-+    }
-+
+       }
+-      return;
+     }
+ 
+-    matrix.voiceMessageEventId.value = widget.event.eventId;
+-    matrix.audioPlayer
+-      ?..stop()
+-      ..dispose();
+-    File? file;
+-    MatrixFile? matrixFile;
 +    final rawFile = File('${tempDir.path}/audio_$cacheKey$ext');
 +    if (await rawFile.exists() && await rawFile.length() > 100) {
 +      return rawFile;
@@ -308013,30 +308127,45 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +      }
 +      return await getLocalAudioFile(event);
 +    }
-+
+ 
+-    setState(() => status = AudioPlayerStatus.downloading);
 +    activeDownloadEventIds.add(eventId);
-+    try {
+     try {
+-      final fileSize = widget.event.content
 +      final fileSize = event.content
-+          .tryGetMap<String, Object?>('info')
-+          ?.tryGet<int>('size');
+           .tryGetMap<String, Object?>('info')
+           ?.tryGet<int>('size');
+-      matrixFile = await widget.event.downloadAndDecryptAttachment(
+-        onDownloadProgress: fileSize != null && fileSize > 0
 +      final matrixFile = await event.downloadAndDecryptAttachment(
 +        onDownloadProgress: (fileSize != null && fileSize > 0)
-+            ? (progress) {
+             ? (progress) {
+-                final progressPercentage = progress / fileSize;
+-                setState(() {
+-                  _downloadProgress = progressPercentage < 1
+-                      ? progressPercentage
+-                      : null;
+-                });
 +                final pct = progress / fileSize;
 +                onProgress?.call(pct < 1 ? pct : 1.0);
-+              }
-+            : null,
-+      );
-+
+               }
+             : null,
+       );
+ 
+-      final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
+-
 +      File? file;
 +      final attachmentUrl = event.attachmentOrThumbnailMxcUrl();
-+      if (!kIsWeb && attachmentUrl != null) {
-+        final tempDir = await getTemporaryDirectory();
+       if (!kIsWeb && attachmentUrl != null) {
+         final tempDir = await getTemporaryDirectory();
+-        final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
+-        file = File('${tempDir.path}/${fileName}_${matrixFile.name}');
+-
 +        final cacheKey = _getAudioCacheKey(event);
 +        final ext = _getAudioExtension(event, matrixFile);
 +        file = File('${tempDir.path}/audio_$cacheKey$ext');
-+        await file.writeAsBytes(matrixFile.bytes);
-+
+         await file.writeAsBytes(matrixFile.bytes);
+ 
 +        if (await file.length() <= 100) {
 +          Logs().w('Downloaded audio file for $eventId is too small or corrupt');
 +          try {
@@ -308045,37 +308174,81 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +          return null;
 +        }
 +
-+        if (Platform.isIOS &&
+         if (Platform.isIOS &&
+-            matrixFile.mimeType.toLowerCase() == 'audio/ogg') {
 +            (matrixFile.mimeType.toLowerCase().startsWith('audio/ogg') ||
 +                matrixFile.name.toLowerCase().endsWith('.ogg') ||
 +                matrixFile.name.toLowerCase().endsWith('.opus') ||
 +                ext == '.ogg' ||
 +                ext == '.opus')) {
-+          Logs().v('Convert ogg audio file for iOS...');
+           Logs().v('Convert ogg audio file for iOS...');
+-          final convertedFile = File('${file.path}.caf');
+-          if (await convertedFile.exists() == false) {
 +          final convertedFile = File('${tempDir.path}/audio_$cacheKey.caf');
 +          if (!await convertedFile.exists() || await convertedFile.length() <= 100) {
-+            OpusCaf().convertOpusToCaf(file.path, convertedFile.path);
-+          }
+             OpusCaf().convertOpusToCaf(file.path, convertedFile.path);
+           }
+-          file = convertedFile;
 +          if (await convertedFile.exists() && await convertedFile.length() > 100) {
 +            file = convertedFile;
 +          }
-+        }
-+      }
+         }
+       }
 +      return file;
 +    } finally {
 +      activeDownloadEventIds.remove(eventId);
 +    }
 +  }
-+
+ 
+-      setState(() {
+-        status = AudioPlayerStatus.downloaded;
 +  Future<void> playEvent(
 +    MatrixState matrix,
 +    Event event, {
 +    File? preloadedFile,
 +    BuildContext? context,
-+    void Function(double)? onDownloadProgress,
-+    void Function(bool)? onWaitingForEarChanged,
++    Duration? initialSeekPosition,
 +  }) async {
-+    HapticFeedback.mediumImpact();
++    _pauseInactivityTimer?.cancel();
++    _pauseInactivityTimer = null;
++
++    final currentEventId = matrix.voiceMessageEventId.value;
++    final currentPlayer = matrix.audioPlayer;
++
++    // Fast path: already loaded audio player -> instant play/pause!
++    if (currentEventId == event.eventId && currentPlayer != null) {
++      if (currentPlayer.playing && !currentPlayer.isAtEndPosition) {
++        HapticFeedback.lightImpact();
++        currentPlayer.pause();
++        _pauseInactivityTimer = Timer(const Duration(seconds: 45), () {
++          AudioRouterService.instance.stopSession();
++        });
++        return;
++      } else if (!currentPlayer.isAtEndPosition) {
++        HapticFeedback.lightImpact();
++        AudioRouterService.instance.startSession(
++          AudioRouterService.instance.outputModeNotifier.value,
++        );
++        if (initialSeekPosition != null) {
++          await currentPlayer.seek(initialSeekPosition);
++        }
++        currentPlayer.play();
++        return;
++      }
++    }
++
++    final sessionToken = ++_playbackSessionToken;
++
++    _playerSub?.cancel();
++    _playerSub = null;
++    matrix.voiceMessageEventId.value = event.eventId;
++    preparingEventIdNotifier.value = event.eventId;
++    downloadProgressNotifier.value = null;
++    isWaitingForEarNotifier.value = false;
++
++    matrix.audioPlayer?.stop();
++    matrix.audioPlayer?.dispose();
++    matrix.audioPlayer = null;
 +
 +    WidgetsBinding.instance.addPostFrameCallback((_) {
 +      try {
@@ -308083,77 +308256,64 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +      } catch (_) {}
 +    });
 +
-+    final currentEventId = matrix.voiceMessageEventId.value;
-+    final currentPlayer = matrix.audioPlayer;
-+
-+    if (currentEventId == event.eventId && currentPlayer != null) {
-+      if (currentPlayer.playing && !currentPlayer.isAtEndPosition) {
-+        HapticFeedback.lightImpact();
-+        currentPlayer.pause();
-+        AudioRouterService.instance.stopSession();
-+        return;
-+      } else if (!currentPlayer.isAtEndPosition) {
-+        HapticFeedback.lightImpact();
-+        AudioRouterService.instance.startSession(
-+          AudioRouterService.instance.outputModeNotifier.value,
-+        );
-+        currentPlayer.play();
-+        return;
-+      }
-+    }
-+
-+    _playerSub?.cancel();
-+    _playerSub = null;
-+    matrix.voiceMessageEventId.value = event.eventId;
-+    matrix.audioPlayer?.stop();
-+    matrix.audioPlayer?.dispose();
-+    matrix.audioPlayer = null;
-+
 +    File? file = preloadedFile;
 +    if (file == null || !await file.exists() || await file.length() <= 100) {
 +      file = await getLocalAudioFile(event);
 +    }
++    if (sessionToken != _playbackSessionToken) return;
++
 +    if (file == null || !await file.exists() || await file.length() <= 100) {
 +      try {
-+        file = await downloadAudio(event, onProgress: onDownloadProgress);
++        file = await downloadAudio(
++          event,
++          onProgress: (pct) {
++            if (sessionToken == _playbackSessionToken) {
++              downloadProgressNotifier.value = pct;
++            }
++          },
++        );
 +      } catch (e, s) {
 +        Logs().e('Failed to download audio for playback', e, s);
-+        if (context != null && context.mounted) {
-+          ScaffoldMessenger.of(context).showSnackBar(
-+            SnackBar(content: Text(e.toLocalizedString(context))),
-+          );
++        if (sessionToken == _playbackSessionToken) {
++          preparingEventIdNotifier.value = null;
++          downloadProgressNotifier.value = null;
++          matrix.voiceMessageEventId.value = null;
++          if (context != null && context.mounted) {
++            ScaffoldMessenger.of(context).showSnackBar(
++              SnackBar(content: Text(e.toLocalizedString(context))),
++            );
++          }
 +        }
-+        matrix.voiceMessageEventId.value = null;
 +        return;
 +      }
 +    }
++    if (sessionToken != _playbackSessionToken) return;
 +
 +    if (file == null || !await file.exists() || await file.length() <= 100) {
-+      matrix.voiceMessageEventId.value = null;
++      if (sessionToken == _playbackSessionToken) {
++        preparingEventIdNotifier.value = null;
++        downloadProgressNotifier.value = null;
++        matrix.voiceMessageEventId.value = null;
++      }
 +      return;
 +    }
-+
-+    if (matrix.voiceMessageEventId.value != event.eventId) return;
 +
 +    final outputMode = AudioRouterService.instance.outputModeNotifier.value;
 +    final audioPlayer = matrix.audioPlayer = AudioPlayer();
 +
 +    if (PlatformInfos.isMobile) {
-+      try {
-+        final session = await AudioSession.instance;
-+        await session.configure(
++      AudioSession.instance.then((session) {
++        session.configure(
 +          outputMode == 'earpiece'
 +              ? const AudioSessionConfiguration.speech()
 +              : const AudioSessionConfiguration.music(),
-+        );
-+      } catch (e) {
-+        Logs().w('Failed to configure audio session', e);
-+      }
-+      await AudioRouterService.instance.startSession(outputMode);
++        ).catchError((e) => Logs().w('Failed audio session config', e));
+       });
++      AudioRouterService.instance.startSession(outputMode);
 +    }
 +
 +    if (Platform.isAndroid) {
-+      await audioPlayer.setAndroidAudioAttributes(
++      audioPlayer.setAndroidAudioAttributes(
 +        outputMode == 'earpiece'
 +            ? const AndroidAudioAttributes(
 +                contentType: AndroidAudioContentType.speech,
@@ -308163,36 +308323,40 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                contentType: AndroidAudioContentType.music,
 +                usage: AndroidAudioUsage.media,
 +              ),
-+      );
++      ).catchError((e) => Logs().w('Failed android audio attrs', e));
 +    }
 +
 +    try {
-+      await audioPlayer.setFilePath(file.path);
-+    } catch (e, s) {
++      await audioPlayer.setFilePath(file.path, initialPosition: initialSeekPosition);
+     } catch (e, s) {
+-      Logs().v('Could not download audio file', e, s);
 +      Logs().e('Failed to load audio file in player: ${file.path}', e, s);
 +      try {
 +        if (await file.exists()) await file.delete();
 +      } catch (_) {}
-+      matrix.voiceMessageEventId.value = null;
-+      matrix.audioPlayer?.dispose();
-+      matrix.audioPlayer = null;
-+      AudioRouterService.instance.stopSession();
-+      if (context != null && context.mounted) {
-+        ScaffoldMessenger.of(context).showSnackBar(
-+          SnackBar(content: Text('Error al cargar audio: $e')),
-+        );
++      if (sessionToken == _playbackSessionToken) {
++        preparingEventIdNotifier.value = null;
++        downloadProgressNotifier.value = null;
++        matrix.voiceMessageEventId.value = null;
++        matrix.audioPlayer?.dispose();
++        matrix.audioPlayer = null;
++        AudioRouterService.instance.stopSession();
++        if (context != null && context.mounted) {
++          ScaffoldMessenger.of(context).showSnackBar(
++            SnackBar(content: Text('Error al cargar audio: $e')),
++          );
++        }
 +      }
 +      return;
 +    }
-+
-+    if (matrix.voiceMessageEventId.value != event.eventId) return;
++    if (sessionToken != _playbackSessionToken) return;
 +
 +    final delaySeconds = AppSettings.audioEarpieceDelaySeconds.value;
 +    if (outputMode == 'earpiece' && delaySeconds > 0) {
 +      final isAlreadyNear = AudioRouterService.instance.isNearEarNotifier.value ||
 +          await AudioRouterService.instance.isNear();
 +      if (!isAlreadyNear) {
-+        onWaitingForEarChanged?.call(true);
++        isWaitingForEarNotifier.value = true;
 +        final completer = Completer<void>();
 +        VoidCallback? listener;
 +        listener = () {
@@ -308207,24 +308371,33 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +        await completer.future;
 +        timer.cancel();
 +        AudioRouterService.instance.isNearEarNotifier.removeListener(listener);
-+        onWaitingForEarChanged?.call(false);
++        isWaitingForEarNotifier.value = false;
 +      }
 +    }
-+
-+    if (matrix.voiceMessageEventId.value != event.eventId) return;
++    if (sessionToken != _playbackSessionToken) return;
 +
 +    bool hasStartedPlaying = false;
 +    _playerSub = audioPlayer.playerStateStream.listen((state) {
 +      if (state.playing) {
 +        hasStartedPlaying = true;
++        if (preparingEventIdNotifier.value == event.eventId) {
++          preparingEventIdNotifier.value = null;
++          downloadProgressNotifier.value = null;
++        }
 +      } else if (hasStartedPlaying &&
 +          state.processingState != ProcessingState.loading &&
 +          state.processingState != ProcessingState.buffering &&
 +          state.processingState != ProcessingState.completed) {
-+        AudioRouterService.instance.stopSession();
++        _pauseInactivityTimer?.cancel();
++        _pauseInactivityTimer = Timer(const Duration(seconds: 45), () {
++          AudioRouterService.instance.stopSession();
++        });
 +      }
 +
 +      if (state.processingState == ProcessingState.completed) {
++        _pauseInactivityTimer?.cancel();
++        preparingEventIdNotifier.value = null;
++        downloadProgressNotifier.value = null;
 +        if (matrix.continuousAudioPlaybackNotifier.value) {
 +          _handleAutoAdvance(matrix, event);
 +        } else {
@@ -308236,18 +308409,27 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +
 +    try {
 +      await audioPlayer.play();
++      if (sessionToken == _playbackSessionToken) {
++        preparingEventIdNotifier.value = null;
++        downloadProgressNotifier.value = null;
++        isWaitingForEarNotifier.value = false;
++      }
 +    } catch (e, s) {
 +      if (e.toString().contains('interrupted') || e.toString().contains('abort')) {
 +        Logs().d('Audio playback interrupted: $e');
 +        return;
 +      }
 +      Logs().e('Failed to play audio', e, s);
-+      matrix.voiceMessageEventId.value = null;
-+      matrix.audioPlayer?.dispose();
-+      matrix.audioPlayer = null;
-+      AudioRouterService.instance.stopSession();
-+      if (context != null && context.mounted) {
-+        ErrorReporter(context, 'Unable to play audio message').onErrorCallback(e, s);
++      if (sessionToken == _playbackSessionToken) {
++        preparingEventIdNotifier.value = null;
++        downloadProgressNotifier.value = null;
++        matrix.voiceMessageEventId.value = null;
++        matrix.audioPlayer?.dispose();
++        matrix.audioPlayer = null;
++        AudioRouterService.instance.stopSession();
++        if (context != null && context.mounted) {
++          ErrorReporter(context, 'Unable to play audio message').onErrorCallback(e, s);
++        }
 +      }
 +    }
 +  }
@@ -308308,12 +308490,12 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +  }
 +}
 +
- class AudioPlayerState extends State<AudioPlayerWidget> {
-   static const double buttonSize = 36;
++class AudioPlayerState extends State<AudioPlayerWidget> {
++  static const double buttonSize = 36;
 +  static const int _maxAutoPreloadSizeBytes = 10 * 1024 * 1024; // 10MB limit
- 
-   AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
-   double? _downloadProgress;
++
++  AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
++  double? _downloadProgress;
 +  File? _cachedFile;
 +  bool _isUserTappedPlay = false;
 +  bool _isWaitingForEar = false;
@@ -308321,52 +308503,20 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +  String? _transcription;
 +  bool _isTranscribing = false;
 +  double? _transcriptionProgress;
- 
-   late final MatrixState matrix;
-   List<int>? _waveform;
-   String? _durationString;
++
++  late final MatrixState matrix;
++  List<int>? _waveform;
++  String? _durationString;
 +  int? _durationInt;
- 
-   @override
-   void dispose() {
-@@ -70,14 +458,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-             MaterialBanner(
-               padding: EdgeInsets.zero,
-               leading: StreamBuilder(
--                stream: audioPlayer.playerStateStream.asBroadcastStream(),
-+                stream: audioPlayer.playerStateStream,
-                 builder: (context, _) => IconButton(
-                   onPressed: () {
-                     if (audioPlayer.isAtEndPosition) {
-                       audioPlayer.seek(Duration.zero);
-                     } else if (audioPlayer.playing) {
-+                      HapticFeedback.lightImpact();
-                       audioPlayer.pause();
-                     } else {
-+                      HapticFeedback.lightImpact();
-                       audioPlayer.play();
-                     }
-                   },
-@@ -87,7 +477,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-                 ),
-               ),
-               content: StreamBuilder(
--                stream: audioPlayer.positionStream.asBroadcastStream(),
-+                stream: audioPlayer.positionStream,
-                 builder: (context, _) => GestureDetector(
-                   onTap: () => FluffyChatApp.router.go(
-                     '/rooms/${widget.event.room.id}?event=${widget.event.eventId}',
-@@ -124,104 +514,161 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-       audioPlayer.pause();
-       audioPlayer.dispose();
-       matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
-+      AudioRouterService.instance.stopSession();
-     }
-   }
- 
--  Future<void> _onButtonTap() async {
--    WidgetsBinding.instance.addPostFrameCallback((_) {
--      ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
++
++  @override
++  void dispose() {
++    super.dispose();
++    // Do NOT stop or dispose matrix.audioPlayer here!
++    // In a ListView, item widgets are disposed and recreated as the user scrolls.
++    // Audio playback and session lifecycle are managed globally by VoicePlaybackController.
++  }
++
 +  void _checkOrPreloadAudio() {
 +    final eventId = widget.event.eventId;
 +    if (VoicePlaybackController.prefetchedEventIds.contains(eventId) ||
@@ -308403,134 +308553,68 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +      });
 +    }).catchError((e) {
 +      Logs().v('Check local audio file failed: $e');
-     });
--    final currentPlayer =
--        matrix.voiceMessageEventId.value != widget.event.eventId
--        ? null
--        : matrix.audioPlayer;
++    });
 +  }
 +
-+  Future<void> _onButtonTap() async {
-+    if (_isWaitingForEar) {
-+      _isWaitingForEar = false;
-+      matrix.voiceMessageEventId.value = null;
-+      matrix.audioPlayer
-+        ?..stop()
-+        ..dispose();
-+      AudioRouterService.instance.stopSession();
-+      if (mounted) setState(() {});
-+      return;
-+    }
-+
++  Future<void> _onButtonTap([Duration? seekPos]) async {
 +    final isCurrent =
 +        matrix.voiceMessageEventId.value == widget.event.eventId;
 +    final currentPlayer = isCurrent ? matrix.audioPlayer : null;
++    final isPlaying = currentPlayer?.playing == true &&
++        currentPlayer?.isAtEndPosition == false;
 +
-+    if (isCurrent && currentPlayer == null) {
-+      matrix.voiceMessageEventId.value = null;
-+      AudioRouterService.instance.stopSession();
++    // Instant tactile feedback directly on touch!
++    if (isPlaying) {
++      HapticFeedback.lightImpact();
++    } else {
++      HapticFeedback.mediumImpact();
++    }
++
++    if (isCurrent &&
++        VoicePlaybackController.instance.isWaitingForEarNotifier.value) {
++      VoicePlaybackController.instance.stopPlayback(matrix);
 +      if (mounted) setState(() {});
 +      return;
 +    }
 +
-     if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
-       if (currentPlayer.playing) {
-+        HapticFeedback.lightImpact();
-         currentPlayer.pause();
-+        AudioRouterService.instance.stopSession();
-       } else {
-+        HapticFeedback.lightImpact();
++    if (isCurrent &&
++        VoicePlaybackController.instance.preparingEventIdNotifier.value ==
++            widget.event.eventId) {
++      VoicePlaybackController.instance.stopPlayback(matrix);
++      if (mounted) setState(() {});
++      return;
++    }
++
++    if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
++      if (currentPlayer.playing) {
++        currentPlayer.pause();
++      } else {
++        if (seekPos != null) {
++          await currentPlayer.seek(seekPos);
++        }
 +        AudioRouterService.instance.startSession(
 +          AudioRouterService.instance.outputModeNotifier.value,
 +        );
-         currentPlayer.play();
-       }
-       return;
-     }
- 
--    matrix.voiceMessageEventId.value = widget.event.eventId;
--    matrix.audioPlayer
--      ?..stop()
--      ..dispose();
--    File? file;
--    MatrixFile? matrixFile;
-+    _isUserTappedPlay = true;
-+    if (status != AudioPlayerStatus.downloaded && mounted) {
-+      setState(() => status = AudioPlayerStatus.downloading);
++        currentPlayer.play();
++      }
++      return;
 +    }
- 
--    setState(() => status = AudioPlayerStatus.downloading);
-     try {
--      final fileSize = widget.event.content
--          .tryGetMap<String, Object?>('info')
--          ?.tryGet<int>('size');
--      matrixFile = await widget.event.downloadAndDecryptAttachment(
--        onDownloadProgress: fileSize != null && fileSize > 0
--            ? (progress) {
--                final progressPercentage = progress / fileSize;
--                setState(() {
--                  _downloadProgress = progressPercentage < 1
--                      ? progressPercentage
--                      : null;
--                });
--              }
--            : null,
--      );
--
--      final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
--
--      if (!kIsWeb && attachmentUrl != null) {
--        final tempDir = await getTemporaryDirectory();
--        final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
--        file = File('${tempDir.path}/${fileName}_${matrixFile.name}');
--
--        await file.writeAsBytes(matrixFile.bytes);
--
--        if (Platform.isIOS &&
--            matrixFile.mimeType.toLowerCase() == 'audio/ogg') {
--          Logs().v('Convert ogg audio file for iOS...');
--          final convertedFile = File('${file.path}.caf');
--          if (await convertedFile.exists() == false) {
--            OpusCaf().convertOpusToCaf(file.path, convertedFile.path);
++
++    try {
 +      await VoicePlaybackController.instance.playEvent(
 +        matrix,
 +        widget.event,
 +        preloadedFile: _cachedFile,
 +        context: context,
-+        onDownloadProgress: (pct) {
-+          if (mounted) {
-+            setState(() => _downloadProgress = pct);
-           }
--          file = convertedFile;
--        }
--      }
--
--      setState(() {
--        status = AudioPlayerStatus.downloaded;
--      });
-+        },
-+        onWaitingForEarChanged: (waiting) {
-+          if (mounted) {
-+            setState(() => _isWaitingForEar = waiting);
-+          }
-+        },
++        initialSeekPosition: seekPos,
 +      );
-     } catch (e, s) {
--      Logs().v('Could not download audio file', e, s);
++    } catch (e, s) {
 +      Logs().v('Could not play audio file', e, s);
        if (!mounted) rethrow;
        ScaffoldMessenger.of(
          context,
        ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
 -      rethrow;
-+    } finally {
-+      if (mounted) {
-+        setState(() {
-+          _isUserTappedPlay = false;
-+          _downloadProgress = null;
-+          status = AudioPlayerStatus.downloaded;
-+        });
-+      }
      }
 -    if (!context.mounted) return;
 -    if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
@@ -308588,7 +308672,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
      final audioPlayer = matrix.audioPlayer;
      if (audioPlayer == null) return;
      switch (audioPlayer.speed) {
-@@ -246,12 +693,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -246,12 +679,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    }
  
    List<int>? _getWaveform() {
@@ -308610,7 +308694,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
      while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
        for (var i = 0; i < eventWaveForm.length; i = i + 2) {
          eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +720,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -266,11 +706,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
      return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
    }
  
@@ -308693,7 +308777,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -281,7 +806,11 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -281,7 +792,11 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
  
      final durationInt = widget.event.content
          .tryGetMap<String, Object?>('info')
@@ -308705,7 +308789,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
      if (durationInt != null) {
        final duration = Duration(milliseconds: durationInt);
        _durationString = duration.minuteSecondString;
-@@ -292,152 +821,105 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+@@ -292,229 +807,831 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
      final waveform = _waveform;
@@ -308728,13 +308812,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 -                  audioPlayer.positionStream.asBroadcastStream(),
 -                  audioPlayer.playerStateStream.asBroadcastStream(),
 -                ]),
-+      builder: (context, activeEventId, _) {
-+        final isCurrent = activeEventId == widget.event.eventId;
-+        final audioPlayer = isCurrent ? matrix.audioPlayer : null;
-+
-+        return StreamBuilder<PlayerState>(
-+          stream: audioPlayer?.playerStateStream,
-           builder: (context, _) {
+-          builder: (context, _) {
 -            final maxPosition =
 -                audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
 -            var currentPosition =
@@ -308747,35 +308825,22 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 -            final statusText = audioPlayer == null
 -                ? _durationString ?? '00:00'
 -                : audioPlayer.position.minuteSecondString;
-+            final processingState = audioPlayer?.processingState;
-+            final isPreparing = isCurrent &&
-+                (audioPlayer == null ||
-+                    processingState == ProcessingState.loading ||
-+                    processingState == ProcessingState.buffering);
-+            final isDownloading = status == AudioPlayerStatus.downloading;
-+            final isLoading = isDownloading || isPreparing;
-+            final isPlaying = audioPlayer?.playing == true &&
-+                audioPlayer?.isAtEndPosition == false;
-+
-             return Padding(
-               padding: const EdgeInsets.all(12.0),
-               child: Column(
+-            return Padding(
+-              padding: const EdgeInsets.all(12.0),
+-              child: Column(
 -                mainAxisSize: .min,
 -                crossAxisAlignment: .start,
-+                mainAxisSize: MainAxisSize.min,
-+                crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   ConstrainedBox(
-                     constraints: const BoxConstraints(
-                       maxWidth: FluffyThemes.columnWidth,
-                     ),
-                     child: Row(
+-                children: [
+-                  ConstrainedBox(
+-                    constraints: const BoxConstraints(
+-                      maxWidth: FluffyThemes.columnWidth,
+-                    ),
+-                    child: Row(
 -                      mainAxisSize: .min,
-+                      mainAxisSize: MainAxisSize.min,
-                       children: <Widget>[
-                         SizedBox(
-                           width: buttonSize,
-                           height: buttonSize,
+-                      children: <Widget>[
+-                        SizedBox(
+-                          width: buttonSize,
+-                          height: buttonSize,
 -                          child: status == AudioPlayerStatus.downloading
 -                              ? CircularProgressIndicator(
 -                                  strokeWidth: 2,
@@ -308789,58 +308854,167 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 -                                  onTap: _onButtonTap,
 -                                  child: Material(
 -                                    color: widget.color.withAlpha(64),
--                                    borderRadius: BorderRadius.circular(64),
++      builder: (context, activeEventId, _) {
++        final isCurrent = activeEventId == widget.event.eventId;
++        final audioPlayer = isCurrent ? matrix.audioPlayer : null;
++
++        return ValueListenableBuilder<String?>(
++          valueListenable:
++              VoicePlaybackController.instance.preparingEventIdNotifier,
++          builder: (context, preparingEventId, _) {
++            final isPreparingThis =
++                isCurrent && preparingEventId == widget.event.eventId;
++
++            return ValueListenableBuilder<bool>(
++              valueListenable:
++                  VoicePlaybackController.instance.isWaitingForEarNotifier,
++              builder: (context, isWaitingForEarGlobal, _) {
++                final isWaitingForEar =
++                    isCurrent && isWaitingForEarGlobal;
++
++                return StreamBuilder<PlayerState>(
++                  stream: audioPlayer?.playerStateStream,
++                  builder: (context, _) {
++                    final isPlaying = audioPlayer?.playing == true &&
++                        audioPlayer?.isAtEndPosition == false;
++                    final isLoading = !isPlaying && isPreparingThis;
++
++                    Widget buttonChild;
++                    if (isPlaying) {
++                      buttonChild = Icon(
++                        Icons.pause_outlined,
++                        color: widget.color,
++                      );
++                    } else if (isWaitingForEar) {
++                      buttonChild = Icon(
++                        Icons.hearing_outlined,
++                        color: widget.color,
++                      );
++                    } else if (isLoading) {
++                      buttonChild = ValueListenableBuilder<double?>(
++                        valueListenable: VoicePlaybackController
++                            .instance.downloadProgressNotifier,
++                        builder: (context, pct, _) {
++                          return Padding(
++                            padding: const EdgeInsets.all(8.0),
++                            child: CircularProgressIndicator(
++                              strokeWidth: 2.2,
++                              color: widget.color,
++                              value: (pct != null && pct > 0 && pct < 1.0)
++                                  ? pct
++                                  : null,
++                            ),
++                          );
++                        },
++                      );
++                    } else {
++                      buttonChild = Icon(
++                        Icons.play_arrow_outlined,
++                        color: widget.color,
++                      );
++                    }
++
++                    return Padding(
++                      padding: const EdgeInsets.all(12.0),
++                      child: Column(
++                        mainAxisSize: MainAxisSize.min,
++                        crossAxisAlignment: CrossAxisAlignment.start,
++                        children: [
++                          ConstrainedBox(
++                            constraints: const BoxConstraints(
++                              maxWidth: FluffyThemes.columnWidth,
++                            ),
++                            child: Row(
++                              mainAxisSize: MainAxisSize.min,
++                              children: <Widget>[
++                                SizedBox(
++                                  width: buttonSize,
++                                  height: buttonSize,
++                                  child: InkWell(
+                                     borderRadius: BorderRadius.circular(64),
 -                                    child: Icon(
 -                                      audioPlayer?.playing == true &&
 -                                              audioPlayer?.isAtEndPosition ==
 -                                                  false
 -                                          ? Icons.pause_outlined
 -                                          : Icons.play_arrow_outlined,
-+                          child: InkWell(
-+                            borderRadius: BorderRadius.circular(64),
-+                            onLongPress: () =>
-+                                widget.event.saveFile(context),
-+                            onTap: _onButtonTap,
-+                            child: Material(
-+                              color: widget.color.withAlpha(64),
-+                              borderRadius: BorderRadius.circular(64),
-+                              child: _isWaitingForEar
-+                                  ? Icon(
-+                                      Icons.hearing_outlined,
-                                       color: widget.color,
--                                    ),
--                                  ),
--                                ),
-+                                    )
-+                                  : isLoading
-+                                      ? Padding(
-+                                          padding: const EdgeInsets.all(8.0),
-+                                          child: CircularProgressIndicator(
-+                                            strokeWidth: 2.2,
-+                                            color: widget.color,
-+                                            value: _downloadProgress,
-+                                          ),
-+                                        )
-+                                      : Icon(
-+                                          isPlaying
-+                                              ? Icons.pause_outlined
-+                                              : Icons.play_arrow_outlined,
-+                                          color: widget.color,
-+                                        ),
-+                            ),
-+                          ),
-                         ),
-                         const SizedBox(width: 8),
-                         Expanded(
+-                                      color: widget.color,
++                                    onLongPress: () =>
++                                        widget.event.saveFile(context),
++                                    onTap: _onButtonTap,
++                                    child: Material(
++                                      color: widget.color.withAlpha(64),
++                                      borderRadius:
++                                          BorderRadius.circular(64),
++                                      child: buttonChild,
+                                     ),
+                                   ),
+                                 ),
+-                        ),
+-                        const SizedBox(width: 8),
+-                        Expanded(
 -                          child: Stack(
 -                            children: [
 -                              if (waveform != null)
 -                                Padding(
 -                                  padding: const EdgeInsets.symmetric(
 -                                    horizontal: 16.0,
--                                  ),
++                                const SizedBox(width: 8),
++                                Expanded(
++                                  child: RepaintBoundary(
++                                    child: Opacity(
++                                      opacity: isLoading ? 0.6 : 1.0,
++                                      child: _AudioScrubberWidget(
++                                        audioPlayer: audioPlayer,
++                                        waveform: waveform,
++                                        durationMs: _durationInt,
++                                        color: widget.color,
++                                        inactiveColor: widget.color
++                                            .withValues(alpha: 0.35),
++                                        thumbColor: widget.event.senderId ==
++                                                widget.event.room.client.userID
++                                            ? theme.colorScheme.onPrimary
++                                            : theme.colorScheme.primary,
++                                        onTapWhenStoppedWithSeek: (pos) =>
++                                            _onButtonTap(pos),
++                                        onSeek: (pos) => audioPlayer?.seek(pos),
++                                      ),
++                                    ),
++                                  ),
++                                ),
++                                const SizedBox(width: 8),
++                                ConstrainedBox(
++                                  constraints:
++                                      const BoxConstraints(minWidth: 42),
++                                  child: ValueListenableBuilder<double?>(
++                                    valueListenable: VoicePlaybackController
++                                        .instance.downloadProgressNotifier,
++                                    builder: (context, pct, _) {
++                                      return _AudioTimeText(
++                                        audioPlayer: audioPlayer,
++                                        durationString:
++                                            _durationString ?? '00:00',
++                                        isWaitingForEar: isWaitingForEar,
++                                        downloadProgress:
++                                            isLoading ? pct : null,
++                                        color: widget.color,
++                                      );
++                                    },
++                                  ),
++                                ),
++                                const SizedBox(width: 8),
++                                AnimatedCrossFade(
++                                  firstChild: Padding(
++                                    padding: const EdgeInsets.only(right: 8.0),
++                                    child: Icon(
++                                      Icons.mic_none_outlined,
++                                      color: widget.color,
++                                    ),
+                                   ),
 -                                  child: Row(
--                                    children: [
++                                  secondChild: Row(
++                                    mainAxisSize: MainAxisSize.min,
+                                     children: [
 -                                      for (
 -                                        var i = 0;
 -                                        i < AudioPlayerWidget.wavesCount;
@@ -308863,14 +309037,40 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 -                                                      ),
 -                                                borderRadius:
 -                                                    BorderRadius.circular(64),
--                                              ),
++                                      Material(
++                                        color: widget.color.withAlpha(64),
++                                        borderRadius: BorderRadius.circular(
++                                          AppConfig.borderRadius,
++                                        ),
++                                        child: InkWell(
++                                          borderRadius: BorderRadius.circular(
++                                            AppConfig.borderRadius,
++                                          ),
++                                          onTap: _toggleSpeed,
++                                          child: SizedBox(
++                                            width: 32,
++                                            height: 20,
++                                            child: Center(
++                                              child: Text(
++                                                '${audioPlayer?.speed ?? 1.0}x',
++                                                style: TextStyle(
++                                                  color: widget.color,
++                                                  fontSize: 9,
++                                                ),
+                                               ),
 -                                              height: 32 * (waveform[i] / 1024),
--                                            ),
--                                          ),
--                                        ),
--                                    ],
--                                  ),
--                                ),
+                                             ),
+                                           ),
+                                         ),
++                                      ),
+                                     ],
+                                   ),
++                                  alignment: Alignment.center,
++                                  crossFadeState: audioPlayer == null
++                                      ? CrossFadeState.showFirst
++                                      : CrossFadeState.showSecond,
++                                  duration: FluffyThemes.animationDuration,
+                                 ),
 -                              SizedBox(
 -                                height: 32,
 -                                child: Slider(
@@ -308894,113 +309094,51 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 -                                            milliseconds: position.round(),
 -                                          ),
 -                                        ),
--                                ),
-+                          child: RepaintBoundary(
-+                            child: Opacity(
-+                              opacity: isLoading ? 0.6 : 1.0,
-+                              child: _AudioScrubberWidget(
-+                                audioPlayer: audioPlayer,
-+                                waveform: waveform,
-+                                durationMs: _durationInt,
-+                                color: widget.color,
-+                                inactiveColor:
-+                                    widget.color.withValues(alpha: 0.35),
-+                                thumbColor: widget.event.senderId ==
-+                                        widget.event.room.client.userID
-+                                    ? theme.colorScheme.onPrimary
-+                                    : theme.colorScheme.primary,
-+                                onTapWhenStopped: _onButtonTap,
-+                                onSeek: (pos) => audioPlayer?.seek(pos),
++                              ],
++                            ),
++                          ),
++                          if (fileDescription != null) ...[
++                            const SizedBox(height: 8),
++                            Padding(
++                              padding: const EdgeInsets.symmetric(
++                                horizontal: 16,
++                                vertical: 8,
++                              ),
++                              child: Linkify(
++                                text: fileDescription,
++                                textScaleFactor: MediaQuery.textScalerOf(
++                                  context,
++                                ).scale(1),
++                                style: TextStyle(
++                                  color: widget.color,
++                                  fontSize: widget.fontSize,
++                                ),
++                                options: const LinkifyOptions(humanize: false),
++                                linkStyle: TextStyle(
++                                  color: widget.linkColor,
++                                  fontSize: widget.fontSize,
++                                  decoration: TextDecoration.underline,
++                                  decorationColor: widget.linkColor,
+                                 ),
++                                onOpen: (url) =>
++                                    UrlLauncher(context, url.url).launchUrl(),
                                ),
 -                            ],
 +                            ),
-                           ),
-                         ),
-                         const SizedBox(width: 8),
--                        SizedBox(
--                          width: 36,
--                          child: Text(
--                            statusText,
--                            style: TextStyle(color: widget.color, fontSize: 12),
-+                        ConstrainedBox(
-+                          constraints: const BoxConstraints(minWidth: 42),
-+                          child: _AudioTimeText(
-+                            audioPlayer: audioPlayer,
-+                            durationString: _durationString ?? '00:00',
-+                            isWaitingForEar: _isWaitingForEar,
-+                            downloadProgress: _downloadProgress,
-+                            color: widget.color,
-                           ),
-                         ),
-                         const SizedBox(width: 8),
-@@ -449,30 +931,35 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-                               color: widget.color,
-                             ),
-                           ),
--                          secondChild: Material(
--                            color: widget.color.withAlpha(64),
--                            borderRadius: BorderRadius.circular(
--                              AppConfig.borderRadius,
--                            ),
--                            child: InkWell(
--                              borderRadius: BorderRadius.circular(
--                                AppConfig.borderRadius,
--                              ),
--                              onTap: _toggleSpeed,
--                              child: SizedBox(
--                                width: 32,
--                                height: 20,
--                                child: Center(
--                                  child: Text(
--                                    '${audioPlayer?.speed}x',
--                                    style: TextStyle(
--                                      color: widget.color,
--                                      fontSize: 9,
-+                          secondChild: Row(
-+                            mainAxisSize: MainAxisSize.min,
-+                            children: [
-+                              Material(
-+                                color: widget.color.withAlpha(64),
-+                                borderRadius: BorderRadius.circular(
-+                                  AppConfig.borderRadius,
-+                                ),
-+                                child: InkWell(
-+                                  borderRadius: BorderRadius.circular(
-+                                    AppConfig.borderRadius,
-+                                  ),
-+                                  onTap: _toggleSpeed,
-+                                  child: SizedBox(
-+                                    width: 32,
-+                                    height: 20,
-+                                    child: Center(
-+                                      child: Text(
-+                                        '${audioPlayer?.speed ?? 1.0}x',
-+                                        style: TextStyle(
-+                                          color: widget.color,
-+                                          fontSize: 9,
-+                                        ),
-+                                      ),
-                                     ),
-                                   ),
-                                 ),
-                               ),
--                            ),
-+                            ],
-                           ),
-                           alignment: Alignment.center,
-                           crossFadeState: audioPlayer == null
-@@ -511,6 +998,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-                       ),
-                     ),
-                   ],
-+                  _buildTranscriptionSection(context),
-                 ],
-               ),
-             );
-@@ -519,6 +1007,599 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-       },
-     );
-   }
++                          ],
++                          _buildTranscriptionSection(context),
++                        ],
++                      ),
++                    );
++                  },
++                );
++              },
++            );
++          },
++        );
++      },
++    );
++  }
 +
 +  Widget _buildTranscriptionSection(BuildContext context) {
 +    return Column(
@@ -309043,8 +309181,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                            color: widget.color.withValues(alpha: 0.8),
 +                            fontSize: 11,
 +                            fontWeight: FontWeight.bold,
-+                          ),
-+                        ),
+                           ),
+                         ),
+-                        const SizedBox(width: 8),
 +                      ],
 +                    ),
 +                    InkWell(
@@ -309098,16 +309237,27 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                    child: Row(
 +                      mainAxisSize: MainAxisSize.min,
 +                      children: [
-+                        SizedBox(
+                         SizedBox(
+-                          width: 36,
+-                          child: Text(
+-                            statusText,
+-                            style: TextStyle(color: widget.color, fontSize: 12),
 +                          width: 12,
 +                          height: 12,
 +                          child: CircularProgressIndicator(
 +                            strokeWidth: 2,
 +                            color: widget.color,
 +                            value: _transcriptionProgress,
-+                          ),
-+                        ),
-+                        const SizedBox(width: 8),
+                           ),
+                         ),
+                         const SizedBox(width: 8),
+-                        AnimatedCrossFade(
+-                          firstChild: Padding(
+-                            padding: const EdgeInsets.only(right: 8.0),
+-                            child: Icon(
+-                              Icons.mic_none_outlined,
+-                              color: widget.color,
+-                            ),
 +                        Text(
 +                          _transcriptionProgress != null
 +                              ? 'Transcribiendo (${(_transcriptionProgress! * 100).toInt()}%)...'
@@ -309115,7 +309265,11 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                          style: TextStyle(
 +                            color: widget.color,
 +                            fontSize: 11,
-+                          ),
+                           ),
+-                          secondChild: Material(
+-                            color: widget.color.withAlpha(64),
+-                            borderRadius: BorderRadius.circular(
+-                              AppConfig.borderRadius,
 +                        ),
 +                      ],
 +                    ),
@@ -309136,7 +309290,24 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                              Icons.subtitles_outlined,
 +                              size: 14,
 +                              color: widget.color,
-+                            ),
+                             ),
+-                            child: InkWell(
+-                              borderRadius: BorderRadius.circular(
+-                                AppConfig.borderRadius,
+-                              ),
+-                              onTap: _toggleSpeed,
+-                              child: SizedBox(
+-                                width: 32,
+-                                height: 20,
+-                                child: Center(
+-                                  child: Text(
+-                                    '${audioPlayer?.speed}x',
+-                                    style: TextStyle(
+-                                      color: widget.color,
+-                                      fontSize: 9,
+-                                    ),
+-                                  ),
+-                                ),
 +                            const SizedBox(width: 5),
 +                            Text(
 +                              'Transcribir',
@@ -309144,13 +309315,26 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                                color: widget.color,
 +                                fontSize: 11,
 +                                fontWeight: FontWeight.w600,
-+                              ),
-+                            ),
+                               ),
+                             ),
+-                          ),
+-                          alignment: Alignment.center,
+-                          crossFadeState: audioPlayer == null
+-                              ? CrossFadeState.showFirst
+-                              : CrossFadeState.showSecond,
+-                          duration: FluffyThemes.animationDuration,
 +                          ],
-+                        ),
+                         ),
+-                      ],
 +                      ),
-+                    ),
-+                  ),
+                     ),
+                   ),
+-                  if (fileDescription != null) ...[
+-                    const SizedBox(height: 8),
+-                    Padding(
+-                      padding: const EdgeInsets.symmetric(
+-                        horizontal: 16,
+-                        vertical: 8,
 +                const SizedBox(width: 8),
 +              ],
 +              _buildPlaybackOutputButton(),
@@ -309204,7 +309388,25 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                        color: widget.color,
 +                        fontSize: 11,
 +                        fontWeight: isEarpiece ? FontWeight.bold : FontWeight.w600,
-+                      ),
+                       ),
+-                      child: Linkify(
+-                        text: fileDescription,
+-                        textScaleFactor: MediaQuery.textScalerOf(
+-                          context,
+-                        ).scale(1),
+-                        style: TextStyle(
+-                          color: widget.color,
+-                          fontSize: widget.fontSize,
+-                        ),
+-                        options: const LinkifyOptions(humanize: false),
+-                        linkStyle: TextStyle(
+-                          color: widget.linkColor,
+-                          fontSize: widget.fontSize,
+-                          decoration: TextDecoration.underline,
+-                          decorationColor: widget.linkColor,
+-                        ),
+-                        onOpen: (url) =>
+-                            UrlLauncher(context, url.url).launchUrl(),
 +                    ),
 +                  ],
 +                ),
@@ -309252,11 +309454,13 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +                        color: widget.color,
 +                        fontSize: 11,
 +                        fontWeight: continuous ? FontWeight.bold : FontWeight.w500,
-+                      ),
-+                    ),
-+                  ],
+                       ),
+                     ),
+                   ],
+-                ],
 +                ),
-+              ),
+               ),
+-            );
 +            ),
 +          ),
 +        );
@@ -309273,6 +309477,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +  final Color inactiveColor;
 +  final Color thumbColor;
 +  final VoidCallback? onTapWhenStopped;
++  final void Function(Duration)? onTapWhenStoppedWithSeek;
 +  final void Function(Duration)? onSeek;
 +
 +  const _AudioScrubberWidget({
@@ -309283,6 +309488,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +    required this.inactiveColor,
 +    required this.thumbColor,
 +    this.onTapWhenStopped,
++    this.onTapWhenStoppedWithSeek,
 +    this.onSeek,
 +  });
 +
@@ -309354,20 +309560,25 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +        return GestureDetector(
 +          behavior: HitTestBehavior.opaque,
 +          onTapDown: (details) {
-+            if (widget.audioPlayer == null) {
-+              widget.onTapWhenStopped?.call();
-+              return;
-+            }
 +            final width = constraints.maxWidth;
 +            if (width <= 0) return;
 +            final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
 +            final targetMs = frac * effectiveTotalMs;
 +            HapticFeedback.selectionClick();
++            if (widget.audioPlayer == null) {
++              final targetDuration = Duration(milliseconds: targetMs.round());
++              if (widget.onTapWhenStoppedWithSeek != null) {
++                widget.onTapWhenStoppedWithSeek!(targetDuration);
++              } else {
++                widget.onTapWhenStopped?.call();
++              }
++              return;
++            }
 +            setState(() {
 +              _currentPositionMs = targetMs;
 +            });
 +            widget.onSeek?.call(Duration(milliseconds: targetMs.round()));
-+          },
+           },
 +          onHorizontalDragStart: (details) {
 +            if (widget.audioPlayer == null) {
 +              widget.onTapWhenStopped?.call();
@@ -309386,8 +309597,12 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +            if (!_isDragging) return;
 +            final width = constraints.maxWidth;
 +            if (width <= 0) return;
++            final prevFrac = (_dragPositionMs / effectiveTotalMs).clamp(0.0, 1.0);
++            final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
++            if ((frac * 15).toInt() != (prevFrac * 15).toInt()) {
++              HapticFeedback.selectionClick();
++            }
 +            setState(() {
-+              final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
 +              _dragPositionMs = frac * effectiveTotalMs;
 +            });
 +          },
@@ -309590,13 +309805,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..2c21a48cb85f6f86567f1856f6c66647
 +        return Text(
 +          pos.minuteSecondString,
 +          style: TextStyle(color: color, fontSize: 11),
-+        );
-+      },
-+    );
-+  }
- }
- 
- extension on AudioPlayer {
+         );
+       },
+     );
 diff --git a/lib/pages/chat/events/cute_events.dart b/lib/pages/chat/events/cute_events.dart
 index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..2096440d061103ddd1fca7df756ffd6e29c35f4c 100644
 --- a/lib/pages/chat/events/cute_events.dart
