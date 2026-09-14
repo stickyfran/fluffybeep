@@ -356488,7 +356488,7 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..cb48bd1150c41df43dee32c4407e774a3dc565e0
+index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586011c2dcb
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
 @@ -0,0 +1,269 @@
@@ -356679,7 +356679,7 @@ index 0000000000000000000000000000000000000000..cb48bd1150c41df43dee32c4407e774a
 +
 +    if (Platform.isAndroid) {
 +      try {
-+        await FlutterForegroundTask.wakeUpScreen();
++        FlutterForegroundTask.wakeUpScreen();
 +      } catch (_) {}
 +      try {
 +        final res = await _channel.invokeMethod<bool>('openWhatsApp', {
