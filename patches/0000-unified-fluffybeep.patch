@@ -14209,10 +14209,10 @@ index d0e0fbc9b9fcfd2a9a97f6916e994394cf88333e..1494f6d72d248920f1a0f5d3d37dc58f
 +-dontwarn com.antonkarpenko.ffmpegkit.**
 \ No newline at end of file
 diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
-index a63fd498ebbe29fc828e0d980ef50460acfd83d5..07d87854bf22a32a4aef046ec9f3a2d9c3837194 100644
+index a63fd498ebbe29fc828e0d980ef50460acfd83d5..0cf941ec56e78e81a12faa5233580424b4f81eda 100644
 --- a/android/app/src/main/AndroidManifest.xml
 +++ b/android/app/src/main/AndroidManifest.xml
-@@ -20,11 +20,31 @@
+@@ -20,11 +20,35 @@
      <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
      <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
      <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
@@ -14227,6 +14227,10 @@ index a63fd498ebbe29fc828e0d980ef50460acfd83d5..07d87854bf22a32a4aef046ec9f3a2d9
 +    <queries>
 +        <package android:name="com.whatsapp" />
 +        <package android:name="com.whatsapp.w4b" />
++        <package android:name="com.gbwhatsapp" />
++        <package android:name="com.yowhatsapp" />
++        <package android:name="com.aerowhatsapp" />
++        <package android:name="com.fmwhatsapp" />
 +        <package android:name="com.instagram.android" />
 +        <intent>
 +            <action android:name="android.intent.action.VIEW" />
@@ -14306,10 +14310,10 @@ index 0db8bdcaeade6711307aa4bd8e4bfa3378be752b..1ab464199e48f156f7efcfdd48e7f316
  */
 \ No newline at end of file
 diff --git a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6799d28de 100644
+index c65f9874d8da2376533e5bd2e9cca738bebb3808..89e54fd0bd83befab7ad2facdbef570fcb4c0490 100644
 --- a/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
 +++ b/android/app/src/main/kotlin/chat/fluffy/fluffychat/MainActivity.kt
-@@ -1,31 +1,490 @@
+@@ -1,31 +1,558 @@
 -package chat.fluffy.fluffychat
 -
 -import io.flutter.embedding.android.FlutterFragmentActivity
@@ -14348,6 +14352,7 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6
 +import io.flutter.plugin.common.MethodChannel
 +
 +import android.app.Activity
++import android.content.ComponentName
 +import android.content.Context
 +import android.content.Intent
 +import android.net.Uri
@@ -14394,12 +14399,43 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6
 +                when (call.method) {
 +                    "launchApp" -> {
 +                        val packageName = call.argument<String>("packageName")
-+                        if (packageName.isNullOrEmpty()) {
-+                            result.error("INVALID_ARGS", "Package name required", null)
-+                            return@setMethodCallHandler
-+                        }
++                        val candidates = listOfNotNull(
++                            packageName?.takeIf { it.isNotBlank() },
++                            "com.whatsapp",
++                            "com.whatsapp.w4b",
++                            "com.gbwhatsapp",
++                            "com.yowhatsapp",
++                            "com.aerowhatsapp",
++                            "com.fmwhatsapp"
++                        ).distinct()
 +                        try {
-+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
++                            val pm = context.packageManager
++                            var launchIntent: Intent? = null
++                            for (pkg in candidates) {
++                                try {
++                                    launchIntent = pm.getLaunchIntentForPackage(pkg)
++                                    if (launchIntent != null) break
++                                } catch (_: Exception) {}
++                            }
++                            if (launchIntent == null) {
++                                for (pkg in candidates) {
++                                    try {
++                                        val queryIntent = Intent(Intent.ACTION_MAIN).apply {
++                                            addCategory(Intent.CATEGORY_LAUNCHER)
++                                            setPackage(pkg)
++                                        }
++                                        val resolveInfos = pm.queryIntentActivities(queryIntent, 0)
++                                        if (resolveInfos.isNotEmpty()) {
++                                            val resolved = resolveInfos[0]
++                                            launchIntent = Intent(Intent.ACTION_MAIN).apply {
++                                                addCategory(Intent.CATEGORY_LAUNCHER)
++                                                component = ComponentName(resolved.activityInfo.packageName, resolved.activityInfo.name)
++                                            }
++                                            break
++                                        }
++                                    } catch (_: Exception) {}
++                                }
++                            }
 +                            if (launchIntent != null) {
 +                                launchIntent.addFlags(
 +                                    Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -14490,6 +14526,15 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6
 +                        val packageName = call.argument<String>("packageName") ?: "com.whatsapp"
 +                        val phone = call.argument<String>("phone")
 +                        val onlyLaunchApp = call.argument<Boolean>("onlyLaunchApp") ?: false
++                        val candidates = listOfNotNull(
++                            packageName.takeIf { it.isNotBlank() },
++                            "com.whatsapp",
++                            "com.whatsapp.w4b",
++                            "com.gbwhatsapp",
++                            "com.yowhatsapp",
++                            "com.aerowhatsapp",
++                            "com.fmwhatsapp"
++                        ).distinct()
 +                        try {
 +                            try {
 +                                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -14517,45 +14562,72 @@ index c65f9874d8da2376533e5bd2e9cca738bebb3808..65c166e2ae3482e3d8f580101187c2d6
 +                                )
 +                                for (uri in uris) {
 +                                    if (launched) break
-+                                    if (packageName.isNotEmpty()) {
++                                    for (pkg in candidates) {
 +                                        try {
 +                                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
 +                                                addFlags(activityFlags)
-+                                                setPackage(packageName)
++                                                setPackage(pkg)
 +                                            }
 +                                            context.startActivity(intent)
 +                                            launched = true
 +                                            break
 +                                        } catch (_: Exception) {}
 +                                    }
++                                }
++                            }
++                            if (!launched) {
++                                val pm = context.packageManager
++                                var launchIntent: Intent? = null
++                                for (pkg in candidates) {
 +                                    try {
-+                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-+                                            addFlags(activityFlags)
-+                                        }
-+                                        context.startActivity(intent)
-+                                        launched = true
-+                                        break
++                                        launchIntent = pm.getLaunchIntentForPackage(pkg)
++                                        if (launchIntent != null) break
 +                                    } catch (_: Exception) {}
 +                                }
-+                            }
-+                            if (!launched) {
-+                                if (packageName.isNotEmpty()) {
-+                                    val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-+                                    if (launchIntent != null) {
-+                                        launchIntent.addFlags(activityFlags)
-+                                        context.startActivity(launchIntent)
-+                                        launched = true
++                                if (launchIntent == null) {
++                                    for (pkg in candidates) {
++                                        try {
++                                            val queryIntent = Intent(Intent.ACTION_MAIN).apply {
++                                                addCategory(Intent.CATEGORY_LAUNCHER)
++                                                setPackage(pkg)
++                                            }
++                                            val resolveInfos = pm.queryIntentActivities(queryIntent, 0)
++                                            if (resolveInfos.isNotEmpty()) {
++                                                val resolved = resolveInfos[0]
++                                                launchIntent = Intent(Intent.ACTION_MAIN).apply {
++                                                    addCategory(Intent.CATEGORY_LAUNCHER)
++                                                    component = ComponentName(resolved.activityInfo.packageName, resolved.activityInfo.name)
++                                                }
++                                                break
++                                            }
++                                        } catch (_: Exception) {}
 +                                    }
 +                                }
-+                            }
-+                            if (!launched) {
-+                                try {
-+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://")).apply {
-+                                        addFlags(activityFlags)
-+                                    }
-+                                    context.startActivity(intent)
++                                if (launchIntent == null) {
++                                    try {
++                                        val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://"))
++                                        val resolveInfos = pm.queryIntentActivities(waIntent, 0)
++                                        val target = resolveInfos.firstOrNull {
++                                            val p = it.activityInfo.packageName.lowercase()
++                                            p.contains("whatsapp")
++                                        } ?: resolveInfos.firstOrNull {
++                                            val p = it.activityInfo.packageName.lowercase()
++                                            !p.contains("android") && !p.contains("browser") && !p.contains("chrome") && !p.contains("linksheet") && !p.contains("chooser") && !p.contains("resolver")
++                                        }
++                                        if (target != null) {
++                                            val targetPkg = target.activityInfo.packageName
++                                            launchIntent = pm.getLaunchIntentForPackage(targetPkg) ?: Intent(Intent.ACTION_MAIN).apply {
++                                                addCategory(Intent.CATEGORY_LAUNCHER)
++                                                component = ComponentName(targetPkg, target.activityInfo.name)
++                                            }
++                                        }
++                                    } catch (_: Exception) {}
++                                }
++                                if (launchIntent != null) {
++                                    launchIntent.addFlags(activityFlags)
++                                    context.startActivity(launchIntent)
 +                                    launched = true
-+                                } catch (_: Exception) {}
++                                }
 +                            }
 +                            result.success(launched)
 +                        } catch (e: Exception) {
@@ -356436,10 +356508,10 @@ index 58d44e4901bdd6d13771509f2a4406e0a2e22a45..b5c22b00212b9e817d33c188e4ac53b4
 +}
 diff --git a/lib/utils/beeper_app_launcher.dart b/lib/utils/beeper_app_launcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586011c2dcb
+index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91c5e37223
 --- /dev/null
 +++ b/lib/utils/beeper_app_launcher.dart
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,271 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -356589,11 +356661,16 @@ index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586
 +  }) async {
 +    final targetPhone = phone ?? (room != null ? extractWhatsAppPhone(room) : null);
 +    final packageName = AppSettings.whatsappPackageName.value.trim();
++    final targetPackage = packageName.isNotEmpty ? packageName : 'com.whatsapp';
++
++    if (targetPhone == null || targetPhone.isEmpty) {
++      return await launchWhatsAppApp();
++    }
 +
 +    if (Platform.isAndroid) {
 +      try {
 +        final res = await _channel.invokeMethod<bool>('openWhatsApp', {
-+          'packageName': packageName.isNotEmpty ? packageName : 'com.whatsapp',
++          'packageName': targetPackage,
 +          'phone': targetPhone,
 +        });
 +        if (res == true) return true;
@@ -356601,8 +356678,8 @@ index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586
 +    }
 +
 +    // Fallback using url_launcher
-+    if (targetPhone != null && targetPhone.isNotEmpty) {
-+      final clean = targetPhone.replaceAll(RegExp(r'\D'), '');
++    final clean = targetPhone.replaceAll(RegExp(r'\D'), '');
++    if (clean.isNotEmpty) {
 +      try {
 +        final uri = Uri.parse('whatsapp://send?phone=$clean');
 +        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
@@ -356613,11 +356690,7 @@ index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586
 +      } catch (_) {}
 +    }
 +
-+    try {
-+      return await launchUrl(Uri.parse('whatsapp://'), mode: LaunchMode.externalApplication);
-+    } catch (_) {
-+      return await launchUrl(Uri.parse('https://whatsapp.com'), mode: LaunchMode.externalApplication);
-+    }
++    return await launchWhatsAppApp();
 +  }
 +
 +  /// Directly launches WhatsApp application process without any URI or redirecting to chat
@@ -356642,20 +356715,21 @@ index 0000000000000000000000000000000000000000..4271c72a17bb194d46f2f3650253c586
 +        });
 +        if (res == true) return true;
 +      } catch (_) {}
++
++      // Try other common WhatsApp package candidates via native channel
++      for (final candidate in ['com.whatsapp', 'com.whatsapp.w4b', 'com.gbwhatsapp', 'com.yowhatsapp']) {
++        if (candidate == targetPackage) continue;
++        try {
++          final res = await _channel.invokeMethod<bool>('launchApp', {
++            'packageName': candidate,
++          });
++          if (res == true) return true;
++        } catch (_) {}
++      }
 +    }
 +
-+    // Fallback using url_launcher
-+    try {
-+      final uri = Uri.parse('whatsapp://');
-+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return true;
-+    } catch (_) {}
-+
-+    try {
-+      final webUri = Uri.parse('https://whatsapp.com');
-+      return await launchUrl(webUri, mode: LaunchMode.externalApplication);
-+    } catch (_) {
-+      return false;
-+    }
++    // Never fall back to generic whatsapp:// or https:// which triggers Android interceptors/choosers
++    return false;
 +  }
 +
 +  /// Dial phone number via native Android dialer
@@ -365799,7 +365873,7 @@ index f331edc163aa2160cb0808d7ea4a7f05b3e4d044..267e2525ea556fdfbb2424a92ed98160
 +  }
 +}
 diff --git a/lib/utils/push_helper.dart b/lib/utils/push_helper.dart
-index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..d7ef92a95240e6cdceefadc05569f6f73bde59bc 100644
+index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..e50d3137af6f578f32821b42535730b53f5e1a85 100644
 --- a/lib/utils/push_helper.dart
 +++ b/lib/utils/push_helper.dart
 @@ -1,500 +1,672 @@
@@ -366713,7 +366787,7 @@ index 5383e26b1cdf64efd23b90fa0df929921cf3f81a..d7ef92a95240e6cdceefadc05569f6f7
 +      roomsChannel.name,
 +      number: notification.counts?.unread,
 +      category: isWhatsAppCall ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
-+      fullScreenIntent: isWhatsAppCall,
++      fullScreenIntent: isWhatsAppCall && !AppSettings.autoOpenWhatsAppOnCall.value,
 +      vibrationPattern: isWhatsAppCall ? Int64List.fromList([0, 1000, 1000, 1000, 1000, 1000, 1000, 1000]) : null,
 +      shortcutId: event.room.id,
 +      styleInformation:
