@@ -303399,7 +303399,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caaf47e7ce7 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160c0015b4c 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303410,13 +303410,14 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
  import 'package:collection/collection.dart';
  import 'package:desktop_drop/desktop_drop.dart';
-@@ -21,9 +22,14 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+@@ -21,9 +22,15 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
  import 'package:fluffychat/pages/chat/utils/web_file_to_x_file.dart';
  import 'package:fluffychat/pages/chat_details/chat_details.dart';
  import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 +import 'package:fluffychat/utils/beeper_bridge_utils.dart';
 +import 'package:fluffychat/utils/beeper_merge_utils.dart';
  import 'package:fluffychat/utils/error_reporter.dart';
++import 'package:fluffychat/utils/crash_logger.dart';
 +import 'package:fluffychat/utils/file_logger.dart';
  import 'package:fluffychat/utils/file_selector.dart';
 +import 'package:fluffychat/utils/client_download_content_extension.dart';
@@ -303425,7 +303426,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
  import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
  import 'package:fluffychat/utils/other_party_can_receive.dart';
-@@ -39,6 +45,8 @@ import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
+@@ -39,6 +46,8 @@ import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
  import 'package:flutter/foundation.dart';
  import 'package:flutter/material.dart';
  import 'package:flutter/services.dart';
@@ -303434,7 +303435,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  import 'package:go_router/go_router.dart';
  import 'package:image_picker/image_picker.dart';
  import 'package:matrix/matrix.dart';
-@@ -49,6 +57,8 @@ import 'package:universal_html/universal_html.dart' as web;
+@@ -49,6 +58,8 @@ import 'package:universal_html/universal_html.dart' as web;
  
  import '../../utils/account_bundles.dart';
  import '../../utils/localized_exception_extension.dart';
@@ -303443,7 +303444,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  import 'send_file_dialog.dart';
  import 'send_location_dialog.dart';
  
-@@ -56,20 +66,17 @@ class ChatPage extends StatelessWidget {
+@@ -56,20 +67,17 @@ class ChatPage extends StatelessWidget {
    final String roomId;
    final List<ShareItem>? shareItems;
    final String? eventId;
@@ -303465,7 +303466,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      if (room == null) {
        return Scaffold(
          appBar: AppBar(title: Text(L10n.of(context).oopsSomethingWentWrong)),
-@@ -87,23 +94,74 @@ class ChatPage extends StatelessWidget {
+@@ -87,23 +95,74 @@ class ChatPage extends StatelessWidget {
        room: room,
        shareItems: shareItems,
        eventId: eventId,
@@ -303543,7 +303544,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    });
  
    @override
-@@ -120,9 +178,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -120,9 +179,13 @@ class ChatController extends State<ChatPageWithRoom>
  
    String? activeThreadId;
  
@@ -303559,7 +303560,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    String get roomId => widget.room.id;
  
-@@ -133,16 +195,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -133,16 +196,21 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? typingCoolDown;
    Timer? typingTimeout;
    bool currentlyTyping = false;
@@ -303585,7 +303586,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      if (details.files.isEmpty) return;
  
      await showAdaptiveDialog(
-@@ -170,15 +237,25 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -170,15 +238,25 @@ class ChatController extends State<ChatPageWithRoom>
    void saveSelectedEvent(BuildContext context) =>
        selectedEvents.single.saveFile(context);
  
@@ -303615,7 +303616,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    bool get showScrollDownButton =>
        _scrolledUp || timeline?.allowNewEvent == false;
-@@ -189,7 +266,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -189,7 +267,9 @@ class ChatController extends State<ChatPageWithRoom>
  
    String pendingText = '';
  
@@ -303626,7 +303627,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    String? get threadLastEventId {
      final threadId = activeThreadId;
-@@ -200,15 +279,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -200,15 +280,21 @@ class ChatController extends State<ChatPageWithRoom>
          ?.eventId;
    }
  
@@ -303656,7 +303657,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    Future<void> recreateChat() async {
      final room = this.room;
-@@ -234,9 +319,29 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -234,9 +320,29 @@ class ChatController extends State<ChatPageWithRoom>
      context.go('/rooms');
    }
  
@@ -303686,7 +303687,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    Future<void> requestFuture() async {
-@@ -271,16 +376,22 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -271,16 +377,22 @@ class ChatController extends State<ChatPageWithRoom>
      if (!scrollController.hasClients) return;
      if (timeline?.allowNewEvent == false ||
          scrollController.position.pixels > 0 && _scrolledUp == false) {
@@ -303712,7 +303713,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      if (draft != null && draft.isNotEmpty) {
        sendController.text = draft;
      }
-@@ -401,13 +512,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -401,13 +513,7 @@ class ChatController extends State<ChatPageWithRoom>
        AppSettings.displayChatDetailsColumn.value,
      );
  
@@ -303727,7 +303728,16 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
      sendingClient = Matrix.of(context).client;
      final lastEventThreadId =
-@@ -428,17 +533,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -419,6 +525,8 @@ class ChatController extends State<ChatPageWithRoom>
+         : '';
+     WidgetsBinding.instance.addObserver(this);
+     _tryLoadTimeline();
++    final net = BeeperBridgeUtils.getRoomNetwork(room);
++    CrashLogger.addBreadcrumb('CHAT', 'Opened chat: "${room.getLocalizedDisplayname(MatrixLocals(context))}" [ID: ${room.id}, Network: ${net?.name ?? "Matrix"}]');
+   }
+ 
+   final Set<String> expandedEventIds = {};
+@@ -428,17 +536,17 @@ class ChatController extends State<ChatPageWithRoom>
        threadId: activeThreadId,
      );
      final start = events.indexOf(event);
@@ -303755,7 +303765,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,6 +551,16 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,6 +554,16 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
@@ -303772,7 +303782,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
        // We launched the chat with a given initial event ID:
        if (initialEventId != null) {
          scrollToEventId(initialEventId);
-@@ -454,30 +569,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -454,30 +572,17 @@ class ChatController extends State<ChatPageWithRoom>
  
        var readMarkerEventIndex = readMarkerEventId.isEmpty
            ? -1
@@ -303807,7 +303817,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
          _showScrollUpMaterialBanner(readMarkerEventId);
        }
  
-@@ -486,20 +588,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -486,20 +591,26 @@ class ChatController extends State<ChatPageWithRoom>
  
        if (!mounted) return;
      } catch (e, s) {
@@ -303839,7 +303849,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    String? animateInEventId;
  
-@@ -512,10 +620,122 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -512,10 +623,122 @@ class ChatController extends State<ChatPageWithRoom>
      if (animateInEventId == eventId) animateInEventId = null;
    }
  
@@ -303964,7 +303974,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +744,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +747,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -303972,7 +303982,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +752,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +755,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -303991,7 +304001,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +779,204 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +782,205 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -304246,10 +304256,11 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
 +    WidgetsBinding.instance.removeObserver(this);
 +    // Release in-memory cached image bytes for this room to avoid unbounded RAM accumulation
 +    MxcImage.clearCache(roomId);
++    CrashLogger.addBreadcrumb('CHAT', 'Closed/Disposed chat [ID: $roomId]');
      super.dispose();
    }
  
-@@ -679,6 +1015,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1019,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304260,7 +304271,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,11 +1036,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,11 +1040,12 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304278,7 +304289,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
      // ignore: unawaited_futures
      room.sendTextEvent(
-@@ -710,20 +1051,70 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,20 +1055,70 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304355,7 +304366,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    Future<void> sendFileAction({FileType type = FileType.any}) async {
      final files = await selectFiles(context, allowMultiple: true, type: type);
      if (files.isEmpty) return;
-@@ -883,60 +1274,204 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1278,204 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304601,7 +304612,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1480,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1484,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304616,7 +304627,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      }
    }
  
-@@ -964,21 +1499,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1503,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304649,7 +304660,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1543,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1547,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304662,7 +304673,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1560,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1564,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304671,7 +304682,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1617,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1621,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304684,7 +304695,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1671,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1675,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -304738,7 +304749,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1727,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1731,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304756,7 +304767,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1829,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1833,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304770,7 +304781,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1861,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1865,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304779,7 +304790,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1927,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1931,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304794,7 +304805,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1964,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1968,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304804,7 +304815,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +2033,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2037,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304867,7 +304878,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2082,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2086,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304878,7 +304889,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
            return;
          }
        }
-@@ -1515,7 +2097,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2101,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304893,7 +304904,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2115,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2119,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304902,7 +304913,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2169,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2173,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304919,7 +304930,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..b1fbe90f23c36464cedc63e4befd8caa
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2256,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2260,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -314858,10 +314869,10 @@ index b4a412669b8c93a72773352f931e045f1354b797..5c11edc0b7a95bd3eed30867d824c307
 +  }
 +}
 diff --git a/lib/pages/chat/recording_view_model.dart b/lib/pages/chat/recording_view_model.dart
-index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8f89b7eae 100644
+index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..d28f357e9ce81e8fdd541de0182f544bd81c547a 100644
 --- a/lib/pages/chat/recording_view_model.dart
 +++ b/lib/pages/chat/recording_view_model.dart
-@@ -1,222 +1,358 @@
+@@ -1,222 +1,363 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -315095,6 +315106,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8
 +import 'package:device_info_plus/device_info_plus.dart';
 +import 'package:fluffychat/config/setting_keys.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
++import 'package:fluffychat/utils/crash_logger.dart';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 +import 'package:flutter/cupertino.dart';
@@ -315198,6 +315210,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8
 +        return;
 +      }
 +      await WakelockPlus.enable();
++      CrashLogger.addBreadcrumb('AUDIO', 'Voice recording started for room ${room.id} (codec: ${codec.name})');
 +
 +      await audioRecorder.start(
 +        RecordConfig(
@@ -315338,6 +315351,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8
 +    try {
 +      _recorderSubscription?.cancel();
 +      final path = await _audioRecorder?.stop();
++      CrashLogger.addBreadcrumb('AUDIO', 'Voice recording stopped, processing audio');
 +
 +      if (path == null) throw ('Recording failed!');
 +
@@ -315362,6 +315376,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8
 +          final normalizedOggPath =
 +              path_lib.join(tempDir.path, normalizedOggFileName);
 +
++          CrashLogger.addBreadcrumb('AUDIO', 'Normalizing audio via FFmpegKit stream copy');
 +          // Try stream copy first to re-package into a clean OGG container without re-encoding
 +          var session = await FFmpegKit.execute(
 +            '-y -i "$path" -c:a copy "$normalizedOggPath"',
@@ -315408,6 +315423,7 @@ index 7d9d886d48d32cb4df4d862b9f560b9b3f824af7..135856d7a58e65c561501d8aec24d0d8
 +        waveform,
 +        effectiveFileName,
 +      );
++      CrashLogger.addBreadcrumb('AUDIO', 'Voice message sent successfully');
 +    } finally {
 +      // cancel() calls setState(_reset). Guard mounted to avoid setState on a
 +      // disposed widget after the long FFmpegKit operation completes.
@@ -360790,11 +360806,12 @@ index 0000000000000000000000000000000000000000..9192e1e3367a521f53fd0e6e35c9a17c
 +}
 diff --git a/lib/utils/crash_logger.dart b/lib/utils/crash_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e0f9d4a9d
+index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df059209f8
 --- /dev/null
 +++ b/lib/utils/crash_logger.dart
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,297 @@
 +import 'dart:async';
++import 'dart:collection';
 +import 'dart:io';
 +import 'dart:isolate';
 +import 'dart:ui';
@@ -360803,7 +360820,8 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +import 'package:path_provider/path_provider.dart';
 +import 'package:shared_preferences/shared_preferences.dart';
 +
-+/// Logger especializado exclusivamente en capturar crasheos no controlados y freezes/tildes (ANRs) de la UI.
++/// Logger especializado exclusivamente en capturar crasheos no controlados, freezes/tildes (ANRs) de la UI
++/// y migas de pan (Breadcrumbs) de contexto en tiempo real con filtrado de segundo plano.
 +class CrashLogger {
 +  static const String prefKey = 'beeper_crash_logging_enabled';
 +  static bool _enabled = false;
@@ -360816,6 +360834,26 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +
 +  // Umbral de bloqueo del hilo principal para considerarlo congelamiento severo (freeze)
 +  static const int freezeThresholdMs = 3500;
++
++  // Estado del ciclo de vida de la aplicación para evitar falsos positivos por suspensión de Android (Doze / segundo plano)
++  static bool _isForeground = true;
++  static bool get isForeground => _isForeground;
++  static _CrashLoggerLifecycleObserver? _lifecycleObserver;
++
++  // Buffer circular de migas de pan (Breadcrumbs)
++  static final ListQueue<String> _breadcrumbs = ListQueue<String>();
++  static const int _maxBreadcrumbs = 40;
++
++  /// Obtiene el consumo actual de memoria RAM del proceso en formato legible.
++  static String get currentRamUsage {
++    try {
++      final bytes = ProcessInfo.currentRss;
++      if (bytes > 0) {
++        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
++      }
++    } catch (_) {}
++    return 'N/A';
++  }
 +
 +  static Future<void> checkEnabledAsync() async {
 +    try {
@@ -360835,7 +360873,7 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +      if (val) {
 +        await _initFile();
 +        startWatchdog();
-+        logEvent('CrashLogger activado manualmente por el usuario.');
++        logEvent('CrashLogger activado manualmente por el usuario. RAM inicial: $currentRamUsage');
 +      } else {
 +        stopWatchdog();
 +        logEvent('CrashLogger desactivado por el usuario.');
@@ -360854,8 +360892,29 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +    }
 +  }
 +
++  static void onLifecycleChanged(AppLifecycleState state) {
++    final wasForeground = _isForeground;
++    _isForeground = (state == AppLifecycleState.resumed);
++
++    if (_isForeground) {
++      _lastHeartbeat = DateTime.now();
++      addBreadcrumb('LIFECYCLE', 'App reanudada en primer plano (resumed)');
++    } else if (wasForeground) {
++      addBreadcrumb('LIFECYCLE', 'App en segundo plano o suspendida (${state.name})');
++    }
++  }
++
 +  static void init() {
 +    if (!_enabled) return;
++
++    if (_lifecycleObserver == null) {
++      _lifecycleObserver = _CrashLoggerLifecycleObserver();
++      WidgetsBinding.instance.addObserver(_lifecycleObserver!);
++    }
++    _isForeground = WidgetsBinding.instance.lifecycleState == null ||
++        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
++
++    _checkPreviousSession();
 +
 +    // 1. Flutter framework error handler
 +    final originalOnError = FlutterError.onError;
@@ -360885,7 +360944,7 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +
 +    // 4. Detección de frames bloqueados (> 150ms)
 +    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
-+      if (!_enabled) return;
++      if (!_enabled || !_isForeground) return;
 +      for (final timing in timings) {
 +        final totalDuration = timing.totalSpan.inMilliseconds;
 +        final buildDuration = timing.buildDuration.inMilliseconds;
@@ -360902,7 +360961,34 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +    startWatchdog();
 +  }
 +
-+  /// Watchdog para detectar ANRs o freezes donde el event loop se queda colgado
++  static void _checkPreviousSession() {
++    if (_logFile == null) return;
++    try {
++      if (_logFile!.existsSync() && _logFile!.lengthSync() > 0) {
++        _write('[SESSION_START] [' + DateTime.now().toIso8601String() + '] CrashLogger iniciado en nueva sesión. (Si la sesión previa cerró abruptamente, revisa el último BREADCRUMB previo) | RAM: ' + currentRamUsage + '\n');
++      } else {
++        _write('[SESSION_START] [' + DateTime.now().toIso8601String() + '] CrashLogger iniciado | RAM: ' + currentRamUsage + '\n');
++      }
++    } catch (_) {}
++  }
++
++  /// Añade una miga de pan contextual al buffer y la persiste inmediatamente en disco.
++  static void addBreadcrumb(String category, String message) {
++    final now = DateTime.now().toIso8601String();
++    final ram = currentRamUsage;
++    final breadcrumb = '[$now] [$category] $message | RAM: $ram';
++
++    if (_breadcrumbs.length >= _maxBreadcrumbs) {
++      _breadcrumbs.removeFirst();
++    }
++    _breadcrumbs.addLast(breadcrumb);
++
++    if (_enabled) {
++      _write('[BREADCRUMB] $breadcrumb\n');
++    }
++  }
++
++  /// Watchdog para detectar ANRs o freezes donde el event loop se queda colgado en primer plano
 +  static void startWatchdog() {
 +    if (_watchdogActive) return;
 +    _watchdogActive = true;
@@ -360910,7 +360996,21 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +
 +    _watchdogTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
 +      final now = DateTime.now();
++
++      // Si la app no está en primer plano, ignorar (Android suspende o duerme los hilos en Doze/fondo)
++      if (!_isForeground) {
++        _lastHeartbeat = now;
++        return;
++      }
++
 +      final diff = now.difference(_lastHeartbeat).inMilliseconds;
++
++      // Descartar saltos extremos (> 90s) causados por despertar tardío de suspensión
++      if (diff > 90000) {
++        _lastHeartbeat = now;
++        return;
++      }
++
 +      if (diff > freezeThresholdMs) {
 +        logFreeze(
 +          'MAIN_THREAD_FROZEN',
@@ -360932,7 +361032,15 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +  }
 +
 +  static void logFreeze(String type, String details) {
-+    _write('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + '\n');
++    final buffer = StringBuffer();
++    buffer.writeln('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + ' | RAM: ' + currentRamUsage);
++    if (_breadcrumbs.isNotEmpty) {
++      buffer.writeln('  ↳ Contexto previo (Breadcrumbs):');
++      for (final b in _breadcrumbs) {
++        buffer.writeln('     * $b');
++      }
++    }
++    _write(buffer.toString());
 +  }
 +
 +  static void logCrash(String type, String error, StackTrace? stack) {
@@ -360941,6 +361049,13 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +    buffer.writeln('Timestamp: ' + DateTime.now().toIso8601String());
 +    buffer.writeln('Type: ' + type);
 +    buffer.writeln('Error: ' + error);
++    buffer.writeln('RAM: ' + currentRamUsage);
++    if (_breadcrumbs.isNotEmpty) {
++      buffer.writeln('Contexto previo (Breadcrumbs):');
++      for (final b in _breadcrumbs) {
++        buffer.writeln('  * $b');
++      }
++    }
 +    if (stack != null) {
 +      buffer.writeln('StackTrace:\n' + stack.toString());
 +    }
@@ -360976,12 +361091,20 @@ index 0000000000000000000000000000000000000000..0c561cec40b3727ab0473383d0f4600e
 +  }
 +
 +  static Future<void> clearLog() async {
++    _breadcrumbs.clear();
 +    try {
 +      await _initFile();
 +      if (_logFile != null && await _logFile!.exists()) {
 +        await _logFile!.delete();
 +      }
 +    } catch (_) {}
++  }
++}
++
++class _CrashLoggerLifecycleObserver with WidgetsBindingObserver {
++  @override
++  void didChangeAppLifecycleState(AppLifecycleState state) {
++    CrashLogger.onLifecycleChanged(state);
 +  }
 +}
 diff --git a/lib/utils/custom_http_client.dart b/lib/utils/custom_http_client.dart
@@ -365412,10 +365535,10 @@ index 2efc33fbf09bcd5677262520fbb55bfb33e8e523..f2d3514975fa0d8c8ef74e04b2dc5dfc
 +class OtherPartyCanNotReceiveMessages implements Exception {}
 diff --git a/lib/utils/performance_logger.dart b/lib/utils/performance_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874ae884fec2
+index 0000000000000000000000000000000000000000..1fe25d6d467139c8009086fe24e2e6b7b0c4bf0f
 --- /dev/null
 +++ b/lib/utils/performance_logger.dart
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,240 @@
 +// SPDX-FileCopyrightText: 2026 FluffyBeep Contributors
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -365426,6 +365549,7 @@ index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874a
 +import 'package:flutter/gestures.dart';
 +import 'package:flutter/services.dart';
 +import 'package:flutter/widgets.dart';
++import 'crash_logger.dart';
 +import 'file_logger.dart';
 +
 +class PerformanceLogger {
@@ -365602,6 +365726,7 @@ index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874a
 +
 +  static void logAction(String action) {
 +    FileLogger.log('[USER_ACTION] $action');
++    CrashLogger.addBreadcrumb('ACTION', action);
 +  }
 +}
 +
@@ -365631,6 +365756,7 @@ index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874a
 +    currentRoute = _getRouteName(route);
 +    currentRouteNotifier.value = currentRoute;
 +    PerformanceLogger.logAction('Screen Pushed: $currentRoute');
++    CrashLogger.addBreadcrumb('NAV', 'Screen Pushed: $currentRoute');
 +  }
 +
 +  @override
@@ -365639,6 +365765,7 @@ index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874a
 +    currentRoute = previousRoute != null ? _getRouteName(previousRoute) : 'unknown';
 +    currentRouteNotifier.value = currentRoute;
 +    PerformanceLogger.logAction('Screen Popped: ${_getRouteName(route)} -> Active: $currentRoute');
++    CrashLogger.addBreadcrumb('NAV', 'Screen Popped to: $currentRoute');
 +  }
 +
 +  @override
@@ -365648,6 +365775,7 @@ index 0000000000000000000000000000000000000000..fb3b2e06ba8e1edfe83ac60eb1b6874a
 +      currentRoute = _getRouteName(newRoute);
 +      currentRouteNotifier.value = currentRoute;
 +      PerformanceLogger.logAction('Screen Replaced: $currentRoute');
++      CrashLogger.addBreadcrumb('NAV', 'Screen Replaced: $currentRoute');
 +    }
 +  }
 +}
@@ -368756,10 +368884,10 @@ index 13c71ba64d6b4abd511b2cd60650327083a8ac94..84f054c3917483d53fea5f6ac6a8dca8
 +}
 diff --git a/lib/utils/transcription_service.dart b/lib/utils/transcription_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..d0de6aa356a69882174f1008e7a59c17324a0405
+index 0000000000000000000000000000000000000000..ae200f384821201558a177a5665fbc7fa43a0ae5
 --- /dev/null
 +++ b/lib/utils/transcription_service.dart
-@@ -0,0 +1,437 @@
+@@ -0,0 +1,441 @@
 +// SPDX-FileCopyrightText: 2026-Present FluffyBeep Contributors
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -368776,6 +368904,7 @@ index 0000000000000000000000000000000000000000..d0de6aa356a69882174f1008e7a59c17
 +import 'package:shared_preferences/shared_preferences.dart';
 +import 'package:whisper_ggml/whisper_ggml.dart';
 +import 'package:fluffychat/config/setting_keys.dart';
++import 'package:fluffychat/utils/crash_logger.dart';
 +
 +class TranscriptionService {
 +  static final TranscriptionService _instance =
@@ -369129,6 +369258,7 @@ index 0000000000000000000000000000000000000000..d0de6aa356a69882174f1008e7a59c17
 +      'Iniciando transcripción. Modelo: $modelName, Lang: $lang, '
 +      'Audio: $wavPath',
 +    );
++    CrashLogger.addBreadcrumb('WHISPER', 'Iniciando transcripción Whisper (evento: ${event.eventId}, modelo: $modelName, lang: $lang)');
 +    
 +    dynamic result;
 +    try {
@@ -369148,8 +369278,10 @@ index 0000000000000000000000000000000000000000..d0de6aa356a69882174f1008e7a59c17
 +      );
 +      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
 +      Logs().d('Transcripción completada en ${elapsed}ms. Result: ${result != null}');
++      CrashLogger.addBreadcrumb('WHISPER', 'Transcripción completada en ${elapsed}ms');
 +    } catch (e, s) {
 +      Logs().e('Error al ejecutar Whisper', e, s);
++      CrashLogger.addBreadcrumb('WHISPER', 'Error en Whisper: $e');
 +      throw 'Error en motor Whisper: $e';
 +    }
 +
