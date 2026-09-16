@@ -303399,7 +303399,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160c0015b4c 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..69f64e8bbd60c0ba681bf9d7d3c5afc106c00798 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -303560,7 +303560,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    String get roomId => widget.room.id;
  
-@@ -133,16 +196,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -133,28 +196,43 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? typingCoolDown;
    Timer? typingTimeout;
    bool currentlyTyping = false;
@@ -303575,18 +303575,45 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    final GlobalKey inputBarKey = GlobalKey();
  
 -  void onDragEntered(_) => setState(() => dragging = true);
+-
+-  void onDragExited(_) => setState(() => dragging = false);
+-
+-  Future<void> onDragDone(DropDoneDetails details) async {
+-    setState(() => dragging = false);
+-    if (details.files.isEmpty) return;
 +  void onDragEntered(_) => dragging = true;
  
--  void onDragExited(_) => setState(() => dragging = false);
-+  void onDragExited(_) => dragging = false;
- 
-   Future<void> onDragDone(DropDoneDetails details) async {
--    setState(() => dragging = false);
-+    dragging = false;
-     if (details.files.isEmpty) return;
- 
++  Future<void> _showSendFileDialog(List<XFile> files) async {
      await showAdaptiveDialog(
-@@ -170,15 +238,25 @@ class ChatController extends State<ChatPageWithRoom>
+       context: context,
+       builder: (c) => SendFileDialog(
+-        files: details.files,
++        files: files,
+         room: room,
+         outerContext: context,
+         threadRootEventId: activeThreadId,
+         threadLastEventId: threadLastEventId,
+       ),
+     );
++    if (mounted) {
++      readMarkerEventId = '';
++      scrollUpBannerEventId = null;
++      setReadMarker(force: true);
++      timelineUpdateNotifier.value++;
++    }
++  }
++
++  void onDragExited(_) => dragging = false;
++
++  Future<void> onDragDone(DropDoneDetails details) async {
++    dragging = false;
++    if (details.files.isEmpty) return;
++
++    await _showSendFileDialog(details.files);
+   }
+ 
+   bool get canSaveSelectedEvent =>
+@@ -170,15 +248,25 @@ class ChatController extends State<ChatPageWithRoom>
    void saveSelectedEvent(BuildContext context) =>
        selectedEvents.single.saveFile(context);
  
@@ -303601,22 +303628,22 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 +  final ValueNotifier<Event?> replyEventNotifier = ValueNotifier(null);
 +  Event? get replyEvent => replyEventNotifier.value;
 +  set replyEvent(Event? val) => replyEventNotifier.value = val;
- 
--  Event? editEvent;
++
 +  final ValueNotifier<Event?> editEventNotifier = ValueNotifier(null);
 +  Event? get editEvent => editEventNotifier.value;
 +  set editEvent(Event? val) => editEventNotifier.value = val;
  
--  bool _scrolledUp = false;
+-  Event? editEvent;
 +  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
-+
+ 
+-  bool _scrolledUp = false;
 +  final ValueNotifier<bool> scrolledUpNotifier = ValueNotifier<bool>(false);
 +  bool get _scrolledUp => scrolledUpNotifier.value;
 +  set _scrolledUp(bool value) => scrolledUpNotifier.value = value;
  
    bool get showScrollDownButton =>
        _scrolledUp || timeline?.allowNewEvent == false;
-@@ -189,7 +267,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -189,7 +277,9 @@ class ChatController extends State<ChatPageWithRoom>
  
    String pendingText = '';
  
@@ -303627,7 +303654,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    String? get threadLastEventId {
      final threadId = activeThreadId;
-@@ -200,15 +280,21 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -200,15 +290,21 @@ class ChatController extends State<ChatPageWithRoom>
          ?.eventId;
    }
  
@@ -303657,7 +303684,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    Future<void> recreateChat() async {
      final room = this.room;
-@@ -234,9 +320,29 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -234,9 +330,29 @@ class ChatController extends State<ChatPageWithRoom>
      context.go('/rooms');
    }
  
@@ -303687,7 +303714,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    Future<void> requestFuture() async {
-@@ -271,16 +377,22 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -271,16 +387,22 @@ class ChatController extends State<ChatPageWithRoom>
      if (!scrollController.hasClients) return;
      if (timeline?.allowNewEvent == false ||
          scrollController.position.pixels > 0 && _scrolledUp == false) {
@@ -303713,7 +303740,37 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      if (draft != null && draft.isNotEmpty) {
        sendController.text = draft;
      }
-@@ -401,13 +513,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -311,21 +433,19 @@ class ChatController extends State<ChatPageWithRoom>
+       if (item is TextShareItem) room.sendTextEvent(item.value);
+       if (item is ContentShareItem) room.sendEvent(item.value.copy());
+     }
++    BeeperBridgeUtils.markRoomAsRead(
++      room,
++      timeline: timeline,
++      publicReceipt: AppSettings.sendPublicReadReceipts.value,
++    );
++    setReadMarker(force: true);
++
+     final files = shareItems
+         .whereType<FileShareItem>()
+         .map((item) => item.value)
+         .toList();
+     if (files.isEmpty) return;
+-    showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: files,
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog(files);
+   }
+ 
+   KeyEventResult _customEnterKeyHandling(FocusNode node, KeyEvent evt) {
+@@ -401,24 +521,25 @@ class ChatController extends State<ChatPageWithRoom>
        AppSettings.displayChatDetailsColumn.value,
      );
  
@@ -303728,16 +303785,26 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
      sendingClient = Matrix.of(context).client;
      final lastEventThreadId =
-@@ -419,6 +525,8 @@ class ChatController extends State<ChatPageWithRoom>
+         room.lastEvent?.relationshipType == RelationshipTypes.thread
+         ? room.lastEvent?.relationshipEventId
+         : null;
+-    readMarkerEventId = room.hasNewMessages
++    final lastReal = BeeperBridgeUtils.findLastRealMessageFast(room);
++    final lastIsMe = (lastReal != null && lastReal.senderId == room.client.userID) ||
++        (room.lastEvent != null && room.lastEvent!.senderId == room.client.userID);
++    final isUnread = BeeperBridgeUtils.isRoomUnread(room);
++
++    readMarkerEventId = (room.hasNewMessages && isUnread && !lastIsMe)
+         ? lastEventThreadId ?? room.fullyRead
          : '';
      WidgetsBinding.instance.addObserver(this);
      _tryLoadTimeline();
 +    final net = BeeperBridgeUtils.getRoomNetwork(room);
-+    CrashLogger.addBreadcrumb('CHAT', 'Opened chat: "${room.getLocalizedDisplayname(MatrixLocals(context))}" [ID: ${room.id}, Network: ${net?.name ?? "Matrix"}]');
++    CrashLogger.addBreadcrumb('CHAT', 'Opened chat: "${room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)))}" [ID: ${room.id}, Network: ${net?.name ?? "Matrix"}]');
    }
  
    final Set<String> expandedEventIds = {};
-@@ -428,17 +536,17 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -428,17 +549,17 @@ class ChatController extends State<ChatPageWithRoom>
        threadId: activeThreadId,
      );
      final start = events.indexOf(event);
@@ -303765,7 +303832,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,6 +554,16 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,38 +567,46 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
@@ -303782,8 +303849,20 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
        // We launched the chat with a given initial event ID:
        if (initialEventId != null) {
          scrollToEventId(initialEventId);
-@@ -454,30 +572,17 @@ class ChatController extends State<ChatPageWithRoom>
+         return;
+       }
  
++      final currentTimeline = timeline;
++      final newestEvent = currentTimeline?.events.firstOrNull ?? room.lastEvent;
++      final lastIsMe = (newestEvent != null && newestEvent.senderId == room.client.userID) ||
++          (BeeperBridgeUtils.findLastRealMessageFast(room)?.senderId == room.client.userID);
++      final isUnread = BeeperBridgeUtils.isRoomUnread(room);
++
++      if (lastIsMe || !isUnread) {
++        readMarkerEventId = '';
++        scrollUpBannerEventId = null;
++      }
++
        var readMarkerEventIndex = readMarkerEventId.isEmpty
            ? -1
 -          : timeline!.events
@@ -303817,7 +303896,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
          _showScrollUpMaterialBanner(readMarkerEventId);
        }
  
-@@ -486,20 +591,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -486,20 +615,26 @@ class ChatController extends State<ChatPageWithRoom>
  
        if (!mounted) return;
      } catch (e, s) {
@@ -303849,7 +303928,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    String? animateInEventId;
  
-@@ -512,10 +623,122 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -512,10 +647,122 @@ class ChatController extends State<ChatPageWithRoom>
      if (animateInEventId == eventId) animateInEventId = null;
    }
  
@@ -303974,7 +304053,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +747,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +771,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -303982,7 +304061,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +755,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +779,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -304001,7 +304080,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +782,205 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +806,211 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -304046,18 +304125,30 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      }
 +    if (eventId?.isValidMatrixIdStrict() == false) return;
 +    if (!force && _setReadMarkerFuture != null) return;
-+    if (!force && _scrolledUp) return;
-+    if (!force && scrollUpBannerEventId != null) return;
  
 -    // We are already setting a read marker
 -    if (_setReadMarkerFuture != null) return;
--
++    final currentTimeline = timeline;
++    final newestEvent = currentTimeline?.events.firstOrNull ?? room.lastEvent;
++    final lastIsMe = (newestEvent != null && newestEvent.senderId == room.client.userID) ||
++        (BeeperBridgeUtils.findLastRealMessageFast(room)?.senderId == room.client.userID);
+ 
 -    // We only set read marker if we are at the bottom
 -    if (_scrolledUp) return;
--
++    if (!force && _scrolledUp && !lastIsMe) return;
++    if (!force && scrollUpBannerEventId != null && !lastIsMe) return;
+ 
 -    // We do not set read marker if we offer user the scroll up banner
 -    if (scrollUpBannerEventId != null) return;
--
++    if (!force &&
++        eventId == null &&
++        !room.hasNewMessages &&
++        room.notificationCount == 0 &&
++        !room.markedUnread &&
++        !BeeperBridgeUtils.isRoomUnread(room)) {
++      return;
++    }
+ 
 -    // We do not set read marker if timeline is empty
 -    final timeline = this.timeline;
 -    if (timeline == null || timeline.events.isEmpty) return;
@@ -304075,26 +304166,17 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 -                    event.eventId.isValidMatrixIdStrict(),
 -        )
 -        ?.eventId;
-+    if (!force &&
-+        eventId == null &&
-+        !room.hasNewMessages &&
-+        room.notificationCount == 0 &&
-+        !room.markedUnread) {
-+      return;
-+    }
- 
--    // There is no event we could place a read marker
--    if (eventId == null) return;
 +    // Do not send read markers when app is not in foreground
 +    if (!force && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
 +      return;
 +    }
  
+-    // There is no event we could place a read marker
+-    if (eventId == null) return;
++    final fullyReadId = eventId ?? currentTimeline?.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
+ 
 -    // This is a sending event, we do not set a readmarker yet
 -    if (eventId.isValidMatrixIdStrict() == false) return;
-+    final currentTimeline = timeline;
-+    final fullyReadId = eventId ?? currentTimeline?.events.firstOrNull?.eventId ?? room.lastEvent?.eventId;
-+
 +    // For mRead (public receipt sent to peer and WhatsApp/Telegram bridges):
 +    // Find the latest incoming real message from the peer so the bridge marks it upstream as read.
 +    Event? incomingEvent;
@@ -304110,7 +304192,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 +        ? eventId
 +        : (incomingEvent?.eventId ?? fullyReadId);
 +
-+    if (force || eventId != null) {
++    if (force || eventId != null || lastIsMe || !BeeperBridgeUtils.isRoomUnread(room)) {
 +      scrollUpBannerEventId = null;
 +      if (room.markedUnread) {
 +        room.markUnread(false);
@@ -304123,7 +304205,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 -    if (room.fullyRead == eventId) return;
 +    // Clear local readMarkerEventId immediately so UI button vanishes
 +    try {
-+      if (force || eventId != null) {
++      if (force || eventId != null || lastIsMe || !BeeperBridgeUtils.isRoomUnread(room)) {
 +        readMarkerEventId = '';
 +      }
 +    } catch (_) {
@@ -304176,7 +304258,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 +          await FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +        }
 +        final unreadCount = room.client.rooms
-+            .where((r) => r.isUnreadOrInvited)
++            .where((r) => BeeperBridgeUtils.isRoomUnread(r) || r.membership == Membership.invite)
 +            .length;
 +        updateAppBadge(unreadCount);
 +        if (force && mounted) {
@@ -304260,7 +304342,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      super.dispose();
    }
  
-@@ -679,6 +1019,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1049,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -304271,7 +304353,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,11 +1040,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,11 +1070,13 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -304280,16 +304362,17 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 -      currentlyTyping = false;
 -      room.setTyping(false);
 -    }
-+    final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
-+        ? replyEvent!.eventId
-+        : timeline?.events.firstWhereOrNull(
-+            (e) => e.senderId != room.client.userID && 
-+                   BeeperBridgeUtils.isRealMessageType(e.type),
-+          )?.eventId;
++    final incomingTargetId = timeline?.events.firstWhereOrNull(
++          (e) => e.senderId != room.client.userID && 
++                 BeeperBridgeUtils.isRealMessageType(e.type),
++        )?.eventId ??
++        (replyEvent != null && replyEvent!.senderId != room.client.userID
++            ? replyEvent!.eventId
++            : null);
  
      // ignore: unawaited_futures
      room.sendTextEvent(
-@@ -710,20 +1055,70 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,48 +1086,81 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -304343,13 +304426,14 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 +
 +    final scheduledAt = await showDialog<DateTime>(
 +      context: context,
-+      builder: (c) => const ScheduledTimePickerDialog(),
++      builder: (ctx) => const ScheduleMessageDialog(),
 +    );
-+    if (scheduledAt == null) return;
++    if (scheduledAt == null || !context.mounted) return;
 +
-+    await ScheduledMessageService().scheduleMessage(
-+      roomId: roomId,
-+      body: sendController.text,
++    final service = ScheduledMessageService();
++    await service.scheduleMessage(
++      roomId: room.id,
++      body: text,
 +      scheduledAt: scheduledAt,
 +      inReplyToId: replyEvent?.eventId,
 +      editEventId: editEvent?.eventId,
@@ -304366,7 +304450,108 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    Future<void> sendFileAction({FileType type = FileType.any}) async {
      final files = await selectFiles(context, allowMultiple: true, type: type);
      if (files.isEmpty) return;
-@@ -883,60 +1278,204 @@ class ChatController extends State<ChatPageWithRoom>
+     if (!mounted) return;
+-    await showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: files,
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog(files);
+   }
+ 
+   Future<void> sendImageFromClipBoard(Uint8List? image) async {
+     if (image == null) return;
+-    await showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: [XFile.fromData(image)],
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog([XFile.fromData(image)]);
+   }
+ 
+   Future<void> openCameraAction() async {
+@@ -760,16 +1169,7 @@ class ChatController extends State<ChatPageWithRoom>
+     if (file == null) return;
+     if (!mounted) return;
+ 
+-    await showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: [file],
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog([file]);
+   }
+ 
+   Future<void> _handleClipboardFilePasteWeb(web.Event event) async {
+@@ -803,32 +1203,14 @@ class ChatController extends State<ChatPageWithRoom>
+     if (xFiles == null || xFiles.isEmpty) return;
+ 
+     if (!mounted) return;
+-    showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: xFiles,
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog(xFiles);
+   }
+ 
+   Future<void> _handleClipboardImagePaste() async {
+     final files = await Pasteboard.files();
+     if (files.isNotEmpty) {
+       if (!mounted) return;
+-      await showAdaptiveDialog(
+-        context: context,
+-        builder: (c) => SendFileDialog(
+-          files: files.map(XFile.new).toList(),
+-          room: room,
+-          outerContext: context,
+-          threadRootEventId: activeThreadId,
+-          threadLastEventId: threadLastEventId,
+-        ),
+-      );
++      await _showSendFileDialog(files.map(XFile.new).toList());
+       return;
+     }
+     final image = await Pasteboard.image;
+@@ -865,16 +1247,7 @@ class ChatController extends State<ChatPageWithRoom>
+     if (file == null) return;
+     if (!mounted) return;
+ 
+-    await showAdaptiveDialog(
+-      context: context,
+-      builder: (c) => SendFileDialog(
+-        files: [file],
+-        room: room,
+-        outerContext: context,
+-        threadRootEventId: activeThreadId,
+-        threadLastEventId: threadLastEventId,
+-      ),
+-    );
++    await _showSendFileDialog([file]);
+   }
+ 
+   Future<void> onVoiceMessageSend(
+@@ -883,60 +1256,206 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -304448,12 +304633,13 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 +        _lastVoiceMessageSentPath = path;
 +        _lastVoiceMessageSentAt = DateTime.now();
 +
-+        final incomingTargetId = (replyEvent != null && replyEvent!.senderId != room.client.userID)
-+            ? replyEvent!.eventId
-+            : timeline?.events.firstWhereOrNull(
-+                (e) => e.senderId != room.client.userID && 
-+                       BeeperBridgeUtils.isRealMessageType(e.type),
-+              )?.eventId;
++        final incomingTargetId = timeline?.events.firstWhereOrNull(
++              (e) => e.senderId != room.client.userID && 
++                     BeeperBridgeUtils.isRealMessageType(e.type),
++            )?.eventId ??
++            (replyEvent != null && replyEvent!.senderId != room.client.userID
++                ? replyEvent!.eventId
++                : null);
 +
 +        if (PlatformInfos.isMobile) {
 +          final notifId = '${room.client.clientName}_${room.id}'.hashCode;
@@ -304579,12 +304765,13 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
 -    return;
 +
 +    final currentReply = replyEvent;
-+    final incomingTargetId = (currentReply != null && currentReply.senderId != room.client.userID)
-+        ? currentReply.eventId
-+        : timeline?.events.firstWhereOrNull(
-+            (e) => e.senderId != room.client.userID && 
-+                   BeeperBridgeUtils.isRealMessageType(e.type),
-+          )?.eventId;
++    final incomingTargetId = timeline?.events.firstWhereOrNull(
++          (e) => e.senderId != room.client.userID && 
++                 BeeperBridgeUtils.isRealMessageType(e.type),
++        )?.eventId ??
++        (currentReply != null && currentReply.senderId != room.client.userID
++            ? currentReply.eventId
++            : null);
 +
 +    if (PlatformInfos.isMobile) {
 +      final notifId = '${room.client.clientName}_${room.id}'.hashCode;
@@ -304612,7 +304799,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1484,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1464,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -304627,7 +304814,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      }
    }
  
-@@ -964,21 +1503,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1483,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -304660,7 +304847,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1547,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1527,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -304673,7 +304860,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1564,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1544,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -304682,7 +304869,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1621,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1601,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -304695,7 +304882,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1675,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1655,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -304749,7 +304936,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1731,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1711,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -304767,7 +304954,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1833,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1813,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -304781,7 +304968,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1865,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1845,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -304790,7 +304977,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1931,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1911,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -304805,7 +304992,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +1968,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +1948,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -304815,7 +305002,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +2037,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2017,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -304878,7 +305065,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2086,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2066,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -304889,7 +305076,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
            return;
          }
        }
-@@ -1515,7 +2101,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2081,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -304904,7 +305091,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2119,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2099,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304913,7 +305100,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2173,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2153,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -304930,7 +305117,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..73d9758b25e0210ea1058fe2d42ff160
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2260,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2240,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -305596,7 +305783,7 @@ index 76cf1aa68b529b43a3617523141a1633d7f2b4ab..c7c5306e61bd6d7dc401f286ac7bd4fa
      );
    }
 diff --git a/lib/pages/chat/chat_event_list.dart b/lib/pages/chat/chat_event_list.dart
-index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38ee51a7ebd 100644
+index 0022f8283395e724e53a0ad11ddbcb614f222db7..a83d3848a4061f30adf44bcd6a9ceab9adc4156c 100644
 --- a/lib/pages/chat/chat_event_list.dart
 +++ b/lib/pages/chat/chat_event_list.dart
 @@ -13,70 +13,79 @@ import 'package:fluffychat/pages/chat/events/message.dart';
@@ -305715,7 +305902,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38e
                // Footer to display typing indicator and read receipts:
                if (i == 0) {
                  if (timeline.canRequestFuture) {
-@@ -92,13 +101,36 @@ class ChatEventList extends StatelessWidget {
+@@ -92,13 +101,37 @@ class ChatEventList extends StatelessWidget {
                      ),
                    );
                  }
@@ -305733,7 +305920,8 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38e
 +                      if (events.isNotEmpty) SeenByRow(event: events.first),
 +                      TypingIndicators(controller),
 +                      if ((BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_receipts') ?? false) &&
-+                          (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_bottom') ?? true))
++                          (BeeperBridgeUtils.prefs?.getBool('beeper_manual_read_show_bottom') ?? true) &&
++                          BeeperBridgeUtils.isRoomUnread(controller.room))
 +                        Padding(
 +                          padding: const EdgeInsets.symmetric(vertical: 8.0),
 +                          child: TextButton.icon(
@@ -305759,7 +305947,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38e
                  );
                }
  
-@@ -110,23 +142,21 @@ class ChatEventList extends StatelessWidget {
+@@ -110,23 +143,21 @@ class ChatEventList extends StatelessWidget {
                  }
                  return Builder(
                    builder: (context) {
@@ -305794,7 +305982,7 @@ index 0022f8283395e724e53a0ad11ddbcb614f222db7..bd4815d1bcd1dd2057655d6373f1b38e
                          label: Text(L10n.of(context).loadMore),
                        ),
                      );
-@@ -159,95 +189,113 @@ class ChatEventList extends StatelessWidget {
+@@ -159,95 +190,113 @@ class ChatEventList extends StatelessWidget {
                    nextEvent == null ||
                    !event.originServerTs.sameDay(nextEvent.originServerTs);
  
@@ -308101,11 +308289,14 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa33bf4b513 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604581f0546 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
-@@ -7,21 +7,27 @@ import 'dart:async';
+@@ -5,23 +5,30 @@
+ 
+ import 'dart:async';
  import 'dart:io';
++import 'dart:math' as math;
  
  import 'package:async/async.dart';
 +import 'package:audio_session/audio_session.dart';
@@ -308132,7 +308323,97 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
  import '../../../widgets/fluffy_chat_app.dart';
  import '../../../widgets/matrix.dart';
  
-@@ -47,181 +53,608 @@ class AudioPlayerWidget extends StatefulWidget {
+@@ -33,6 +40,89 @@ class AudioPlayerWidget extends StatefulWidget {
+ 
+   static const int wavesCount = 40;
+ 
++  static List<double>? extractRawWaveform(Event event) {
++    final raw = event.content.tryGetMap<String, Object?>('org.matrix.msc1767.audio')?['waveform'] ??
++        event.content.tryGetMap<String, Object?>('org.matrix.msc3245.voice')?['waveform'] ??
++        event.content.tryGetMap<String, Object?>('info')?['waveform'];
++    if (raw is! List || raw.isEmpty) return null;
++    final samples = <double>[];
++    for (final item in raw) {
++      if (item is num) {
++        samples.add(item.toDouble());
++      }
++    }
++    if (samples.isEmpty) return null;
++    return samples;
++  }
++
++  static int? extractDurationMs(Event event) {
++    final infoMap = event.content.tryGetMap<String, Object?>('info');
++    final mscAudioMap = event.content.tryGetMap<String, Object?>('org.matrix.msc1767.audio');
++    final rawDur = infoMap?['duration'] ?? mscAudioMap?['duration'];
++    if (rawDur is num) {
++      final val = rawDur.toDouble();
++      if (val > 0 && val < 1000 && !event.body.toLowerCase().endsWith('.gif')) {
++        return (val * 1000).round();
++      }
++      return val.round();
++    }
++    return null;
++  }
++
++  static List<double> resampleWaveform(List<double> raw, int targetBars) {
++    if (raw.isEmpty || targetBars <= 0) return const [];
++    if (targetBars == 1) {
++      return [raw.reduce(math.max)];
++    }
++
++    double peak = 0.0;
++    for (final s in raw) {
++      if (s > peak) peak = s;
++    }
++    if (peak <= 0.001) {
++      return List<double>.filled(targetBars, 0.12);
++    }
++
++    final double normFactor;
++    if (peak <= 1.05) {
++      normFactor = 1.0;
++    } else if (peak <= 260.0) {
++      normFactor = math.max(peak, 80.0);
++    } else {
++      normFactor = math.max(peak, 300.0);
++    }
++
++    final result = List<double>.filled(targetBars, 0.0);
++    final n = raw.length;
++
++    if (n >= targetBars) {
++      for (var k = 0; k < targetBars; k++) {
++        final start = (k * n / targetBars).floor();
++        final end = math.min(((k + 1) * n / targetBars).ceil(), n);
++        double windowMax = 0.0;
++        for (var j = start; j < end; j++) {
++          if (raw[j] > windowMax) {
++            windowMax = raw[j];
++          }
++        }
++        final normalized = (windowMax / normFactor).clamp(0.12, 1.0);
++        result[k] = normalized;
++      }
++    } else {
++      for (var k = 0; k < targetBars; k++) {
++        final srcPos = k * (n - 1) / (targetBars - 1);
++        final idx = srcPos.floor();
++        final frac = srcPos - idx;
++        final val1 = raw[idx];
++        final val2 = (idx + 1 < n) ? raw[idx + 1] : val1;
++        final interpolated = val1 + (val2 - val1) * frac;
++        final normalized = (interpolated / normFactor).clamp(0.12, 1.0);
++        result[k] = normalized;
++      }
++    }
++    return result;
++  }
++
+   const AudioPlayerWidget(
+     this.event, {
+     required this.color,
+@@ -47,480 +137,1646 @@ class AudioPlayerWidget extends StatefulWidget {
  
  enum AudioPlayerStatus { notDownloaded, downloading, downloaded }
  
@@ -308283,16 +308564,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      final convertedFile = File('${tempDir.path}/audio_$cacheKey.caf');
 +      if (await convertedFile.exists() && await convertedFile.length() > 100) {
 +        return convertedFile;
-       }
--      return;
-     }
- 
--    matrix.voiceMessageEventId.value = widget.event.eventId;
--    matrix.audioPlayer
--      ?..stop()
--      ..dispose();
--    File? file;
--    MatrixFile? matrixFile;
++      }
++    }
++
 +    final rawFile = File('${tempDir.path}/audio_$cacheKey$ext');
 +    if (await rawFile.exists() && await rawFile.length() > 100) {
 +      return rawFile;
@@ -308305,8 +308579,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      final legacyCaf = File('${legacyFile.path}.caf');
 +      if (await legacyCaf.exists() && await legacyCaf.length() > 100) {
 +        return legacyCaf;
-+      }
-+    }
+       }
+-      return;
+     }
 +    if (await legacyFile.exists() && await legacyFile.length() > 100) {
 +      return legacyFile;
 +    }
@@ -308321,7 +308596,13 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +    final eventId = event.eventId;
 +    final existing = await getLocalAudioFile(event);
 +    if (existing != null) return existing;
-+
+ 
+-    matrix.voiceMessageEventId.value = widget.event.eventId;
+-    matrix.audioPlayer
+-      ?..stop()
+-      ..dispose();
+-    File? file;
+-    MatrixFile? matrixFile;
 +    if (activeDownloadEventIds.contains(eventId)) {
 +      while (activeDownloadEventIds.contains(eventId)) {
 +        await Future.delayed(const Duration(milliseconds: 50));
@@ -308393,16 +308674,14 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +          if (await convertedFile.exists() && await convertedFile.length() > 100) {
 +            file = convertedFile;
 +          }
-         }
-       }
++        }
++      }
 +      return file;
 +    } finally {
 +      activeDownloadEventIds.remove(eventId);
 +    }
 +  }
- 
--      setState(() {
--        status = AudioPlayerStatus.downloaded;
++
 +  Future<void> playEvent(
 +    MatrixState matrix,
 +    Event event, {
@@ -308432,6 +308711,10 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +        );
 +        if (initialSeekPosition != null) {
 +          await currentPlayer.seek(initialSeekPosition);
++        }
++        final preferredSpeed = AudioRouterService.instance.playbackSpeedNotifier.value;
++        if (currentPlayer.speed != preferredSpeed) {
++          await currentPlayer.setSpeed(preferredSpeed);
 +        }
 +        currentPlayer.play();
 +        return;
@@ -308509,7 +308792,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +              ? const AudioSessionConfiguration.speech()
 +              : const AudioSessionConfiguration.music(),
 +        ).catchError((e) => Logs().w('Failed audio session config', e));
-       });
++      });
 +      AudioRouterService.instance.startSession(outputMode);
 +    }
 +
@@ -308529,8 +308812,11 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +
 +    try {
 +      await audioPlayer.setFilePath(file.path, initialPosition: initialSeekPosition);
-     } catch (e, s) {
--      Logs().v('Could not download audio file', e, s);
++      final preferredSpeed = AudioRouterService.instance.playbackSpeedNotifier.value;
++      if (preferredSpeed != 1.0) {
++        await audioPlayer.setSpeed(preferredSpeed);
++      }
++    } catch (e, s) {
 +      Logs().e('Failed to load audio file in player: ${file.path}', e, s);
 +      try {
 +        if (await file.exists()) await file.delete();
@@ -308630,8 +308916,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +        AudioRouterService.instance.stopSession();
 +        if (context != null && context.mounted) {
 +          ErrorReporter(context, 'Unable to play audio message').onErrorCallback(e, s);
-+        }
-+      }
+         }
+       }
 +    }
 +  }
 +
@@ -308698,20 +308984,23 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +  AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
 +  double? _downloadProgress;
 +  File? _cachedFile;
-+  bool _isUserTappedPlay = false;
-+  bool _isWaitingForEar = false;
++  final ValueNotifier<Duration?> _scrubbingDurationNotifier =
++      ValueNotifier<Duration?>(null);
 +
 +  String? _transcription;
 +  bool _isTranscribing = false;
 +  double? _transcriptionProgress;
 +
 +  late final MatrixState matrix;
-+  List<int>? _waveform;
++  List<double>? _rawWaveform;
 +  String? _durationString;
 +  int? _durationInt;
++  StreamSubscription<Duration?>? _playerDurationSub;
 +
 +  @override
 +  void dispose() {
++    _playerDurationSub?.cancel();
++    _scrubbingDurationNotifier.dispose();
 +    super.dispose();
 +    // Do NOT stop or dispose matrix.audioPlayer here!
 +    // In a ListView, item widgets are disposed and recreated as the user scrolls.
@@ -308731,7 +309020,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      return;
 +    }
 +    VoicePlaybackController.prefetchedEventIds.add(eventId);
-+
+ 
+-      setState(() {
+-        status = AudioPlayerStatus.downloaded;
 +    VoicePlaybackController.getLocalAudioFile(widget.event).then((cached) {
 +      if (cached != null) {
 +        if (mounted) {
@@ -308751,7 +309042,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +        }
 +      }).catchError((e) {
 +        Logs().v('Background audio preload failed silently for $eventId: $e');
-+      });
+       });
 +    }).catchError((e) {
 +      Logs().v('Check local audio file failed: $e');
 +    });
@@ -308809,7 +309100,11 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +        context: context,
 +        initialSeekPosition: seekPos,
 +      );
-+    } catch (e, s) {
++      if (mounted && matrix.audioPlayer != null) {
++        _listenToPlayerDuration(matrix.audioPlayer);
++      }
+     } catch (e, s) {
+-      Logs().v('Could not download audio file', e, s);
 +      Logs().v('Could not play audio file', e, s);
        if (!mounted) rethrow;
        ScaffoldMessenger.of(
@@ -308830,12 +309125,6 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
  
 -    if (file != null) {
 -      audioPlayer.setFilePath(file.path);
--    } else {
--      await audioPlayer.setAudioSource(
--        AudioSource.uri(
--          Uri.dataFromBytes(matrixFile.bytes, mimeType: matrixFile.mimeType),
--        ),
--      );
 +    if (PlatformInfos.isMobile) {
 +      try {
 +        final session = await AudioSession.instance;
@@ -308860,45 +309149,115 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +                ),
 +        );
 +      }
++    }
++  }
++
++  Future<void> _toggleSpeed() async {
++    HapticFeedback.selectionClick();
++    final currentSpeed = AudioRouterService.instance.playbackSpeedNotifier.value;
++    final double nextSpeed;
++    if (currentSpeed == 1.0) {
++      nextSpeed = 1.5;
++    } else if (currentSpeed == 1.5) {
++      nextSpeed = 2.0;
+     } else {
+-      await audioPlayer.setAudioSource(
+-        AudioSource.uri(
+-          Uri.dataFromBytes(matrixFile.bytes, mimeType: matrixFile.mimeType),
+-        ),
+-      );
++      nextSpeed = 1.0;
      }
 -    if (!mounted) return;
--
++    AudioRouterService.instance.playbackSpeedNotifier.value = nextSpeed;
++    final audioPlayer = matrix.audioPlayer;
++    if (audioPlayer != null &&
++        matrix.voiceMessageEventId.value == widget.event.eventId) {
++      await audioPlayer.setSpeed(nextSpeed);
++    }
++  }
+ 
 -    audioPlayer.play().onError(
 -      ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
--    );
++  Widget _buildSpeedButton(BuildContext context) {
++    return ValueListenableBuilder<double>(
++      valueListenable: AudioRouterService.instance.playbackSpeedNotifier,
++      builder: (context, speed, _) {
++        final label = speed == 1.0
++            ? '1x'
++            : speed == 1.5
++                ? '1.5x'
++                : '${speed.toStringAsFixed(speed.truncateToDouble() == speed ? 0 : 1)}x';
++        final isCustomSpeed = speed != 1.0;
++        return Material(
++          color: isCustomSpeed
++              ? widget.color.withValues(alpha: 0.22)
++              : widget.color.withValues(alpha: 0.08),
++          borderRadius: BorderRadius.circular(12),
++          child: InkWell(
++            borderRadius: BorderRadius.circular(12),
++            onTap: _toggleSpeed,
++            child: Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
++              child: Text(
++                label,
++                style: TextStyle(
++                  color: widget.color,
++                  fontSize: 10.5,
++                  fontWeight: isCustomSpeed ? FontWeight.bold : FontWeight.w600,
++                  letterSpacing: -0.2,
++                ),
++              ),
++            ),
++          ),
++        );
++      },
+     );
    }
  
-   Future<void> _toggleSpeed() async {
-+    HapticFeedback.selectionClick();
-     final audioPlayer = matrix.audioPlayer;
-     if (audioPlayer == null) return;
-     switch (audioPlayer.speed) {
-@@ -246,12 +679,19 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-   }
- 
-   List<int>? _getWaveform() {
+-  Future<void> _toggleSpeed() async {
+-    final audioPlayer = matrix.audioPlayer;
+-    if (audioPlayer == null) return;
+-    switch (audioPlayer.speed) {
+-      case 1.0:
+-        await audioPlayer.setSpeed(1.25);
+-        break;
+-      case 1.25:
+-        await audioPlayer.setSpeed(1.5);
+-        break;
+-      case 1.5:
+-        await audioPlayer.setSpeed(2.0);
+-        break;
+-      case 2.0:
+-        await audioPlayer.setSpeed(0.5);
+-        break;
+-      case 0.5:
+-      default:
+-        await audioPlayer.setSpeed(1.0);
+-        break;
+-    }
+-    setState(() {});
+-  }
+-
+-  List<int>? _getWaveform() {
 -    final eventWaveForm = widget.event.content
-+    final rawWaveform = widget.event.content
-         .tryGetMap<String, Object?>('org.matrix.msc1767.audio')
-+        ?.tryGetList<int>('waveform') ??
-+        widget.event.content
-+        .tryGetMap<String, Object?>('org.matrix.msc3245.voice')
-+        ?.tryGetList<int>('waveform') ??
-+        widget.event.content
-+        .tryGetMap<String, Object?>('info')
-         ?.tryGetList<int>('waveform');
+-        .tryGetMap<String, Object?>('org.matrix.msc1767.audio')
+-        ?.tryGetList<int>('waveform');
 -    if (eventWaveForm == null || eventWaveForm.isEmpty) {
-+    if (rawWaveform == null || rawWaveform.isEmpty) {
-       return null;
-     }
-+    final eventWaveForm = List<int>.from(rawWaveform);
-     while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
-       for (var i = 0; i < eventWaveForm.length; i = i + 2) {
-         eventWaveForm.insert(i, eventWaveForm[i]);
-@@ -266,11 +706,82 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
-     return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
-   }
- 
+-      return null;
+-    }
+-    while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
+-      for (var i = 0; i < eventWaveForm.length; i = i + 2) {
+-        eventWaveForm.insert(i, eventWaveForm[i]);
+-      }
+-    }
+-    var i = 0;
+-    final step = (eventWaveForm.length / AudioPlayerWidget.wavesCount).round();
+-    while (eventWaveForm.length > AudioPlayerWidget.wavesCount) {
+-      eventWaveForm.removeAt(i);
+-      i = (i + step) % AudioPlayerWidget.wavesCount;
+-    }
+-    return eventWaveForm.map((i) => i > 1024 ? 1024 : i).toList();
 +  void _loadTranscription() {
 +    _transcription =
 +        TranscriptionService().getCachedTranscription(widget.event.eventId);
@@ -308915,12 +309274,55 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +    }
 +  }
 +
++  void _initEventState() {
++    _rawWaveform = AudioPlayerWidget.extractRawWaveform(widget.event);
++    _durationInt = AudioPlayerWidget.extractDurationMs(widget.event);
++    _durationString = _durationInt != null
++        ? Duration(milliseconds: _durationInt!).minuteSecondString
++        : '00:00';
++    _cachedFile = null;
++    status = AudioPlayerStatus.notDownloaded;
++    _downloadProgress = null;
++    _scrubbingDurationNotifier.value = null;
++    _loadTranscription();
++    _checkOrPreloadAudio();
++  }
++
++  void _listenToPlayerDuration(AudioPlayer? player) {
++    _playerDurationSub?.cancel();
++    _playerDurationSub = null;
++    if (player != null) {
++      if (player.duration != null && player.duration!.inMilliseconds > 0) {
++        _updateDurationFromPlayer(player.duration);
++      }
++      _playerDurationSub = player.durationStream.listen((dur) {
++        if (mounted && dur != null && dur.inMilliseconds > 0) {
++          _updateDurationFromPlayer(dur);
++        }
++      });
++    }
++  }
++
++  void _updateDurationFromPlayer(Duration? dur) {
++    if (dur != null && dur.inMilliseconds > 0 && dur.inMilliseconds != _durationInt) {
++      if (mounted) {
++        setState(() {
++          _durationInt = dur.inMilliseconds;
++          _durationString = dur.minuteSecondString;
++        });
++      }
++    }
++  }
++
 +  @override
 +  void didUpdateWidget(covariant AudioPlayerWidget oldWidget) {
 +    super.didUpdateWidget(oldWidget);
 +    if (oldWidget.event.eventId != widget.event.eventId) {
-+      _loadTranscription();
-+      _checkOrPreloadAudio();
++      _initEventState();
++      final player = matrix.voiceMessageEventId.value == widget.event.eventId
++          ? matrix.audioPlayer
++          : null;
++      _listenToPlayerDuration(player);
 +    }
 +  }
 +
@@ -308966,34 +309368,36 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +        );
 +      }
 +    }
-+  }
-+
+   }
+ 
    @override
    void initState() {
      super.initState();
      matrix = Matrix.of(context);
-     _waveform = _getWaveform();
-+    _loadTranscription();
-+    _checkOrPreloadAudio();
+-    _waveform = _getWaveform();
++    _initEventState();
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
-@@ -281,7 +792,11 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+         ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
+       });
+-    }
+-
+-    final durationInt = widget.event.content
+-        .tryGetMap<String, Object?>('info')
+-        ?.tryGet<int>('duration');
+-    if (durationInt != null) {
+-      final duration = Duration(milliseconds: durationInt);
+-      _durationString = duration.minuteSecondString;
++      _listenToPlayerDuration(matrix.audioPlayer);
+     }
+   }
  
-     final durationInt = widget.event.content
-         .tryGetMap<String, Object?>('info')
-+        ?.tryGet<int>('duration') ??
-+        widget.event.content
-+        .tryGetMap<String, Object?>('org.matrix.msc1767.audio')
-         ?.tryGet<int>('duration');
-+    _durationInt = durationInt;
-     if (durationInt != null) {
-       final duration = Duration(milliseconds: durationInt);
-       _durationString = duration.minuteSecondString;
-@@ -292,229 +807,831 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
+   @override
    Widget build(BuildContext context) {
      final theme = Theme.of(context);
-     final waveform = _waveform;
+-    final waveform = _waveform;
 +    final fileDescription = widget.event.fileDescription;
  
 -    return ValueListenableBuilder(
@@ -309167,55 +309571,21 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +                                      opacity: isLoading ? 0.6 : 1.0,
 +                                      child: _AudioScrubberWidget(
 +                                        audioPlayer: audioPlayer,
-+                                        waveform: waveform,
++                                        rawWaveform: _rawWaveform,
 +                                        durationMs: _durationInt,
 +                                        color: widget.color,
 +                                        inactiveColor: widget.color
 +                                            .withValues(alpha: 0.35),
-+                                        thumbColor: widget.event.senderId ==
-+                                                widget.event.room.client.userID
-+                                            ? theme.colorScheme.onPrimary
-+                                            : theme.colorScheme.primary,
++                                        scrubbingDurationNotifier:
++                                            _scrubbingDurationNotifier,
 +                                        onTapWhenStoppedWithSeek: (pos) =>
 +                                            _onButtonTap(pos),
 +                                        onSeek: (pos) => audioPlayer?.seek(pos),
 +                                      ),
 +                                    ),
-+                                  ),
-+                                ),
-+                                const SizedBox(width: 8),
-+                                ConstrainedBox(
-+                                  constraints:
-+                                      const BoxConstraints(minWidth: 42),
-+                                  child: ValueListenableBuilder<double?>(
-+                                    valueListenable: VoicePlaybackController
-+                                        .instance.downloadProgressNotifier,
-+                                    builder: (context, pct, _) {
-+                                      return _AudioTimeText(
-+                                        audioPlayer: audioPlayer,
-+                                        durationString:
-+                                            _durationString ?? '00:00',
-+                                        isWaitingForEar: isWaitingForEar,
-+                                        downloadProgress:
-+                                            isLoading ? pct : null,
-+                                        color: widget.color,
-+                                      );
-+                                    },
-+                                  ),
-+                                ),
-+                                const SizedBox(width: 8),
-+                                AnimatedCrossFade(
-+                                  firstChild: Padding(
-+                                    padding: const EdgeInsets.only(right: 8.0),
-+                                    child: Icon(
-+                                      Icons.mic_none_outlined,
-+                                      color: widget.color,
-+                                    ),
                                    ),
 -                                  child: Row(
-+                                  secondChild: Row(
-+                                    mainAxisSize: MainAxisSize.min,
-                                     children: [
+-                                    children: [
 -                                      for (
 -                                        var i = 0;
 -                                        i < AudioPlayerWidget.wavesCount;
@@ -309238,39 +309608,34 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 -                                                      ),
 -                                                borderRadius:
 -                                                    BorderRadius.circular(64),
-+                                      Material(
-+                                        color: widget.color.withAlpha(64),
-+                                        borderRadius: BorderRadius.circular(
-+                                          AppConfig.borderRadius,
-+                                        ),
-+                                        child: InkWell(
-+                                          borderRadius: BorderRadius.circular(
-+                                            AppConfig.borderRadius,
-+                                          ),
-+                                          onTap: _toggleSpeed,
-+                                          child: SizedBox(
-+                                            width: 32,
-+                                            height: 20,
-+                                            child: Center(
-+                                              child: Text(
-+                                                '${audioPlayer?.speed ?? 1.0}x',
-+                                                style: TextStyle(
-+                                                  color: widget.color,
-+                                                  fontSize: 9,
-+                                                ),
-                                               ),
+-                                              ),
 -                                              height: 32 * (waveform[i] / 1024),
-                                             ),
-                                           ),
-                                         ),
-+                                      ),
-                                     ],
+-                                            ),
+-                                          ),
+-                                        ),
+-                                    ],
++                                ),
++                                const SizedBox(width: 8),
++                                ConstrainedBox(
++                                  constraints:
++                                      const BoxConstraints(minWidth: 42),
++                                  child: ValueListenableBuilder<double?>(
++                                    valueListenable: VoicePlaybackController
++                                        .instance.downloadProgressNotifier,
++                                    builder: (context, pct, _) {
++                                      return _AudioTimeText(
++                                        audioPlayer: audioPlayer,
++                                        durationString:
++                                            _durationString ?? '00:00',
++                                        isWaitingForEar: isWaitingForEar,
++                                        downloadProgress:
++                                            isLoading ? pct : null,
++                                        scrubbingDurationListenable:
++                                            _scrubbingDurationNotifier,
++                                        color: widget.color,
++                                      );
++                                    },
                                    ),
-+                                  alignment: Alignment.center,
-+                                  crossFadeState: audioPlayer == null
-+                                      ? CrossFadeState.showFirst
-+                                      : CrossFadeState.showSecond,
-+                                  duration: FluffyThemes.animationDuration,
                                  ),
 -                              SizedBox(
 -                                height: 32,
@@ -309295,6 +309660,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 -                                            milliseconds: position.round(),
 -                                          ),
 -                                        ),
++                                const SizedBox(width: 8),
++                                _buildSpeedButton(context),
 +                              ],
 +                            ),
 +                          ),
@@ -309672,22 +310039,22 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +
 +class _AudioScrubberWidget extends StatefulWidget {
 +  final AudioPlayer? audioPlayer;
-+  final List<int>? waveform;
++  final List<double>? rawWaveform;
 +  final int? durationMs;
 +  final Color color;
 +  final Color inactiveColor;
-+  final Color thumbColor;
++  final ValueNotifier<Duration?>? scrubbingDurationNotifier;
 +  final VoidCallback? onTapWhenStopped;
 +  final void Function(Duration)? onTapWhenStoppedWithSeek;
 +  final void Function(Duration)? onSeek;
 +
 +  const _AudioScrubberWidget({
 +    required this.audioPlayer,
-+    required this.waveform,
++    required this.rawWaveform,
 +    required this.durationMs,
 +    required this.color,
 +    required this.inactiveColor,
-+    required this.thumbColor,
++    this.scrubbingDurationNotifier,
 +    this.onTapWhenStopped,
 +    this.onTapWhenStoppedWithSeek,
 +    this.onSeek,
@@ -309702,6 +310069,10 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +  double _dragPositionMs = 0.0;
 +  StreamSubscription<Duration>? _positionSub;
 +  double _currentPositionMs = 0.0;
++
++  int? _lastCount;
++  List<double>? _lastRaw;
++  List<double>? _resampledBars;
 +
 +  @override
 +  void initState() {
@@ -309741,6 +310112,17 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +    super.dispose();
 +  }
 +
++  List<double>? _getBars(int count) {
++    if (widget.rawWaveform == null) return null;
++    if (_lastCount == count && identical(_lastRaw, widget.rawWaveform)) {
++      return _resampledBars;
++    }
++    _lastCount = count;
++    _lastRaw = widget.rawWaveform;
++    _resampledBars = AudioPlayerWidget.resampleWaveform(widget.rawWaveform!, count);
++    return _resampledBars;
++  }
++
 +  @override
 +  Widget build(BuildContext context) {
 +    final player = widget.audioPlayer;
@@ -309758,16 +310140,23 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +
 +    return LayoutBuilder(
 +      builder: (context, constraints) {
++        final width = constraints.maxWidth;
++        const double pitch = 4.0;
++        final count = (width / pitch).floor().clamp(16, 120);
++        final bars = _getBars(count);
++
 +        return GestureDetector(
 +          behavior: HitTestBehavior.opaque,
 +          onTapDown: (details) {
-+            final width = constraints.maxWidth;
 +            if (width <= 0) return;
 +            final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
 +            final targetMs = frac * effectiveTotalMs;
 +            HapticFeedback.selectionClick();
 +            if (widget.audioPlayer == null) {
 +              final targetDuration = Duration(milliseconds: targetMs.round());
++              setState(() {
++                _currentPositionMs = targetMs;
++              });
 +              if (widget.onTapWhenStoppedWithSeek != null) {
 +                widget.onTapWhenStoppedWithSeek!(targetDuration);
 +              } else {
@@ -309779,33 +310168,32 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +              _currentPositionMs = targetMs;
 +            });
 +            widget.onSeek?.call(Duration(milliseconds: targetMs.round()));
-           },
++          },
 +          onHorizontalDragStart: (details) {
-+            if (widget.audioPlayer == null) {
-+              widget.onTapWhenStopped?.call();
-+              return;
-+            }
-+            final width = constraints.maxWidth;
 +            if (width <= 0) return;
 +            HapticFeedback.selectionClick();
++            final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
++            final targetMs = frac * effectiveTotalMs;
 +            setState(() {
 +              _isDragging = true;
-+              final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
-+              _dragPositionMs = frac * effectiveTotalMs;
++              _dragPositionMs = targetMs;
 +            });
++            widget.scrubbingDurationNotifier?.value =
++                Duration(milliseconds: targetMs.round());
 +          },
 +          onHorizontalDragUpdate: (details) {
-+            if (!_isDragging) return;
-+            final width = constraints.maxWidth;
-+            if (width <= 0) return;
++            if (!_isDragging || width <= 0) return;
 +            final prevFrac = (_dragPositionMs / effectiveTotalMs).clamp(0.0, 1.0);
 +            final frac = (details.localPosition.dx / width).clamp(0.0, 1.0);
-+            if ((frac * 15).toInt() != (prevFrac * 15).toInt()) {
++            if ((frac * count).toInt() != (prevFrac * count).toInt()) {
 +              HapticFeedback.selectionClick();
 +            }
++            final targetMs = frac * effectiveTotalMs;
 +            setState(() {
-+              _dragPositionMs = frac * effectiveTotalMs;
++              _dragPositionMs = targetMs;
 +            });
++            widget.scrubbingDurationNotifier?.value =
++                Duration(milliseconds: targetMs.round());
 +          },
 +          onHorizontalDragEnd: (details) {
 +            if (!_isDragging) return;
@@ -309815,41 +310203,55 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +              _isDragging = false;
 +              _currentPositionMs = targetMs;
 +            });
-+            widget.onSeek?.call(Duration(milliseconds: targetMs.round()));
++            widget.scrubbingDurationNotifier?.value = null;
++            if (widget.audioPlayer != null) {
++              widget.onSeek?.call(Duration(milliseconds: targetMs.round()));
++            } else if (widget.onTapWhenStoppedWithSeek != null) {
++              widget.onTapWhenStoppedWithSeek!(
++                Duration(milliseconds: targetMs.round()),
++              );
++            }
+           },
++          onHorizontalDragCancel: () {
++            if (!_isDragging) return;
++            setState(() {
++              _isDragging = false;
++            });
++            widget.scrubbingDurationNotifier?.value = null;
 +          },
 +          child: SizedBox(
 +            height: 32,
 +            width: double.infinity,
 +            child: CustomPaint(
-+              size: Size(constraints.maxWidth, 32),
++              size: Size(width, 32),
 +              painter: _WaveformScrubberPainter(
-+                waveform: widget.waveform,
++                bars: bars,
 +                progress: progress,
++                isDragging: _isDragging,
 +                activeColor: widget.color,
 +                inactiveColor: widget.inactiveColor,
-+                thumbColor: widget.thumbColor,
 +              ),
 +            ),
 +          ),
-+        );
-+      },
-+    );
-+  }
-+}
-+
+         );
+       },
+     );
+   }
+ }
+ 
 +class _WaveformScrubberPainter extends CustomPainter {
-+  final List<int>? waveform;
++  final List<double>? bars;
 +  final double progress; // 0.0 to 1.0
++  final bool isDragging;
 +  final Color activeColor;
 +  final Color inactiveColor;
-+  final Color thumbColor;
 +
 +  _WaveformScrubberPainter({
-+    required this.waveform,
++    required this.bars,
 +    required this.progress,
++    required this.isDragging,
 +    required this.activeColor,
 +    required this.inactiveColor,
-+    required this.thumbColor,
 +  });
 +
 +  @override
@@ -309859,17 +310261,12 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +    final clampedProgress = progress.clamp(0.0, 1.0);
 +    final xProgress = clampedProgress * size.width;
 +
-+    if (waveform != null && waveform!.isNotEmpty) {
-+      final bars = waveform!;
-+      final totalBars = bars.length;
-+      const minSpacing = 1.5;
-+      final totalSpacing = (totalBars - 1) * minSpacing;
-+      var barWidth = (size.width - totalSpacing) / totalBars;
-+      var spacing = minSpacing;
-+      if (barWidth > 4.0) {
-+        barWidth = 3.5;
-+        spacing = (size.width - totalBars * barWidth) / (totalBars - 1);
-+      }
++    if (bars != null && bars!.isNotEmpty) {
++      final totalBars = bars!.length;
++      const double barWidth = 2.4;
++      final double spacing = totalBars > 1
++          ? (size.width - totalBars * barWidth) / (totalBars - 1)
++          : 0.0;
 +
 +      final activePaint = Paint()
 +        ..color = activeColor
@@ -309884,8 +310281,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      for (var i = 0; i < totalBars; i++) {
 +        final barX = i * (barWidth + spacing);
 +        final barCenterX = barX + barWidth / 2;
-+        final rawAmp = bars[i];
-+        final ampFraction = (rawAmp / 1024.0).clamp(0.1, 1.0);
++        final ampFraction = bars![i].clamp(0.12, 1.0);
 +        final barHeight = (maxHeight * ampFraction).clamp(4.0, maxHeight);
 +        final barY = (size.height - barHeight) / 2;
 +
@@ -309894,7 +310290,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +
 +        final rrect = RRect.fromRectAndRadius(
 +          Rect.fromLTWH(barX, barY, barWidth, barHeight),
-+          Radius.circular(barWidth / 2),
++          const Radius.circular(1.2),
 +        );
 +        canvas.drawRRect(rrect, paint);
 +      }
@@ -309927,32 +310323,31 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      }
 +    }
 +
-+    if (clampedProgress > 0.001) {
-+      const thumbRadius = 5.5;
-+      final thumbCenter = Offset(
-+        xProgress.clamp(thumbRadius, size.width - thumbRadius),
-+        size.height / 2,
-+      );
-+
-+      final shadowPaint = Paint()
-+        ..color = Colors.black.withValues(alpha: 0.22)
-+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
-+      canvas.drawCircle(thumbCenter, thumbRadius + 0.5, shadowPaint);
-+
-+      final thumbPaint = Paint()
-+        ..color = thumbColor
++    if (isDragging) {
++      final cursorX = xProgress.clamp(1.5, size.width - 1.5);
++      final cursorPaint = Paint()
++        ..color = activeColor
 +        ..style = PaintingStyle.fill;
-+      canvas.drawCircle(thumbCenter, thumbRadius, thumbPaint);
++      final shadowPaint = Paint()
++        ..color = Colors.black.withValues(alpha: 0.25)
++        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
++
++      final cursorRRect = RRect.fromRectAndRadius(
++        Rect.fromLTWH(cursorX - 1.25, 2.0, 2.5, size.height - 4.0),
++        const Radius.circular(1.25),
++      );
++      canvas.drawRRect(cursorRRect, shadowPaint);
++      canvas.drawRRect(cursorRRect, cursorPaint);
 +    }
 +  }
 +
 +  @override
 +  bool shouldRepaint(_WaveformScrubberPainter oldDelegate) {
 +    return oldDelegate.progress != progress ||
++        oldDelegate.isDragging != isDragging ||
 +        oldDelegate.activeColor != activeColor ||
 +        oldDelegate.inactiveColor != inactiveColor ||
-+        oldDelegate.thumbColor != thumbColor ||
-+        oldDelegate.waveform != waveform;
++        oldDelegate.bars != bars;
 +  }
 +}
 +
@@ -309961,6 +310356,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +  final String durationString;
 +  final bool isWaitingForEar;
 +  final double? downloadProgress;
++  final ValueListenable<Duration?>? scrubbingDurationListenable;
 +  final Color color;
 +
 +  const _AudioTimeText({
@@ -309968,6 +310364,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +    required this.durationString,
 +    required this.isWaitingForEar,
 +    this.downloadProgress,
++    this.scrubbingDurationListenable,
 +    required this.color,
 +  });
 +
@@ -309989,26 +310386,55 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..ad534d078ab36f32b20326c46b61cfa3
 +      );
 +    }
 +
++    Widget content;
 +    final player = audioPlayer;
 +    if (player == null) {
-+      return Text(
++      content = Text(
 +        durationString,
 +        style: TextStyle(color: color, fontSize: 11),
 +      );
++    } else {
++      content = StreamBuilder<Duration>(
++        stream: player.positionStream.distinct(
++          (prev, next) => prev.inSeconds == next.inSeconds,
++        ),
++        builder: (context, snapshot) {
++          final pos = snapshot.data ?? player.position;
++          return Text(
++            pos.minuteSecondString,
++            style: TextStyle(color: color, fontSize: 11),
++          );
++        },
++      );
 +    }
 +
-+    return StreamBuilder<Duration>(
-+      stream: player.positionStream.distinct(
-+        (prev, next) => prev.inSeconds == next.inSeconds,
-+      ),
-+      builder: (context, snapshot) {
-+        final pos = snapshot.data ?? player.position;
-+        return Text(
-+          pos.minuteSecondString,
-+          style: TextStyle(color: color, fontSize: 11),
-         );
-       },
-     );
++    if (scrubbingDurationListenable != null) {
++      return ValueListenableBuilder<Duration?>(
++        valueListenable: scrubbingDurationListenable!,
++        builder: (context, scrubDur, child) {
++          if (scrubDur != null) {
++            return Text(
++              scrubDur.minuteSecondString,
++              style: TextStyle(
++                color: color,
++                fontSize: 11,
++                fontWeight: FontWeight.bold,
++              ),
++            );
++          }
++          return child!;
++        },
++        child: content,
++      );
++    }
++
++    return content;
++  }
++}
++
+ extension on AudioPlayer {
+   bool get isAtEndPosition {
+     final duration = this.duration;
 diff --git a/lib/pages/chat/events/cute_events.dart b/lib/pages/chat/events/cute_events.dart
 index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..2096440d061103ddd1fca7df756ffd6e29c35f4c 100644
 --- a/lib/pages/chat/events/cute_events.dart
@@ -311877,10 +312303,10 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..cf340764ace52eec19e1482c4dc14fa6172ab828 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..f955cd27ecfa43bbe7a657897755dd61213d40a8 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
-@@ -1,324 +1,516 @@
+@@ -1,324 +1,517 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -312321,6 +312747,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..cf340764ace52eec19e1482c4dc14fa6
 +            ) {
 +              return AudioPlayerWidget(
 +                event,
++                key: ValueKey('audio_player_${event.eventId}'),
 +                color: textColor,
 +                linkColor: linkColor,
 +                fontSize: fontSize,
@@ -314210,7 +314637,7 @@ index 81f95d322408d1f10fbcd43b90fe98f8bcd428cd..80647bc638041cc0e0bfc97eb222e35e
            focusNode: focusNode,
 diff --git a/lib/pages/chat/merged_contact_switcher.dart b/lib/pages/chat/merged_contact_switcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..5b27004776ed9604a3145274b211edc732ed9521
+index 0000000000000000000000000000000000000000..7aa86252e22c6f413cbe2b2ea4504450167c9a7d
 --- /dev/null
 +++ b/lib/pages/chat/merged_contact_switcher.dart
 @@ -0,0 +1,176 @@
@@ -314283,7 +314710,7 @@ index 0000000000000000000000000000000000000000..5b27004776ed9604a3145274b211edc7
 +          final beeperData = BeeperBridgeUtils.getRoomData(room);
 +          final network = BeeperBridgeUtils.getRoomNetwork(room);
 +          final displayname = beeperData.displayName ?? room.name;
-+          final hasUnread = room.isUnreadOrInvited || room.notificationCount > 0;
++          final hasUnread = BeeperBridgeUtils.isRoomUnread(room);
 +
 +          final handle = BeeperBridgeUtils.getAccountHandle(room);
 +          final label = network?.name ?? 'Chat';
@@ -324239,7 +324666,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..603633b50e96732756200ac7b46f8c99d142ffb8 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..7151b2e131eb143df841eea80cacbedf68b706c1 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,16 @@
@@ -324874,7 +325301,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..603633b50e96732756200ac7b46f8c99
 +            }
 +          }
 +          final unreadCount = Matrix.of(context).client.rooms
-+              .where((r) => r.isUnreadOrInvited)
++              .where((r) => BeeperBridgeUtils.isRoomUnread(r) || r.membership == Membership.invite)
 +              .length;
 +          updateAppBadge(unreadCount);
 +          _invalidateRoomCache();
@@ -325469,7 +325896,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..603633b50e96732756200ac7b46f8c99
 +                publicReceipt: AppSettings.sendPublicReadReceipts.value,
 +              );
 +              final unreadCount = room.client.rooms
-+                  .where((r) => r.isUnreadOrInvited)
++                  .where((r) => BeeperBridgeUtils.isRoomUnread(r) || r.membership == Membership.invite)
 +                  .length;
 +              updateAppBadge(unreadCount);
 +              _invalidateRoomCache({room.id});
@@ -328780,7 +329207,7 @@ index 7ff17ad1207427b0a5d4bea92575c356dd7c5eb9..da393b9501c2bf5285da57e49a8d30cc
                                    top: -12,
                                    end: -8,
 diff --git a/lib/pages/chat_list/navigation_rail.dart b/lib/pages/chat_list/navigation_rail.dart
-index a6491714ee4527a605ccdb1b5ec4f689d9512b22..9659529395dab1c500d95d6af52e2c0b5df28b81 100644
+index a6491714ee4527a605ccdb1b5ec4f689d9512b22..5b5119a1ae26cea63d37d03ccf095ce20a887f8b 100644
 --- a/lib/pages/chat_list/navigation_rail.dart
 +++ b/lib/pages/chat_list/navigation_rail.dart
 @@ -3,20 +3,26 @@
@@ -329188,7 +329615,7 @@ index a6491714ee4527a605ccdb1b5ec4f689d9512b22..9659529395dab1c500d95d6af52e2c0b
 +              roomsTagHash ^= r.isSpace ? 1 : 0;
 +            }
 +            final totalHash = '${accountDataHash}_$roomsTagHash';
-+            final unreadRooms = client.rooms.where((r) => r.isUnread || r.membership == Membership.invite).toList();
++            final unreadRooms = client.rooms.where((r) => BeeperBridgeUtils.isRoomUnread(r) || r.membership == Membership.invite).toList();
 +            
 +            if (_cachedCombinedItems != null && _lastCombinedHash == totalHash) {
 +              // Usa los elementos cacheados sin volver a recalcular todo
@@ -355283,10 +355710,10 @@ index 0000000000000000000000000000000000000000..1aaaee3532b22ac5ac7434e9a40d8def
 +
 diff --git a/lib/utils/audio_router_service.dart b/lib/utils/audio_router_service.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..524893f6cf1b252f947e3aef0e2f0a45054c9b66
+index 0000000000000000000000000000000000000000..b0458915bccf62ab2baf06702e15b91f6fd3e837
 --- /dev/null
 +++ b/lib/utils/audio_router_service.dart
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,94 @@
 +// SPDX-FileCopyrightText: 2026 Contributors to FluffyBeep
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
@@ -355313,6 +355740,7 @@ index 0000000000000000000000000000000000000000..524893f6cf1b252f947e3aef0e2f0a45
 +  final ValueNotifier<bool> isNearEarNotifier = ValueNotifier<bool>(false);
 +  late final ValueNotifier<String> outputModeNotifier =
 +      ValueNotifier<String>(_currentMode);
++  final ValueNotifier<double> playbackSpeedNotifier = ValueNotifier<double>(1.0);
 +  bool _isSessionActive = false;
 +  String _currentMode = 'speaker'; // 'speaker', 'earpiece'
 +
@@ -356801,10 +357229,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b5234c15b944
+index 0000000000000000000000000000000000000000..4d97ad58187a85267a95fe333eed56e851ce7938
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1409 @@
+@@ -0,0 +1,1455 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -358007,18 +358435,39 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +  /// Prevents stale sync states from flickering the room back to unread until newer messages arrive.
 +  static final Map<String, int> locallyReadRooms = {};
 +
++  static void saveLocallyReadTimestamp(String roomId, int milliseconds) {
++    locallyReadRooms[roomId] = milliseconds;
++    if (prefs != null) {
++      prefs?.setInt('beeper_read_ts_$roomId', milliseconds);
++    } else {
++      SharedPreferences.getInstance().then((p) {
++        prefs = p;
++        p.setInt('beeper_read_ts_$roomId', milliseconds);
++      }).catchError((_) {});
++    }
++  }
++
++  static int? getLocallyReadTimestamp(String roomId) {
++    return locallyReadRooms[roomId] ?? prefs?.getInt('beeper_read_ts_$roomId');
++  }
++
++  static void clearLocallyReadTimestamp(String roomId) {
++    locallyReadRooms.remove(roomId);
++    prefs?.remove('beeper_read_ts_$roomId');
++  }
++
 +  /// Checks if a room has unread messages, factoring in optimistic local read suppression.
 +  static bool isRoomUnread(Room room) {
-+    if (locallyReadRooms.containsKey(room.id)) {
-+      final readTs = locallyReadRooms[room.id]!;
++    final readTs = getLocallyReadTimestamp(room.id);
++    if (readTs != null) {
 +      final lastMsgTs = getLastMessageTime(room.id)?.millisecondsSinceEpoch ??
 +          room.lastEvent?.originServerTs.millisecondsSinceEpoch ??
 +          getCachedLastTimestamp(room.id) ??
 +          0;
-+      if (lastMsgTs <= readTs && !room.markedUnread && room.notificationCount == 0) {
++      if (lastMsgTs <= readTs && !room.markedUnread) {
 +        return false;
 +      } else if (lastMsgTs > readTs) {
-+        locallyReadRooms.remove(room.id);
++        clearLocallyReadTimestamp(room.id);
 +      }
 +    }
 +    // If the last real message in this room was sent by the current user
@@ -358026,9 +358475,7 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +    // or if the last real message is from me, suppress unread status.
 +    if (!room.markedUnread) {
 +      final myUserId = room.client.userID;
-+      final lastReal = getLastRealMessage(room) ??
-+          lastRealMessageCache[room.id] ??
-+          (room.lastEvent?.type.startsWith('com.beeper') == true ? null : room.lastEvent);
++      final lastReal = findLastRealMessageFast(room);
 +      if (lastReal != null && lastReal.senderId == myUserId) {
 +        return false;
 +      }
@@ -358048,6 +358495,32 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +    return type == EventTypes.Message ||
 +        type == EventTypes.Encrypted ||
 +        type == EventTypes.Sticker;
++  }
++
++  /// Returns the last real message in a room, checking lastEvent, in-memory caches,
++  /// and loaded timeline if available.
++  static Event? findLastRealMessageFast(Room room) {
++    final lastEvent = room.lastEvent;
++    if (lastEvent != null && isRealMessageType(lastEvent.type)) {
++      return lastEvent;
++    }
++
++    final cached = lastRealMessageCache[room.id];
++    if (cached != null && isRealMessageType(cached.type)) {
++      return cached;
++    }
++
++    final timeline = room.timeline;
++    if (timeline != null && timeline.events.isNotEmpty) {
++      for (final ev in timeline.events) {
++        if (isRealMessageType(ev.type)) {
++          lastRealMessageCache[room.id] = ev;
++          return ev;
++        }
++      }
++    }
++
++    return (lastEvent?.type.startsWith('com.beeper') == true ? null : lastEvent);
 +  }
 +
 +  /// Returns the last real message event in a room, skipping state events
@@ -358134,8 +358607,9 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +    Timeline? timeline,
 +    bool publicReceipt = true,
 +  }) async {
-+    // 1. Optimistically mark as read locally
-+    locallyReadRooms[room.id] = DateTime.now().millisecondsSinceEpoch;
++    // 1. Optimistically mark as read locally and persist timestamp to disk
++    final nowTs = DateTime.now().millisecondsSinceEpoch;
++    saveLocallyReadTimestamp(room.id, nowTs);
 +    room.notificationCount = 0;
 +    room.highlightCount = 0;
 +    if (room.markedUnread) {
@@ -358143,13 +358617,13 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +    }
 +
 +    // 2. Resolve target incoming event for mRead (crucial for WhatsApp/Telegram bridges):
-+    final incomingMsg = targetEventId != null
-+        ? null
-+        : await findLastIncomingRealMessage(room, timeline: timeline);
-+    final mReadId = targetEventId ?? incomingMsg?.eventId;
++    // Prioritize the latest incoming real message in the room so the bridge marks all incoming
++    // messages read, even if a specific older message was quoted/replied to.
++    final latestIncoming = await findLastIncomingRealMessage(room, timeline: timeline);
++    final mReadId = latestIncoming?.eventId ?? targetEventId;
 +
 +    // Resolve fullyRead ID (advances to latest event in room so no unread banners remain):
-+    final anyRealMsg = getLastRealMessage(room) ?? lastRealMessageCache[room.id];
++    final anyRealMsg = findLastRealMessageFast(room);
 +    final fullyReadId = room.lastEvent?.eventId ??
 +        anyRealMsg?.eventId ??
 +        mReadId ??
@@ -358162,7 +358636,7 @@ index 0000000000000000000000000000000000000000..e775cf4a9ce175bb723c23a89504b523
 +        await FlutterLocalNotificationsPlugin().cancel(id: notifId);
 +      } catch (_) {}
 +    }
-+    final unreadCount = room.client.rooms.where((r) => r.isUnreadOrInvited).length;
++    final unreadCount = room.client.rooms.where((r) => isRoomUnread(r) || r.membership == Membership.invite).length;
 +    updateAppBadge(unreadCount);
 +
 +    // 4. Notify listeners (such as ChatListController) immediately
