@@ -303399,7 +303399,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..76298a52f9f7b08d0802e77f529738de
 +  }
 +}
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..69f64e8bbd60c0ba681bf9d7d3c5afc106c00798 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..dae7ced8a29292d7bffb20349bc5d08688221e6d 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -304426,7 +304426,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..69f64e8bbd60c0ba681bf9d7d3c5afc1
 +
 +    final scheduledAt = await showDialog<DateTime>(
 +      context: context,
-+      builder: (ctx) => const ScheduleMessageDialog(),
++      builder: (ctx) => const ScheduledTimePickerDialog(),
 +    );
 +    if (scheduledAt == null || !context.mounted) return;
 +
@@ -357229,10 +357229,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4d97ad58187a85267a95fe333eed56e851ce7938
+index 0000000000000000000000000000000000000000..c37388fcf2a971a3fae3670f7ff781cce6ea089c
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1455 @@
+@@ -0,0 +1,1454 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -358499,7 +358499,7 @@ index 0000000000000000000000000000000000000000..4d97ad58187a85267a95fe333eed56e8
 +
 +  /// Returns the last real message in a room, checking lastEvent, in-memory caches,
 +  /// and loaded timeline if available.
-+  static Event? findLastRealMessageFast(Room room) {
++  static Event? findLastRealMessageFast(Room room, {Timeline? timeline}) {
 +    final lastEvent = room.lastEvent;
 +    if (lastEvent != null && isRealMessageType(lastEvent.type)) {
 +      return lastEvent;
@@ -358510,7 +358510,6 @@ index 0000000000000000000000000000000000000000..4d97ad58187a85267a95fe333eed56e8
 +      return cached;
 +    }
 +
-+    final timeline = room.timeline;
 +    if (timeline != null && timeline.events.isNotEmpty) {
 +      for (final ev in timeline.events) {
 +        if (isRealMessageType(ev.type)) {
@@ -358623,7 +358622,7 @@ index 0000000000000000000000000000000000000000..4d97ad58187a85267a95fe333eed56e8
 +    final mReadId = latestIncoming?.eventId ?? targetEventId;
 +
 +    // Resolve fullyRead ID (advances to latest event in room so no unread banners remain):
-+    final anyRealMsg = findLastRealMessageFast(room);
++    final anyRealMsg = findLastRealMessageFast(room, timeline: timeline);
 +    final fullyReadId = room.lastEvent?.eventId ??
 +        anyRealMsg?.eventId ??
 +        mReadId ??
