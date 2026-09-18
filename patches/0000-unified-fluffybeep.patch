@@ -311721,7 +311721,7 @@ index dc9ab9acc27c8949e823efc3114c6a1efaff7112..7af684a5577204bb61c647af6ca1e5dd
 +  }
 +}
 diff --git a/lib/pages/chat/events/message.dart b/lib/pages/chat/events/message.dart
-index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcbb769106e 100644
+index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..12c234635b1b574ec86cc494fbd8d3fee4b585c3 100644
 --- a/lib/pages/chat/events/message.dart
 +++ b/lib/pages/chat/events/message.dart
 @@ -5,7 +5,6 @@
@@ -312129,7 +312129,40 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                            MediaQuery.highContrastOf(context),
                                        scrollController: scrollController,
                                        child: Container(
-@@ -471,9 +527,8 @@ class Message extends StatelessWidget {
+@@ -466,14 +522,41 @@ class Message extends StatelessWidget {
+                                           crossAxisAlignment:
+                                               CrossAxisAlignment.start,
+                                           children: <Widget>[
++                                            if (event.redacted && event.content.isNotEmpty)
++                                              Padding(
++                                                padding: const EdgeInsets.only(
++                                                  left: 12,
++                                                  right: 12,
++                                                  top: 6,
++                                                  bottom: 2,
++                                                ),
++                                                child: Row(
++                                                  mainAxisSize: MainAxisSize.min,
++                                                  children: [
++                                                    Icon(
++                                                      Icons.delete_outline_rounded,
++                                                      size: 14,
++                                                      color: textColor.withAlpha(150),
++                                                    ),
++                                                    const SizedBox(width: 4),
++                                                    Text(
++                                                      'Mensaje eliminado',
++                                                      style: TextStyle(
++                                                        fontSize: 11,
++                                                        fontStyle: FontStyle.italic,
++                                                        color: textColor.withAlpha(150),
++                                                      ),
++                                                    ),
++                                                  ],
++                                                ),
++                                              ),
+                                             if (event.inReplyToEventId(
+                                                   includingFallback: false,
                                                  ) !=
                                                  null)
                                                FutureBuilder<Event?>(
@@ -312141,7 +312174,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                                  builder: (BuildContext context, snapshot) {
                                                    final replyEvent =
                                                        snapshot.hasData
-@@ -530,15 +585,30 @@ class Message extends StatelessWidget {
+@@ -530,15 +613,30 @@ class Message extends StatelessWidget {
                                                    );
                                                  },
                                                ),
@@ -312181,7 +312214,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                              ),
                                            ],
                                          ),
-@@ -550,7 +620,8 @@ class Message extends StatelessWidget {
+@@ -550,7 +648,8 @@ class Message extends StatelessWidget {
                              ),
  
                              AnimatedSize(
@@ -312191,7 +312224,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                curve: FluffyThemes.animationCurve,
                                alignment: Alignment.bottomCenter,
                                child: !hasReactions
-@@ -564,7 +635,11 @@ class Message extends StatelessWidget {
+@@ -564,7 +663,11 @@ class Message extends StatelessWidget {
                                          left: 8.0,
                                          right: ownMessage ? 0 : 12.0,
                                        ),
@@ -312204,7 +312237,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                      ),
                              ),
                              Row(
-@@ -646,7 +721,8 @@ class Message extends StatelessWidget {
+@@ -646,7 +749,8 @@ class Message extends StatelessWidget {
                                    ? Alignment.bottomRight
                                    : Alignment.bottomLeft,
                                child: AnimatedSize(
@@ -312214,7 +312247,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                  curve: FluffyThemes.animationCurve,
                                  child: showReactionPicker
                                      ? Padding(
-@@ -667,22 +743,20 @@ class Message extends StatelessWidget {
+@@ -667,22 +771,20 @@ class Message extends StatelessWidget {
                                                    (emoji) => IconButton(
                                                      padding: EdgeInsets.zero,
                                                      icon: Center(
@@ -312250,7 +312283,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                                                      ),
                                                      onPressed:
                                                          sentReactions.contains(
-@@ -829,7 +903,8 @@ class Message extends StatelessWidget {
+@@ -829,7 +931,8 @@ class Message extends StatelessWidget {
                ),
                if (enterThread != null)
                  AnimatedSize(
@@ -312260,7 +312293,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                    curve: FluffyThemes.animationCurve,
                    alignment: Alignment.bottomCenter,
                    child: threadChildren.isEmpty
-@@ -890,9 +965,52 @@ class Message extends StatelessWidget {
+@@ -890,9 +993,52 @@ class Message extends StatelessWidget {
                        ),
                        child: Text(
                          L10n.of(context).readUpToHere,
@@ -312314,7 +312347,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
                      Expanded(
                        child: Divider(
                          color: theme.colorScheme.surfaceContainerHighest,
-@@ -924,61 +1042,26 @@ class BubbleBackground extends StatelessWidget {
+@@ -924,61 +1070,26 @@ class BubbleBackground extends StatelessWidget {
  
    @override
    Widget build(BuildContext context) {
@@ -312390,7 +312423,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
  class _AnimateIn extends StatefulWidget {
    final bool animateIn;
    final Widget child;
-@@ -1003,7 +1086,8 @@ class __AnimateInState extends State<_AnimateIn> {
+@@ -1003,7 +1114,8 @@ class __AnimateInState extends State<_AnimateIn> {
      }
  
      return AnimatedSize(
@@ -312401,7 +312434,7 @@ index d43470011e1b9e0c7e722b5d44ff7d1ea6c7da47..0b95f7c19ae05ddd8835c2991eb57bcb
        child: _animationFinished ? widget.child : const SizedBox.shrink(),
      );
 diff --git a/lib/pages/chat/events/message_content.dart b/lib/pages/chat/events/message_content.dart
-index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..f955cd27ecfa43bbe7a657897755dd61213d40a8 100644
+index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..79baeff851bbe0683ebc2bb4830f050aa2be2c73 100644
 --- a/lib/pages/chat/events/message_content.dart
 +++ b/lib/pages/chat/events/message_content.dart
 @@ -1,324 +1,517 @@
@@ -312791,7 +312824,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..f955cd27ecfa43bbe7a657897755dd61
 +        switch (event.messageType) {
 +          case MessageTypes.Image:
 +          case MessageTypes.Sticker:
-+            if (event.redacted) continue textmessage;
++            if (event.redacted && event.content.isEmpty) continue textmessage;
 +            final maxSize = event.messageType == MessageTypes.Sticker
 +                ? 128.0
 +                : 256.0;
@@ -313030,7 +313063,7 @@ index 91fffa01f41b7449b3d5bacd4979bbb2287ad21c..f955cd27ecfa43bbe7a657897755dd61
 +          case MessageTypes.None:
 +          textmessage:
 +          default:
-+            if (event.redacted) {
++            if (event.redacted && event.content.isEmpty) {
 +              return RedactionWidget(
 +                event: event,
 +                buttonTextColor: buttonTextColor,
