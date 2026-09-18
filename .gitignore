@@ -3,3 +3,5 @@ server_credentials.txt
 *.key
 *.pem
 .env
+server_deploy/
+
