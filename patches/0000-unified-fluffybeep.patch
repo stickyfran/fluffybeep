@@ -308370,7 +308370,7 @@ index 731cc945f6ccb94c2aff2a2a13c93cfc184d1043..25f8aa16cc9d68903084e5d5da20b8fd
 +  }
 +}
 diff --git a/lib/pages/chat/events/audio_player.dart b/lib/pages/chat/events/audio_player.dart
-index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604581f0546 100644
+index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..d234da7e5197359666f5a1b46f801ea728667a46 100644
 --- a/lib/pages/chat/events/audio_player.dart
 +++ b/lib/pages/chat/events/audio_player.dart
 @@ -5,23 +5,30 @@
@@ -308494,7 +308494,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
    const AudioPlayerWidget(
      this.event, {
      required this.color,
-@@ -47,480 +137,1646 @@ class AudioPlayerWidget extends StatefulWidget {
+@@ -47,484 +137,1662 @@ class AudioPlayerWidget extends StatefulWidget {
  
  enum AudioPlayerStatus { notDownloaded, downloading, downloaded }
  
@@ -308645,9 +308645,16 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      final convertedFile = File('${tempDir.path}/audio_$cacheKey.caf');
 +      if (await convertedFile.exists() && await convertedFile.length() > 100) {
 +        return convertedFile;
-+      }
-+    }
-+
+       }
+-      return;
+     }
+ 
+-    matrix.voiceMessageEventId.value = widget.event.eventId;
+-    matrix.audioPlayer
+-      ?..stop()
+-      ..dispose();
+-    File? file;
+-    MatrixFile? matrixFile;
 +    final rawFile = File('${tempDir.path}/audio_$cacheKey$ext');
 +    if (await rawFile.exists() && await rawFile.length() > 100) {
 +      return rawFile;
@@ -308660,9 +308667,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      final legacyCaf = File('${legacyFile.path}.caf');
 +      if (await legacyCaf.exists() && await legacyCaf.length() > 100) {
 +        return legacyCaf;
-       }
--      return;
-     }
++      }
++    }
 +    if (await legacyFile.exists() && await legacyFile.length() > 100) {
 +      return legacyFile;
 +    }
@@ -308678,20 +308684,14 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +    final existing = await getLocalAudioFile(event);
 +    if (existing != null) return existing;
  
--    matrix.voiceMessageEventId.value = widget.event.eventId;
--    matrix.audioPlayer
--      ?..stop()
--      ..dispose();
--    File? file;
--    MatrixFile? matrixFile;
+-    setState(() => status = AudioPlayerStatus.downloading);
 +    if (activeDownloadEventIds.contains(eventId)) {
 +      while (activeDownloadEventIds.contains(eventId)) {
 +        await Future.delayed(const Duration(milliseconds: 50));
 +      }
 +      return await getLocalAudioFile(event);
 +    }
- 
--    setState(() => status = AudioPlayerStatus.downloading);
++
 +    activeDownloadEventIds.add(eventId);
      try {
 -      final fileSize = widget.event.content
@@ -308848,7 +308848,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +              SnackBar(content: Text(e.toLocalizedString(context))),
 +            );
 +          }
-+        }
+         }
 +        return;
 +      }
 +    }
@@ -308859,13 +308859,15 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +        preparingEventIdNotifier.value = null;
 +        downloadProgressNotifier.value = null;
 +        matrix.voiceMessageEventId.value = null;
-+      }
+       }
 +      return;
 +    }
 +
 +    final outputMode = AudioRouterService.instance.outputModeNotifier.value;
 +    final audioPlayer = matrix.audioPlayer = AudioPlayer();
-+
+ 
+-      setState(() {
+-        status = AudioPlayerStatus.downloaded;
 +    if (PlatformInfos.isMobile) {
 +      AudioSession.instance.then((session) {
 +        session.configure(
@@ -308873,7 +308875,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +              ? const AudioSessionConfiguration.speech()
 +              : const AudioSessionConfiguration.music(),
 +        ).catchError((e) => Logs().w('Failed audio session config', e));
-+      });
+       });
 +      AudioRouterService.instance.startSession(outputMode);
 +    }
 +
@@ -308897,7 +308899,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      if (preferredSpeed != 1.0) {
 +        await audioPlayer.setSpeed(preferredSpeed);
 +      }
-+    } catch (e, s) {
+     } catch (e, s) {
+-      Logs().v('Could not download audio file', e, s);
 +      Logs().e('Failed to load audio file in player: ${file.path}', e, s);
 +      try {
 +        if (await file.exists()) await file.delete();
@@ -308969,8 +308972,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +        if (matrix.continuousAudioPlaybackNotifier.value) {
 +          _handleAutoAdvance(matrix, event);
 +        } else {
-+          matrix.voiceMessageEventId.value = null;
-+          AudioRouterService.instance.stopSession();
++          stopPlayback(matrix);
 +        }
 +      }
 +    });
@@ -308989,16 +308991,11 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      }
 +      Logs().e('Failed to play audio', e, s);
 +      if (sessionToken == _playbackSessionToken) {
-+        preparingEventIdNotifier.value = null;
-+        downloadProgressNotifier.value = null;
-+        matrix.voiceMessageEventId.value = null;
-+        matrix.audioPlayer?.dispose();
-+        matrix.audioPlayer = null;
-+        AudioRouterService.instance.stopSession();
++        stopPlayback(matrix);
 +        if (context != null && context.mounted) {
 +          ErrorReporter(context, 'Unable to play audio message').onErrorCallback(e, s);
-         }
-       }
++        }
++      }
 +    }
 +  }
 +
@@ -309013,8 +309010,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +    } catch (e, s) {
 +      Logs().e('Error in auto advance', e, s);
 +    }
-+    matrix.voiceMessageEventId.value = null;
-+    AudioRouterService.instance.stopSession();
++    stopPlayback(matrix);
 +  }
 +
 +  static Future<Event?> findNextAudioEvent(Event currentEvent) async {
@@ -309080,6 +309076,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +
 +  @override
 +  void dispose() {
++    matrix.audioPlayerNotifier.removeListener(_onAudioPlayerChanged);
++    matrix.voiceMessageEventId.removeListener(_onAudioPlayerChanged);
 +    _playerDurationSub?.cancel();
 +    _scrubbingDurationNotifier.dispose();
 +    super.dispose();
@@ -309101,9 +309099,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      return;
 +    }
 +    VoicePlaybackController.prefetchedEventIds.add(eventId);
- 
--      setState(() {
--        status = AudioPlayerStatus.downloaded;
++
 +    VoicePlaybackController.getLocalAudioFile(widget.event).then((cached) {
 +      if (cached != null) {
 +        if (mounted) {
@@ -309123,7 +309119,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +        }
 +      }).catchError((e) {
 +        Logs().v('Background audio preload failed silently for $eventId: $e');
-       });
++      });
 +    }).catchError((e) {
 +      Logs().v('Check local audio file failed: $e');
 +    });
@@ -309181,11 +309177,10 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +        context: context,
 +        initialSeekPosition: seekPos,
 +      );
-+      if (mounted && matrix.audioPlayer != null) {
-+        _listenToPlayerDuration(matrix.audioPlayer);
++      if (mounted) {
++        _onAudioPlayerChanged();
 +      }
-     } catch (e, s) {
--      Logs().v('Could not download audio file', e, s);
++    } catch (e, s) {
 +      Logs().v('Could not play audio file', e, s);
        if (!mounted) rethrow;
        ScaffoldMessenger.of(
@@ -309203,9 +309198,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +    final current = AudioRouterService.instance.outputModeNotifier.value;
 +    final next = current == 'earpiece' ? 'speaker' : 'earpiece';
 +    await AudioRouterService.instance.setOutputMode(next);
- 
--    if (file != null) {
--      audioPlayer.setFilePath(file.path);
++
 +    if (PlatformInfos.isMobile) {
 +      try {
 +        final session = await AudioSession.instance;
@@ -309232,7 +309225,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +      }
 +    }
 +  }
-+
+ 
+-    if (file != null) {
+-      audioPlayer.setFilePath(file.path);
 +  Future<void> _toggleSpeed() async {
 +    HapticFeedback.selectionClick();
 +    final currentSpeed = AudioRouterService.instance.playbackSpeedNotifier.value;
@@ -309395,15 +309390,20 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +    }
 +  }
 +
++  void _onAudioPlayerChanged() {
++    if (!mounted) return;
++    final player = matrix.voiceMessageEventId.value == widget.event.eventId
++        ? matrix.audioPlayer
++        : null;
++    _listenToPlayerDuration(player);
++  }
++
 +  @override
 +  void didUpdateWidget(covariant AudioPlayerWidget oldWidget) {
 +    super.didUpdateWidget(oldWidget);
 +    if (oldWidget.event.eventId != widget.event.eventId) {
 +      _initEventState();
-+      final player = matrix.voiceMessageEventId.value == widget.event.eventId
-+          ? matrix.audioPlayer
-+          : null;
-+      _listenToPlayerDuration(player);
++      _onAudioPlayerChanged();
 +    }
 +  }
 +
@@ -309457,6 +309457,9 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
      matrix = Matrix.of(context);
 -    _waveform = _getWaveform();
 +    _initEventState();
++
++    matrix.audioPlayerNotifier.addListener(_onAudioPlayerChanged);
++    matrix.voiceMessageEventId.addListener(_onAudioPlayerChanged);
  
      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
          matrix.audioPlayer != null) {
@@ -309542,27 +309545,32 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 -                                    color: widget.color.withAlpha(64),
 +      builder: (context, activeEventId, _) {
 +        final isCurrent = activeEventId == widget.event.eventId;
-+        final audioPlayer = isCurrent ? matrix.audioPlayer : null;
 +
-+        return ValueListenableBuilder<String?>(
-+          valueListenable:
-+              VoicePlaybackController.instance.preparingEventIdNotifier,
-+          builder: (context, preparingEventId, _) {
-+            final isPreparingThis =
-+                isCurrent && preparingEventId == widget.event.eventId;
++        return ValueListenableBuilder<AudioPlayer?>(
++          valueListenable: matrix.audioPlayerNotifier,
++          builder: (context, activePlayer, _) {
++            final audioPlayer = isCurrent ? activePlayer : null;
 +
-+            return ValueListenableBuilder<bool>(
++            return ValueListenableBuilder<String?>(
 +              valueListenable:
-+                  VoicePlaybackController.instance.isWaitingForEarNotifier,
-+              builder: (context, isWaitingForEarGlobal, _) {
-+                final isWaitingForEar =
-+                    isCurrent && isWaitingForEarGlobal;
++                  VoicePlaybackController.instance.preparingEventIdNotifier,
++              builder: (context, preparingEventId, _) {
++                final isPreparingThis =
++                    isCurrent && preparingEventId == widget.event.eventId;
 +
-+                return StreamBuilder<PlayerState>(
-+                  stream: audioPlayer?.playerStateStream,
-+                  builder: (context, _) {
-+                    final isPlaying = audioPlayer?.playing == true &&
-+                        audioPlayer?.isAtEndPosition == false;
++                return ValueListenableBuilder<bool>(
++                  valueListenable:
++                      VoicePlaybackController.instance.isWaitingForEarNotifier,
++                  builder: (context, isWaitingForEarGlobal, _) {
++                    final isWaitingForEar =
++                        isCurrent && isWaitingForEarGlobal;
++
++                    return StreamBuilder<PlayerState>(
++                      stream: audioPlayer?.playerStateStream,
++                      initialData: audioPlayer?.playerState,
++                      builder: (context, _) {
++                        final isPlaying = audioPlayer?.playing == true &&
++                            audioPlayer?.isAtEndPosition == false;
 +                    final isLoading = !isPlaying && isPreparingThis;
 +
 +                    Widget buttonChild;
@@ -309779,6 +309787,8 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +                        ],
 +                      ),
 +                    );
++                    },
++                  );
 +                  },
 +                );
 +              },
@@ -310479,6 +310489,7 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +        stream: player.positionStream.distinct(
 +          (prev, next) => prev.inSeconds == next.inSeconds,
 +        ),
++        initialData: player.position,
 +        builder: (context, snapshot) {
 +          final pos = snapshot.data ?? player.position;
 +          return Text(
@@ -310515,7 +310526,13 @@ index e5b54c10a2fbe692e848a573ae8bc345f5f4df69..13db30eb2284110b69d5e99ea74f1604
 +
  extension on AudioPlayer {
    bool get isAtEndPosition {
++    if (processingState == ProcessingState.completed) return true;
      final duration = this.duration;
+-    if (duration == null) return true;
++    if (duration == null || duration == Duration.zero) return false;
+     return position >= duration;
+   }
+ }
 diff --git a/lib/pages/chat/events/cute_events.dart b/lib/pages/chat/events/cute_events.dart
 index 69b4feb91e13ba5c71d40adbd74212c5129a6dd0..2096440d061103ddd1fca7df756ffd6e29c35f4c 100644
 --- a/lib/pages/chat/events/cute_events.dart
@@ -324747,7 +324764,7 @@ index f454d6811c19a528ecfba80b9e47845fa6786390..d3882ee1f06a994f4c445cf3e4f6bbfd
 +  }
 +}
 diff --git a/lib/pages/chat_list/chat_list.dart b/lib/pages/chat_list/chat_list.dart
-index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..6eb953e445183b870c5e6173776956c8f036d773 100644
+index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..c6d570dc79a1a99f3525c54501264029fbfc7594 100644
 --- a/lib/pages/chat_list/chat_list.dart
 +++ b/lib/pages/chat_list/chat_list.dart
 @@ -4,13 +4,17 @@
@@ -326126,15 +326143,52 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..6eb953e445183b870c5e6173776956c8
      }
    }
  
-@@ -864,6 +1763,7 @@ class ChatListController extends State<ChatList>
-     final router = GoRouter.of(context);
+@@ -861,9 +1760,9 @@ class ChatListController extends State<ChatList>
+   bool waitForFirstSync = false;
+ 
+   Future<void> _waitForFirstSync() async {
+-    final router = GoRouter.of(context);
      final client = Matrix.of(context).client;
      await client.roomsLoading;
 +    if (mounted) _invalidateRoomCache();
      await client.accountDataLoading;
      await client.userDeviceKeysLoading;
      if (client.prevBatch == null) {
-@@ -914,10 +1814,9 @@ class ChatListController extends State<ChatList>
+@@ -880,44 +1779,15 @@ class ChatListController extends State<ChatList>
+     setState(() {
+       waitForFirstSync = true;
+     });
+-
+-    if (client.userDeviceKeys[client.userID!]?.deviceKeys.values.any(
+-          (device) => !device.verified && !device.blocked,
+-        ) ??
+-        false) {
+-      late final ScaffoldFeatureController controller;
+-      final theme = Theme.of(context);
+-      controller = ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(
+-          duration: const Duration(seconds: 15),
+-          showCloseIcon: true,
+-          backgroundColor: theme.colorScheme.errorContainer,
+-          closeIconColor: theme.colorScheme.onErrorContainer,
+-          content: Text(
+-            L10n.of(context).oneOfYourDevicesIsNotVerified,
+-            style: TextStyle(color: theme.colorScheme.onErrorContainer),
+-          ),
+-          action: SnackBarAction(
+-            onPressed: () {
+-              controller.close();
+-              router.go('/rooms/settings/devices');
+-            },
+-            textColor: theme.colorScheme.onErrorContainer,
+-            label: L10n.of(context).settings,
+-          ),
+-        ),
+-      );
+-    }
+   }
+ 
+   void setActiveFilter(ActiveFilter filter, String? tag) {
      if (filter == ActiveFilter.tag && tag == null) {
        throw ('Must set a tag when setting filter to tags!');
      }
@@ -326148,7 +326202,7 @@ index dc5d8a4ac4fdd4f7a3e11c6d13a917ee4bf7ad34..6eb953e445183b870c5e6173776956c8
      AppSettings.chatFilter.setItem(
        filter == ActiveFilter.tag ? tag! : filter.name,
      );
-@@ -1039,4 +1938,7 @@ enum ChatContextAction {
+@@ -1039,4 +1909,7 @@ enum ChatContextAction {
    addToSpace,
    block,
    showMore,
@@ -334325,10 +334379,10 @@ index 932334e6b4bde5fc047855d85998b2298e8c0173..2c2f112998b9939ab969358a16e14106
 +  }
 +}
 diff --git a/lib/pages/device_settings/device_settings.dart b/lib/pages/device_settings/device_settings.dart
-index 0791b1017736c76964b303d6faebc97a04768465..ecfdcc0e787c6f008599c9a9d9d565ba806fee29 100644
+index 0791b1017736c76964b303d6faebc97a04768465..29b6bdbf34532ed3fb550cb2920f8856ef76f839 100644
 --- a/lib/pages/device_settings/device_settings.dart
 +++ b/lib/pages/device_settings/device_settings.dart
-@@ -1,179 +1,190 @@
+@@ -1,179 +1,204 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -334541,17 +334595,30 @@ index 0791b1017736c76964b303d6faebc97a04768465..ecfdcc0e787c6f008599c9a9d9d565ba
 +
 +  Future<bool> loadUserDevices(BuildContext context) async {
 +    if (devices != null) return true;
-+    devices = await Matrix.of(context).client.getDevices();
++    final client = Matrix.of(context).client;
++    await client.userDeviceKeysLoading;
++    devices = await client.getDevices();
 +    _cachedNotThisDevice = null;
 +    return true;
 +  }
 +
-+  void reload() => setState(() {
-+    devices = null;
-+    _cachedNotThisDevice = null;
-+  });
++  void reload() {
++    _checkChatBackup();
++    setState(() {
++      devices = null;
++      _cachedNotThisDevice = null;
++    });
++  }
 +
 +  bool? chatBackupEnabled;
++  bool encryptionIssue = false;
++
++  bool get hasUnverifiedDevices {
++    final client = Matrix.of(context).client;
++    final keys = client.userDeviceKeys[client.userID]?.deviceKeys;
++    if (keys == null) return false;
++    return keys.values.any((device) => !device.verified && !device.blocked);
++  }
 +
 +  @override
 +  void initState() {
@@ -334565,6 +334632,7 @@ index 0791b1017736c76964b303d6faebc97a04768465..ecfdcc0e787c6f008599c9a9d9d565ba
 +    if (!mounted) return;
 +    setState(() {
 +      chatBackupEnabled = state.initialized && !state.connected;
++      encryptionIssue = state.initialized && !state.connected;
 +    });
 +  }
 +
@@ -334699,10 +334767,10 @@ index 0791b1017736c76964b303d6faebc97a04768465..ecfdcc0e787c6f008599c9a9d9d565ba
 +  Widget build(BuildContext context) => DevicesSettingsView(this);
 +}
 diff --git a/lib/pages/device_settings/device_settings_view.dart b/lib/pages/device_settings/device_settings_view.dart
-index 68d3a8fa32e5dfc17a32ea47640b8cbdb92e6b8e..a073e3eead2c49d2d08b5b51c089d20f30f3236a 100644
+index 68d3a8fa32e5dfc17a32ea47640b8cbdb92e6b8e..e8d69d6cc13e89cb39ebefe135ebdd7cc8b62559 100644
 --- a/lib/pages/device_settings/device_settings_view.dart
 +++ b/lib/pages/device_settings/device_settings_view.dart
-@@ -1,148 +1,148 @@
+@@ -1,148 +1,235 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -334856,11 +334924,13 @@ index 68d3a8fa32e5dfc17a32ea47640b8cbdb92e6b8e..a073e3eead2c49d2d08b5b51c089d20f
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'package:fluffychat/config/app_config.dart';
 +import 'package:fluffychat/config/themes.dart';
 +import 'package:fluffychat/l10n/l10n.dart';
 +import 'package:fluffychat/pages/device_settings/device_settings.dart';
 +import 'package:fluffychat/widgets/layouts/max_width_body.dart';
 +import 'package:flutter/material.dart';
++import 'package:go_router/go_router.dart';
 +
 +import 'user_device_list_item.dart';
 +
@@ -334907,6 +334977,91 @@ index 68d3a8fa32e5dfc17a32ea47640b8cbdb92e6b8e..a073e3eead2c49d2d08b5b51c089d20f
 +                  return Column(
 +                    mainAxisSize: .min,
 +                    children: [
++                      if (controller.encryptionIssue)
++                        Padding(
++                          padding: const EdgeInsets.symmetric(
++                            horizontal: 16.0,
++                            vertical: 6.0,
++                          ),
++                          child: Material(
++                            color: theme.colorScheme.errorContainer,
++                            borderRadius:
++                                BorderRadius.circular(AppConfig.borderRadius),
++                            child: Padding(
++                              padding: const EdgeInsets.all(12.0),
++                              child: Row(
++                                children: [
++                                  Icon(
++                                    Icons.lock_reset,
++                                    color: theme.colorScheme.onErrorContainer,
++                                  ),
++                                  const SizedBox(width: 12),
++                                  Expanded(
++                                    child: Text(
++                                      'Problema con el cifrado de extremo a extremo. Por favor verifica tu sesión.',
++                                      style: TextStyle(
++                                        color:
++                                            theme.colorScheme.onErrorContainer,
++                                        fontWeight: FontWeight.w500,
++                                      ),
++                                    ),
++                                  ),
++                                  const SizedBox(width: 8),
++                                  FilledButton.tonal(
++                                    style: FilledButton.styleFrom(
++                                      visualDensity: VisualDensity.compact,
++                                      backgroundColor:
++                                          theme.colorScheme.onErrorContainer,
++                                      foregroundColor:
++                                          theme.colorScheme.errorContainer,
++                                    ),
++                                    onPressed: () => context.go('/bootstrap'),
++                                    child: const Text('Verificar'),
++                                  ),
++                                ],
++                              ),
++                            ),
++                          ),
++                        ),
++                      if (controller.hasUnverifiedDevices)
++                        Padding(
++                          padding: const EdgeInsets.symmetric(
++                            horizontal: 16.0,
++                            vertical: 6.0,
++                          ),
++                          child: Material(
++                            color: theme.colorScheme.errorContainer,
++                            borderRadius:
++                                BorderRadius.circular(AppConfig.borderRadius),
++                            child: Padding(
++                              padding: const EdgeInsets.symmetric(
++                                horizontal: 16.0,
++                                vertical: 12.0,
++                              ),
++                              child: Row(
++                                children: [
++                                  Icon(
++                                    Icons.warning_amber_rounded,
++                                    color: theme.colorScheme.onErrorContainer,
++                                  ),
++                                  const SizedBox(width: 12),
++                                  Expanded(
++                                    child: Text(
++                                      L10n.of(
++                                        context,
++                                      ).oneOfYourDevicesIsNotVerified,
++                                      style: TextStyle(
++                                        color:
++                                            theme.colorScheme.onErrorContainer,
++                                        fontWeight: FontWeight.w500,
++                                      ),
++                                    ),
++                                  ),
++                                ],
++                              ),
++                            ),
++                          ),
++                        ),
 +                      if (controller.chatBackupEnabled == false)
 +                        Padding(
 +                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -361372,10 +361527,10 @@ index 0000000000000000000000000000000000000000..9192e1e3367a521f53fd0e6e35c9a17c
 +}
 diff --git a/lib/utils/crash_logger.dart b/lib/utils/crash_logger.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df059209f8
+index 0000000000000000000000000000000000000000..80db0668de06f7570fc5a898489c6b89fb75a818
 --- /dev/null
 +++ b/lib/utils/crash_logger.dart
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,331 @@
 +import 'dart:async';
 +import 'dart:collection';
 +import 'dart:io';
@@ -361397,6 +361552,7 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +  static Timer? _watchdogTimer;
 +  static DateTime _lastHeartbeat = DateTime.now();
 +  static bool _watchdogActive = false;
++  static bool _handlersHooked = false;
 +
 +  // Umbral de bloqueo del hilo principal para considerarlo congelamiento severo (freeze)
 +  static const int freezeThresholdMs = 3500;
@@ -361409,6 +361565,7 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +  // Buffer circular de migas de pan (Breadcrumbs)
 +  static final ListQueue<String> _breadcrumbs = ListQueue<String>();
 +  static const int _maxBreadcrumbs = 40;
++  static String? _lastDumpedBreadcrumb;
 +
 +  /// Obtiene el consumo actual de memoria RAM del proceso en formato legible.
 +  static String get currentRamUsage {
@@ -361438,7 +361595,7 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +      await prefs.setBool(prefKey, val);
 +      if (val) {
 +        await _initFile();
-+        startWatchdog();
++        init();
 +        logEvent('CrashLogger activado manualmente por el usuario. RAM inicial: $currentRamUsage');
 +      } else {
 +        stopWatchdog();
@@ -361464,67 +361621,81 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +
 +    if (_isForeground) {
 +      _lastHeartbeat = DateTime.now();
++      if (_enabled) {
++        startWatchdog();
++      }
 +      addBreadcrumb('LIFECYCLE', 'App reanudada en primer plano (resumed)');
 +    } else if (wasForeground) {
++      // Si la app pasa a segundo plano o se apaga la pantalla, detener el watchdog
++      // para evitar que el estrangulamiento de CPU del sistema operativo (Doze) genere falsos positivos de freeze.
++      stopWatchdog();
 +      addBreadcrumb('LIFECYCLE', 'App en segundo plano o suspendida (${state.name})');
 +    }
 +  }
 +
 +  static void init() {
-+    if (!_enabled) return;
-+
++    // Siempre asegurar que el observador de ciclo de vida esté registrado
++    // si el framework de Flutter está listo, para mantener _isForeground actualizado.
 +    if (_lifecycleObserver == null) {
 +      _lifecycleObserver = _CrashLoggerLifecycleObserver();
 +      WidgetsBinding.instance.addObserver(_lifecycleObserver!);
 +    }
-+    _isForeground = WidgetsBinding.instance.lifecycleState == null ||
-+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
++    final currentLifecycle = WidgetsBinding.instance.lifecycleState;
++    _isForeground = currentLifecycle == null || currentLifecycle == AppLifecycleState.resumed;
++
++    if (!_enabled) return;
 +
 +    _checkPreviousSession();
 +
-+    // 1. Flutter framework error handler
-+    final originalOnError = FlutterError.onError;
-+    FlutterError.onError = (FlutterErrorDetails details) {
-+      logCrash('FLUTTER_ERROR', details.exceptionAsString(), details.stack);
-+      if (originalOnError != null) {
-+        originalOnError(details);
-+      }
-+    };
++    if (!_handlersHooked) {
++      _handlersHooked = true;
 +
-+    // 2. Async error handler (PlatformDispatcher)
-+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-+      logCrash('PLATFORM_ASYNC_ERROR', error.toString(), stack);
-+      return false;
-+    };
-+
-+    // 3. Isolate errors
-+    final errorPort = ReceivePort();
-+    errorPort.listen((message) {
-+      if (message is List && message.length >= 2) {
-+        logCrash('ISOLATE_ERROR', message[0].toString(), StackTrace.fromString(message[1].toString()));
-+      } else {
-+        logCrash('ISOLATE_ERROR', message.toString(), null);
-+      }
-+    });
-+    Isolate.current.addErrorListener(errorPort.sendPort);
-+
-+    // 4. Detección de frames bloqueados (> 150ms)
-+    WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
-+      if (!_enabled || !_isForeground) return;
-+      for (final timing in timings) {
-+        final totalDuration = timing.totalSpan.inMilliseconds;
-+        final buildDuration = timing.buildDuration.inMilliseconds;
-+        final rasterDuration = timing.rasterDuration.inMilliseconds;
-+        if (totalDuration > 150) {
-+          logFreeze(
-+            'UI_FRAME_DROP',
-+            'Frame demoro ' + totalDuration.toString() + 'ms (Build: ' + buildDuration.toString() + 'ms, Raster: ' + rasterDuration.toString() + 'ms)',
-+          );
++      // 1. Flutter framework error handler
++      final originalOnError = FlutterError.onError;
++      FlutterError.onError = (FlutterErrorDetails details) {
++        logCrash('FLUTTER_ERROR', details.exceptionAsString(), details.stack);
++        if (originalOnError != null) {
++          originalOnError(details);
 +        }
-+      }
-+    });
++      };
 +
-+    startWatchdog();
++      // 2. Async error handler (PlatformDispatcher)
++      PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
++        logCrash('PLATFORM_ASYNC_ERROR', error.toString(), stack);
++        return false;
++      };
++
++      // 3. Isolate errors
++      final errorPort = ReceivePort();
++      errorPort.listen((message) {
++        if (message is List && message.length >= 2) {
++          logCrash('ISOLATE_ERROR', message[0].toString(), StackTrace.fromString(message[1].toString()));
++        } else {
++          logCrash('ISOLATE_ERROR', message.toString(), null);
++        }
++      });
++      Isolate.current.addErrorListener(errorPort.sendPort);
++
++      // 4. Detección de frames bloqueados (> 150ms)
++      WidgetsBinding.instance.addTimingsCallback((List<FrameTiming> timings) {
++        if (!_enabled || !_isForeground) return;
++        for (final timing in timings) {
++          final totalDuration = timing.totalSpan.inMilliseconds;
++          final buildDuration = timing.buildDuration.inMilliseconds;
++          final rasterDuration = timing.rasterDuration.inMilliseconds;
++          if (totalDuration > 150) {
++            logFreeze(
++              'UI_FRAME_DROP',
++              'Frame demoro ' + totalDuration.toString() + 'ms (Build: ' + buildDuration.toString() + 'ms, Raster: ' + rasterDuration.toString() + 'ms)',
++            );
++          }
++        }
++      });
++    }
++
++    if (_isForeground) {
++      startWatchdog();
++    }
 +  }
 +
 +  static void _checkPreviousSession() {
@@ -361556,23 +361727,34 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +
 +  /// Watchdog para detectar ANRs o freezes donde el event loop se queda colgado en primer plano
 +  static void startWatchdog() {
-+    if (_watchdogActive) return;
++    if (_watchdogActive || !_enabled) return;
++
++    final currentLifecycle = WidgetsBinding.instance.lifecycleState;
++    final isActuallyForeground = _isForeground &&
++        (currentLifecycle == null || currentLifecycle == AppLifecycleState.resumed);
++
++    if (!isActuallyForeground) return;
++
 +    _watchdogActive = true;
 +    _lastHeartbeat = DateTime.now();
 +
 +    _watchdogTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
 +      final now = DateTime.now();
 +
-+      // Si la app no está en primer plano, ignorar (Android suspende o duerme los hilos en Doze/fondo)
-+      if (!_isForeground) {
-+        _lastHeartbeat = now;
++      // Si la app no está en primer plano, detener watchdog inmediatamente
++      final state = WidgetsBinding.instance.lifecycleState;
++      final isForegroundNow = _isForeground &&
++          (state == null || state == AppLifecycleState.resumed);
++
++      if (!isForegroundNow) {
++        stopWatchdog();
 +        return;
 +      }
 +
 +      final diff = now.difference(_lastHeartbeat).inMilliseconds;
 +
-+      // Descartar saltos extremos (> 90s) causados por despertar tardío de suspensión
-+      if (diff > 90000) {
++      // Descartar saltos causados por despertar tardío de suspensión (> 15s)
++      if (diff > 15000) {
 +        _lastHeartbeat = now;
 +        return;
 +      }
@@ -361601,9 +361783,15 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +    final buffer = StringBuffer();
 +    buffer.writeln('[FREEZE] [' + DateTime.now().toIso8601String() + '] [' + type + '] ' + details + ' | RAM: ' + currentRamUsage);
 +    if (_breadcrumbs.isNotEmpty) {
-+      buffer.writeln('  ↳ Contexto previo (Breadcrumbs):');
-+      for (final b in _breadcrumbs) {
-+        buffer.writeln('     * $b');
++      final currentLastBreadcrumb = _breadcrumbs.last;
++      if (_lastDumpedBreadcrumb == currentLastBreadcrumb) {
++        buffer.writeln('  ↳ Contexto previo: (Sin cambios en breadcrumbs)');
++      } else {
++        _lastDumpedBreadcrumb = currentLastBreadcrumb;
++        buffer.writeln('  ↳ Contexto previo (Breadcrumbs):');
++        for (final b in _breadcrumbs) {
++          buffer.writeln('     * $b');
++        }
 +      }
 +    }
 +    _write(buffer.toString());
@@ -361658,6 +361846,7 @@ index 0000000000000000000000000000000000000000..8d95941da8580c0cf18504e29c4e14df
 +
 +  static Future<void> clearLog() async {
 +    _breadcrumbs.clear();
++    _lastDumpedBreadcrumb = null;
 +    try {
 +      await _initFile();
 +      if (_logFile != null && await _logFile!.exists()) {
@@ -362118,17 +362307,16 @@ index b7e14ed983608a54f846e997c31ca74d6be4d34b..af847fa5570816390d0e6d7bbd618e0e
    /// Check if time needs to be in 24h format
 diff --git a/lib/utils/encryption_health_monitor.dart b/lib/utils/encryption_health_monitor.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77fc39f2df
+index 0000000000000000000000000000000000000000..40f273a475175900235631ffdafa2c94e211e15f
 --- /dev/null
 +++ b/lib/utils/encryption_health_monitor.dart
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,98 @@
 +import 'dart:async';
 +import 'package:fluffychat/utils/platform_infos.dart';
 +import 'package:flutter/material.dart';
 +import 'package:matrix/matrix.dart';
 +import 'package:matrix/encryption.dart';
 +import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-+import 'package:go_router/go_router.dart';
 +
 +class EncryptionHealthMonitor {
 +  static final EncryptionHealthMonitor _instance = EncryptionHealthMonitor._internal();
@@ -362136,14 +362324,8 @@ index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77
 +  EncryptionHealthMonitor._internal();
 +
 +  Timer? _timer;
-+  // Tracks the 10-minute cooldown before we can show another prompt.
-+  // Stored as a cancellable Timer so stop() can cancel it on logout,
-+  // preventing the delayed closure from resetting _isPrompting on a
-+  // new session after a fast logout/re-login.
-+  Timer? _promptCooldownTimer;
 +  Client? _client;
 +  BuildContext? _context;
-+  bool _isPrompting = false;
 +  String? _cachedRecoveryKey;
 +
 +  int _checkCount = 0;
@@ -362161,12 +362343,9 @@ index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77
 +  void stop() {
 +    _timer?.cancel();
 +    _timer = null;
-+    _promptCooldownTimer?.cancel();
-+    _promptCooldownTimer = null;
 +    _client = null;
 +    _context = null;
 +    _cachedRecoveryKey = null;
-+    _isPrompting = false;
 +    _checkCount = 0;
 +  }
 +
@@ -362175,7 +362354,7 @@ index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77
 +    // (which nulls _client/_context) does not cause NPE force-unwraps later.
 +    final client = _client;
 +    final context = _context;
-+    if (client == null || context == null || !context.mounted || _isPrompting) return;
++    if (client == null || context == null || !context.mounted) return;
 +    _checkCount++;
 +    final state = await client.getCryptoIdentityState();
 +
@@ -362226,34 +362405,10 @@ index 0000000000000000000000000000000000000000..64a73ef0f93f92cdc1cecf3732dc2c77
 +          Logs().w('EncryptionHealthMonitor: Failed to auto-restore crypto identity', e);
 +        }
 +      }
-+
-+      // If auto-restore failed, prompt user
-+      _isPrompting = true;
-+      if (context.mounted) {
-+        ScaffoldMessenger.of(context).showSnackBar(
-+          SnackBar(
-+            content: const Text('Problema con el cifrado de extremo a extremo. Por favor verifica tu sesión.'),
-+            action: SnackBarAction(
-+              label: 'Verificar',
-+              onPressed: () {
-+                context.go('/bootstrap');
-+              },
-+            ),
-+            duration: const Duration(seconds: 10),
-+          ),
-+        );
-+      }
-+      
-+      // Cooldown before prompting again. Use a tracked Timer so stop() can
-+      // cancel it and prevent it from firing on a new session after re-login.
-+      _promptCooldownTimer?.cancel();
-+      _promptCooldownTimer = Timer(const Duration(minutes: 10), () {
-+        _promptCooldownTimer = null;
-+        _isPrompting = false;
-+      });
 +    }
 +  }
 +}
++
 diff --git a/lib/utils/error_reporter.dart b/lib/utils/error_reporter.dart
 index ae6d2a8e5183a11b3706967cf375c251b33b8302..5c23b9b78db30adc26a430e4f8b0bd63534b3b44 100644
 --- a/lib/utils/error_reporter.dart
@@ -377383,10 +377538,10 @@ index 90aadb66a8e714cdb27b93bd93a17145a9328103..13d31c04319f9bd8f2c9cbc29c71f9b6
 +  }
 +}
 diff --git a/lib/widgets/matrix.dart b/lib/widgets/matrix.dart
-index 934de68f51737ab2db0e621f4b7277df3beb8989..23e838590b945aa608275c7e8db30299c440737b 100644
+index 934de68f51737ab2db0e621f4b7277df3beb8989..bf4fdcc0cd918d7985ee75fc536ab6efa2aef25e 100644
 --- a/lib/widgets/matrix.dart
 +++ b/lib/widgets/matrix.dart
-@@ -1,443 +1,529 @@
+@@ -1,443 +1,532 @@
 -// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
 -// SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 -//
@@ -377996,7 +378151,9 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..23e838590b945aa608275c7e8db30299
 +
 +  Client? _loginClientCandidate;
 +
-+  AudioPlayer? audioPlayer;
++  final ValueNotifier<AudioPlayer?> audioPlayerNotifier = ValueNotifier<AudioPlayer?>(null);
++  AudioPlayer? get audioPlayer => audioPlayerNotifier.value;
++  set audioPlayer(AudioPlayer? player) => audioPlayerNotifier.value = player;
 +  final ValueNotifier<String?> voiceMessageEventId = ValueNotifier(null);
 +  final ValueNotifier<bool> continuousAudioPlaybackNotifier = ValueNotifier(true);
 +
@@ -378309,6 +378466,7 @@ index 934de68f51737ab2db0e621f4b7277df3beb8989..23e838590b945aa608275c7e8db30299
 +
 +    voiceMessageEventId.dispose();
 +    continuousAudioPlaybackNotifier.dispose();
++    audioPlayerNotifier.dispose();
 +
 +    // Cancel the static presence stream subscription to prevent it from
 +    // leaking across logout/re-login cycles.

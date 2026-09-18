@@ -1,0 +1,5 @@
+credentials*
+server_credentials.txt
+*.key
+*.pem
+.env

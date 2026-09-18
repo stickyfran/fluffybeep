@@ -308,7 +308,7 @@ Preservar y compartir borrador de input al cambiar entre chats fusionados del mi
 
 **Prioridad**: 🔴 Crítica | **Complejidad**: 🟡 Media | **Estado**: ✅ Implementada y Verificada
 
-Desplegar los espacios (WhatsApp, Instagram, etc.) como iconos permanentes en la barra de navegación principal tipo Telegram en lugar de requerir abrir el modal de Spaces.
+Desplegar los espacios (WhatsApp, Instagram, etc.) como iconos permanentes en la barra de navegación principal tipo Telegram en lugar de requerir abrir el modal de Spaces, permitiendo elegir cuáles aparecen en el drawer rápido y organizar contactos en carpetas.
 
 **Implementación en Element X (`fluffybeep-x`)**:
 - **Navegación Inferior Flotante**: Se expandió `HomeView` y `HorizontalFloatingToolbar` para integrar los accesos directos a Espacios con scroll horizontal.
@@ -317,9 +317,21 @@ Desplegar los espacios (WhatsApp, Instagram, etc.) como iconos permanentes en la
   - Pestañas para cada Espacio unido con avatar circular y nombre.
   - Indicador de selección activa con resaltado y pills estilizados según tokens Compound (`ElementTheme.colors`).
   - Botón selector/expansor de espacios al final para gestionar o ver la lista completa.
+- **Filtrado y Gestión de Barra Rápida (`QuickSpacesService`)**:
+  - Exclusión automática por defecto de espacios de bridges masivos (`WhatsApp`, `Instagram`, etc.) de la barra rápida para evitar saturación visual.
+  - Fijado / Ocultado granular con persistencia en `m.fluffybeep.quick_spaces` (Account Data de Matrix) y fallback reactivo en memoria.
+  - Selector de pin directo (`CompoundIcons.Pin()` / `CompoundIcons.PinSolid()`) en cada fila del modal de Espacios (`SpaceFiltersView`).
+  - Menú contextual de pulsación larga en los iconos de la barra inferior flotante (`HomeBottomBar`) para *"Ocultar de la barra rápida"* en un tap.
+- **Organización de Personas y Salas en Espacios (`OrganizeInSpacesBottomSheet`)**:
+  - Opción *"Organizar en Espacios"* en el menú contextual de la lista de chats (`RoomListContextMenu`).
+  - Modal interactivo para marcar o desmarcar pertenencia a espacios disponibles con avatar, conteo de chats y checkboxes.
+  - **Soporte total de Contactos Fusionados**: al organizar una persona fusionada (ej. WhatsApp + Instagram), la operación añade o remueve en lote (`addRoomsToSpace` / `removeRoomsFromSpace`) todas las salas hermanas vinculadas (`mc.roomIds`).
 - **Presenter y Estado**:
-  - `SpaceFiltersState`: expone `allSpaces: ImmutableList<SpaceSummary>` directamente a la barra de navegación.
+  - `SpaceFiltersState`: expone `quickBarFilters: ImmutableList<SpaceServiceFilter>` directamente a la barra de navegación.
   - `SpaceFiltersEvent.SelectSpaceDirectly(spaceId: RoomId?)`: filtra la lista de chats de inmediato sin abrir el bottom sheet.
+  - `RoomListPresenter`: gestiona `ShowOrganizeInSpaces`, `ToggleSpaceMembership` y `HideOrganizeInSpaces`.
+- **CI / GitHub Actions & Releases**:
+  - Publicación automática de cada build (`fluffybeep-x-arm64-v8a-debug.apk`) a GitHub Releases (`stickyfran/fluffybeep-x/releases/tag/latest`) con permissions `contents: write` y `softprops/action-gh-release`.
 - **Tests Unitarios**: 13 tests pasando en `:features:home:impl:testDebugUnitTest` (`SpaceFiltersPresenterTest`).
 
 ---
