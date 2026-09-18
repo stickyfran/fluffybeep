@@ -54,9 +54,9 @@ Fusionar contactos de múltiples bridges (WhatsApp, Instagram, Signal, etc.) en 
   - Sección dedicada de fusión de contactos.
   - Lista de salas hermanas vinculadas con indicador de sala activa y botón de desvinculación individual o total.
   - Diálogo de búsqueda y selección de chats unidos para vincular con un tap, con avatares y detección de red (WhatsApp, Instagram, Telegram, Signal, Matrix).
-- **Corrección de Navegación / Swapping (Fix del Crash)**:
-  - Causa del crash: `attachRoom` en `LoggedInFlowNode.kt` realizaba `waitForNavTargetAttached { it is NavTarget.Home }`, bloqueándose indefinidamente cuando la sala ya estaba abierta (`NavTarget.Room`).
-  - Solución: Swapping de salas hermanas usa `backstack.replace(NavTarget.Room(...))` en `LoggedInFlowNode` sin apilar en el historial, y `attachRoom` acepta `NavTarget.Home || NavTarget.Room`.
+- **Corrección de Crashes al abrir chats fusionados y Swapping**:
+  - **Causa 1 (Deadlock de navegación)**: `attachRoom` en `LoggedInFlowNode.kt` realizaba `waitForNavTargetAttached { it is NavTarget.Home }`, bloqueándose cuando ya se estaba en una sala. Solución: usar `backstack.replace` directo al cambiar de sala y relajar la condición a `NavTarget.Home || NavTarget.Room`.
+  - **Causa 2 (Crash de medición intrínseca de Compose)**: `MergedRoomsSwitcher` utilizaba un `LazyRow` dentro de `bottomSheetContent`. El layout contenedor `ExpandableBottomSheetLayout` ejecuta `bottomContentMeasurables.minIntrinsicHeight(constraints.maxWidth)`. En Jetpack Compose, consultar la altura intrínseca sobre cualquier `SubcomposeLayout` (`LazyRow`/`LazyColumn`) lanza una excepción fatal `IllegalStateException: Asking for intrinsic measurements of SubcomposeLayout represents an approach that isn't supported` inmediatamente al abrir cualquier chat fusionado. Solución: reemplazar `LazyRow` por un `Row` scrollable horizontal estándar (`Modifier.horizontalScroll(rememberScrollState())`) que soporta mediciones intrínsecas nativamente.
 - **Indicadores de Red (Puntitos de Color en Avatares)**:
   - WhatsApp: Verde `#25D366`
   - Instagram: Rosa `#E1306C`
