@@ -357538,10 +357538,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2896e7816
+index 0000000000000000000000000000000000000000..f17f48f25bf7a54ea974f08858108dab013dd27e
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1566 @@
+@@ -0,0 +1,1563 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -357562,7 +357562,6 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +  final bool isFakeDM;
 +  final Uri? avatarUrl;
 +  final String? displayName;
-+  final String? phone;
 +  final String? networkKey;
 +  final bool fromCache;
 +
@@ -357571,7 +357570,6 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +    this.isFakeDM = false,
 +    this.avatarUrl,
 +    this.displayName,
-+    this.phone,
 +    this.networkKey,
 +    this.fromCache = false,
 +  });
@@ -357966,7 +357964,6 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +      }
 +    }
 +
-+    final rawPhone = extractWhatsAppPhone(room);
 +    if (displayName != null) {
 +      displayName = sanitizeDisplayName(displayName);
 +    }
@@ -358027,7 +358024,6 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +      isFakeDM: isFakeDM,
 +      avatarUrl: avatarUrl,
 +      displayName: displayName,
-+      phone: rawPhone,
 +      networkKey: networkKey,
 +    );
 +  }
@@ -358275,7 +358271,8 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +    // 4. Check candidate MXIDs (directChatMatrixID, contactId, room participants, room.id)
 +    final candidateMxids = <String>[
 +      if (room.directChatMatrixID != null) room.directChatMatrixID!,
-+      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
++      if ((_roomDataCache[room.id]?.contactId ?? getCachedContactId(room.id)) != null)
++        (_roomDataCache[room.id]?.contactId ?? getCachedContactId(room.id))!,
 +      ...room.getParticipants().map((p) => p.id),
 +      room.id,
 +    ];
@@ -359101,7 +359098,7 @@ index 0000000000000000000000000000000000000000..d514438e329b2ca49e2719e4480cabd2
 +  String? get beeperContactId => _beeperData.contactId;
 +  bool get isBeeperFakeDM => _beeperData.isFakeDM;
 +  Uri? get beeperAvatarUrl => _beeperData.avatarUrl;
-+  String? get beeperPhone => _beeperData.phone;
++  String? get beeperPhone => BeeperBridgeUtils.extractWhatsAppPhone(this);
 +
 +  String getBeeperDisplayname(MatrixLocalizations locals) {
 +    final raw = _beeperData.displayName ?? getLocalizedDisplayname(locals);
@@ -360037,10 +360034,10 @@ index 0000000000000000000000000000000000000000..441c35a95c6ce8590e81b0fdc82fc6fc
 +}
 diff --git a/lib/utils/beeper_phone_contacts.dart b/lib/utils/beeper_phone_contacts.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672fbd1836c
+index 0000000000000000000000000000000000000000..43fd091a800ef215f92d38d64db8469904972410
 --- /dev/null
 +++ b/lib/utils/beeper_phone_contacts.dart
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,165 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -360068,6 +360065,7 @@ index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672
 +class BeeperPhoneContacts {
 +  static List<CachedPhoneContact> _contacts = <CachedPhoneContact>[];
 +  static Map<String, CachedPhoneContact> _phoneIndex = <String, CachedPhoneContact>{};
++  static Map<String, CachedPhoneContact> _nameIndex = <String, CachedPhoneContact>{};
 +  static bool _loaded = false;
 +  static bool _isLoading = false;
 +  static bool _permissionDenied = false;
@@ -360125,6 +360123,7 @@ index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672
 +
 +      final list = <CachedPhoneContact>[];
 +      final index = <String, CachedPhoneContact>{};
++      final nameIdx = <String, CachedPhoneContact>{};
 +
 +      for (final c in rawList) {
 +        final phones = <String>[];
@@ -360143,6 +360142,11 @@ index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672
 +        );
 +        list.add(cached);
 +
++        final cleanName = BeeperBridgeUtils.sanitizeDisplayName(cached.displayName).toLowerCase();
++        if (cleanName.isNotEmpty) {
++          nameIdx[cleanName] = cached;
++        }
++
 +        // Index by full phone number and by last 8 digits for fuzzy match
 +        for (final p in phones) {
 +          index[p] = cached;
@@ -360154,6 +360158,7 @@ index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672
 +
 +      _contacts = list;
 +      _phoneIndex = index;
++      _nameIndex = nameIdx;
 +      _loaded = true;
 +      _permissionDenied = false;
 +      _isLoading = false;
@@ -360190,18 +360195,14 @@ index 0000000000000000000000000000000000000000..4b434a284609e6e7b7e95bb7cf1d1672
 +    return null;
 +  }
 +
-+  /// Lookup contact by Display Name (O(N), used infrequently as fallback)
++  /// Lookup contact by Display Name (O(1))
 +  static CachedPhoneContact? findByName(String name) {
-+    if (!_loaded || _contacts.isEmpty) return null;
++    if (!_loaded || _nameIndex.isEmpty) return null;
 +    final clean = BeeperBridgeUtils.sanitizeDisplayName(name).toLowerCase();
-+    for (final c in _contacts) {
-+      if (BeeperBridgeUtils.sanitizeDisplayName(c.displayName).toLowerCase() == clean) {
-+        return c;
-+      }
-+    }
-+    return null;
++    return _nameIndex[clean];
 +  }
 +}
++
 diff --git a/lib/utils/beeper_sync_manager.dart b/lib/utils/beeper_sync_manager.dart
 new file mode 100644
 index 0000000000000000000000000000000000000000..9e5790d3c4007047717129d3ce6f673b81509553
