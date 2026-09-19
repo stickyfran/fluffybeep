@@ -1,52 +1,77 @@
-# Walkthrough - Beeper Patches Settings, UI Fixes, Sticker to WhatsApp, Keystore Alias Case Fix & Phase 1 Optimizations
+# Walkthrough - Asignación de Etiquetas y Fusión Triple de Contactos en FluffyBeep
 
-I have completed the **Phase 1 Critical Optimizations** for FluffyBeep and regenerated the validated unified patch against upstream base `259bc72fb897e99303058712fcdfaee033bd4d33`.
+Se resolvieron en profundidad los dos problemas reportados:
+1. **Asignación y gestión de etiquetas en contactos fusionados**: Se agregó la capacidad completa de asignar y desasignar etiquetas tanto desde el menú contextual del chat list (`MergedContactListItem`) como desde la vista de detalles del chat (`ChatDetailsView`).
+2. **Coherencia de la fusión triple (WhatsApp + Libreta + Instagram) en el nuevo servidor**: Se corrigió el criterio de filtrado que descartaba 107 contactos fusionados, se incorporó compatibilidad con WhatsApp LID (`@whatsapp_lid-...`), se habilitó sincronización dual con Element X (`m.fluffybeep.merges`) y se integró un selector directo de contactos de la libreta telefónica.
 
-## Changes Made
+---
 
-### 1. Keystore Alias Case Fix
-The build logs indicated:
-`com.android.ide.common.signing.KeytoolException: Failed to read key dummyAlias from store "/home/runner/work/fluffybeep/fluffybeep/fluffychat/android/app/dummy.keystore": Get Key failed: Given final block not properly padded.`
+## Cambios Realizados
 
-Checking the keystore `patches/release.keystore` using `keytool` revealed that the alias was actually `dummyalias` (all lowercase), while `android/app/build.gradle.kts` expected `dummyAlias` (camelCase). I added a patch to `build.gradle.kts` to change `keyAlias` to `dummyalias` (lowercase).
+### 1. Gestión de Etiquetas en Contactos Fusionados
 
-### 2. Fix Patch File Encoding & Validation (Repository Level)
-Re-generated `0000-unified-fluffybeep.patch` with `--full-index` natively in UTF-8. Verified clean application against upstream base `259bc72` using `../patches/patch-manager.sh validate`.
+- **Menú contextual en la lista de chats (`chat_list.dart`)**:
+  - En `mergedContactContextAction`, se añadieron las opciones:
+    - **Agregar a etiqueta** (`addToLabel`): despliega el listado de etiquetas existentes y asocia todos los chats (`entry.rooms`) vinculados al contacto fusionado con la etiqueta elegida.
+    - **Quitar de etiqueta** (`removeFromLabel`): detecta qué etiquetas activas contienen salas del contacto fusionado y permite remover todas sus salas de la etiqueta seleccionada.
+  - Se invoca `_invalidateRoomCache()` tras modificar las etiquetas para refrescar instantáneamente la vista.
+- **Filtro de Inbox y Etiquetas (`chat_list_body.dart`)**:
+  - Se añadió la verificación de `hiddenInboxRoomIds` para los `mergedEntries`, garantizando que si una etiqueta tiene `isShownInInbox == false`, los contactos fusionados respeten la configuración y no aparezcan en el buzón principal si están ocultos.
+- **Detalles del Chat (`chat_details_view.dart`)**:
+  - Se incorporó un `ListTile` dedicado a **"Etiquetas"** inmediatamente después de la fila de contacto fusionado.
+  - **Subtítulo dinámico**: Muestra las etiquetas activas del contacto (con sus emojis y títulos) o un aviso explicativo si no tiene ninguna.
+  - **Modal de Gestión (`_showManageLabelsDialog`)**:
+    - Permite marcar y desmarcar etiquetas con checkboxes en tiempo real.
+    - Aplica los cambios a todas las cuentas vinculadas del contacto (mostrando la cantidad de chats afectados).
+    - Incluye acceso directo a `LabelEditorDialog` ("Crear nueva etiqueta...") para crear etiquetas al instante sin salir de la pantalla.
 
-### 3. Beeper Patches Settings Screen
-Created a new settings page at `lib/pages/settings/patches_settings.dart` and integrated it with the router and `settings_view.dart`. This page provides:
-- **Re-sincronizar chats (Beeper):** Purges cached room avatars, profiles, and timelines safely to prepare for a fresh sync.
-- **Contener Bridges:** Switches to toggle whether chats from specific bridges (like WhatsApp or Instagram) appear in the main timeline. If toggled ON, their chats will only show up inside their respective virtual spaces on the navigation sidebar.
-- **Ocultar de la barra lateral:** Toggle switches to hide/show Beeper network icons in the sidebar.
-- **Contener Etiquetas (Labels):** Switches to toggle containment for custom Nheko tags (tags starting with `u.`).
+---
 
-### 4. Phase 1 Optimizations (Battery, Memory & Build Safety)
-- **Wakelock Disposal Safety & Prewarm Bounds (`cache_refresh_overlay.dart`)**:
-  - Implemented `dispose()` to call `WakelockPlus.disable()`, ensuring the CPU/screen wake lock is never leaked if the widget unmounts.
-  - Capped cache prewarming to process a maximum of 30 recent rooms (down from 100% of rooms unbounded).
-- **Native Skia Memory Leaks (`client_download_content_extension.dart`)**:
-  - Wrapped `_convertToCircularImage` in explicit `try...finally` blocks calling `.dispose()` on `originalImage`, `picture`, `codec`, and `circularImage`, eliminating Skia GPU texture leaks (~3.2 MB per 50 avatars).
-- **Target Downscaling Memory Protection (`custom_image_resizer.dart`)**:
-  - Passed `targetWidth` / `targetHeight` downsampling constraints into `instantiateImageCodec`, preventing 150 MB+ RGBA RAM spikes when sending 12MP camera photos.
-  - Ensured `dartCodec` and `dartFrame` are disposed inside `try...finally`.
-- **WidgetBinding Startup Ordering & Memory Cap (`main.dart`)**:
-  - Moved `WidgetsFlutterBinding.ensureInitialized()` to be the very first statement in `main()`.
-  - Reduced maximum image cache size from 100 MB to 40 MB on mobile devices to prevent OOM crashes on low-end hardware.
-- **ProGuard / R8 Rules (`proguard-rules.pro`)**:
-  - Added `-keep` rules for WebRTC (`org.webrtc.**`) and Vodozemac (`uniffi.**`) to prevent release build minification crashes.
+### 2. Fusión Triple (WhatsApp + Contacto de Libreta + Instagram)
 
-## Validation Results
+- **Criterio de Fusión en el Servidor (`beeper_merge_utils.dart` y `chat_list.dart`)**:
+  - El servidor `francomusco.duckdns.org` contenía 140 fusiones en Account Data, de las cuales 107 tenían 1 sala puenteada vinculada a un contacto de libreta (`phoneContactId`) o a un teléfono/usuario manual (`customWhatsAppPhone`/`customInstagramHandle`).
+  - Anteriormente, el código descartaba cualquier entrada con `contactRooms.length < 2`. Se actualizó la condición en `getMergedContacts`, `_save`, `addMerge` y `_invalidateRoomCache`:
+    ```dart
+    final isTripleOrCustom = (contact.phoneContactId != null && contact.phoneContactId!.isNotEmpty) ||
+        (contact.customWhatsAppPhone != null && contact.customWhatsAppPhone!.isNotEmpty) ||
+        (contact.customInstagramHandle != null && contact.customInstagramHandle!.isNotEmpty);
+    if (contactRooms.length < 2 && !isTripleOrCustom) continue;
+    ```
+- **Soporte de WhatsApp LID (`beeper_merge_utils.dart`)**:
+  - En el nuevo servidor, `mautrix-whatsapp` utiliza identificadores LID (ej. `@whatsapp_lid-171631574052876:...`).
+  - La expresión regular anterior interpretaba los 15 dígitos del LID como un número de teléfono erróneo, rompiendo la búsqueda en la libreta. Se actualizó `extractPhoneFromMxid` para ignorar identificadores LID y delegar la resolución del teléfono a los eventos del puente, notas o coincidencia por nombre.
+- **Búsqueda y Vinculación con Libreta (`beeper_phone_contacts.dart` y `beeper_fuzzy_matcher.dart`)**:
+  - En `beeper_phone_contacts.dart`, `findById` ahora soporta identificadores con formato slug (`merge_nombre_apellido`) como fallback.
+  - Se añadió `resolveContact({id, name, phone})` para unificar la búsqueda por múltiples criterios.
+  - En `beeper_fuzzy_matcher.dart`, se implementó `normalizeFancyUnicode()` para normalizar caracteres alfanuméricos matemáticos / tipografías decorativas (ej. `𝑷𝒂𝒑𝒂` -> `papa`).
+- **Selector de Contacto en la UI (`merge_contact_picker.dart`)**:
+  - Se integró un botón y modal de selección manual de contactos de la libreta (`_pickPhoneContact()`).
+  - Se añadió un chip interactivo que indica el contacto de libreta vinculado con opciones para cambiarlo o desvincularlo.
+  - Se habilitó guardar la fusión incluso si hay un solo chat, siempre que esté vinculado a la libreta o con metadatos personalizados.
+- **Sincronización Dual con Element X / fluffybeep-x (`beeper_merge_utils.dart`)**:
+  - `_save()` ahora escribe simultáneamente en `com.beeper.merged_contacts` y en `m.fluffybeep.merges`.
+  - `getMergedContacts()` une los datos de ambas claves para garantizar interoperabilidad entre clientes.
 
-- **Patch Validation**: Successfully ran `../patches/patch-manager.sh validate`. Output:
-  `[INFO] ✅ Patch validates successfully against upstream base.`
-- **Git Commit**: All modifications committed cleanly to `fluffychat_src/` and patch regenerated with Python binary write.
+---
 
-### 5. Phase 2 Optimizations (Jank, CPU & Push Race Conditions)
-- **UnifiedPush Setup Race Condition (`background_push.dart`)**:
-  - Added a `_isSettingUpPusher` mutex lock to `setupPusher` to prevent concurrent POST requests to the server during startup (caused when the distributor callback and manual startup flow collide).
-- **Chat ListView Background Rebuilds (`chat_list.dart`)**:
-  - `_invalidateRoomCache` now suppresses `roomCacheNotifier` updates when the current active route (`PerformanceLoggerObserver.currentRouteNotifier.value`) is not `/rooms`. This prevents 2800+ rooms from sorting and triggering a `ChatListViewBody` rebuild in the background while inside a chat room or settings menu.
-  - Flushed the pending state via `_onRouteChange` when navigating back to the main list.
-  - Increased `_roomCacheDebounceTimer` from 300ms to 500ms for slightly better event batching during sync spikes.
-- **Message List Rendering Overload (`chat_event_list.dart`)**:
-  - Reduced `cacheExtent` of the `CustomScrollView` from 1500 to 500. This significantly lowers the amount of off-screen DOM nodes rendered, alleviating CPU/Raster thread pressure when scrolling or receiving messages.
+## Verificación y Pruebas
+
+1. **Prueba de Aplicación del Parche (`git apply --check`)**:
+   - Se ejecutó una validación en un worktree limpio basado en el commit `c9c58c24f04304cc2ec263d891073805468383b8`:
+     ```powershell
+     git worktree add -d ../temp_test_tree c9c58c24f04304cc2ec263d891073805468383b8
+     git -C ../temp_test_tree apply --check --whitespace=nowarn ../patches/0000-unified-fluffybeep.patch
+     git worktree remove ../temp_test_tree --force
+     ```
+   - **Resultado**: El parche se aplica al 100% de manera limpia sin ningún conflicto ni error de sintaxis.
+
+2. **Archivos Actualizados en el Parche**:
+   - `lib/utils/beeper_phone_contacts.dart`
+   - `lib/utils/beeper_fuzzy_matcher.dart`
+   - `lib/utils/beeper_merge_utils.dart`
+   - `lib/pages/merge_contact_picker/merge_contact_picker.dart`
+   - `lib/pages/chat_list/chat_list.dart`
+   - `lib/pages/chat_list/chat_list_body.dart`
+   - `lib/pages/chat_details/chat_details_view.dart`
+   - `patches/0000-unified-fluffybeep.patch`
