@@ -24911,10 +24911,10 @@ index c20d748c908187325325d74bfeaad28858684b0a..4d9c0f8a068424a61e724279f5799ba2
    }
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f4e0a38cd76a49c2d26985d30dd479fc98c8a745
+index 0000000000000000000000000000000000000000..e65c51cf54b28673babe1437ee53a481e2e670ff
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,859 @@
+@@ -0,0 +1,857 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -25334,8 +25334,6 @@ index 0000000000000000000000000000000000000000..f4e0a38cd76a49c2d26985d30dd479fc
 +      ScaffoldMessenger.of(context).showSnackBar(
 +        SnackBar(content: Text('Contacto "$name" fusionado exitosamente (${_selectedRoomIds.length} chats${_matchedPhoneContactId != null ? ' + libreta' : ''})')),
 +      );
-+    }
-+  }
 +    }
 +  }
 +
