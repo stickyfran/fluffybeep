@@ -24911,10 +24911,10 @@ index c20d748c908187325325d74bfeaad28858684b0a..4d9c0f8a068424a61e724279f5799ba2
    }
 diff --git a/lib/pages/merge_contact_picker/merge_contact_picker.dart b/lib/pages/merge_contact_picker/merge_contact_picker.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87be9c61175
+index 0000000000000000000000000000000000000000..57591c5ab6330957c8988c2ee0a67f743a6d1e54
 --- /dev/null
 +++ b/lib/pages/merge_contact_picker/merge_contact_picker.dart
-@@ -0,0 +1,965 @@
+@@ -0,0 +1,950 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
@@ -25050,33 +25050,42 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +    });
 +  }
 +
++  static List<_MergePickerRoomItem>? _cachedGlobalRoomItems;
++  static int _cachedGlobalRoomCount = 0;
++
++  static void invalidateRoomItemsCache() {
++    _cachedGlobalRoomItems = null;
++    _cachedGlobalRoomCount = 0;
++  }
++
 +  void _buildFastRoomItems() {
 +    final client = widget.client;
 +    final nonSpaceRooms = client.rooms.where((r) => !r.isSpace).toList();
-+    final items = <_MergePickerRoomItem>[];
 +
-+    for (final room in nonSpaceRooms) {
-+      final data = BeeperBridgeUtils.getRoomData(room);
-+      final dName = data.displayName ?? room.name;
-+      final net = BeeperBridgeUtils.getRoomNetwork(room);
-+      final netKey = (data.networkKey ?? '').toLowerCase();
-+      final handle = BeeperBridgeUtils.getAccountHandle(room);
-+      final ig = BeeperBridgeUtils.extractInstagramDetails(room);
-+      final igUser = ig.username?.toLowerCase() ?? '';
-+      final igId = ig.numericId ?? '';
-+      final phone = BeeperBridgeUtils.extractWhatsAppPhone(room) ?? '';
++    List<_MergePickerRoomItem> items;
++    if (_cachedGlobalRoomItems != null && _cachedGlobalRoomCount == nonSpaceRooms.length) {
++      items = List<_MergePickerRoomItem>.from(_cachedGlobalRoomItems!);
++    } else {
++      items = <_MergePickerRoomItem>[];
++      for (final room in nonSpaceRooms) {
++        final data = BeeperBridgeUtils.getRoomData(room);
++        final dName = data.displayName ?? room.name;
++        final net = BeeperBridgeUtils.getRoomNetwork(room);
++        final handle = BeeperBridgeUtils.getAccountHandle(room);
++        final searchKey = '${dName.toLowerCase()} ${room.name.toLowerCase()} ${handle?.toLowerCase() ?? ''} ${(data.networkKey ?? '').toLowerCase()} ${room.id.toLowerCase()}';
 +
-+      final searchKey = '${dName.toLowerCase()} ${room.name.toLowerCase()} ${handle?.toLowerCase() ?? ''} $igUser @$igUser $igId $phone $netKey ${room.id.toLowerCase()}';
-+
-+      items.add(_MergePickerRoomItem(
-+        room: room,
-+        displayName: dName,
-+        accountHandle: handle,
-+        searchKey: searchKey,
-+        network: net,
-+        avatarUrl: data.avatarUrl,
-+        similarity: 0.0,
-+      ));
++        items.add(_MergePickerRoomItem(
++          room: room,
++          displayName: dName,
++          accountHandle: handle,
++          searchKey: searchKey,
++          network: net,
++          avatarUrl: data.avatarUrl,
++          similarity: 0.0,
++        ));
++      }
++      _cachedGlobalRoomItems = List<_MergePickerRoomItem>.from(items);
++      _cachedGlobalRoomCount = nonSpaceRooms.length;
 +    }
 +
 +    _sortRoomItems(items);
@@ -25108,7 +25117,7 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +
 +  Future<void> _loadBackgroundAnalysis() async {
 +    // 1. Wait for bottom sheet transition animation to finish smoothly
-+    await Future.delayed(const Duration(milliseconds: 250));
++    await Future.delayed(const Duration(milliseconds: 200));
 +    if (!mounted) return;
 +
 +    // 2. Check phone contact match if phone contacts are already loaded
@@ -25117,13 +25126,13 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +      if (mounted) setState(() {});
 +    }
 +
-+    // 3. Compute suggestions
++    // 3. Compute suggestions (instant if cached)
 +    _computeSuggestions();
 +    if (mounted && _suggestions.isNotEmpty) {
 +      setState(() {});
 +    }
 +
-+    // 4. Compute similarities progressively
++    // 4. Compute similarities progressively (instant if cached)
 +    await _updateSimilaritiesAsync();
 +  }
 +
@@ -25138,48 +25147,22 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +
 +    if (sourceRooms.isEmpty) return;
 +
-+    final sourceTexts = <String>[];
-+    for (final sRoom in sourceRooms) {
-+      final sData = BeeperBridgeUtils.getRoomData(sRoom);
-+      if (sData.displayName != null && sData.displayName!.isNotEmpty) {
-+        sourceTexts.add(sData.displayName!);
-+      }
-+      if (sRoom.name.isNotEmpty) sourceTexts.add(sRoom.name);
-+      final sHandle = BeeperBridgeUtils.getAccountHandle(sRoom);
-+      if (sHandle != null && sHandle.isNotEmpty) sourceTexts.add(sHandle);
-+      final sIg = BeeperBridgeUtils.extractInstagramDetails(sRoom);
-+      if (sIg.username != null) sourceTexts.add(sIg.username!);
-+    }
-+
-+    if (sourceTexts.isEmpty) return;
-+
 +    final updatedItems = List<_MergePickerRoomItem>.from(_allRoomItems);
 +    bool hasAnySim = false;
 +
 +    for (var i = 0; i < updatedItems.length; i++) {
-+      if (i > 0 && i % 25 == 0) {
-+        await Future.delayed(Duration.zero);
++      if (i > 0 && i % 30 == 0) {
++        await Future.delayed(const Duration(milliseconds: 1));
 +        if (!mounted) return;
 +      }
 +
 +      final item = updatedItems[i];
 +      if (_selectedRoomIds.contains(item.room.id)) continue;
 +
-+      final ig = BeeperBridgeUtils.extractInstagramDetails(item.room);
-+      final igUser = ig.username?.toLowerCase() ?? '';
-+      final cTexts = [
-+        if (item.displayName.isNotEmpty) item.displayName,
-+        if (item.room.name.isNotEmpty) item.room.name,
-+        if (item.accountHandle != null && item.accountHandle!.isNotEmpty) item.accountHandle!,
-+        if (igUser.isNotEmpty) igUser,
-+      ];
-+
 +      var maxSim = 0.0;
-+      for (final s in sourceTexts) {
-+        for (final c in cTexts) {
-+          final sim = BeeperFuzzyMatcher.matchStrings(s, c);
-+          if (sim > maxSim) maxSim = sim;
-+        }
++      for (final sRoom in sourceRooms) {
++        final sim = BeeperFuzzyMatcher.computeRoomSimilarity(sRoom, item.room);
++        if (sim > maxSim) maxSim = sim;
 +      }
 +
 +      if (maxSim > 0.0) {
@@ -25403,6 +25386,7 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +        displayName: name,
 +        phoneContactId: _matchedPhoneContactId,
 +      );
++      invalidateRoomItemsCache();
 +
 +      if (mounted) {
 +        Navigator.of(context).pop();
@@ -25423,6 +25407,7 @@ index 0000000000000000000000000000000000000000..dab323729ef9a53e64a2a2f2edbdc87b
 +    setState(() => _isUnmerging = true);
 +    try {
 +      await BeeperMergeUtils.removeMerge(client, _existingMergeId!);
++      invalidateRoomItemsCache();
 +      if (mounted) {
 +        Navigator.of(context).pop();
 +        ScaffoldMessenger.of(context).showSnackBar(
@@ -29729,10 +29714,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ea13e4ccec6368c05aac8dae11662f2f7084db06
+index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be277740268429699173
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1593 @@
+@@ -0,0 +1,1612 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -29904,9 +29889,15 @@ index 0000000000000000000000000000000000000000..ea13e4ccec6368c05aac8dae11662f2f
 +  static final Map<String, BeeperRoomData> _roomDataCache = LinkedHashMap<String, BeeperRoomData>();
 +  static final Map<String, int> _roomDataSignatures = LinkedHashMap<String, int>();
 +  static final Map<String, String?> _extractedPhoneCache = LinkedHashMap<String, String?>();
++  static final Map<String, ({String? username, String? numericId})> _extractedInstagramCache =
++      LinkedHashMap<String, ({String? username, String? numericId})>();
 +
 +  static void invalidateExtractedPhone(String roomId) {
 +    _extractedPhoneCache.remove(roomId);
++  }
++
++  static void invalidateExtractedInstagram(String roomId) {
++    _extractedInstagramCache.remove(roomId);
 +  }
 +
 +  static int _getRoomSignature(Room room) {
@@ -29997,6 +29988,7 @@ index 0000000000000000000000000000000000000000..ea13e4ccec6368c05aac8dae11662f2f
 +    _roomDataCache.clear();
 +    _roomDataSignatures.clear();
 +    _extractedPhoneCache.clear();
++    _extractedInstagramCache.clear();
 +    lastRealMessageCache.clear();
 +    _lastMessageTimeCache.clear();
 +    locallyReadRooms.clear();
@@ -30549,8 +30541,20 @@ index 0000000000000000000000000000000000000000..ea13e4ccec6368c05aac8dae11662f2f
 +    return null;
 +  }
 +
-+  /// Robust extraction of Instagram username and numeric ID from room or bridge events
++  /// Robust extraction of Instagram username and numeric ID from room or bridge events (cached O(1))
 +  static ({String? username, String? numericId}) extractInstagramDetails(Room room) {
++    if (_extractedInstagramCache.containsKey(room.id)) {
++      return _extractedInstagramCache[room.id]!;
++    }
++    final details = _computeInstagramDetails(room);
++    _extractedInstagramCache[room.id] = details;
++    if (_extractedInstagramCache.length > maxCacheSize) {
++      _extractedInstagramCache.remove(_extractedInstagramCache.keys.first);
++    }
++    return details;
++  }
++
++  static ({String? username, String? numericId}) _computeInstagramDetails(Room room) {
 +    String? username = BeeperMergeUtils.getCustomInstagramHandle(room.id);
 +    String? numericId;
 +
@@ -31328,20 +31332,29 @@ index 0000000000000000000000000000000000000000..ea13e4ccec6368c05aac8dae11662f2f
 +}
 diff --git a/lib/utils/beeper_fuzzy_matcher.dart b/lib/utils/beeper_fuzzy_matcher.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..78f0823f4904a655fa24b18c2b3df409a9c32fcf
+index 0000000000000000000000000000000000000000..adb3255fb9fe49c2e6e905adbd4a9a11fa034aad
 --- /dev/null
 +++ b/lib/utils/beeper_fuzzy_matcher.dart
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,413 @@
 +// SPDX-FileCopyrightText: 2026-Present Contributors to FluffyBeep
 +//
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +
++import 'dart:collection';
 +import 'dart:math';
 +import 'package:matrix/matrix.dart';
 +import 'beeper_bridge_utils.dart';
 +import 'beeper_phone_contacts.dart';
 +
 +class BeeperFuzzyMatcher {
++  static final Map<String, double> _stringMatchCache = LinkedHashMap<String, double>();
++  static final Map<String, double> _roomSimilarityCache = LinkedHashMap<String, double>();
++  static const int _maxCacheSize = 5000;
++
++  static void clearCaches() {
++    _stringMatchCache.clear();
++    _roomSimilarityCache.clear();
++  }
 +  /// Spanish and Latin American common nicknames / apodos mapping
 +  static const Map<String, List<String>> _nicknameMap = {
 +    'alejandro': ['ale', 'alex', 'alejo', 'jano'],
@@ -31641,22 +31654,37 @@ index 0000000000000000000000000000000000000000..78f0823f4904a655fa24b18c2b3df409
 +    return (avg1 + avg2) / 2.0;
 +  }
 +
-+  /// Hybrid similarity combining Token-level and Character-level matching (0.0 to 1.0)
++  /// Hybrid similarity combining Token-level and Character-level matching (0.0 to 1.0, cached)
 +  static double matchStrings(String s1, String s2) {
 +    if (s1.isEmpty || s2.isEmpty) return 0.0;
 +    final c1 = clean(s1);
 +    final c2 = clean(s2);
 +    if (c1 == c2) return 1.0;
 +
++    final key = c1.compareTo(c2) <= 0 ? '$c1::$c2' : '$c2::$c1';
++    final cached = _stringMatchCache[key];
++    if (cached != null) return cached;
++
 +    final tokenScore = tokenSimilarity(c1, c2);
 +    final diceScore = diceBigramSimilarity(c1, c2);
 +
-+    return max(tokenScore, diceScore);
++    final score = max(tokenScore, diceScore);
++    _stringMatchCache[key] = score;
++    if (_stringMatchCache.length > _maxCacheSize) {
++      _stringMatchCache.remove(_stringMatchCache.keys.first);
++    }
++    return score;
 +  }
 +
-+  /// Calculate similarity score between source room (or selected rooms) and a candidate room (0.0 to 1.0)
++  /// Calculate similarity score between source room (or selected rooms) and a candidate room (0.0 to 1.0, cached O(1))
 +  static double computeRoomSimilarity(Room sourceRoom, Room candidateRoom) {
 +    if (sourceRoom.id == candidateRoom.id) return 1.0;
++
++    final pairKey = sourceRoom.id.compareTo(candidateRoom.id) <= 0
++        ? '${sourceRoom.id}::${candidateRoom.id}'
++        : '${candidateRoom.id}::${sourceRoom.id}';
++    final cached = _roomSimilarityCache[pairKey];
++    if (cached != null) return cached;
 +
 +    final sourceData = BeeperBridgeUtils.getRoomData(sourceRoom);
 +    final candData = BeeperBridgeUtils.getRoomData(candidateRoom);
@@ -31670,7 +31698,10 @@ index 0000000000000000000000000000000000000000..78f0823f4904a655fa24b18c2b3df409
 +        cPhone.length >= 7) {
 +      final sTail = sPhone.substring(max(0, sPhone.length - 8));
 +      final cTail = cPhone.substring(max(0, cPhone.length - 8));
-+      if (sTail == cTail) return 1.0;
++      if (sTail == cTail) {
++        _roomSimilarityCache[pairKey] = 1.0;
++        return 1.0;
++      }
 +    }
 +
 +    // 2. Candidate strings from source
@@ -31711,15 +31742,19 @@ index 0000000000000000000000000000000000000000..78f0823f4904a655fa24b18c2b3df409
 +      }
 +    }
 +
++    _roomSimilarityCache[pairKey] = maxScore;
++    if (_roomSimilarityCache.length > _maxCacheSize) {
++      _roomSimilarityCache.remove(_roomSimilarityCache.keys.first);
++    }
 +    return maxScore;
 +  }
 +}
 diff --git a/lib/utils/beeper_merge_utils.dart b/lib/utils/beeper_merge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c9e4e7d7e
+index 0000000000000000000000000000000000000000..9b84a248df542ac0dd4efb7403b63ddf134e30ff
 --- /dev/null
 +++ b/lib/utils/beeper_merge_utils.dart
-@@ -0,0 +1,648 @@
+@@ -0,0 +1,669 @@
 +import 'dart:collection';
 +import 'dart:convert';
 +import 'package:flutter/foundation.dart';
@@ -31810,11 +31845,19 @@ index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c
 +  /// Precomputed sibling rooms map: key is roomId or mergeId -> List<Room>
 +  static Map<String, List<Room>> _mergeSiblingRooms = <String, List<Room>>{};
 +
++  static List<List<Room>>? _cachedSuggestions;
++
++  static void invalidateSuggestionsCache() {
++    _cachedSuggestions = null;
++  }
++
 +  static void invalidateCache() {
 +    _lastMergeDataRef = null;
 +    _contactsCache = <String, MergedContact>{};
 +    _roomToMergeId = <String, String>{};
 +    _mergeSiblingRooms = <String, List<Room>>{};
++    _cachedSuggestions = null;
++    BeeperFuzzyMatcher.clearCaches();
 +  }
 +
 +  static void _invalidateDerivedMaps() {
@@ -32015,8 +32058,13 @@ index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c
 +    } else {
 +      await BeeperBridgeUtils.prefs?.remove('custom_ig_handle_$roomId');
 +    }
++    BeeperBridgeUtils.invalidateExtractedInstagram(roomId);
 +    final mergeId = _roomToMergeId[roomId];
 +    if (mergeId != null) {
++      final siblings = getSiblingRooms(roomId, client);
++      for (final s in siblings) {
++        BeeperBridgeUtils.invalidateExtractedInstagram(s.id);
++      }
 +      final current = getMergedContacts(client);
 +      final mc = current[mergeId];
 +      if (mc != null) {
@@ -32073,6 +32121,8 @@ index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c
 +    _contactsCache = parsed;
 +    _invalidateDerivedMaps();
 +    _lastMergeDataRef = {'contacts': contacts};
++    _cachedSuggestions = null;
++    BeeperFuzzyMatcher.clearCaches();
 +
 +    // 2. Rebuild sibling maps
 +    updateSiblingRooms(client);
@@ -32258,6 +32308,10 @@ index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c
 +    Client client, [
 +    List<CachedPhoneContact>? phoneContacts,
 +  ]) {
++    if (_cachedSuggestions != null) {
++      return _cachedSuggestions!;
++    }
++
 +    getMergedContacts(client); // Ensure cache is loaded
 +
 +    final bridgedRooms = client.rooms
@@ -32363,9 +32417,11 @@ index 0000000000000000000000000000000000000000..f716c500bf6f59547d12fcbd6cbff13c
 +      }
 +    }
 +
-+    return groups.values
++    final result = groups.values
 +        .where((list) => list.length >= 2)
 +        .toList();
++    _cachedSuggestions = result;
++    return result;
 +  }
 +}
 diff --git a/lib/utils/beeper_phone_contacts.dart b/lib/utils/beeper_phone_contacts.dart
