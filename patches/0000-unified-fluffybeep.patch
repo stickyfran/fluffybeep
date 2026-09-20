@@ -4834,7 +4834,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..ea4c24c1b476f5e15ad86037be1e3eda
            minLines: 2,
            maxLines: 4,
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd4386ea6b 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332737e8c39 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -5267,7 +5267,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,38 +567,61 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,76 +567,268 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
@@ -5343,12 +5343,30 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
 -        scrollToEventId(readMarkerEventId, highlightEvent: false);
 -        return;
 -      } else if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1) {
-+      if (readMarkerEventId.isNotEmpty && (readMarkerEventIndex > 1 || readMarkerEventIndex == -1) && !lastIsMe) {
++      if (readMarkerEventId.isNotEmpty && (readMarkerEventIndex > 2 || readMarkerEventIndex == -1) && !lastIsMe) {
          _showScrollUpMaterialBanner(readMarkerEventId);
++        WidgetsBinding.instance.addPostFrameCallback((_) {
++          if (mounted && readMarkerEventId.isNotEmpty) {
++            scrollToEventId(readMarkerEventId, highlightEvent: false);
++          }
++        });
++      } else {
++        scrollUpBannerEventId = null;
++        WidgetsBinding.instance.addPostFrameCallback((_) {
++          if (mounted && scrollController.hasClients) {
++            if (scrollController.position.pixels != 0) {
++              scrollController.jumpTo(0.0);
++            }
++            _updateScrollController();
++          }
++        });
++        // Mark room as read on first visit if requirements are fulfilled and messages fit on screen
++        setReadMarker();
        }
  
-@@ -486,36 +630,191 @@ class ChatController extends State<ChatPageWithRoom>
- 
+-      // Mark room as read on first visit if requirements are fulfilled
+-      setReadMarker();
+-
        if (!mounted) return;
      } catch (e, s) {
 +      if (!mounted) rethrow;
@@ -5360,12 +5378,12 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
 -  String? scrollUpBannerEventId;
 +  final ValueNotifier<String?> scrollUpBannerEventIdNotifier =
 +      ValueNotifier<String?>(null);
- 
--  void discardScrollUpBannerEventId() => setState(() {
++
 +  String? get scrollUpBannerEventId => scrollUpBannerEventIdNotifier.value;
 +  set scrollUpBannerEventId(String? value) =>
 +      scrollUpBannerEventIdNotifier.value = value;
-+
+ 
+-  void discardScrollUpBannerEventId() => setState(() {
 +  void discardScrollUpBannerEventId() {
      scrollUpBannerEventId = null;
 -  });
@@ -5549,7 +5567,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +823,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +837,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -5557,7 +5575,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +831,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +845,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -5576,7 +5594,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +858,217 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +872,217 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -5844,7 +5862,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      super.dispose();
    }
  
-@@ -679,6 +1107,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1121,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -5855,7 +5873,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,11 +1128,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,11 +1142,13 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -5874,7 +5892,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
  
      // ignore: unawaited_futures
      room.sendTextEvent(
-@@ -710,48 +1144,81 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,48 +1158,81 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -5982,7 +6000,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void> openCameraAction() async {
-@@ -760,16 +1227,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -760,16 +1241,7 @@ class ChatController extends State<ChatPageWithRoom>
      if (file == null) return;
      if (!mounted) return;
  
@@ -6000,7 +6018,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void> _handleClipboardFilePasteWeb(web.Event event) async {
-@@ -803,32 +1261,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -803,32 +1275,14 @@ class ChatController extends State<ChatPageWithRoom>
      if (xFiles == null || xFiles.isEmpty) return;
  
      if (!mounted) return;
@@ -6035,7 +6053,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
        return;
      }
      final image = await Pasteboard.image;
-@@ -865,16 +1305,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -865,16 +1319,7 @@ class ChatController extends State<ChatPageWithRoom>
      if (file == null) return;
      if (!mounted) return;
  
@@ -6053,7 +6071,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void> onVoiceMessageSend(
-@@ -883,60 +1314,206 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1328,206 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -6301,7 +6319,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1522,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1536,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -6316,7 +6334,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      }
    }
  
-@@ -964,21 +1541,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1555,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -6349,7 +6367,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1585,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1599,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -6362,7 +6380,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1602,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1616,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -6371,7 +6389,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1659,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1673,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -6384,7 +6402,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1713,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1727,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -6438,7 +6456,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1769,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,14 +1783,12 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -6456,7 +6474,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1871,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1262,10 +1885,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -6470,7 +6488,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1903,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1917,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -6479,7 +6497,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1969,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1983,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -6494,7 +6512,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +2006,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +2020,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -6504,7 +6522,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +2075,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2089,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -6567,7 +6585,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2124,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2138,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -6578,7 +6596,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
            return;
          }
        }
-@@ -1515,7 +2139,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2153,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -6593,7 +6611,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2157,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2171,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -6602,7 +6620,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2211,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2225,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -6619,7 +6637,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..ac7017fea832196ed931b8279923dbcd
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2298,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2312,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -20838,7 +20856,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..2013afc725f2081c8a1c4c5a9c083e5c
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161cde48b7a 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c690084d6 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -20878,7 +20896,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,286 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,322 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -21049,7 +21067,40 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
          lastEvent != null &&
 -        room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
 -    final space = this.space;
--
++        widget.room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
++    final roomNetwork = BeeperBridgeUtils.getRoomNetwork(widget.room);
++    final space = isBeeperFakeDM ? null : widget.space;
++    final spaceNetwork = space != null ? BeeperBridgeUtils.getRoomNetwork(space!) : null;
++    final isNetworkSpace = spaceNetwork != null ||
++        (space != null && (space!.name.toLowerCase().contains('whatsapp') ||
++                           space!.name.toLowerCase().contains('instagram') ||
++                           space!.name.toLowerCase().contains('telegram')));
++    final showSpaceAvatar = space != null && !isNetworkSpace && roomNetwork == null;
++    final Widget avatarWidget;
++    if (!showSpaceAvatar) {
++      final baseAvatarWidget = Avatar(
++        shapeBorder: widget.room.isSpace
++            ? RoundedSuperellipseBorder(
++                side: BorderSide(
++                  width: 1,
++                  color: theme.dividerColor,
++                ),
++                borderRadius: BorderRadius.circular(
++                  AppConfig.spaceBorderRadius,
++                ),
++              )
++            : null,
++        borderRadius: widget.room.isSpace
++            ? BorderRadius.circular(AppConfig.spaceBorderRadius)
++            : null,
++        mxContent: mxContent,
++        size: Avatar.defaultSize,
++        name: displayname,
++        presenceUserId: roomNetwork == null ? directChatMatrixId : null,
++        presenceBackgroundColor: backgroundColor,
++        onTap: () => widget.onLongPress?.call(context),
++      );
+ 
 -    return Padding(
 -      padding: const EdgeInsets.symmetric(horizontal: 8),
 -      child: Material(
@@ -21139,34 +21190,36 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
 -                            presenceBackgroundColor: backgroundColor,
 -                            onTap: () => onLongPress?.call(context),
 -                          ),
-+        widget.room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
-+    final space = isBeeperFakeDM ? null : widget.space;
-+    final mxContent = beeperData.avatarUrl;
-+    final showSpaceAvatar = space != null && BeeperBridgeUtils.getRoomNetwork(space!) == null;
-+    final Widget avatarWidget;
-+    if (!showSpaceAvatar) {
-+      avatarWidget = Avatar(
-+        shapeBorder: widget.room.isSpace
-+            ? RoundedSuperellipseBorder(
-+                side: BorderSide(
-+                  width: 1,
-+                  color: theme.dividerColor,
++      if (roomNetwork != null) {
++        avatarWidget = SizedBox(
++          width: Avatar.defaultSize,
++          height: Avatar.defaultSize,
++          child: Stack(
++            clipBehavior: Clip.none,
++            children: [
++              baseAvatarWidget,
++              Positioned(
++                bottom: -2,
++                right: -2,
++                child: Container(
++                  width: 10,
++                  height: 10,
++                  decoration: BoxDecoration(
++                    shape: BoxShape.circle,
++                    color: Color(roomNetwork.colorHex),
++                    border: Border.all(
++                      color: backgroundColor ?? theme.colorScheme.surface,
++                      width: 1.5,
++                    ),
++                  ),
 +                ),
-+                borderRadius: BorderRadius.circular(
-+                  AppConfig.spaceBorderRadius,
-+                ),
-+              )
-+            : null,
-+        borderRadius: widget.room.isSpace
-+            ? BorderRadius.circular(AppConfig.spaceBorderRadius)
-+            : null,
-+        mxContent: mxContent,
-+        size: Avatar.defaultSize,
-+        name: displayname,
-+        presenceUserId: directChatMatrixId,
-+        presenceBackgroundColor: backgroundColor,
-+        onTap: () => widget.onLongPress?.call(context),
-+      );
++              ),
++            ],
++          ),
++        );
++      } else {
++        avatarWidget = baseAvatarWidget;
++      }
 +    } else {
 +      avatarWidget = SizedBox(
 +        width: Avatar.defaultSize,
@@ -21289,7 +21342,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +337,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +373,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -21298,7 +21351,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +348,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +384,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -21307,7 +21360,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +359,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +395,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -21346,7 +21399,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +376,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +412,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -21369,7 +21422,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +404,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +440,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -21378,7 +21431,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +422,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +458,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -21392,7 +21445,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +435,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +471,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -21418,7 +21471,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..51a6381c0e6b1f2d1c00bd4a0ff15161
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,69 +449,177 @@ class ChatListItem extends StatelessWidget {
+@@ -336,69 +485,177 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
@@ -22099,7 +22152,7 @@ index 0000000000000000000000000000000000000000..66565158498a0d4f25c068b729b214df
 +}
 diff --git a/lib/pages/chat_list/merged_contact_list_item.dart b/lib/pages/chat_list/merged_contact_list_item.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..111d46e6b27627bb900e7643bc5f4bb18835bf03
+index 0000000000000000000000000000000000000000..9df1e1bf1c08622f2171c3fa629965fd1ed84f98
 --- /dev/null
 +++ b/lib/pages/chat_list/merged_contact_list_item.dart
 @@ -0,0 +1,281 @@
@@ -22364,7 +22417,7 @@ index 0000000000000000000000000000000000000000..111d46e6b27627bb900e7643bc5f4bb1
 +    return Row(
 +      mainAxisSize: MainAxisSize.min,
 +      crossAxisAlignment: CrossAxisAlignment.center,
-+      children: networks.take(3).map((net) {
++      children: networks.take(5).map((net) {
 +        final isActive = net.key == activeNetworkKey;
 +        final size = isActive ? 10.0 : 6.5;
 +        return Container(
@@ -29714,10 +29767,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be277740268429699173
+index 0000000000000000000000000000000000000000..ae0cd101c1fc4731636b036857c644ac577e3d50
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1612 @@
+@@ -0,0 +1,1639 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -30038,12 +30091,18 @@ index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be2777402684
 +          final localpart = mxid.split(':').first.toLowerCase();
 +          if (localpart.startsWith('@')) {
 +            final rawPrefix = localpart.substring(1).replaceFirst(RegExp(r'^_+'), '');
-+            for (final netEntry in networkMap.entries) {
-+              if (rawPrefix.startsWith('${netEntry.key}_') ||
-+                  rawPrefix == '${netEntry.key}bot' ||
-+                  rawPrefix.startsWith(netEntry.key)) {
-+                networkKey = getBaseNetworkKey(netEntry.key);
-+                break;
++            if (rawPrefix.startsWith('ig_') || rawPrefix == 'igbot' || rawPrefix.startsWith('ig')) {
++              networkKey = 'instagram';
++            } else if (rawPrefix.startsWith('wa_') || rawPrefix == 'wabot' || rawPrefix.startsWith('wa')) {
++              networkKey = 'whatsapp';
++            } else {
++              for (final netEntry in networkMap.entries) {
++                if (rawPrefix.startsWith('${netEntry.key}_') ||
++                    rawPrefix == '${netEntry.key}bot' ||
++                    rawPrefix.startsWith(netEntry.key)) {
++                  networkKey = getBaseNetworkKey(netEntry.key);
++                  break;
++                }
 +              }
 +            }
 +          }
@@ -30164,12 +30223,18 @@ index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be2777402684
 +        final localpart = directId.split(':').first.toLowerCase();
 +        if (localpart.startsWith('@')) {
 +          final rawPrefix = localpart.substring(1).replaceFirst(RegExp(r'^_+'), '');
-+          for (final netEntry in networkMap.entries) {
-+            if (rawPrefix.startsWith('${netEntry.key}_') ||
-+                rawPrefix == '${netEntry.key}bot' ||
-+                rawPrefix.startsWith(netEntry.key)) {
-+              networkKey = getBaseNetworkKey(netEntry.key);
-+              break;
++          if (rawPrefix.startsWith('ig_') || rawPrefix == 'igbot' || rawPrefix.startsWith('ig')) {
++            networkKey = 'instagram';
++          } else if (rawPrefix.startsWith('wa_') || rawPrefix == 'wabot' || rawPrefix.startsWith('wa')) {
++            networkKey = 'whatsapp';
++          } else {
++            for (final netEntry in networkMap.entries) {
++              if (rawPrefix.startsWith('${netEntry.key}_') ||
++                  rawPrefix == '${netEntry.key}bot' ||
++                  rawPrefix.startsWith(netEntry.key)) {
++                networkKey = getBaseNetworkKey(netEntry.key);
++                break;
++              }
 +            }
 +          }
 +        }
@@ -30205,6 +30270,17 @@ index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be2777402684
 +          }
 +        }
 +        if (networkKey != null) break;
++      }
++    }
++
++    if (networkKey == null) {
++      if (BeeperMergeUtils.getCustomInstagramHandle(room.id) != null ||
++          extractInstagramDetails(room).username != null ||
++          extractInstagramDetails(room).numericId != null) {
++        networkKey = 'instagram';
++      } else if (BeeperMergeUtils.getCustomWhatsAppPhone(room.id) != null ||
++          extractWhatsAppPhone(room) != null) {
++        networkKey = 'whatsapp';
 +      }
 +    }
 +
@@ -30286,8 +30362,10 @@ index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be2777402684
 +  static const Map<String, BeeperNetSpec> networkMap = {
 +    'whatsapp': BeeperNetSpec('WhatsApp', 0xFF25D366),
 +    'whatsappgo': BeeperNetSpec('WhatsApp', 0xFF25D366),
++    'wa': BeeperNetSpec('WhatsApp', 0xFF25D366),
 +    'instagram': BeeperNetSpec('Instagram', 0xFFE1306C),
 +    'instagramgo': BeeperNetSpec('Instagram', 0xFFE1306C),
++    'ig': BeeperNetSpec('Instagram', 0xFFE1306C),
 +    'telegram': BeeperNetSpec('Telegram', 0xFF2AABEE),
 +    'telegramgo': BeeperNetSpec('Telegram', 0xFF2AABEE),
 +    'signal': BeeperNetSpec('Signal', 0xFF3A76F0),
@@ -30303,6 +30381,8 @@ index 0000000000000000000000000000000000000000..26ae4cb42b26c26df039be2777402684
 +  };
 +
 +  static String getBaseNetworkKey(String key) {
++    if (key == 'wa') return 'whatsapp';
++    if (key == 'ig') return 'instagram';
 +    if (key.endsWith('go')) {
 +      return key.substring(0, key.length - 2);
 +    }
@@ -37250,7 +37330,7 @@ index 903cc7fea791578cd261dc184b6d741e330dca91..a44d94b723ef1496228a30fc2da4e2fe
 +  }
  }
 diff --git a/lib/widgets/avatar.dart b/lib/widgets/avatar.dart
-index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..8588868c4c6d7a73d77accc4c42bb0920bd1cbec 100644
+index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..78bdbf4f0da9d4dab047186a4e8003156d287920 100644
 --- a/lib/widgets/avatar.dart
 +++ b/lib/widgets/avatar.dart
 @@ -3,6 +3,8 @@
@@ -37385,9 +37465,22 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..8588868c4c6d7a73d77accc4c42bb092
            ),
          ),
          if (presenceUserId != null)
-@@ -132,8 +148,8 @@ class Avatar extends StatelessWidget {
-                   ? Colors.orange
-                   : Colors.grey;
+@@ -121,19 +137,15 @@ class Avatar extends StatelessWidget {
+             client: client,
+             userId: presenceUserId,
+             builder: (context, presence) {
+-              if (presence == null ||
+-                  (presence.presence == PresenceType.offline &&
+-                      presence.lastActiveTimestamp == null)) {
++              if (presence == null || presence.presence == PresenceType.offline) {
+                 return const SizedBox.shrink();
+               }
+               final dotColor = presence.presence.isOnline
+                   ? Colors.green
+-                  : presence.presence.isUnavailable
+-                  ? Colors.orange
+-                  : Colors.grey;
++                  : Colors.orange;
                return Positioned(
 -                bottom: -3,
 -                right: -3,
@@ -37396,7 +37489,7 @@ index 68963ff4c05a6ed5fb1a9bbc68fedfeb90434121..8588868c4c6d7a73d77accc4c42bb092
                  child: Container(
                    width: 16,
                    height: 16,
-@@ -161,6 +177,9 @@ class Avatar extends StatelessWidget {
+@@ -161,6 +173,9 @@ class Avatar extends StatelessWidget {
        ],
      );
      if (onTap == null) return container;
