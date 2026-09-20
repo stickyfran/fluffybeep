@@ -20856,7 +20856,7 @@ index e518661dbc1025bc9c70f570a758dbec67e7aa8c..2013afc725f2081c8a1c4c5a9c083e5c
 -  Size get preferredSize => const Size.fromHeight(56);
  }
 diff --git a/lib/pages/chat_list/chat_list_item.dart b/lib/pages/chat_list/chat_list_item.dart
-index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c690084d6 100644
+index 01e93717dcb7fbac921d4eb9846c315badd80834..b6be5b92e6539362ebe1cefc2d8271b7f944cc7d 100644
 --- a/lib/pages/chat_list/chat_list_item.dart
 +++ b/lib/pages/chat_list/chat_list_item.dart
 @@ -8,18 +8,23 @@ import 'package:fluffychat/l10n/l10n.dart';
@@ -20896,7 +20896,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
  
    const ChatListItem(
      this.room, {
-@@ -36,151 +42,322 @@ class ChatListItem extends StatelessWidget {
+@@ -36,151 +42,323 @@ class ChatListItem extends StatelessWidget {
      this.onForget,
      this.filter,
      this.space,
@@ -21076,6 +21076,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
 +                           space!.name.toLowerCase().contains('instagram') ||
 +                           space!.name.toLowerCase().contains('telegram')));
 +    final showSpaceAvatar = space != null && !isNetworkSpace && roomNetwork == null;
++    final mxContent = beeperData.avatarUrl;
 +    final Widget avatarWidget;
 +    if (!showSpaceAvatar) {
 +      final baseAvatarWidget = Avatar(
@@ -21342,7 +21343,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                title: Row(
                  children: <Widget>[
                    Expanded(
-@@ -196,7 +373,7 @@ class ChatListItem extends StatelessWidget {
+@@ -196,7 +374,7 @@ class ChatListItem extends StatelessWidget {
                        padding: EdgeInsets.only(left: 4.0),
                        child: Icon(Icons.notifications_off_outlined, size: 16),
                      ),
@@ -21351,7 +21352,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -207,7 +384,7 @@ class ChatListItem extends StatelessWidget {
+@@ -207,7 +385,7 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -21360,7 +21361,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                      Padding(
                        padding: EdgeInsets.only(
                          right: hasNotifications ? 4.0 : 0.0,
-@@ -218,35 +395,15 @@ class ChatListItem extends StatelessWidget {
+@@ -218,35 +396,15 @@ class ChatListItem extends StatelessWidget {
                          color: theme.colorScheme.primary,
                        ),
                      ),
@@ -21399,7 +21400,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                      const SizedBox(
                        width: 16,
                        height: 16,
-@@ -255,15 +412,19 @@ class ChatListItem extends StatelessWidget {
+@@ -255,15 +413,19 @@ class ChatListItem extends StatelessWidget {
                      const SizedBox(width: 4),
                    ],
                    AnimatedSize(
@@ -21422,7 +21423,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                                RelationshipTypes.thread
                          ? Container(
                              decoration: BoxDecoration(
-@@ -279,7 +440,7 @@ class ChatListItem extends StatelessWidget {
+@@ -279,7 +441,7 @@ class ChatListItem extends StatelessWidget {
                              ),
                              margin: const EdgeInsets.only(right: 4.0),
                              child: Row(
@@ -21431,7 +21432,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                                children: [
                                  Icon(
                                    Icons.message_outlined,
-@@ -297,11 +458,11 @@ class ChatListItem extends StatelessWidget {
+@@ -297,11 +459,11 @@ class ChatListItem extends StatelessWidget {
                          : const SizedBox.shrink(),
                    ),
                    Expanded(
@@ -21445,7 +21446,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                            )
                          : typingText.isNotEmpty
                          ? Text(
-@@ -310,23 +471,11 @@ class ChatListItem extends StatelessWidget {
+@@ -310,23 +472,11 @@ class ChatListItem extends StatelessWidget {
                              maxLines: 1,
                              softWrap: false,
                            )
@@ -21471,7 +21472,7 @@ index 01e93717dcb7fbac921d4eb9846c315badd80834..0325d2f6311172339921379d13459b8c
                              initialData: lastEvent?.calcLocalizedBodyFallback(
                                MatrixLocals(L10n.of(context)),
                                hideReply: true,
-@@ -336,69 +485,177 @@ class ChatListItem extends StatelessWidget {
+@@ -336,69 +486,177 @@ class ChatListItem extends StatelessWidget {
                                withSenderNamePrefix:
                                    (!isDirectChat ||
                                    directChatMatrixId !=
