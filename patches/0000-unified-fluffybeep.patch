@@ -4834,7 +4834,7 @@ index 91939e96a5147247a7f293f166c58f3e7384ab5e..ea4c24c1b476f5e15ad86037be1e3eda
            minLines: 2,
            maxLines: 4,
 diff --git a/lib/pages/chat/chat.dart b/lib/pages/chat/chat.dart
-index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332737e8c39 100644
+index cf82ac748a7a715de21bbea47aecd191713a5d1d..97fe9210d42473feb33443790b62f6b0a0666774 100644
 --- a/lib/pages/chat/chat.dart
 +++ b/lib/pages/chat/chat.dart
 @@ -5,6 +5,7 @@
@@ -5063,15 +5063,15 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
 +  final ValueNotifier<Event?> replyEventNotifier = ValueNotifier(null);
 +  Event? get replyEvent => replyEventNotifier.value;
 +  set replyEvent(Event? val) => replyEventNotifier.value = val;
- 
--  Event? editEvent;
++
 +  final ValueNotifier<Event?> editEventNotifier = ValueNotifier(null);
 +  Event? get editEvent => editEventNotifier.value;
 +  set editEvent(Event? val) => editEventNotifier.value = val;
  
--  bool _scrolledUp = false;
+-  Event? editEvent;
 +  final ValueNotifier<int> timelineUpdateNotifier = ValueNotifier<int>(0);
-+
+ 
+-  bool _scrolledUp = false;
 +  final ValueNotifier<bool> scrolledUpNotifier = ValueNotifier<bool>(false);
 +  bool get _scrolledUp => scrolledUpNotifier.value;
 +  set _scrolledUp(bool value) => scrolledUpNotifier.value = value;
@@ -5267,7 +5267,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void> _tryLoadTimeline() async {
-@@ -446,76 +567,268 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -446,76 +567,270 @@ class ChatController extends State<ChatPageWithRoom>
      loadTimelineFuture = _getTimeline();
      try {
        await loadTimelineFuture;
@@ -5343,13 +5343,15 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
 -        scrollToEventId(readMarkerEventId, highlightEvent: false);
 -        return;
 -      } else if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1) {
-+      if (readMarkerEventId.isNotEmpty && (readMarkerEventIndex > 2 || readMarkerEventIndex == -1) && !lastIsMe) {
-         _showScrollUpMaterialBanner(readMarkerEventId);
++      if (readMarkerEventId.isNotEmpty && readMarkerEventIndex > 2 && !lastIsMe) {
++        _showScrollUpMaterialBanner(readMarkerEventId);
 +        WidgetsBinding.instance.addPostFrameCallback((_) {
 +          if (mounted && readMarkerEventId.isNotEmpty) {
 +            scrollToEventId(readMarkerEventId, highlightEvent: false);
 +          }
 +        });
++      } else if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1 && !lastIsMe) {
+         _showScrollUpMaterialBanner(readMarkerEventId);
 +      } else {
 +        scrollUpBannerEventId = null;
 +        WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -5567,7 +5569,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void>? loadTimelineFuture;
-@@ -524,6 +837,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -524,6 +839,7 @@ class ChatController extends State<ChatPageWithRoom>
      final matrix = Matrix.of(context);
      await matrix.client.roomsLoading;
      await matrix.client.accountDataLoading;
@@ -5575,7 +5577,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      if (eventContextId != null &&
          (!eventContextId.isValidMatrixIdStrict() ||
              eventContextId.sigil != '\$')) {
-@@ -531,13 +845,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -531,13 +847,11 @@ class ChatController extends State<ChatPageWithRoom>
      }
      try {
        timeline?.cancelSubscriptions();
@@ -5594,7 +5596,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      } catch (e, s) {
        Logs().w('Unable to load timeline on event ID $eventContextId', e, s);
        if (!mounted) return;
-@@ -560,87 +872,217 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -560,87 +874,217 @@ class ChatController extends State<ChatPageWithRoom>
      if (state != AppLifecycleState.resumed) return;
      if (!mounted) return;
      setReadMarker();
@@ -5862,7 +5864,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      super.dispose();
    }
  
-@@ -679,6 +1121,10 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -679,6 +1123,10 @@ class ChatController extends State<ChatPageWithRoom>
      _storeInputTimeoutTimer?.cancel();
      final prefs = Matrix.of(context).store;
      prefs.remove('draft_$roomId');
@@ -5873,7 +5875,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      var parseCommands = true;
  
      final commandMatch = RegExp(r'^\/(\w+)').firstMatch(sendController.text);
-@@ -696,11 +1142,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -696,11 +1144,13 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands = false;
      }
  
@@ -5892,7 +5894,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
  
      // ignore: unawaited_futures
      room.sendTextEvent(
-@@ -710,48 +1158,81 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -710,48 +1160,81 @@ class ChatController extends State<ChatPageWithRoom>
        parseCommands: parseCommands,
        threadRootEventId: activeThreadId,
      );
@@ -6000,7 +6002,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void> openCameraAction() async {
-@@ -760,16 +1241,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -760,16 +1243,7 @@ class ChatController extends State<ChatPageWithRoom>
      if (file == null) return;
      if (!mounted) return;
  
@@ -6018,7 +6020,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void> _handleClipboardFilePasteWeb(web.Event event) async {
-@@ -803,32 +1275,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -803,32 +1277,14 @@ class ChatController extends State<ChatPageWithRoom>
      if (xFiles == null || xFiles.isEmpty) return;
  
      if (!mounted) return;
@@ -6053,7 +6055,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
        return;
      }
      final image = await Pasteboard.image;
-@@ -865,16 +1319,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -865,16 +1321,7 @@ class ChatController extends State<ChatPageWithRoom>
      if (file == null) return;
      if (!mounted) return;
  
@@ -6071,7 +6073,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void> onVoiceMessageSend(
-@@ -883,60 +1328,206 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -883,60 +1330,206 @@ class ChatController extends State<ChatPageWithRoom>
      List<int> waveform,
      String fileName,
    ) async {
@@ -6319,7 +6321,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    void emojiPickerAction() {
-@@ -945,12 +1536,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -945,12 +1538,12 @@ class ChatController extends State<ChatPageWithRoom>
      } else {
        inputFocus.unfocus();
      }
@@ -6334,7 +6336,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      }
    }
  
-@@ -964,21 +1555,26 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -964,21 +1557,26 @@ class ChatController extends State<ChatPageWithRoom>
    String _getSelectedEventString() {
      var copyString = '';
      if (selectedEvents.length == 1) {
@@ -6367,7 +6369,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    Future<void> reportEventAction() async {
-@@ -1003,10 +1599,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1003,10 +1601,8 @@ class ChatController extends State<ChatPageWithRoom>
      );
      if (result.error != null) return;
      if (!mounted) return;
@@ -6380,7 +6382,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      scaffoldMessenger.showSnackBar(
        SnackBar(content: Text(l10n.contentHasBeenReported)),
      );
-@@ -1022,7 +1616,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1022,7 +1618,7 @@ class ChatController extends State<ChatPageWithRoom>
        for (final event in selectedEvents) {
          await event.cancelSend();
        }
@@ -6389,7 +6391,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      } catch (e, s) {
        if (!mounted) return;
        ErrorReporter(
-@@ -1079,10 +1673,8 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1079,10 +1675,8 @@ class ChatController extends State<ChatPageWithRoom>
          }
        },
      );
@@ -6402,7 +6404,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    List<Client?> get currentRoomBundle {
-@@ -1135,16 +1727,49 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1135,16 +1729,49 @@ class ChatController extends State<ChatPageWithRoom>
        selectedEvents,
      ).map((event) => event.getDisplayEvent(timeline)).toList();
  
@@ -6456,7 +6458,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    }
  
    void sendAgainAction() {
-@@ -1158,14 +1783,12 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1158,20 +1785,19 @@ class ChatController extends State<ChatPageWithRoom>
      for (final e in allEditEvents) {
        e.sendAgain();
      }
@@ -6474,7 +6476,40 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      inputFocus.requestFocus();
    }
  
-@@ -1262,10 +1885,10 @@ class ChatController extends State<ChatPageWithRoom>
+   Future<void> scrollToEventId(
+     String eventId, {
+     bool highlightEvent = true,
++    bool hasRetried = false,
+   }) async {
+     final foundEvent = timeline!.events.firstWhereOrNull(
+       (event) => event.eventId == eventId,
+@@ -1187,6 +1813,10 @@ class ChatController extends State<ChatPageWithRoom>
+               .indexOf(foundEvent);
+ 
+     if (eventIndex == -1) {
++      if (hasRetried) {
++        Logs().w('Event $eventId not found in timeline even after reloadContext');
++        return;
++      }
+       setState(() {
+         timeline = null;
+         _scrolledUp = false;
+@@ -1199,7 +1829,13 @@ class ChatController extends State<ChatPageWithRoom>
+       });
+       await loadTimelineFuture;
+       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+-        scrollToEventId(eventId);
++        if (mounted) {
++          scrollToEventId(
++            eventId,
++            highlightEvent: highlightEvent,
++            hasRetried: true,
++          );
++        }
+       });
+       return;
+     }
+@@ -1262,10 +1898,10 @@ class ChatController extends State<ChatPageWithRoom>
        );
    }
  
@@ -6488,7 +6523,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
  
    void clearSingleSelectedEvent() {
      if (selectedEvents.length <= 1) {
-@@ -1294,7 +1917,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1294,7 +1930,7 @@ class ChatController extends State<ChatPageWithRoom>
              withSenderNamePrefix: false,
              hideReply: true,
            );
@@ -6497,7 +6532,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      });
      inputFocus.requestFocus();
    }
-@@ -1360,11 +1983,11 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1360,11 +1996,11 @@ class ChatController extends State<ChatPageWithRoom>
    void onSelectMessage(Event event) {
      if (!event.redacted) {
        if (selectedEvents.contains(event)) {
@@ -6512,7 +6547,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
          (a, b) => a.originServerTs.compareTo(b.originServerTs),
        );
      }
-@@ -1397,6 +2020,9 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1397,6 +2033,9 @@ class ChatController extends State<ChatPageWithRoom>
      room.client.getConfig();
  
      switch (choice) {
@@ -6522,7 +6557,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
        case AddPopupMenuActions.image:
          sendFileAction(type: FileType.image);
          return;
-@@ -1463,33 +2089,47 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1463,33 +2102,47 @@ class ChatController extends State<ChatPageWithRoom>
    Timer? _storeInputTimeoutTimer;
    static const Duration _storeInputTimeout = Duration(milliseconds: 500);
  
@@ -6585,7 +6620,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
      });
      if (text.endsWith(' ') && Matrix.of(context).hasComplexBundles) {
        final clients = currentRoomBundle;
-@@ -1498,9 +2138,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1498,9 +2151,7 @@ class ChatController extends State<ChatPageWithRoom>
          if ((prefix.isNotEmpty) &&
              text.toLowerCase() == '${prefix.toLowerCase()} ') {
            setSendingClient(client);
@@ -6596,7 +6631,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
            return;
          }
        }
-@@ -1515,7 +2153,13 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1515,7 +2166,13 @@ class ChatController extends State<ChatPageWithRoom>
        });
        typingTimeout ??= Timer(const Duration(seconds: 30), () {
          typingTimeout = null;
@@ -6611,7 +6646,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
        });
        if (!currentlyTyping) {
          currentlyTyping = true;
-@@ -1527,8 +2171,6 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1527,8 +2184,6 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -6620,7 +6655,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
    bool get isArchived =>
        {Membership.leave, Membership.ban}.contains(room.membership);
  
-@@ -1583,14 +2225,14 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1583,14 +2238,14 @@ class ChatController extends State<ChatPageWithRoom>
      }
    }
  
@@ -6637,7 +6672,7 @@ index cf82ac748a7a715de21bbea47aecd191713a5d1d..240184666545b9d0c7c7f10e92965332
  
    Future<void> _cancelEditWithConfirmation() async {
      final originalText = editEvent!
-@@ -1670,6 +2312,7 @@ class ChatController extends State<ChatPageWithRoom>
+@@ -1670,6 +2325,7 @@ class ChatController extends State<ChatPageWithRoom>
  }
  
  enum AddPopupMenuActions {
@@ -29768,10 +29803,10 @@ index 0000000000000000000000000000000000000000..f23e48fe29044de44b4b54bc69f06c91
 +}
 diff --git a/lib/utils/beeper_bridge_utils.dart b/lib/utils/beeper_bridge_utils.dart
 new file mode 100644
-index 0000000000000000000000000000000000000000..ae0cd101c1fc4731636b036857c644ac577e3d50
+index 0000000000000000000000000000000000000000..e53e758f2920b6afd3c2af8fbca8056dc5d0450f
 --- /dev/null
 +++ b/lib/utils/beeper_bridge_utils.dart
-@@ -0,0 +1,1639 @@
+@@ -0,0 +1,1646 @@
 +import 'dart:collection';
 +import 'dart:typed_data';
 +
@@ -30275,12 +30310,11 @@ index 0000000000000000000000000000000000000000..ae0cd101c1fc4731636b036857c644ac
 +    }
 +
 +    if (networkKey == null) {
-+      if (BeeperMergeUtils.getCustomInstagramHandle(room.id) != null ||
-+          extractInstagramDetails(room).username != null ||
-+          extractInstagramDetails(room).numericId != null) {
++      final customIg = BeeperMergeUtils.getCustomInstagramHandle(room.id);
++      final customWa = BeeperMergeUtils.getCustomWhatsAppPhone(room.id);
++      if (customIg != null && customIg.isNotEmpty) {
 +        networkKey = 'instagram';
-+      } else if (BeeperMergeUtils.getCustomWhatsAppPhone(room.id) != null ||
-+          extractWhatsAppPhone(room) != null) {
++      } else if (customWa != null && customWa.isNotEmpty) {
 +        networkKey = 'whatsapp';
 +      }
 +    }
@@ -30392,6 +30426,14 @@ index 0000000000000000000000000000000000000000..ae0cd101c1fc4731636b036857c644ac
 +
 +  static BeeperNetwork? getRoomNetwork(Room room) {
 +    var key = getRoomData(room).networkKey;
++    if (key == null) {
++      if (extractInstagramDetails(room).username != null ||
++          extractInstagramDetails(room).numericId != null) {
++        key = 'instagram';
++      } else if (extractWhatsAppPhone(room) != null) {
++        key = 'whatsapp';
++      }
++    }
 +    if (key == null) return null;
 +    key = getBaseNetworkKey(key);
 +    if (!networkMap.containsKey(key)) return null;
@@ -30776,11 +30818,11 @@ index 0000000000000000000000000000000000000000..ae0cd101c1fc4731636b036857c644ac
 +      }
 +    }
 +
-+    // 6. Extract numeric ID or handle from participant MXIDs
++    // 6. Extract numeric ID or handle from candidate MXIDs
 +    final candidateMxids = <String>[
 +      if (room.directChatMatrixID != null) room.directChatMatrixID!,
-+      if (getRoomData(room).contactId != null) getRoomData(room).contactId!,
-+      ...room.getParticipants().map((p) => p.id),
++      if ((_roomDataCache[room.id]?.contactId ?? getCachedContactId(room.id)) != null)
++        (_roomDataCache[room.id]?.contactId ?? getCachedContactId(room.id))!,
 +      room.id,
 +    ];
 +
